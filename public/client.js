@@ -191,7 +191,16 @@
     const hp = $('heroPilot');
     hp.style.setProperty('--pc', P.accent);
     hp.innerHTML = `<b>${P.name}<small>「${P.code}」${P.title}</small></b><i>“${P.line}”</i>`;
-    if (R3.preview($('preview'), { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: P.id })) PV_OK = true;
+    $('stagePortrait').innerHTML = GP.portrait(P);
+    $('garageStage').style.setProperty('--pc', P.accent);
+    $('stageModes').style.setProperty('--pc', P.accent);
+    mountPreview();
+  }
+  // 3D 展示台跟着当前打开的面板走：整备界面是大展示台，主界面是小圆窗
+  function mountPreview() {
+    const P = S.pilot(profile.pilot);
+    const garage = !$('panel-garage').classList.contains('hidden');
+    if (R3.preview(garage ? $('garageStage') : $('preview'), { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: P.id }, garage)) PV_OK = true;
   }
   let PV_OK = false;
   // ---------------- 驾驶员选择 ----------------
@@ -426,6 +435,7 @@
       btn.onclick = () => {
         for (const x of document.querySelectorAll('.mbtn')) x.classList.toggle('sel', x === btn);
         for (const pnl of document.querySelectorAll('.mpanel')) pnl.classList.toggle('hidden', pnl.id !== 'panel-' + btn.dataset.panel);
+        mountPreview();
         if (btn.dataset.panel === 'settings') renderSettings();
         sfx.click();
       };
@@ -447,6 +457,10 @@
     addEventListener('pointerdown', () => setTimeout(updateNowPlaying, 150));
     addEventListener('keydown', () => setTimeout(updateNowPlaying, 150));
     renderProfile(); renderWeaponLists(); renderHeads(); renderPilots(); renderSettings();
+    for (const b of document.querySelectorAll('#stageModes button')) b.onclick = () => {
+      for (const o of document.querySelectorAll('#stageModes button')) o.classList.toggle('sel', o === b);
+      R3.previewMode(b.dataset.mode); sfx.click();
+    };
     menuMusic();
     if (!FILE_MODE) fetch('/info').then((r) => r.json()).then((j) => { lanInfo = j; renderRoom(); }).catch(() => {});
     else $('copyBtn').textContent = '复制房间码';

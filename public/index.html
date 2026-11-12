@@ -38,7 +38,7 @@
           <div class="play-hero">
             <div class="hero-art">
               <div id="heroPortrait" class="hero-portrait"></div>
-              <canvas id="preview"></canvas>
+              <div id="preview" class="pv-host"></div>
             </div>
             <div class="hero-txt">
               <div class="hero-pilot" id="heroPilot"></div>
@@ -55,12 +55,20 @@
         </div>
 
         <div class="mpanel hidden" id="panel-garage">
-          <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
-          <h2>驾驶员</h2>
-          <div class="pilot-wrap">
-            <div id="pilotList" class="pilot-list"></div>
+          <div class="showroom">
+            <div class="stage pv-host" id="garageStage">
+              <div class="stage-portrait" id="stagePortrait"></div>
+              <div class="stage-modes" id="stageModes">
+                <button data-mode="auto" class="sel">自动</button><button data-mode="idle">待机</button><button data-mode="walk">行走</button>
+                <button data-mode="fire">开火</button><button data-mode="jump">跳跃</button><button data-mode="wheel">滚轮</button>
+              </div>
+              <div class="stage-hint">⟲ 拖动旋转机兵</div>
+            </div>
             <div id="pilotDetail" class="pilot-detail"></div>
           </div>
+          <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
+          <h2>驾驶员</h2>
+          <div id="pilotList" class="pilot-list"></div>
           <h2>武器</h2>
           <div id="weaponList" class="weapon-list"></div>
           <h2>头部涂装 <small>升级解锁</small></h2>

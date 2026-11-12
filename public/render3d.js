@@ -1420,54 +1420,93 @@
   }
 
   // =====================================================================
-  // 菜单里的机兵展示台（独立的小渲染器）
+  // 菜单里的机兵展示台：一个渲染器 + 一块画布，在主界面和整备界面之间移动
   // =====================================================================
-  const PV = { r: null, scene: null, cam: null, bot: null, key: '', canvas: null, t0: 0, demo: 0 };
-  function preview(canvas, opt) {
+  const PV = { r: null, scene: null, cam: null, bot: null, key: '', canvas: null, host: null, mode: 'auto', yaw: 0, drag: null, big: false, t0: 0 };
+  function pvInit() {
+    if (PV.r) return true;
     if (!T) return false;
     try {
-      if (!PV.r || PV.canvas !== canvas) {
-        if (PV.r) PV.r.dispose();
-        PV.r = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
-        PV.canvas = canvas;
-        PV.scene = new T.Scene();
-        PV.scene.add(new T.HemisphereLight(0xe8ecff, 0x4a3a5a, 1.0));
-        const sun = new T.DirectionalLight(0xffffff, 0.8); sun.position.set(60, 120, 80); PV.scene.add(sun);
-        const ring = new T.Mesh(new T.CylinderGeometry(30, 32, 3, 40), new T.MeshLambertMaterial({ color: 0x2a2440 }));
-        ring.position.y = -1.5; PV.scene.add(ring);
-        const glow = new T.Mesh(new T.RingGeometry(26, 30, 48), new T.MeshBasicMaterial({ color: 0xffdf2e, transparent: true, opacity: 0.7 }));
-        glow.rotation.x = -Math.PI / 2; glow.position.y = 0.1; PV.scene.add(glow); PV.glow = glow;
-        PV.cam = new T.PerspectiveCamera(32, 1, 1, 1000);
-      }
-    } catch (e) { return false; }
+      PV.canvas = document.createElement('canvas');
+      PV.canvas.className = 'pv-canvas';
+      PV.r = new T.WebGLRenderer({ canvas: PV.canvas, antialias: true, alpha: true });
+    } catch (e) { PV.r = null; return false; }
+    PV.r.shadowMap.enabled = true;
+    PV.scene = new T.Scene();
+    PV.scene.add(new T.HemisphereLight(0xe8ecff, 0x4a3a5a, 0.95));
+    const sun = new T.DirectionalLight(0xfff2e0, 0.85); sun.position.set(60, 140, 90); sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 10, far: 400 });
+    PV.scene.add(sun);
+    const back = new T.DirectionalLight(0x8fa8ff, 0.5); back.position.set(-80, 60, -90); PV.scene.add(back);
+    const stage = new T.Mesh(new T.CylinderGeometry(34, 37, 4, 48), new T.MeshLambertMaterial({ color: 0x2a2440 }));
+    stage.position.y = -2; stage.receiveShadow = true; PV.scene.add(stage);
+    const glow = new T.Mesh(new T.RingGeometry(30, 34, 64), new T.MeshBasicMaterial({ color: 0xffdf2e, transparent: true, opacity: 0.8 }));
+    glow.rotation.x = -Math.PI / 2; glow.position.y = 0.1; PV.scene.add(glow); PV.glow = glow;
+    // 地面网格光
+    const grid = new T.Mesh(new T.RingGeometry(8, 29, 48, 3), new T.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.07 }));
+    grid.rotation.x = -Math.PI / 2; grid.position.y = 0.15; PV.scene.add(grid);
+    PV.cam = new T.PerspectiveCamera(30, 1, 1, 1000);
+    // 拖动旋转（鼠标和触屏都用 pointer 事件）
+    const c = PV.canvas;
+    c.style.touchAction = 'none';
+    c.addEventListener('pointerdown', (e) => { PV.drag = { x: e.clientX, yaw: PV.yaw }; try { c.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ } });
+    c.addEventListener('pointermove', (e) => { if (PV.drag) PV.yaw = PV.drag.yaw + (e.clientX - PV.drag.x) * 0.012; });
+    const up = () => { PV.drag = null; };
+    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+    return true;
+  }
+  // host: 承载画布的元素；opt: 机兵外观；big: 大展示台（相机更近）
+  function preview(host, opt, big) {
+    if (!pvInit()) return false;
     shared();
+    if (PV.host !== host) { host.appendChild(PV.canvas); PV.host = host; }
+    PV.big = !!big;
     const key = [opt.color, opt.head, opt.weapon, opt.pilot].join('|');
     if (key !== PV.key) {
       if (PV.bot) PV.scene.remove(PV.bot.root);
       PV.bot = makeBot(opt.color, opt.head, opt.weapon, opt.pilot);
-      PV.scene.add(PV.bot.root);
       PV.bot.wpnType = opt.weapon;
+      PV.bot.root.traverse((o) => { if (o.isMesh && o.castShadow) o.castShadow = true; });
+      PV.scene.add(PV.bot.root);
       PV.key = key;
       PV.glow.material.color.set(opt.color);
     }
-    const w = canvas.clientWidth || canvas.width, h = canvas.clientHeight || canvas.height;
+    pvResize();
+    return true;
+  }
+  function pvResize() {
+    const w = PV.host.clientWidth || 200, h = PV.host.clientHeight || 200;
     PV.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     PV.r.setSize(w, h, false);
     PV.cam.aspect = w / Math.max(1, h); PV.cam.updateProjectionMatrix();
-    PV.cam.position.set(78, 44, 78); PV.cam.lookAt(0, 17, 0);
-    return true;
+    const d = PV.big ? 132 : 104;
+    PV.cam.position.set(d * 0.78, PV.big ? 46 : 44, d * 0.78); PV.cam.lookAt(0, PV.big ? 22 : 17, 0);
+    PV.w = w; PV.h = h;
   }
+  function previewMode(m) { PV.mode = m; PV.t0 = performance.now(); }
   function previewFrame(now, dt) {
-    if (!PV.r || !PV.bot || !PV.canvas.isConnected || PV.canvas.offsetParent === null) return;
+    if (!PV.r || !PV.bot || !PV.host || !PV.canvas.isConnected || PV.canvas.offsetParent === null) return;
+    if (PV.host.clientWidth !== PV.w || PV.host.clientHeight !== PV.h) pvResize();
     const t = now / 1000;
-    // 原地踏步 → 待机，循环展示动作
-    const cyc = t % 8;
-    const walking = cyc < 3.5;
-    const sp = walking ? 120 : 0;
-    const a = t * 0.5;
-    const st = { x: 0, y: 0, z: 0, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: 0, a: a, pt: walking ? 0 : Math.sin(t * 1.3) * 0.25, flags: 1 | (cyc > 5 && cyc < 6.2 ? 16 : 0), charge: 0, tank: 60 + 40 * Math.sin(t), flash: 0, weapon: PV.bot.wpnType || '' };
+    let mode = PV.mode;
+    if (mode === 'auto') mode = ['idle', 'walk', 'fire', 'jump', 'walk', 'wheel'][Math.floor(t / 3.2) % 6];
+    if (!PV.drag) PV.yaw += dt * (PV.mode === 'auto' ? 0.35 : 0.15);
+    const face = PV.yaw + 0.7;
+    const st = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, a: face, pt: 0, flags: 1, charge: 0, tank: 70 + 30 * Math.sin(t), flash: 0, weapon: PV.bot.wpnType || '' };
+    if (mode === 'walk' || mode === 'wheel') { const sp = mode === 'wheel' ? 230 : 140; st.vx = Math.cos(face) * sp; st.vy = Math.sin(face) * sp; if (mode === 'wheel') st.flags |= 2; }
+    if (mode === 'fire') {
+      st.pt = 0.05 + Math.sin(t * 2) * 0.08;
+      if (st.weapon === 'charger') { const c = (t % 1.6) / 1.1; st.charge = c < 1 ? c : 0; }
+      else { const ph = t % 1.2; st.flags |= ph < 0.8 ? 16 : 0; if (st.weapon === 'gatling') st.charge = 1; }
+    }
+    if (mode === 'jump') {
+      // 每 1.6 秒跳一次：z = v·t − g·t²/2
+      const ph = (t % 1.6), T0 = 380 / 980 * 2;
+      if (ph < T0) { st.z = (380 * ph - 490 * ph * ph) * 0.45; st.vz = 380 - 980 * ph; }
+    }
+    PV.bot.body.visible = !(st.flags & 2); PV.bot.wheel.visible = !!(st.flags & 2);
     animateBot(PV.bot, st, now, dt);
-    PV.bot.root.position.set(0, 0, 0);
+    PV.bot.root.position.set(0, st.z, 0);
     PV.r.render(PV.scene, PV.cam);
   }
 
@@ -1609,7 +1648,7 @@
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
-    build, paintCell, burst, setCamera, project, render, clear, show, preview, previewFrame, setQuality,
+    build, paintCell, burst, setCamera, project, render, clear, show, preview, previewFrame, previewMode, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();

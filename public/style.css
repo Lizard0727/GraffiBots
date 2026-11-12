@@ -203,8 +203,27 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .hero-portrait { position: absolute; left: 0; top: 0; width: 230px; height: 300px; border-radius: 18px; overflow: hidden; border: 3px solid #000;
   box-shadow: 6px 6px 0 #000; transform: rotate(-2.5deg); }
 .hero-portrait svg { width: 100%; height: 100%; display: block; }
-.hero-art #preview { position: absolute; right: -10px; bottom: -14px; width: 150px; height: 150px; border-radius: 50%;
+.hero-art #preview { position: absolute; right: -10px; bottom: -14px; width: 150px; height: 150px; border-radius: 50%; overflow: hidden;
   background: radial-gradient(circle, #3a3358, #17142a 72%); border: 3px solid #000; box-shadow: 4px 4px 0 #000; }
+.pv-canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.pv-canvas:active { cursor: grabbing; }
+/* 整备：3D 展示台 */
+.showroom { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 14px; margin-bottom: 14px; }
+.stage { position: relative; height: 380px; border-radius: 16px; overflow: hidden; border: 3px solid #000; box-shadow: 5px 5px 0 #000;
+  background: radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--pc, #ffdf2e) 30%, #2a2346) 0%, #120f20 70%),
+    repeating-linear-gradient(90deg, #ffffff06 0 1px, transparent 1px 40px), repeating-linear-gradient(0deg, #ffffff06 0 1px, transparent 1px 40px); }
+.stage .pv-canvas { position: absolute; inset: 0; }
+.stage-portrait { position: absolute; left: 12px; top: 12px; width: 110px; height: 143px; border-radius: 12px; overflow: hidden; border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000; transform: rotate(-3deg); z-index: 2; pointer-events: none; }
+.stage-portrait svg { width: 100%; height: 100%; display: block; }
+.stage-modes { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 4px; z-index: 2; flex-wrap: wrap; justify-content: center; }
+.stage-modes button { font: inherit; font-size: 12px; font-weight: 700; color: #fff; background: #0009; border: 2px solid #ffffff33; border-radius: 99px; padding: 4px 11px; cursor: pointer; }
+.stage-modes button.sel { background: var(--pc, #ffdf2e); color: #000; border-color: #000; }
+.stage-hint { position: absolute; right: 12px; top: 12px; font-size: 12px; color: #fff9; z-index: 2; pointer-events: none; }
+.pilot-list { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; margin-bottom: 8px; }
+.pilot-list .pcard .pname { padding: 14px 6px 5px; }
+.pilot-list .pcard .pname b { font-size: 14px; }
+@media (max-width: 900px) { .showroom { grid-template-columns: 1fr; } .stage { height: 320px; } .pilot-list { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; } }
 .hero-pilot { display: inline-flex; flex-direction: column; margin-bottom: 10px; padding: 6px 14px 8px; border-radius: 10px;
   background: #0007; border-left: 5px solid var(--pc, var(--accent)); }
 .hero-pilot b { font-size: 24px; letter-spacing: 2px; }
