@@ -806,42 +806,55 @@
   // 机兵模型
   // =====================================================================
   function buildWeapon(g, weapon, color) {
-    const s = SH, cm = lambert(color);
+    const s = SH, cm = toon(color), dk = toon(0x2a2d3a), mt = toon(0x8c94ab);
+    const lt = toon(new T.Color(color).lerp(new T.Color(0xffffff), 0.5));
     const add = (o) => { g.add(o); return o; };
+    const cylX = (m, r, len, x, y, z) => { const o = part(s.cyl, m, r, len, r, x, y, z); o.rotation.z = -Math.PI / 2; return add(o); };
     switch (weapon) {
       case 'blaster':
-        add(part(s.box, s.metal, 18, 6, 6, 5, 0, 0));
-        add(part(s.box, cm, 7, 5, 5, 15, 0, 0));
-        add(part(s.box, s.dark, 4, 7, 3, 0, -5, 0));
+        add(outlined(rbox(15, 6, 6, 2), mt, 1, 1, 1, 5, 0, 0));
+        add(outlined(rbox(7, 5, 5.4, 1.8), cm, 1, 1, 1, 9, 0.4, 0));
+        cylX(dk, 1.6, 7, 16, 0.5, 0); cylX(cm, 2.2, 1.6, 19.5, 0.5, 0);
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        { const can = part(s.cyl, lt, 2.4, 7, 2.4, 3, 5.2, 0); can.rotation.z = Math.PI / 2 - 0.2; add(can); }
         break;
       case 'roller': {
         g.position.z = 4;
-        add(part(s.box, s.metal, 20, 3, 3, 8, -6, -4));
-        const r = add(part(s.cyl, cm, 7, 42, 7, 20, -12, -19)); r.rotation.x = Math.PI / 2;
+        add(part(s.cyl, mt, 1.2, 20, 1.2, 8, -6, -4)).rotation.z = -Math.PI / 2;
+        add(outlined(rbox(4, 4, 4, 1.4), dk, 1, 1, 1, 18, -8, -4));
+        add(part(s.box, mt, 2, 2, 40, 20, -12, -19));
+        const r = add(part(s.cyl, cm, 6.5, 40, 6.5, 22, -12, -19)); r.rotation.x = Math.PI / 2;
+        for (const z of [1.5, -39.5]) { const cap = add(part(s.cyl, dk, 7.2, 1.6, 7.2, 22, -12, z)); cap.rotation.x = Math.PI / 2; }
         g.userData.roller = r;
         break;
       }
       case 'charger':
-        add(part(s.box, s.metal, 40, 4, 4, 14, 0, 0));
-        add(part(s.box, cm, 12, 5, 5, 6, 4, 0));
-        add(part(s.box, s.dark, 5, 8, 3, 0, -5, 0));
-        g.userData.tip = add(part(s.sph, basic(0xffffff, { transparent: true, opacity: 0.9 }), 2, 2, 2, 35, 0, 0));
+        add(outlined(rbox(14, 5, 5, 1.8), cm, 1, 1, 1, 6, 0, 0));
+        cylX(mt, 1.4, 30, 24, 0.5, 0); cylX(dk, 2.1, 2, 38, 0.5, 0);
+        cylX(dk, 1.8, 10, 8, 4.6, 0);                                       // 瞄准镜
+        { const lens = part(s.sph, toon(0x7af0ff, { emissive: 0x1a6070 }), 1.4, 1.4, 1.4, 13.2, 4.6, 0); add(lens); }
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 0, -5, 0));
+        g.userData.tip = add(part(s.sph, basic(0xffffff, { transparent: true, opacity: 0.9 }), 2, 2, 2, 40, 0.5, 0));
         break;
       case 'bucket': {
-        const b = add(new T.Mesh(new T.CylinderGeometry(9, 4, 18, 14, 1, true), new T.MeshLambertMaterial({ color, side: T.DoubleSide })));
+        const b = add(new T.Mesh(new T.CylinderGeometry(9, 5, 18, 16, 1, true), toon(color, { side: T.DoubleSide })));
         b.rotation.z = -Math.PI / 2; b.position.set(12, 0, 0); b.castShadow = true;
-        add(part(s.box, s.metal, 6, 6, 6, 1, 0, 0));
+        const rim = add(new T.Mesh(new T.TorusGeometry(9, 1.1, 6, 18), dk)); rim.rotation.y = Math.PI / 2; rim.position.set(21, 0, 0);
+        add(part(s.cyl, dk, 5.2, 1.4, 5.2, 3, 0, 0)).rotation.z = -Math.PI / 2;
+        add(outlined(rbox(7, 7, 7, 2), mt, 1, 1, 1, 0, 0, 0));
+        { const h = add(new T.Mesh(new T.TorusGeometry(6, 0.7, 5, 12, Math.PI), mt)); h.position.set(12, 0, 0); h.rotation.x = Math.PI / 2; }
         break;
       }
       case 'gatling': {
-        add(part(s.box, s.metal, 12, 14, 12, 1, 0, 0));
+        add(outlined(rbox(13, 13, 12, 3), mt, 1, 1, 1, 1, 0, 0));
+        { const drum = part(s.cyl, cm, 5.5, 7, 5.5, -1, 0, -8.5); drum.rotation.x = Math.PI / 2; add(drum); }
         const sp = new T.Group(); sp.position.set(8, 0, 0); g.add(sp);
-        for (let i = 0; i < 3; i++) {
-          const a = (i / 3) * Math.PI * 2;
-          const br = part(s.cyl, s.dark, 1.8, 22, 1.8, 11, Math.cos(a) * 3.6, Math.sin(a) * 3.6);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2;
+          const br = part(s.cyl, dk, 1.6, 22, 1.6, 11, Math.cos(a) * 3.4, Math.sin(a) * 3.4);
           br.rotation.z = -Math.PI / 2; sp.add(br);
         }
-        const ring = part(s.cyl, cm, 5.5, 3, 5.5, 18, 0, 0); ring.rotation.z = -Math.PI / 2; sp.add(ring);
+        for (const x of [9, 20]) { const ring = part(s.cyl, cm, 5.4, 2, 5.4, x, 0, 0); ring.rotation.z = -Math.PI / 2; sp.add(ring); }
         g.userData.spinner = sp;
         break;
       }
@@ -897,7 +910,50 @@
     TOON_GRAD.needsUpdate = true;
     return TOON_GRAD;
   }
-  const toon = (c, extra) => new T.MeshToonMaterial(Object.assign({ color: c, gradientMap: toonGrad() }, extra));
+  // 卡通材质 + 轮廓光（菲涅尔边缘提亮），让机兵在任何背景下都有清晰的边
+  const RIM = { color: new T.Color(0xcfe0ff), k: 0.55 };
+  function rimCompile(sh) {
+    sh.uniforms.rimC = { value: RIM.color };
+    sh.uniforms.rimK = { value: RIM.k };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 rimC; uniform float rimK;')
+      .replace('#include <output_fragment>', `float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.6);
+        outgoingLight += rimC * rimF * rimK * (0.35 + 0.65 * max(0.0, normal.y + 0.4));
+        #include <output_fragment>`);
+  }
+  const toon = (c, extra) => { const m = new T.MeshToonMaterial(Object.assign({ color: c, gradientMap: toonGrad() }, extra)); m.onBeforeCompile = rimCompile; return m; };
+  // 装甲面板贴图：板缝、铆钉、散热孔（灰度，乘以机兵颜色）
+  let PANEL = null;
+  function panelTex() {
+    if (PANEL) return PANEL;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, 128, 128);
+    const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    x.strokeStyle = 'rgba(30,20,50,0.55)'; x.lineWidth = 2;
+    x.strokeRect(10, 10, 108, 108);
+    x.beginPath(); x.moveTo(10, 64); x.lineTo(50, 64); x.lineTo(58, 56); x.lineTo(118, 56); x.stroke();
+    x.strokeStyle = 'rgba(255,255,255,0.5)'; x.lineWidth = 1;
+    x.strokeRect(12, 12, 104, 104);
+    x.fillStyle = 'rgba(30,20,50,0.5)';
+    for (const [px, py] of [[16, 16], [112, 16], [16, 112], [112, 112]]) { x.beginPath(); x.arc(px, py, 2.4, 0, 7); x.fill(); }
+    for (let k = 0; k < 4; k++) x.fillRect(74, 74 + k * 8, 34, 4);
+    PANEL = new T.CanvasTexture(c);
+    PANEL.anisotropy = 4;
+    return PANEL;
+  }
+  // 机身侧面的驾驶员代号贴花
+  function decalTex(text, color) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    x.fillStyle = '#14101f'; x.beginPath(); x.roundRect ? x.roundRect(8, 8, 112, 112, 22) : x.rect(8, 8, 112, 112); x.fill();
+    x.strokeStyle = '#fff'; x.lineWidth = 6; x.stroke();
+    x.fillStyle = color; x.font = '900 76px "Microsoft YaHei", "PingFang SC", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(text, 64, 70);
+    const t = new T.CanvasTexture(c); t.anisotropy = 4;
+    return t;
+  }
   // 圆角方块：把细分方块的顶点推到「内盒 + 半径」的表面上
   const RB = new Map();
   function rbox(w, h, d, r, seg = 2) {
@@ -973,12 +1029,17 @@
     for (const [mat, bk] of buckets) {
       let n = 0;
       const parts = bk.items.map(([geo, m]) => { const gg = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m); n += gg.attributes.position.count; return gg; });
-      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = mat.map ? new Float32Array(n * 2) : null;
       let o = 0;
-      for (const gg of parts) { pos.set(gg.attributes.position.array, o * 3); nor.set(gg.attributes.normal.array, o * 3); o += gg.attributes.position.count; gg.dispose(); }
+      for (const gg of parts) {
+        pos.set(gg.attributes.position.array, o * 3); nor.set(gg.attributes.normal.array, o * 3);
+        if (uv && gg.attributes.uv) uv.set(gg.attributes.uv.array, o * 2);
+        o += gg.attributes.position.count; gg.dispose();
+      }
       const geo = new T.BufferGeometry();
       geo.setAttribute('position', new T.BufferAttribute(pos, 3));
       geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
+      if (uv) geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
       geo.computeBoundingSphere();
       const mesh = new T.Mesh(geo, mat);
       mesh.castShadow = shadows && bk.shadow && mat !== OUTLINE;
@@ -1071,10 +1132,13 @@
   function makeBot(color, head, weapon, pilotId) {
     const s = SH;
     const root = new T.Group();
-    const bodyMat = toon(color);
-    const tint = toon(new T.Color(color).multiplyScalar(0.62));
+    const bodyMat = toon(color, { map: panelTex() });
+    const tint = toon(new T.Color(color).multiplyScalar(0.62), { map: panelTex() });
     const light = toon(new T.Color(color).lerp(new T.Color(0xffffff), 0.55));
-    const frame = toon(0x3a3e52), joint = toon(0x23252f);
+    const frame = toon(0x3a3e52), joint = toon(0x23252f), steel = toon(0xaab2c8);
+    const glowC = new T.Color(color).lerp(new T.Color(0xffffff), 0.45);
+    const strip = basic(glowC);                     // 发光灯条
+    const P = S.pilot(pilotId);
     const body = dyn(new T.Group()); root.add(body);            // 双足形态（滚轮形态时隐藏）
     const hips = dyn(new T.Group()); body.add(hips);              // 髋部高度随步态 / 悬挂变化
     const lower = dyn(new T.Group()); hips.add(lower);            // 腿部朝向
@@ -1091,9 +1155,13 @@
       knee.add(part(s.sph, joint, 2.1, 2.1, 2.1, 0, 0, 0));
       knee.add(outlined(rbox(4.6, LEG.L2 + 1, 4.4, 1.5), frame, 1, 1, 1, 0, -LEG.L2 / 2, 0));
       knee.add(outlined(rbox(3, 4, 4.8, 1.2), light, 1, 1, 1, 2.4, -1.6, 0));      // 膝盖护甲
+      knee.add(part(s.box, strip, 0.6, LEG.L2 * 0.55, 1.4, 2.45, -LEG.L2 * 0.55, 0));    // 小腿灯条
+      knee.add(part(s.cyl, steel, 0.7, LEG.L2 * 0.8, 0.7, -2.6, -LEG.L2 * 0.45, side * 1.4)); // 液压杆
       const ankle = dyn(new T.Group()); ankle.position.y = -LEG.L2; knee.add(ankle);
       ankle.add(outlined(rbox(10, 3, 6.4, 1.3), tint, 1, 1, 1, 1.4, -0.4, 0));
       ankle.add(part(s.box, joint, 3, 1.2, 6.6, -2.6, -1.4, 0));
+      ankle.add(outlined(rbox(3.2, 2.2, 6.8, 1), light, 1, 1, 1, 6, -0.9, 0));     // 鞋尖
+      hip.add(part(s.cyl, steel, 0.8, LEG.L1 * 0.9, 0.8, 2.6, -LEG.L1 * 0.5, side * 1.6)); // 大腿液压杆
       legs.push({ hip, knee, ankle, side });
     }
     // ---- 上身 ----
@@ -1103,7 +1171,25 @@
     lean.add(outlined(rbox(17, 3, 21, 1.4), tint, 1, 1, 1, 0, 3, 0));             // 腰带
     for (const side of [-1, 1]) {
       const sh = outlined(rbox(9, 7, 6, 2.4), tint, 1, 1, 1, 0, 13, side * 12.5); lean.add(sh);
-      lean.add(part(s.box, s.yellow, 4, 1, 0.6, 2, 14.5, side * 15.6));
+      lean.add(part(s.box, strip, 6, 0.8, 0.6, 0.5, 11, side * 15.6));                  // 肩甲灯条
+      lean.add(part(s.box, s.yellow, 3, 1, 0.6, 2.5, 14.5, side * 15.6));
+      // 侧裙甲
+      const sk = outlined(rbox(10, 5, 2, 1), light, 1, 1, 1, 0.5, 2, side * 10.6); sk.rotation.x = side * 0.12; lean.add(sk);
+      // 机身代号贴花
+      const dm = new T.Mesh(new T.PlaneGeometry(6.4, 6.4), new T.MeshBasicMaterial({ map: decalTex(P.code[0], P.accent), transparent: true }));
+      dm.position.set(-1.5, 9.5, side * 10.15); dm.rotation.y = side > 0 ? 0 : Math.PI; dm.userData.keep = true; lean.add(dm);
+    }
+    // 胸口散热格栅 + 发光眼
+    for (let k = 0; k < 3; k++) lean.add(part(s.box, frame, 0.6, 0.7, 6, 10.6, 5.6 - k * 1.2, 0));
+    lean.add(part(s.box, strip, 0.5, 0.6, 15, 9.3, 12.6, 0));
+    // 背部推进器（空中会喷火）
+    const flames = [];
+    for (const side of [-1, 1]) {
+      const nz = part(s.cyl, frame, 2.6, 4, 2.6, -11, 1.5, side * 4.6); lean.add(nz);
+      lean.add(part(s.cyl, strip, 1.8, 0.6, 1.8, -11, -0.7, side * 4.6));
+      const fl = new T.Mesh(s.cone, new T.MeshBasicMaterial({ color: glowC, transparent: true, opacity: 0.85, blending: T.AdditiveBlending, depthWrite: false }));
+      fl.scale.set(1.8, 7, 1.8); fl.rotation.x = Math.PI; fl.position.set(-11, -4.5, side * 4.6);
+      fl.visible = false; fl.userData.keep = true; lean.add(fl); flames.push(fl);
     }
     // 背后涂料罐（玻璃 + 液位）
     lean.add(outlined(rbox(6, 15, 11, 2.4), frame, 1, 1, 1, -10.5, 9.5, 0));
@@ -1118,6 +1204,9 @@
       new T.MeshPhongMaterial({ color: 0xbdefff, transparent: true, opacity: 0.22, shininess: 120, specular: 0xffffff, depthWrite: false }));
     dome.position.y = 1; dome.userData.keep = true; cockpit.add(dome);
     const rim = new T.Mesh(new T.TorusGeometry(7.7, 0.8, 6, 24), frame); rim.rotation.x = Math.PI / 2; rim.position.y = 1.4; cockpit.add(rim);
+    cockpit.add(part(s.cyl, frame, 0.35, 9, 0.35, -6, 5.5, -5));
+    cockpit.add(part(s.sph, strip, 0.9, 0.9, 0.9, -6, 10.2, -5));
+    for (const z of [-6.4, 6.4]) cockpit.add(part(s.box, strip, 2.2, 0.6, 0.6, 5.2, 1.4, z));
     // 武器臂
     const wpnMount = dyn(new T.Group()); wpnMount.position.set(3, 9, 15.5); lean.add(wpnMount);
     wpnMount.add(part(s.sph, joint, 3, 3, 3, -2, 0, 0));
@@ -1148,7 +1237,7 @@
     for (const g of [lower, lean, wpnMount, wpn, arm, spinG]) bake(g);
     for (const L of legs) { bake(L.hip); bake(L.knee); bake(L.ankle); }
     return {
-      root, body, hips, lower, upper, lean, legs, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
+      root, body, hips, lower, upper, lean, legs, flames, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
       fadeMats: [wheelMat, hubMat, spokeMat, tireMat, treadMat], shield, ud: wpn.userData,
       // 动画状态
       spin: 0, moveA: 0, phase: 0, legYaw: 0, face: null, zs: null, lvx: 0, lvy: 0, avx: 0, avy: 0,
@@ -1253,6 +1342,12 @@
       L.hip.rotation.z = -a; L.knee.rotation.z = kk; L.ankle.rotation.z = a - kk;
     }
     const hipY = air ? legDrop(0.2, 0.4) : maxDrop;
+    // 推进器火焰：上升时喷射，长短随速度闪烁
+    const fOn = air && vz > -60;
+    for (const fl of b.flames) {
+      fl.visible = fOn;
+      if (fOn) { const L = 4 + Math.max(0, vz) / 60 + Math.random() * 2; fl.scale.set(1.6 + Math.random() * 0.4, L, 1.6); fl.position.y = -2.5 - L / 2; }
+    }
     b.hips.position.y = hipY + 0.5 + b.susp + (air ? 0 : Math.sin(now / 520) * 0.25);
     // 上身弹簧倾斜：加速时前倾、刹车时后仰、转弯时侧倾
     const tP = clampN(-aF * 0.00032 - vF * 0.0007, -0.4, 0.4) + b.recoil * -0.16;
