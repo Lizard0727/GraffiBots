@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.graffibots.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.graffibots.app'
+        minSdk 24
+        targetSdk 34
+        versionCode 3
+        versionName '3.0'
+    }
+
+    // 游戏本体就是 public 文件夹：直接打包成 App 的 assets，不用复制
+    sourceSets {
+        main.assets.srcDirs = ['../../public']
+    }
+
+    // 有签名密钥（GitHub Secrets）时用正式签名，否则用调试签名
+    signingConfigs {
+        release {
+            def ks = System.getenv('GB_KEYSTORE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('GB_KEYSTORE_PASS')
+                keyAlias System.getenv('GB_KEY_ALIAS') ?: 'graffibots'
+                keyPassword System.getenv('GB_KEYSTORE_PASS')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('GB_KEYSTORE') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    androidResources {
+        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

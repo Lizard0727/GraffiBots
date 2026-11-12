@@ -1,0 +1,50 @@
+# 在 GitHub 的服务器上用官方 Android SDK 打包「涂鸦机兵」安卓 App（APK）
+# 推送代码或在 Actions 页面点「Run workflow」即可；打包好的 APK 在本次运行页面底部的 Artifacts 里下载。
+name: 打包安卓 App
+
+on:
+  push:
+    branches: [main, master]
+    paths: ['public/**', 'android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # 可选：在仓库 Settings → Secrets 里设置 GB_KEYSTORE_B64 / GB_KEYSTORE_PASS，用固定签名（以后更新可以直接覆盖安装）
+      - name: 准备签名密钥
+        env:
+          KS_B64: ${{ secrets.GB_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "GB_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          fi
+
+      - name: 打包 APK
+        working-directory: android
+        env:
+          GB_KEYSTORE_PASS: ${{ secrets.GB_KEYSTORE_PASS }}
+        run: gradle assembleRelease --no-daemon
+
+      - name: 重命名
+        run: cp android/app/build/outputs/apk/release/app-release.apk 涂鸦机兵-GraffiBots.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 涂鸦机兵-安卓App
+          path: 涂鸦机兵-GraffiBots.apk

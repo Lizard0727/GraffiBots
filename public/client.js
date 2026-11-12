@@ -1709,7 +1709,13 @@
   bindUI();
   setupTouch();
   // 通过网址打开时注册离线缓存（双击本地文件打开时浏览器不支持，自动跳过）
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.GB_SINGLE) navigator.serviceWorker.register('sw.js').catch(() => {});
+  const IN_APP = new URLSearchParams(location.search).has('app');   // 安卓 App 里运行
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.GB_SINGLE && !IN_APP) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // 安卓返回键：对战中打开 / 关闭暂停菜单，菜单里关掉弹窗
+  window.GB_back = () => {
+    if (!$('settingsDlg').classList.contains('hidden')) closeSettings();
+    else if (G && !G.over) openSettings();
+  };
   connect();
   requestAnimationFrame(loop);
 })();
