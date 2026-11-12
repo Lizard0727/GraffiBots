@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>涂鸦机兵 GraffiBots</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <canvas id="game"></canvas>
+
+  <!-- ============ 主界面 ============ -->
+  <section id="title" class="screen menu">
+    <canvas id="menuBg"></canvas>
+    <div class="menu-wrap">
+      <aside class="menu-left">
+        <header class="logo">
+          <h1><span>涂鸦</span>机兵</h1>
+          <p>GRAFFI·BOTS</p>
+        </header>
+        <nav class="menu-nav">
+          <button class="mbtn sel" data-panel="play"><b>开始游戏</b><small>创建或加入房间</small></button>
+          <button class="mbtn" data-panel="garage"><b>机兵整备</b><small>武器 · 涂装 · 代号</small></button>
+          <button class="mbtn" data-panel="guide"><b>玩法说明</b><small>模式 · 操作 · 技巧</small></button>
+          <button class="mbtn" data-panel="settings"><b>设置</b><small>音乐 · 音效 · 画面</small></button>
+        </nav>
+        <div class="me-chip">
+          <canvas id="chipBot" width="96" height="96"></canvas>
+          <div><b id="chipName">机兵</b><div class="lvrow"><span id="lvText">Lv.1</span><small id="xpText"></small></div><div class="bar"><i id="xpBar"></i></div></div>
+        </div>
+        <div id="connStatus" class="conn">正在连接服务器…</div>
+        <div class="nowplay" id="nowPlaying">♪ 点击任意位置开启音乐</div>
+      </aside>
+
+      <main class="menu-right">
+        <div class="mpanel" id="panel-play">
+          <div class="play-hero">
+            <canvas id="preview" width="220" height="220"></canvas>
+            <div class="hero-txt">
+              <h2>4v4 联机涂装对战</h2>
+              <p>和朋友组队，用涂料抢地盘、打比赛。创建房间后把邀请链接发给朋友，空位会由 AI 机兵补上。</p>
+              <div class="stats" id="statsText"></div>
+            </div>
+          </div>
+          <button id="createBtn" class="btn big">创建房间</button>
+          <div class="join">
+            <input id="codeInput" maxlength="4" placeholder="输入房间码" autocomplete="off">
+            <button id="joinBtn" class="btn">加入房间</button>
+          </div>
+        </div>
+
+        <div class="mpanel hidden" id="panel-garage">
+          <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
+          <h2>武器</h2>
+          <div id="weaponList" class="weapon-list"></div>
+          <h2>头部涂装 <small>升级解锁</small></h2>
+          <div id="headList" class="head-list"></div>
+        </div>
+
+        <div class="mpanel hidden" id="panel-guide">
+          <h2>核心玩法</h2>
+          <ul class="tips">
+            <li>第三人称 3D 视角：鼠标转动视角，准星对准哪里就打向哪里。子弹飞出射程后会<b>抛物线下坠</b>，可以抬高枪口打得更远。</li>
+            <li>场地有<b>矮台、高台和高墙</b>：空格跳跃可跳上矮台；滚轮形态跳得更高，能直接跳上高台。平台顶面同样可以涂色。</li>
+            <li>开火会把地面涂成己方颜色。<b>站在己方涂料上</b>按住 <kbd>Shift</kbd> 变成滚轮：移动极快、对敌人隐身，并迅速补充涂料。</li>
+            <li>踩在<b>敌方涂料</b>上会减速并持续掉血，先把脚下涂成自己的颜色再推进。</li>
+            <li>涂地会给<b>大招</b>充能，充满后按 <kbd>Q</kbd> 发动。被击倒会损失一半充能。</li>
+            <li>涂料罐会被射击、炸弹消耗。不开火时自动缓慢恢复，变滚轮潜入己方涂料恢复更快。</li>
+            <li>被击倒的位置会被炸开一片敌方涂料，5 秒后在基地重新部署。</li>
+          </ul>
+          <h2>对战模式</h2>
+          <div id="guideModes" class="guide-modes"></div>
+          <h2>操作</h2>
+          <ul class="controls">
+            <li><kbd>W A S D</kbd>移动　<kbd>鼠标</kbd>转动视角 / 瞄准　<kbd>左键</kbd>开火</li>
+            <li><kbd>空格</kbd>跳跃　<kbd>Shift</kbd>按住变成滚轮　<kbd>← →</kbd>键盘转视角</li>
+            <li><kbd>右键</kbd>/<kbd>E</kbd>喷漆炸弹（消耗 55% 涂料，投向准星位置）</li>
+            <li><kbd>Q</kbd>大招　<kbd>1</kbd>–<kbd>4</kbd>快捷语音　<kbd>Tab</kbd>记分板</li>
+            <li><kbd>Esc</kbd>暂停 / 设置（可调鼠标灵敏度）　<kbd>M</kbd>静音</li>
+          </ul>
+        </div>
+
+        <div class="mpanel hidden" id="panel-settings">
+          <div class="settings-box"></div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============ 房间 ============ -->
+  <section id="room" class="screen hidden">
+    <div class="wrap">
+      <header class="room-head">
+        <div class="codebox"><small>房间码</small><div id="roomCode" class="code">----</div></div>
+        <div class="invite">
+          <div class="inv-row"><input id="inviteLink" readonly><button id="copyBtn" class="btn">复制邀请链接</button></div>
+          <small id="lanHint"></small>
+        </div>
+        <button id="roomSetBtn" class="btn ghost">设置</button>
+        <button id="leaveBtn" class="btn ghost">离开房间</button>
+      </header>
+      <div class="room-grid">
+        <div class="teams">
+          <div class="team" id="team1"><h3><i class="sw"></i><span>α队</span></h3><ul></ul><button class="btn small" data-team="1">加入 α队</button></div>
+          <div class="vs">VS</div>
+          <div class="team" id="team2"><h3><i class="sw"></i><span>β队</span></h3><ul></ul><button class="btn small" data-team="2">加入 β队</button></div>
+        </div>
+        <div class="panel settings">
+          <h2>对战模式</h2>
+          <div id="modeList" class="mode-list"></div>
+          <h2>地图</h2>
+          <div id="mapList" class="map-list"></div>
+          <div class="row">
+            <label>时长
+              <select id="durSel"><option value="120">2 分钟</option><option value="180">3 分钟</option><option value="240">4 分钟</option><option value="300">5 分钟</option></select>
+            </label>
+            <label>每队人数
+              <select id="sizeSel"><option value="1">1v1</option><option value="2">2v2</option><option value="3">3v3</option><option value="4">4v4</option></select>
+            </label>
+            <label class="chk"><input type="checkbox" id="botChk"> AI 机兵补位</label>
+          </div>
+        </div>
+        <div class="panel myload">
+          <h2>我的武器</h2>
+          <div id="roomWeaponList" class="weapon-list compact"></div>
+        </div>
+      </div>
+      <footer class="room-foot">
+        <button id="startBtn" class="btn big">开始对战</button>
+        <span id="waitText"></span>
+      </footer>
+    </div>
+  </section>
+
+  <!-- ============ 结算 ============ -->
+  <section id="results" class="screen overlay hidden">
+    <div class="res">
+      <h1 id="resTitle"></h1>
+      <div id="resSub" class="sub"></div>
+      <div class="turfbar"><i id="resA"></i><i id="resB"></i></div>
+      <div id="resScore" class="score"></div>
+      <table id="resTable"></table>
+      <div id="resXp" class="xp"></div>
+      <button id="resBack" class="btn big">返回房间</button>
+    </div>
+  </section>
+
+  <!-- ============ 设置弹窗 ============ -->
+  <div id="settingsDlg" class="dlg hidden">
+    <div class="dlg-card">
+      <h2>设置</h2>
+      <div class="settings-box"></div>
+      <button class="btn" id="dlgClose">关闭</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <script src="vendor/three.min.js"></script>
+  <script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"><\/script>')</script>
+  <script src="shared.js"></script>
+  <script src="audio.js"></script>
+  <script src="vendor/peerjs.min.js"></script>
+  <script src="core.js"></script>
+  <script src="render3d.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

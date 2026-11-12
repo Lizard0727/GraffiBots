@@ -1,0 +1,794 @@
+// 涂鸦机兵 GraffiBots — Three.js 3D 渲染
+// 坐标约定：游戏 (x, y, z朝上) → three (x, z, y)
+(() => {
+  'use strict';
+  const S = window.GS;
+  const T = window.THREE;
+  const PK = 0.5;              // 涂料贴图分辨率（像素/游戏单位）
+  const PN = 2500;             // 粒子上限
+  let renderer = null, scene = null, camera = null, W = null, failed = false;
+
+  function rng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
+  const lambert = (c, extra) => new T.MeshLambertMaterial(Object.assign({ color: c }, extra));
+  const basic = (c, extra) => new T.MeshBasicMaterial(Object.assign({ color: c }, extra));
+
+  function init() {
+    if (renderer) return true;
+    if (failed || !T) { failed = true; return false; }
+    try {
+      renderer = new T.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, powerPreference: 'high-performance' });
+    } catch (e) { failed = true; console.error(e); return false; }
+    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    camera = new T.PerspectiveCamera(72, 1, 2, 7000);
+    resize();
+    addEventListener('resize', resize);
+    return true;
+  }
+  function resize() {
+    if (!renderer) return;
+    renderer.setSize(innerWidth, innerHeight, false);
+    camera.aspect = innerWidth / Math.max(1, innerHeight);
+    camera.updateProjectionMatrix();
+  }
+  function show(on) { const c = document.getElementById('gl'); if (c) c.style.visibility = on ? 'visible' : 'hidden'; }
+
+  function dispose() {
+    if (!scene) return;
+    const seen = new Set();
+    scene.traverse((o) => {
+      if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+      const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      for (const m of ms) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        for (const k of ['map', 'emissiveMap']) if (m[k] && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
+        m.dispose();
+      }
+    });
+    scene = null; W = null; SH.ok = false;
+  }
+
+  // =====================================================================
+  // 共享几何体 / 材质
+  // =====================================================================
+  const SH = {};
+  function shared() {
+    if (SH.ok) return SH;
+    SH.ok = true;
+    SH.dark = lambert(0x1b1c26); SH.metal = lambert(0x3c4056); SH.visor = lambert(0x0d0e15);
+    SH.glow = basic(0xc4fbff); SH.yellow = basic(0xfff36b); SH.white = lambert(0xf4efe6); SH.orange = lambert(0xff7a1a);
+    SH.gold = lambert(0xffd23f, { emissive: 0x4a2c00 }); SH.red = basic(0xff3e6c); SH.phone = lambert(0x23252f);
+    SH.box = new T.BoxGeometry(1, 1, 1); SH.cyl = new T.CylinderGeometry(1, 1, 1, 14); SH.sph = new T.SphereGeometry(1, 14, 10);
+    SH.cone = new T.ConeGeometry(1, 1, 12); SH.ring = new T.RingGeometry(0.86, 1, 56); SH.tube = new T.CylinderGeometry(1, 1, 1, 8, 1, true);
+    SH.disc = new T.CircleGeometry(1, 40);
+    return SH;
+  }
+  function part(g, m, sx, sy, sz, x, y, z) {
+    const o = new T.Mesh(g, m);
+    o.scale.set(sx, sy, sz); o.position.set(x, y, z); o.castShadow = true;
+    return o;
+  }
+
+  // =====================================================================
+  // 构建场景
+  // =====================================================================
+  function build(G) {
+    if (!init()) return false;
+    dispose();
+    shared();
+    scene = new T.Scene();
+    scene.background = new T.Color(0x1d1636);
+    scene.fog = new T.Fog(0x1d1636, 1300, 4200);
+    scene.add(new T.HemisphereLight(0xd4dcff, 0x3a2f4a, 0.9));
+    const sun = new T.DirectionalLight(0xfff0dc, 0.72);
+    sun.position.set(S.W / 2 - 520, 1400, S.H / 2 - 760);
+    sun.target.position.set(S.W / 2, 0, S.H / 2);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
+    sc.left = -1250; sc.right = 1250; sc.top = 1250; sc.bottom = -1250; sc.near = 200; sc.far = 3600;
+    sun.shadow.bias = -0.0006;
+    scene.add(sun, sun.target);
+
+    W = { G, M: G.M, colors: G.colors, bots: new Map(), pools: {}, dirty: true, pd: new Array(PN).fill(null), pi: 0 };
+    buildSurface(G);
+    buildFloor();
+    buildBlocks();
+    buildBounds();
+    buildCity(G.map);
+    buildModeDecor(G);
+    buildDynamic(G);
+    buildParticles();
+    show(true);
+    return true;
+  }
+
+  // ---------------- 地面 + 平台顶面共用的涂料贴图 ----------------
+  function buildSurface(G) {
+    const cv = document.createElement('canvas');
+    cv.width = S.W * PK; cv.height = S.H * PK;
+    const x = cv.getContext('2d'), M = G.M, C = S.CELL * PK, R = rng(G.map * 977 + 13);
+    const A = ['#2b2e40', '#3f4565', '#4c5479', '#1e1f2a'];
+    const B = ['#272a3a', '#3a405e', '#474e72', '#1a1b25'];
+    for (let cy = 0; cy < S.GH; cy++)
+      for (let cx = 0; cx < S.GW; cx++) {
+        const lv = M.lv[cy * S.GW + cx];
+        x.fillStyle = ((cx >> 2) + (cy >> 2)) % 2 ? A[lv] : B[lv];
+        x.fillRect(cx * C, cy * C, C, C);
+      }
+    x.strokeStyle = 'rgba(255,255,255,0.05)'; x.lineWidth = 1;
+    for (let i = 0; i <= S.GW; i += 4) { x.beginPath(); x.moveTo(i * C, 0); x.lineTo(i * C, cv.height); x.stroke(); }
+    for (let j = 0; j <= S.GH; j += 4) { x.beginPath(); x.moveTo(0, j * C); x.lineTo(cv.width, j * C); x.stroke(); }
+    // 地面涂鸦装饰
+    x.save(); x.scale(PK, PK);
+    const words = ['GB', '07', 'SPRAY', '★', 'BOTS', '42', 'INK?', 'NO.9'];
+    for (let i = 0; i < 34; i++) {
+      x.save(); x.translate(R() * S.W, R() * S.H); x.rotate(R() * 6.28);
+      x.globalAlpha = 0.05 + R() * 0.05; x.fillStyle = '#fff'; x.strokeStyle = '#fff';
+      const t = R();
+      if (t < 0.35) { x.beginPath(); x.moveTo(-30, -10); x.lineTo(10, -10); x.lineTo(10, -24); x.lineTo(36, 0); x.lineTo(10, 24); x.lineTo(10, 10); x.lineTo(-30, 10); x.closePath(); x.fill(); }
+      else if (t < 0.7) { x.font = 'bold 46px sans-serif'; x.fillText(words[Math.floor(R() * words.length)], -40, 16); }
+      else { x.lineWidth = 6; x.beginPath(); x.arc(0, 0, 20 + R() * 30, 0, 7); x.stroke(); }
+      x.restore();
+    }
+    // 场地边缘警示条
+    x.globalAlpha = 0.3;
+    for (let i = 0; i < S.W; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(i, 0, 32, 8); x.fillRect(i, S.H - 8, 32, 8); }
+    for (let i = 0; i < S.H; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(0, i, 8, 32); x.fillRect(S.W - 8, i, 8, 32); }
+    x.restore();
+    // 高墙顶部：黄黑斜纹
+    x.save();
+    for (const [rx, ry, rw, rh, lv] of M.rects) {
+      if (lv < 3) continue;
+      x.save(); x.beginPath(); x.rect(rx * C, ry * C, rw * C, rh * C); x.clip();
+      x.strokeStyle = 'rgba(255,210,63,0.35)'; x.lineWidth = 4;
+      for (let k = -rh * C; k < rw * C; k += 14) { x.beginPath(); x.moveTo(rx * C + k, ry * C); x.lineTo(rx * C + k + rh * C, ry * C + rh * C); x.stroke(); }
+      x.restore();
+    }
+    x.restore();
+    W.surf = cv; W.sctx = x;
+    W.surfTex = new T.CanvasTexture(cv);
+    W.surfTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    // 高度交界的格子：涂料只填满本格，避免溢到台阶上/下
+    W.edge = new Uint8Array(S.GW * S.GH);
+    for (let cy = 0; cy < S.GH; cy++)
+      for (let cx = 0; cx < S.GW; cx++) {
+        const t = M.top[cy * S.GW + cx];
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= S.GW || ny >= S.GH) continue;
+          if (M.top[ny * S.GW + nx] !== t) { W.edge[cy * S.GW + cx] = 1; break; }
+        }
+      }
+  }
+
+  function paintCell(i, team) {
+    if (!W || !team) return;
+    const x = W.sctx, C = S.CELL * PK, cx = i % S.GW, cy = (i / S.GW) | 0;
+    x.fillStyle = W.G.shades[team][(i * 7919) % 3];
+    if (W.edge[i]) x.fillRect(cx * C, cy * C, C, C);
+    else {
+      x.beginPath();
+      x.arc(cx * C + C / 2 + (((i * 13) % 5) - 2) * PK, cy * C + C / 2 + (((i * 29) % 5) - 2) * PK, 11.5 * PK, 0, 6.2832);
+      x.fill();
+    }
+    W.dirty = true;
+  }
+
+  function buildFloor() {
+    const g = new T.PlaneGeometry(S.W, S.H);
+    g.rotateX(-Math.PI / 2); g.translate(S.W / 2, 0, S.H / 2);
+    const m = new T.Mesh(g, lambert(0xffffff, { map: W.surfTex }));
+    m.receiveShadow = true;
+    scene.add(m);
+    const g2 = new T.PlaneGeometry(9000, 9000);
+    g2.rotateX(-Math.PI / 2); g2.translate(S.W / 2, -3, S.H / 2);
+    scene.add(new T.Mesh(g2, lambert(0x17142a)));
+  }
+
+  function wallTexture() {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    const x = c.getContext('2d'), R = rng(99);
+    x.fillStyle = '#c9cde0'; x.fillRect(0, 0, 128, 128);
+    x.fillStyle = '#b4b9d0'; x.fillRect(0, 60, 128, 4); x.fillRect(62, 0, 4, 128);
+    const cols = ['#ff5fa2', '#ffd23f', '#3ee8ff', '#a3ff3a', '#ff8a1f', '#b38cff'];
+    for (let i = 0; i < 5; i++) {
+      x.strokeStyle = cols[Math.floor(R() * cols.length)]; x.globalAlpha = 0.55; x.lineWidth = 4 + R() * 6; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(R() * 128, R() * 128);
+      for (let k = 0; k < 3; k++) x.quadraticCurveTo(R() * 128, R() * 128, R() * 128, R() * 128);
+      x.stroke();
+    }
+    x.globalAlpha = 1; x.fillStyle = '#8a8fa8';
+    for (const [px, py] of [[8, 8], [120, 8], [8, 120], [120, 120], [56, 56], [72, 72]]) { x.beginPath(); x.arc(px, py, 3, 0, 7); x.fill(); }
+    const t = new T.CanvasTexture(c);
+    t.wrapS = t.wrapT = T.RepeatWrapping;
+    t.anisotropy = 4;
+    return t;
+  }
+
+  // ---------------- 方块（由高度网格合并） ----------------
+  function buildBlocks() {
+    const M = W.M, GW = S.GW, GH = S.GH, C = S.CELL;
+    const used = new Uint8Array(GW * GH);
+    const top = { p: [], n: [], uv: [] }, side = { p: [], n: [], uv: [], c: [] }, edge = { p: [], c: [] };
+    const sideCol = [null, new T.Color(0x8f98c8), new T.Color(0xa7b0e2), new T.Color(0x666b8c)];
+    const edgeCol = [null, new T.Color(0x5ef0ff), new T.Color(0xff5fd2), new T.Color(0xffd23f)];
+    const quad = (o, v, n, uv, color) => {
+      for (const k of [0, 1, 2, 0, 2, 3]) {
+        o.p.push(v[k][0], v[k][1], v[k][2]); o.n.push(n[0], n[1], n[2]); o.uv.push(uv[k][0], uv[k][1]);
+        if (o.c) o.c.push(color.r, color.g, color.b);
+      }
+    };
+    const box = (x0, z0, w, d, H, lv) => {
+      const x1 = x0 + w, z1 = z0 + d;
+      const tuv = (x, z) => [x / S.W, 1 - z / S.H];
+      quad(top, [[x0, H, z0], [x0, H, z1], [x1, H, z1], [x1, H, z0]], [0, 1, 0], [tuv(x0, z0), tuv(x0, z1), tuv(x1, z1), tuv(x1, z0)]);
+      const sc = sideCol[lv];
+      const suv = (len) => [[0, 0], [len / 64, 0], [len / 64, H / 64], [0, H / 64]];
+      quad(side, [[x1, 0, z0], [x0, 0, z0], [x0, H, z0], [x1, H, z0]], [0, 0, -1], suv(w), sc);
+      quad(side, [[x0, 0, z1], [x1, 0, z1], [x1, H, z1], [x0, H, z1]], [0, 0, 1], suv(w), sc);
+      quad(side, [[x0, 0, z0], [x0, 0, z1], [x0, H, z1], [x0, H, z0]], [-1, 0, 0], suv(d), sc);
+      quad(side, [[x1, 0, z1], [x1, 0, z0], [x1, H, z0], [x1, H, z1]], [1, 0, 0], suv(d), sc);
+      const e = edgeCol[lv], y = H + 0.4;
+      const pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+      for (let k = 0; k < 4; k++) {
+        const a = pts[k], b = pts[(k + 1) % 4];
+        edge.p.push(a[0], y, a[1], b[0], y, b[1]);
+        edge.c.push(e.r, e.g, e.b, e.r, e.g, e.b);
+      }
+    };
+    for (let cy = 0; cy < GH; cy++)
+      for (let cx = 0; cx < GW; cx++) {
+        const i = cy * GW + cx, lv = M.lv[i];
+        if (!lv || used[i]) continue;
+        let w = 1;
+        while (cx + w < GW && M.lv[i + w] === lv && !used[i + w]) w++;
+        let h = 1;
+        outer: while (cy + h < GH) {
+          for (let k = 0; k < w; k++) { const j = (cy + h) * GW + cx + k; if (M.lv[j] !== lv || used[j]) break outer; }
+          h++;
+        }
+        for (let j = 0; j < h; j++) for (let k = 0; k < w; k++) used[(cy + j) * GW + cx + k] = 1;
+        box(cx * C, cy * C, w * C, h * C, S.LEVEL_H[lv], lv);
+      }
+    const mk = (o) => {
+      const g = new T.BufferGeometry();
+      g.setAttribute('position', new T.Float32BufferAttribute(o.p, 3));
+      g.setAttribute('normal', new T.Float32BufferAttribute(o.n, 3));
+      g.setAttribute('uv', new T.Float32BufferAttribute(o.uv, 2));
+      if (o.c) g.setAttribute('color', new T.Float32BufferAttribute(o.c, 3));
+      return g;
+    };
+    if (top.p.length) {
+      const tm = new T.Mesh(mk(top), lambert(0xffffff, { map: W.surfTex }));
+      tm.receiveShadow = true; tm.castShadow = true; scene.add(tm);
+      W.wallTex = wallTexture();
+      const sm = new T.Mesh(mk(side), lambert(0xffffff, { map: W.wallTex, vertexColors: true }));
+      sm.receiveShadow = true; sm.castShadow = true; scene.add(sm);
+      const eg = new T.BufferGeometry();
+      eg.setAttribute('position', new T.Float32BufferAttribute(edge.p, 3));
+      eg.setAttribute('color', new T.Float32BufferAttribute(edge.c, 3));
+      scene.add(new T.LineSegments(eg, new T.LineBasicMaterial({ vertexColors: true })));
+    }
+  }
+
+  function buildBounds() {
+    const H = 30, th = 40;
+    const mat = lambert(0x4b4f6c);
+    const trim = basic(0xffd23f);
+    for (const [x, z, w, d] of [[S.W / 2, -th / 2, S.W + th * 2, th], [S.W / 2, S.H + th / 2, S.W + th * 2, th], [-th / 2, S.H / 2, th, S.H], [S.W + th / 2, S.H / 2, th, S.H]]) {
+      const m = part(SH.box, mat, w, H, d, x, H / 2, z);
+      m.receiveShadow = true; scene.add(m);
+      scene.add(part(SH.box, trim, w + 1, 3, d + 1, x, H + 1.5, z));
+    }
+  }
+
+  function buildCity(mapIdx) {
+    const R = rng(mapIdx * 131 + 5);
+    const wc = document.createElement('canvas'); wc.width = 32; wc.height = 64;
+    const x = wc.getContext('2d');
+    x.fillStyle = '#000'; x.fillRect(0, 0, 32, 64);
+    const lit = ['#ffd58a', '#9ae6ff', '#ff9ad5', '#fff3c4'];
+    for (let j = 2; j < 64; j += 6) for (let i = 2; i < 32; i += 6) if (R() < 0.38) { x.fillStyle = lit[Math.floor(R() * lit.length)]; x.fillRect(i, j, 3, 3); }
+    const wt = new T.CanvasTexture(wc); wt.wrapS = wt.wrapT = T.RepeatWrapping; wt.repeat.set(3, 6);
+    const mat = lambert(0x161828, { emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.9 });
+    const neon = ['#ff3ea5', '#1fd6ee', '#9cff2e', '#ffdf2e', '#8c5cff'];
+    let placed = 0;
+    for (let k = 0; k < 400 && placed < 70; k++) {
+      const px = -1500 + R() * (S.W + 3000), pz = -1500 + R() * (S.H + 3000);
+      if (px > -260 && px < S.W + 260 && pz > -260 && pz < S.H + 260) continue;
+      const w = 120 + R() * 220, d = 120 + R() * 220, h = 180 + R() * 900;
+      const b = part(SH.box, mat, w, h, d, px, h / 2 - 3, pz);
+      b.castShadow = false; scene.add(b);
+      if (R() < 0.5) scene.add(part(SH.box, basic(neon[Math.floor(R() * neon.length)]), w + 2, 4, d + 2, px, h - 3, pz));
+      placed++;
+    }
+    // 霓虹广告牌
+    const texts = ['GRAFFI BOTS', '涂鸦机兵', 'SPRAY ON!', 'INK ZONE'];
+    for (let i = 0; i < 4; i++) {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+      const g = c.getContext('2d');
+      g.fillStyle = '#0d0b18'; g.fillRect(0, 0, 512, 128);
+      g.strokeStyle = neon[i]; g.lineWidth = 6; g.strokeRect(6, 6, 500, 116);
+      g.font = '900 64px "Microsoft YaHei", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.shadowColor = neon[i]; g.shadowBlur = 18; g.fillStyle = '#fff'; g.fillText(texts[i], 256, 68);
+      const tex = new T.CanvasTexture(c);
+      const bb = new T.Mesh(new T.PlaneGeometry(520, 130), basic(0xffffff, { map: tex }));
+      const ang = (i / 4) * Math.PI * 2 + 0.6;
+      bb.position.set(S.W / 2 + Math.cos(ang) * 1700, 420 + i * 60, S.H / 2 + Math.sin(ang) * 1400);
+      bb.lookAt(S.W / 2, 200, S.H / 2);
+      scene.add(bb);
+    }
+  }
+
+  function flat(mesh, x, y, z) { mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, y); return mesh; }
+
+  function buildModeDecor(G) {
+    const cs = G.colors;
+    for (const t of [1, 2]) {
+      const b = S.basePos(t);
+      scene.add(flat(part(SH.disc, basic(cs[t], { transparent: true, opacity: 0.3, depthWrite: false }), 66, 66, 1), b.x, b.y, 0.7));
+      scene.add(flat(part(SH.ring, basic(cs[t]), 66, 66, 1), b.x, b.y, 0.9));
+    }
+    if (G.mode === 'zone') {
+      const Z = S.ZONE, C = S.CELL;
+      const w = (Z.x1 - Z.x0) * C, h = (Z.y1 - Z.y0) * C;
+      W.zoneMat = basic(0xffffff, { transparent: true, opacity: 0.12, depthWrite: false });
+      const zp = new T.Mesh(new T.PlaneGeometry(w, h), W.zoneMat);
+      flat(zp, Z.x0 * C + w / 2, Z.y0 * C + h / 2, 1.2); scene.add(zp);
+      W.zoneLineMat = new T.LineBasicMaterial({ color: 0xffffff });
+      const pts = [[Z.x0, Z.y0], [Z.x1, Z.y0], [Z.x1, Z.y1], [Z.x0, Z.y1], [Z.x0, Z.y0]].map(([a, b]) => new T.Vector3(a * C, 1.6, b * C));
+      scene.add(new T.Line(new T.BufferGeometry().setFromPoints(pts), W.zoneLineMat));
+      // 四角立柱
+      W.zonePosts = [];
+      for (const [a, b] of [[Z.x0, Z.y0], [Z.x1, Z.y0], [Z.x1, Z.y1], [Z.x0, Z.y1]]) {
+        const m = basic(0xffffff);
+        W.zonePosts.push(m);
+        scene.add(part(SH.cyl, m, 3, 70, 3, a * C, 35, b * C));
+      }
+    }
+    if (G.mode === 'escort') {
+      for (const t of [1, 2]) {
+        const g = S.goalFor(t, G.map);
+        scene.add(flat(part(SH.disc, basic(cs[t], { transparent: true, opacity: 0.35, depthWrite: false }), 52, 52, 1), g.x, g.y, 1));
+        scene.add(flat(part(SH.ring, basic(cs[t]), 52, 52, 1), g.x, g.y, 1.2));
+        const beam = part(SH.tube, basic(cs[t], { transparent: true, opacity: 0.18, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending }), 52, 300, 52, g.x, 150, g.y);
+        beam.castShadow = false; scene.add(beam);
+      }
+    }
+    if (G.mode === 'soccer') {
+      const gl = S.SOCCER_GOAL;
+      for (const [t, gx] of [[1, gl.depth], [2, S.W - gl.depth]]) {
+        const m = lambert(cs[t], { emissive: new T.Color(cs[t]).multiplyScalar(0.3) });
+        for (const s of [-1, 1]) scene.add(part(SH.cyl, m, 4, 100, 4, gx, 50, S.H / 2 + s * gl.half));
+        const bar = part(SH.cyl, m, 4, gl.half * 2, 4, gx, 100, S.H / 2); bar.rotation.x = Math.PI / 2; scene.add(bar);
+        const back = t === 1 ? 2 : S.W - 2;
+        const net = new T.Mesh(new T.PlaneGeometry(gl.half * 2, 100), basic(cs[t], { transparent: true, opacity: 0.18, side: T.DoubleSide, depthWrite: false }));
+        net.position.set(back, 50, S.H / 2); net.rotation.y = Math.PI / 2; scene.add(net);
+        const area = new T.Mesh(new T.PlaneGeometry(gl.depth, gl.half * 2), basic(cs[t], { transparent: true, opacity: 0.22, depthWrite: false }));
+        flat(area, t === 1 ? gl.depth / 2 : S.W - gl.depth / 2, S.H / 2, 1); scene.add(area);
+      }
+    }
+    if (G.mode === 'battery') {
+      for (const t of [1, 2]) {
+        const b = S.basePos(t);
+        scene.add(flat(part(SH.ring, basic(cs[t]), 120, 120, 1), b.x, b.y, 1.1));
+        const wall = part(SH.tube, basic(cs[t], { transparent: true, opacity: 0.12, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending }), 120, 40, 120, b.x, 20, b.y);
+        wall.castShadow = false; scene.add(wall);
+      }
+    }
+  }
+
+  // ---------------- 动态物体 ----------------
+  function pool(make) {
+    const items = [];
+    let n = 0;
+    return {
+      begin() { n = 0; },
+      next() { let m = items[n]; if (!m) { m = make(); items.push(m); scene.add(m); } m.visible = true; n++; return m; },
+      end() { for (let i = n; i < items.length; i++) items[i].visible = false; },
+    };
+  }
+  function buildDynamic(G) {
+    const cs = G.colors, P = W.pools;
+    for (const t of [1, 2]) {
+      const pm = basic(cs[t]);
+      P['proj' + t] = pool(() => { const m = new T.Mesh(SH.sph, pm); return m; });
+      const bm = lambert(cs[t], { emissive: new T.Color(cs[t]).multiplyScalar(0.25) });
+      P['bomb' + t] = pool(() => {
+        const g = new T.Group();
+        const s = new T.Mesh(SH.sph, bm); s.scale.setScalar(8); s.castShadow = true; g.add(s);
+        const cap = part(SH.cyl, SH.dark, 3, 5, 3, 0, 8, 0); g.add(cap);
+        return g;
+      });
+      const mm = basic(cs[t], { transparent: true, opacity: 0.8, side: T.DoubleSide, depthWrite: false });
+      P['mark' + t] = pool(() => new T.Mesh(SH.ring, mm));
+      const cm = lambert(cs[t], { emissive: new T.Color(cs[t]).multiplyScalar(0.4) });
+      P['missile' + t] = pool(() => { const m = new T.Mesh(SH.cone, cm); m.scale.set(9, 34, 9); m.rotation.x = Math.PI; return m; });
+    }
+    P.ring = pool(() => new T.Mesh(SH.ring, basic(0xffffff, { transparent: true, side: T.DoubleSide, depthWrite: false })));
+    P.line = pool(() => new T.Mesh(SH.tube, basic(0xffffff, { transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
+    P.beam = pool(() => new T.Mesh(SH.tube, basic(0xffffff, { transparent: true, opacity: 0.75, depthWrite: false, blending: T.AdditiveBlending })));
+    P.beamCore = pool(() => new T.Mesh(SH.tube, basic(0xffffff)));
+    const batMat = lambert(0x9cff2e, { emissive: 0x3c7a00 });
+    P.bat = pool(() => {
+      const g = new T.Group();
+      g.add(part(SH.cyl, batMat, 6, 16, 6, 0, 0, 0));
+      g.add(part(SH.cyl, SH.white, 3, 4, 3, 0, 10, 0));
+      return g;
+    });
+    if (G.mode === 'escort') {
+      W.treasure = new T.Group();
+      const core = new T.Mesh(new T.OctahedronGeometry(15), lambert(0xffd23f, { emissive: 0x8a5a00 }));
+      core.castShadow = true; W.treasure.add(core); W.treasureCore = core;
+      const halo = new T.Mesh(SH.ring, basic(0xfff3a0, { transparent: true, opacity: 0.6, side: T.DoubleSide, depthWrite: false }));
+      halo.scale.setScalar(24); halo.rotation.x = Math.PI / 2; W.treasure.add(halo);
+      scene.add(W.treasure);
+    }
+    if (G.mode === 'soccer') {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+      const x = c.getContext('2d');
+      x.fillStyle = '#f5f6ff'; x.fillRect(0, 0, 256, 128);
+      x.fillStyle = '#2a2d3d';
+      for (let i = 0; i < 8; i++) { x.beginPath(); x.arc(16 + i * 32, i % 2 ? 40 : 88, 12, 0, 7); x.fill(); }
+      x.fillRect(0, 60, 256, 8);
+      W.ballMat = lambert(0xffffff, { map: new T.CanvasTexture(c) });
+      W.ball = new T.Mesh(new T.SphereGeometry(26, 24, 16), W.ballMat);
+      W.ball.castShadow = true; scene.add(W.ball);
+      W.ballPrev = null;
+    }
+  }
+
+  function buildParticles() {
+    const g = new T.BufferGeometry();
+    W.pPos = new Float32Array(PN * 3); W.pCol = new Float32Array(PN * 3);
+    for (let i = 0; i < PN; i++) W.pPos[i * 3 + 1] = -9999;
+    g.setAttribute('position', new T.BufferAttribute(W.pPos, 3));
+    g.setAttribute('color', new T.BufferAttribute(W.pCol, 3));
+    const m = new T.PointsMaterial({ size: 7, vertexColors: true, sizeAttenuation: true, transparent: true, depthWrite: false });
+    W.points = new T.Points(g, m);
+    W.points.frustumCulled = false;
+    scene.add(W.points);
+  }
+  function burst(x, y, z, color, n, spd = 220, up = 1) {
+    if (!W) return;
+    const c = new T.Color(color);
+    for (let k = 0; k < n; k++) {
+      const i = W.pi; W.pi = (W.pi + 1) % PN;
+      const a = Math.random() * 6.283, e = 0.15 + Math.random() * 1.1 * up, v = spd * (0.3 + Math.random());
+      W.pd[i] = { x, y, z, vx: Math.cos(a) * Math.cos(e) * v, vy: Math.sin(a) * Math.cos(e) * v, vz: Math.sin(e) * v, life: 0.35 + Math.random() * 0.5 };
+      W.pCol[i * 3] = c.r; W.pCol[i * 3 + 1] = c.g; W.pCol[i * 3 + 2] = c.b;
+    }
+    W.points.geometry.attributes.color.needsUpdate = true;
+  }
+  function stepParticles(dt) {
+    const P = W.pPos;
+    for (let i = 0; i < PN; i++) {
+      const p = W.pd[i];
+      if (!p) continue;
+      p.life -= dt;
+      if (p.life <= 0) { W.pd[i] = null; P[i * 3 + 1] = -9999; continue; }
+      p.vz -= 760 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      const gh = S.topAt(W.M, p.x, p.y);
+      if (p.z < gh && gh < 1e3) { p.z = gh + 0.5; p.vx *= 0.4; p.vy *= 0.4; p.vz = 0; }
+      P[i * 3] = p.x; P[i * 3 + 1] = p.z; P[i * 3 + 2] = p.y;
+    }
+    W.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // =====================================================================
+  // 机兵模型
+  // =====================================================================
+  function buildWeapon(g, weapon, color) {
+    const s = SH, cm = lambert(color);
+    const add = (o) => { g.add(o); return o; };
+    switch (weapon) {
+      case 'blaster':
+        add(part(s.box, s.metal, 18, 6, 6, 5, 0, 0));
+        add(part(s.box, cm, 7, 5, 5, 15, 0, 0));
+        add(part(s.box, s.dark, 4, 7, 3, 0, -5, 0));
+        break;
+      case 'roller': {
+        g.position.z = 4;
+        add(part(s.box, s.metal, 20, 3, 3, 8, -6, -4));
+        const r = add(part(s.cyl, cm, 7, 42, 7, 20, -12, -19)); r.rotation.x = Math.PI / 2;
+        g.userData.roller = r;
+        break;
+      }
+      case 'charger':
+        add(part(s.box, s.metal, 40, 4, 4, 14, 0, 0));
+        add(part(s.box, cm, 12, 5, 5, 6, 4, 0));
+        add(part(s.box, s.dark, 5, 8, 3, 0, -5, 0));
+        g.userData.tip = add(part(s.sph, basic(0xffffff, { transparent: true, opacity: 0.9 }), 2, 2, 2, 35, 0, 0));
+        break;
+      case 'bucket': {
+        const b = add(new T.Mesh(new T.CylinderGeometry(9, 4, 18, 14, 1, true), new T.MeshLambertMaterial({ color, side: T.DoubleSide })));
+        b.rotation.z = -Math.PI / 2; b.position.set(12, 0, 0); b.castShadow = true;
+        add(part(s.box, s.metal, 6, 6, 6, 1, 0, 0));
+        break;
+      }
+      case 'gatling': {
+        add(part(s.box, s.metal, 12, 14, 12, 1, 0, 0));
+        const sp = new T.Group(); sp.position.set(8, 0, 0); g.add(sp);
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2;
+          const br = part(s.cyl, s.dark, 1.8, 22, 1.8, 11, Math.cos(a) * 3.6, Math.sin(a) * 3.6);
+          br.rotation.z = -Math.PI / 2; sp.add(br);
+        }
+        const ring = part(s.cyl, cm, 5.5, 3, 5.5, 18, 0, 0); ring.rotation.z = -Math.PI / 2; sp.add(ring);
+        g.userData.spinner = sp;
+        break;
+      }
+    }
+  }
+  function buildHead(g, head, color) {
+    const s = SH;
+    const add = (o) => { g.add(o); return o; };
+    switch (head) {
+      case 'antenna': {
+        const a = add(part(s.cyl, s.metal, 0.9, 13, 0.9, -5, 6, -5)); a.rotation.set(-0.35, 0, 0.35);
+        add(part(s.sph, s.yellow, 2.8, 2.8, 2.8, -7.2, 12.2, -7.2));
+        break;
+      }
+      case 'mohawk': {
+        const m = lambert(new T.Color(color).lerp(new T.Color(0xffffff), 0.5));
+        for (let i = 0; i < 4; i++) add(part(s.cone, m, 2.6, 9, 2.6, -7 + i * 4.6, 4.5, 0));
+        break;
+      }
+      case 'phones': {
+        const arc = add(new T.Mesh(new T.TorusGeometry(13.5, 1.5, 6, 18, Math.PI), s.phone));
+        arc.rotation.y = Math.PI / 2; arc.position.y = -7; arc.castShadow = true;
+        for (const z of [-13.5, 13.5]) {
+          const c = add(part(s.cyl, s.phone, 5, 4, 5, 0, -7, z)); c.rotation.x = Math.PI / 2;
+          const d = add(part(s.cyl, lambert(color), 2.4, 4.4, 2.4, 0, -7, z)); d.rotation.x = Math.PI / 2;
+        }
+        break;
+      }
+      case 'cone':
+        add(part(s.cone, s.orange, 7, 15, 7, 0, 7.5, 0));
+        add(part(s.cyl, s.white, 5.2, 2.2, 5.2, 0, 6, 0));
+        break;
+      case 'crown': {
+        const band = add(new T.Mesh(new T.CylinderGeometry(9, 9, 6, 12, 1, true), new T.MeshLambertMaterial({ color: 0xffd23f, emissive: 0x4a2c00, side: T.DoubleSide })));
+        band.position.y = 3; band.castShadow = true;
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; add(part(s.cone, s.gold, 2.4, 6, 2.4, Math.cos(a) * 8.5, 9, Math.sin(a) * 8.5)); }
+        add(part(s.sph, s.red, 2.2, 2.2, 2.2, 9, 3, 0));
+        break;
+      }
+      case 'horns':
+        for (const z of [-1, 1]) { const h = add(part(s.cone, s.white, 2.8, 13, 2.8, 2, 6, z * 9)); h.rotation.x = z * 0.55; }
+        break;
+    }
+  }
+  function makeBot(color, head, weapon) {
+    const s = SH;
+    const root = new T.Group();
+    const body = new T.Group(); root.add(body);
+    const bodyMat = lambert(color);
+    const tint = lambert(new T.Color(color).multiplyScalar(0.7));
+    const B = (o) => { body.add(o); return o; };
+    B(part(s.box, s.dark, 28, 8, 7, 0, 4, -12)); B(part(s.box, s.dark, 28, 8, 7, 0, 4, 12));
+    for (const z of [-12, 12]) for (const x of [-10, 10]) { const w = B(part(s.cyl, s.metal, 4, 7.4, 4, x, 4, z)); w.rotation.x = Math.PI / 2; }
+    B(part(s.box, s.metal, 16, 6, 18, 0, 10, 0));
+    B(part(s.box, bodyMat, 24, 19, 24, 0, 22.5, 0));
+    B(part(s.box, tint, 25, 4, 25, 0, 14, 0));
+    B(part(s.box, s.visor, 3, 10, 18, 12.5, 25, 0));
+    B(part(s.box, s.glow, 1, 3, 13, 14.2, 26, 0));
+    B(part(s.cyl, s.dark, 6, 18, 6, -16, 22, 0));
+    const tankFill = B(part(s.cyl, basic(color), 4.4, 16, 4.4, -16.8, 22, 0));
+    const wpn = new T.Group(); wpn.position.set(4, 19, 15); body.add(wpn);
+    buildWeapon(wpn, weapon, color);
+    const hd = new T.Group(); hd.position.set(0, 32, 0); body.add(hd);
+    buildHead(hd, head, color);
+    // 滚轮形态
+    const wheel = new T.Group(); wheel.position.y = 14; root.add(wheel);
+    const spinG = new T.Group(); wheel.add(spinG);
+    const wheelMat = lambert(color, { transparent: true });
+    const tor = new T.Mesh(new T.TorusGeometry(10.5, 3.6, 8, 22), wheelMat); tor.castShadow = true; spinG.add(tor);
+    const hubMat = lambert(0x1b1c26, { transparent: true });
+    const hub = part(s.cyl, hubMat, 8, 5, 8, 0, 0, 0); hub.rotation.x = Math.PI / 2; spinG.add(hub);
+    const spokeMat = basic(new T.Color(color).lerp(new T.Color(0xffffff), 0.4), { transparent: true });
+    for (let i = 0; i < 2; i++) { const sp = part(s.box, spokeMat, 19, 2.4, 3, 0, 0, 0); sp.rotation.z = i * Math.PI / 2; spinG.add(sp); }
+    wheel.visible = false;
+    const shield = new T.Mesh(s.sph, new T.MeshBasicMaterial({ color: 0xbef6ff, transparent: true, opacity: 0.22, depthWrite: false }));
+    shield.scale.setScalar(31); shield.position.y = 18; shield.visible = false; root.add(shield);
+    return { root, body, wheel, spinG, wpn, tankFill, bodyMat, fadeMats: [wheelMat, hubMat, spokeMat], shield, ud: wpn.userData, spin: 0, moveA: 0 };
+  }
+
+  // =====================================================================
+  // 每帧同步
+  // =====================================================================
+  const SP_CHARGE = S.SPECIAL_IDS.indexOf('charge'), SP_BEAM = S.SPECIAL_IDS.indexOf('beam');
+  function syncBots(G, now, dt, myId) {
+    const me = G.me;
+    for (const b of W.bots.values()) b.root.visible = false;
+    for (const id of G.cur) {
+      const p = G.players.get(id);
+      if (!p) continue;
+      let b = W.bots.get(id);
+      if (!b) { b = makeBot(G.colors[p.team], p.head, p.weapon); W.bots.set(id, b); scene.add(b.root); }
+      if (!(p.flags & 1)) continue;
+      const enemy = me && p.team !== me.team;
+      let vis = true, fade = 1;
+      if (p.flags & 4) {
+        if (enemy) { const d = me ? Math.hypot(me.px - p.x, me.py - p.y) : 1e9; vis = d < 110; fade = 0.3; }
+        else fade = 0.45;
+      }
+      if (p.flags & 8 && Math.sin(now / 45) < -0.3) vis = false;
+      if (id === myId && G.camClose) vis = false;
+      if (!vis) continue;
+      b.root.visible = true;
+      b.root.position.set(p.x, p.z || 0, p.y);
+      const wheel = !!(p.flags & 2);
+      b.body.visible = !wheel; b.wheel.visible = wheel;
+      const sp = Math.hypot(p.vx || 0, p.vy || 0);
+      if (sp > 25) b.moveA = Math.atan2(p.vy, p.vx);
+      if (wheel) {
+        b.root.rotation.y = -b.moveA;
+        b.spin -= (sp * dt) / 11;
+        b.spinG.rotation.z = b.spin;
+        for (const m of b.fadeMats) m.opacity = fade;
+      } else {
+        const face = p.flags & 32 ? b.moveA : p.a;
+        b.root.rotation.y = -face;
+        b.body.position.y = sp > 25 ? Math.abs(Math.sin(now / 85)) * 1.3 : 0;
+        b.wpn.rotation.z = Math.max(-0.9, Math.min(0.9, (p.pt || 0) * 0.9));
+        b.wpn.position.x = p.flags & 16 ? 4 - Math.abs(Math.sin(now / 35)) * 1.6 : 4;
+        if (b.ud.spinner) b.ud.spinner.rotation.x += dt * (4 + 40 * (p.charge || 0));
+        if (b.ud.tip) { const c = p.charge || 0; b.ud.tip.visible = c > 0.02; b.ud.tip.scale.setScalar(1.5 + 4 * c); }
+        if (b.ud.roller && sp > 25) b.ud.roller.rotation.y += (sp * dt) / 7;
+        const f = Math.max(0.03, Math.min(1, (p.tank == null ? 100 : p.tank) / 100));
+        b.tankFill.scale.y = 16 * f; b.tankFill.position.y = 14 + 8 * f;
+      }
+      if (p.flash > 0) b.bodyMat.emissive.setRGB(0.8, 0.8, 0.8);
+      else if (p.spk === SP_CHARGE && p.flags & 128) b.bodyMat.emissive.set(G.colors[p.team]).multiplyScalar(0.4 + 0.3 * Math.sin(now / 60));
+      else b.bodyMat.emissive.setRGB(0, 0, 0);
+      b.shield.visible = p.shield > 0;
+      if (p.shield > 0) b.shield.material.opacity = 0.16 + 0.08 * Math.sin(now / 120);
+    }
+  }
+
+  const _v = new T.Vector3(), _up = new T.Vector3(0, 1, 0), _q = new T.Quaternion();
+  function placeTube(m, x0, y0, z0, x1, y1, z1, w) {
+    _v.set(x1 - x0, z1 - z0, y1 - y0);
+    const len = _v.length() || 1;
+    m.position.set((x0 + x1) / 2, (z0 + z1) / 2, (y0 + y1) / 2);
+    m.quaternion.setFromUnitVectors(_up, _v.multiplyScalar(1 / len));
+    m.scale.set(w, len, w);
+  }
+
+  function syncWorld(G, now, dt) {
+    const P = W.pools, cs = G.colors;
+    for (const k in P) P[k].begin();
+    // 子弹
+    for (const pr of G.projs.values()) {
+      const m = P['proj' + pr.team].next();
+      m.position.set(pr.x, pr.z, pr.y);
+      m.scale.setScalar(Math.max(3, pr.s * 0.8));
+    }
+    // 炸弹
+    for (const b of G.bombs.values()) {
+      const g = P['bomb' + b.team].next();
+      g.position.set(b.x, b.z + 8, b.y);
+      const pulse = b.landed ? 1 + 0.18 * Math.sin(now / 40) : 1;
+      g.scale.setScalar(pulse);
+    }
+    // 导弹
+    for (const m of G.missiles) {
+      const k = (now - m.t0) / m.dur;
+      if (k > 1) continue;
+      const mk = P['mark' + m.team].next();
+      flat(mk, m.x, m.y, m.z + 1.5);
+      mk.scale.setScalar(80 * (1 - 0.5 * k) + 4 * Math.sin(now / 50));
+      if (k > 0.45) {
+        const ms = P['missile' + m.team].next();
+        const h = (1 - (k - 0.45) / 0.55) * 700;
+        ms.position.set(m.x, m.z + 17 + h, m.y);
+      }
+    }
+    // 特效
+    for (const f of G.fx) {
+      const k = (now - f.t0) / f.dur;
+      if (k < 0 || k > 1) continue;
+      if (f.k === 'ring') {
+        const m = P.ring.next();
+        flat(m, f.x, f.y, (f.z || 0) + 2);
+        m.scale.setScalar(f.r * (0.3 + 0.7 * Math.sqrt(k)));
+        m.material.color.set(f.color); m.material.opacity = 0.85 * (1 - k);
+      } else if (f.k === 'line') {
+        const m = P.line.next();
+        placeTube(m, f.x0, f.y0, f.z0, f.x1, f.y1, f.z1, f.w * (1 - k * 0.6));
+        m.material.color.set(f.color); m.material.opacity = 0.9 * (1 - k);
+      }
+    }
+    // 极光喷射光束
+    for (const id of G.cur) {
+      const p = G.players.get(id);
+      if (!p || !(p.flags & 1) || !(p.flags & 128) || p.spk !== SP_BEAM) continue;
+      const d = S.dir3(p.a, p.pt || 0);
+      const x0 = p.x + d.x * 16, y0 = p.y + d.y * 16, z0 = (p.z || 0) + S.MUZZLE + d.z * 16;
+      const L = S.ray3(W.M, x0, y0, z0, d, 950);
+      const x1 = x0 + d.x * L, y1 = y0 + d.y * L, z1 = z0 + d.z * L;
+      const m = P.beam.next();
+      placeTube(m, x0, y0, z0, x1, y1, z1, 13 + 3 * Math.sin(now / 30));
+      m.material.color.set(cs[p.team]);
+      placeTube(P.beamCore.next(), x0, y0, z0, x1, y1, z1, 4);
+      if (Math.random() < 0.6) burst(x1, y1, z1, cs[p.team], 2, 160);
+    }
+    // 模式物体
+    const o = G.obj, oa = G.objA || o, k = G.objK == null ? 1 : G.objK;
+    const lp = (i) => (oa ? oa[i] : o[i]) + (o[i] - (oa ? oa[i] : o[i])) * k;
+    if (W.treasure) {
+      const show = o && !o[5];
+      W.treasure.visible = !!show;
+      if (show) {
+        let x = lp(0), y = lp(1), z = (o[6] || 0) + 22 + Math.sin(now / 300) * 4;
+        if (o[2]) { const c = G.players.get(o[2]); if (c) { x = c.x; y = c.y; z = (c.z || 0) + 58; } }
+        W.treasure.position.set(x, z, y);
+        W.treasureCore.rotation.y = now / 500; W.treasureCore.rotation.x = Math.sin(now / 700) * 0.3;
+      }
+    }
+    if (W.ball && o) {
+      const x = lp(0), y = lp(1);
+      if (W.ballPrev) {
+        const dx = x - W.ballPrev.x, dz = y - W.ballPrev.y, dl = Math.hypot(dx, dz);
+        if (dl > 0.01 && dl < 200) { _v.set(dz, 0, -dx).normalize(); _q.setFromAxisAngle(_v, dl / 26); W.ball.quaternion.premultiply(_q); }
+      }
+      W.ballPrev = { x, y };
+      W.ball.position.set(x, 26, y);
+      const last = o[4];
+      W.ballMat.color.set(last ? new T.Color(cs[last]).lerp(new T.Color(0xffffff), 0.55) : 0xffffff);
+    }
+    if (G.mode === 'battery' && o && o[2]) {
+      const f = o[2];
+      for (let i = 0; i < f.length; i += 4) {
+        const g = P.bat.next();
+        g.position.set(f[i + 1], (f[i + 3] || 0) + 12 + Math.sin(now / 250 + f[i]) * 3, f[i + 2]);
+        g.rotation.y = now / 400 + f[i];
+      }
+    }
+    if (G.mode === 'zone' && o && W.zoneMat) {
+      const owner = o[0];
+      const c = owner ? cs[owner] : '#ffffff';
+      W.zoneMat.color.set(c); W.zoneMat.opacity = owner ? 0.2 + 0.06 * Math.sin(now / 200) : 0.1;
+      W.zoneLineMat.color.set(c);
+      for (const m of W.zonePosts) m.color.set(c);
+    }
+    for (const k2 in P) P[k2].end();
+  }
+
+  // =====================================================================
+  // 对外接口
+  // =====================================================================
+  function setCamera(cx, cy, cz, tx, ty, tz, fov) {
+    if (!camera) return;
+    camera.position.set(cx, cz, cy);
+    camera.lookAt(tx, tz, ty);
+    if (fov && Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  }
+  const _p = new T.Vector3();
+  function project(x, y, z) {
+    if (!camera) return null;
+    _p.set(x, z, y).project(camera);
+    if (_p.z > 1 || _p.z < -1) return null;
+    return { x: ((_p.x + 1) / 2) * innerWidth, y: ((1 - _p.y) / 2) * innerHeight };
+  }
+  function render(G, now, dt, myId) {
+    if (!W || W.G !== G) return;
+    if (W.dirty) { W.surfTex.needsUpdate = true; W.dirty = false; }
+    syncBots(G, now, dt, myId);
+    syncWorld(G, now, dt);
+    stepParticles(dt);
+    renderer.render(scene, camera);
+  }
+  function clear() { dispose(); show(false); }
+
+  window.GB3D = {
+    get ok() { return init(); },
+    build, paintCell, burst, setCamera, project, render, clear, show,
+    info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
+  };
+})();
