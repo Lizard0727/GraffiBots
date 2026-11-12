@@ -484,7 +484,8 @@
   const sendHello = () => send({ t: 'hello', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot, level: level() });
   const sendLoadout = () => send({ t: 'loadout', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot, level: level() });
   setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
-  const LOCAL_TEXT = () => (window.Peer ? '单机模式 ✓ 创建房间后，朋友可用房间码联机' : '单机模式 ✓（P2P 组件未加载，只能和 AI 对战）');
+  const NO_P2P = window.GB_ARTIFACT ? '网页版只能和 AI 对战；和朋友联机请用 ZIP 版' : 'P2P 组件未加载，只能和 AI 对战';
+  const LOCAL_TEXT = () => (window.Peer ? '单机模式 ✓ 创建房间后，朋友可用房间码联机' : `单机模式 ✓（${NO_P2P}）`);
 
   function connect() { if (FILE_MODE) startLocal(); else connectWS(); }
 
@@ -534,7 +535,7 @@
   // 房主：把内置服务器开放给 P2P 连接
   function stopHost() { if (peerHost) { try { peerHost.destroy(); } catch (e) { /* ignore */ } } peerHost = null; hostCode = null; }
   function hostP2P(code) {
-    if (!window.Peer) { setP2P('P2P 组件未加载，本房间只能和 AI 对战', 'bad'); return; }
+    if (!window.Peer) { setP2P(NO_P2P, 'bad'); return; }
     if (peerHost && hostCode === code) return;
     stopHost();
     hostCode = code;
@@ -568,7 +569,7 @@
   let joining = false;
   function joinP2P(code) {
     if (localHub && localHub.rooms.has(code) && net && net.kind === 'local') { send({ t: 'join', code }); return; }
-    if (!window.Peer) { toast('P2P 组件未加载，无法联机'); return; }
+    if (!window.Peer) { toast(NO_P2P); return; }
     if (joining) return;
     joining = true;
     setConn(`正在连接房间 ${code}…`, '');
