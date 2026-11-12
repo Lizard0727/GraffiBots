@@ -79,7 +79,31 @@
     { id: 'crown', name: '王冠', lv: 6 },
     { id: 'horns', name: '恶魔角', lv: 8 },
   ];
-  S.levelFromXp = (xp) => Math.floor(Math.sqrt(Math.max(0, xp) / 120)) + 1;
+  // ---------------- 驾驶员（立绘 + 3D 驾驶舱里的角色） ----------------
+  // hair/skin/eye 同时用于 SVG 立绘与 3D 模型；style 决定发型
+  S.PILOTS = [
+    { id: 'blaze', name: '凌焰', code: '烈焰', title: '热血突击手', weapon: 'blaster', accent: '#ff4d3d',
+      hair: '#e8382f', hair2: '#8f1022', skin: '#ffd9bf', eye: '#ffb21f', style: 'spiky', eyeShape: 'sharp', mouth: 'grin', outfit: 'jacket',
+      line: '涂料都装满了？那就冲啊！', bio: '街头涂鸦队的队长，永远第一个冲进敌阵。说话大声、笑声更大，护目镜是他唯一不肯借人的东西。' },
+    { id: 'frost', name: '白夜', code: '霜刃', title: '冷面狙击手', weapon: 'charger', accent: '#5fd3ff',
+      hair: '#e6eef8', hair2: '#8796b8', skin: '#fde3d2', eye: '#47c8ff', style: 'swept', eyeShape: 'cool', mouth: 'calm', outfit: 'coat',
+      line: '一发，就够了。', bio: '曾经的天台竞速冠军，退役后只用一支狙击笔说话。刘海下藏着一只机械义眼，能看清八百米外的涂料滴。' },
+    { id: 'candy', name: '苏糖', code: '电音', title: '元气偶像主播', weapon: 'gatling', accent: '#ff5fc1',
+      hair: '#ff8fcf', hair2: '#c0367e', skin: '#ffe2d3', eye: '#b56bff', style: 'twintail', eyeShape: 'round', mouth: 'open', outfit: 'idol',
+      line: '大家～今天也要涂得闪闪发光哦！', bio: '拥有百万粉丝的直播主，猫耳耳机连着直播间。看起来软萌，实际是旋转喷管的火力狂人。' },
+    { id: 'titan', name: '雷豹', code: '铁拳', title: '重装开路者', weapon: 'roller', accent: '#ffb000',
+      hair: '#2a2420', hair2: '#0d0b0a', skin: '#b97a55', eye: '#ffcc33', style: 'dreads', eyeShape: 'bold', mouth: 'smirk', outfit: 'tank',
+      line: '挡路的，统统碾过去。', bio: '前码头起重机驾驶员，力气大到能单手扛起滚刷。外表凶悍，其实是全队最会照顾人的大哥。' },
+    { id: 'raven', name: '夜鸢', code: '墨鸦', title: '神秘涂鸦师', weapon: 'bucket', accent: '#a46bff',
+      hair: '#3b2b5c', hair2: '#160f26', skin: '#f6d8c8', eye: '#c18bff', style: 'hood', eyeShape: 'sleepy', mouth: 'smirk', outfit: 'hoodie',
+      line: '这面墙……归我了。', bio: '城市里最神秘的涂鸦作者，没人见过她摘下兜帽。她泼出的每一桶涂料都是一幅画。' },
+    { id: 'aurora', name: '星澜', code: '极光', title: '天才机兵工程师', weapon: 'blaster', accent: '#2ee6b0',
+      hair: '#35d6c4', hair2: '#1c6f8c', skin: '#ffe4d6', eye: '#3fe0a0', style: 'ponytail', eyeShape: 'round', mouth: 'smile', outfit: 'engineer',
+      line: '机兵的参数我都调好啦，交给我吧！', bio: '十四岁就设计出第一台涂鸦机兵的天才少女。头上的护目镜是工作用的，扳手总是插在腰间。' },
+  ];
+  S.pilot = (id) => S.PILOTS.find((p) => p.id === id) || S.PILOTS[0];
+
+  S.levelFromXp =(xp) => Math.floor(Math.sqrt(Math.max(0, xp) / 120)) + 1;
   S.xpForLevel = (lv) => (lv - 1) * (lv - 1) * 120;
 
   // ---------------- 模式 ----------------
@@ -221,29 +245,108 @@
     }
     return s * (sm || 1);
   };
-  // p: {x,y,z,vx,vy,vz,onGround,team,sm}; inp: {mx,my,w,j}
+  // ---------------- 物理手感参数 ----------------
+  // 加速度单位：单位/秒²。机兵有质量感：起步要加速、松手会滑行、急转会刹车。
+  S.PHYS = {
+    walk: { acc: 1500, brake: 2300, coast: 1700 },        // 双足行走：抓地好
+    wheelOwn: { acc: 1150, brake: 900, coast: 240 },      // 己方涂料上的滚轮：滑溜、惯性大
+    wheelDry: { acc: 700, brake: 1100, coast: 900 },      // 无涂料地面上的滚轮
+    sticky: { acc: 520, brake: 2600, coast: 2600 },       // 敌方涂料：又黏又慢
+    air: { acc: 520, brake: 620, coast: 90 },             // 空中：保留动量，少量空中控制
+    kbGround: 7.5, kbAir: 1.2,                            // 击退速度的衰减（地面摩擦 / 空气阻力）
+    coyote: 0.11,                                         // 走出平台边缘后仍可起跳的宽限时间
+    jumpBuffer: 0.13,                                     // 落地前提前按跳的缓冲时间
+    jumpCut: 2.4,                                         // 松开跳跃键后上升阶段的额外重力倍数（短按小跳）
+    fallMul: 1.25,                                        // 下落阶段重力略大：落地更干脆
+    maxFall: 1400,
+  };
+  function surfaceFor(team, ground, wheel) {
+    const P = S.PHYS;
+    if (ground < 0) return P.air;
+    const enemy = ground !== 0 && ground !== team;
+    if (enemy) return P.sticky;
+    if (wheel) return ground === team ? P.wheelOwn : P.wheelDry;
+    return P.walk;
+  }
+  // 速度向目标速度靠近：同向加速用 acc，反向/超速用 brake，无输入用 coast
+  function approach(p, tx, ty, surf, dt) {
+    const dvx = tx - p.vx, dvy = ty - p.vy;
+    const dl = Math.hypot(dvx, dvy);
+    if (dl < 1e-4) return;
+    const tl = Math.hypot(tx, ty), vl = Math.hypot(p.vx, p.vy);
+    let a;
+    if (tl < 1) a = surf.coast;
+    else if (p.vx * tx + p.vy * ty < 0 || vl > tl + 5) a = surf.brake;
+    else a = surf.acc;
+    const m = Math.min(dl, a * dt);
+    p.vx += (dvx / dl) * m; p.vy += (dvy / dl) * m;
+  }
+  // 施加冲量（击退、后坐力、爆炸），kx/ky 独立于操控速度衰减，玩家无法马上抵消
+  S.impulse = function (p, ix, iy, iz) {
+    p.kx = (p.kx || 0) + ix; p.ky = (p.ky || 0) + iy;
+    const kl = Math.hypot(p.kx, p.ky);
+    if (kl > 520) { p.kx *= 520 / kl; p.ky *= 520 / kl; }
+    if (iz > 0) { p.vz = Math.max(p.vz || 0, 0) + iz; p.onGround = false; p.coy = 0; }
+  };
+
+  // p: {x,y,z,vx,vy,vz,kx,ky,onGround,team,sm}; inp: {mx,my,w,j,jh}
+  // 返回脚下涂料（空中为 -1）；p.landV 记录本帧落地冲击速度（供镜头 / 动画 / 音效使用）
   S.stepMove = function (p, inp, dt, grid, M, mul) {
+    const P = S.PHYS;
     if (p.z == null) { p.z = S.topAt(M, p.x, p.y); p.vz = 0; p.onGround = true; }
+    if (p.kx == null) { p.kx = 0; p.ky = 0; p.coy = 0; p.jb = 0; }
+    p.landV = 0;
     let mx = inp.mx || 0, my = inp.my || 0;
     const l = Math.hypot(mx, my);
     if (l > 1) { mx /= l; my /= l; }
+    const wheel = !!inp.w;
     const ground = p.onGround ? S.cellAt(grid, p.x, p.y) : -1;
-    const spd = S.speedFor(p.team, p.sm, ground, !!inp.w, mul);
-    const k = Math.min(1, dt * (p.onGround ? 14 : 5));
-    p.vx += (mx * spd - p.vx) * k;
-    p.vy += (my * spd - p.vy) * k;
-    if (inp.j && p.onGround) { p.vz = inp.w ? S.JUMP_W : S.JUMP_V; p.onGround = false; }
-    p.x += p.vx * dt; p.y += p.vy * dt;
+    const spd = S.speedFor(p.team, p.sm, ground, wheel, mul);
+    approach(p, mx * spd, my * spd, surfaceFor(p.team, ground, wheel), dt);
+    // 击退衰减
+    const kd = Math.exp(-dt * (p.onGround ? P.kbGround : P.kbAir));
+    p.kx *= kd; p.ky *= kd;
+    if (Math.abs(p.kx) < 1) p.kx = 0;
+    if (Math.abs(p.ky) < 1) p.ky = 0;
+    // 跳跃：土狼时间 + 预输入缓冲
+    p.coy = p.onGround ? P.coyote : Math.max(0, p.coy - dt);
+    if (inp.j && !p.jHeld) p.jb = P.jumpBuffer; else p.jb = Math.max(0, p.jb - dt);
+    p.jHeld = !!inp.j;
+    if (p.jb > 0 && p.coy > 0) {
+      p.vz = wheel ? S.JUMP_W : S.JUMP_V;
+      p.onGround = false; p.coy = 0; p.jb = 0; p.jumped = true;
+    }
+    // 水平位移 + 碰撞；撞墙时去掉速度中朝向墙的分量（贴墙滑行而不是卡住）
+    const ox = p.x, oy = p.y;
+    const ex = (p.vx + p.kx) * dt, ey = (p.vy + p.ky) * dt;
+    p.x += ex; p.y += ey;
     S.collide(p, S.R, M);
+    const nx = p.x - (ox + ex), ny = p.y - (oy + ey);
+    const nl = Math.hypot(nx, ny);
+    if (nl > 0.01) {
+      const ux = nx / nl, uy = ny / nl;
+      const dv = p.vx * ux + p.vy * uy;
+      if (dv < 0) { p.vx -= ux * dv; p.vy -= uy * dv; }
+      const dk = p.kx * ux + p.ky * uy;
+      if (dk < 0) { p.kx -= ux * dk * 1.4; p.ky -= uy * dk * 1.4; }   // 击退撞墙小幅反弹
+    }
+    // 垂直
     const gh = S.topAt(M, p.x, p.y);
     if (p.onGround) {
       if (gh < p.z - 0.5) { p.onGround = false; p.vz = 0; }
       else p.z = gh;
     }
     if (!p.onGround) {
-      p.vz -= S.GRAV * dt;
+      let g = S.GRAV;
+      if (p.vz > 0 && inp.jh === false && p.jumped) g *= P.jumpCut;
+      else if (p.vz < 0) g *= P.fallMul;
+      p.vz = Math.max(-P.maxFall, p.vz - g * dt);
       p.z += p.vz * dt;
-      if (p.z <= gh) { p.z = gh; p.vz = 0; p.onGround = true; }
+      if (p.z <= gh) {
+        p.landV = p.vz; p.z = gh; p.vz = 0; p.onGround = true; p.jumped = false;
+        // 落地冲击：重落地会损失一点水平速度
+        if (p.landV < -520) { const k = wheel ? 0.92 : 0.7; p.vx *= k; p.vy *= k; }
+      }
     }
     return p.onGround ? S.cellAt(grid, p.x, p.y) : -1;
   };

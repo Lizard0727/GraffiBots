@@ -18,9 +18,10 @@
     get(k, d) { try { const v = localStorage.getItem('gb_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('gb_' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
-  const profile = Object.assign({ name: '', weapon: 'blaster', head: 'antenna', xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 }, store.get('profile', {}));
+  const profile = Object.assign({ name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 }, store.get('profile', {}));
   if (!S.WEAPONS[profile.weapon]) profile.weapon = 'blaster';
   if (!S.HEADS.some((h) => h.id === profile.head)) profile.head = 'antenna';
+  if (!S.PILOTS.some((p) => p.id === profile.pilot)) profile.pilot = 'blaze';
   const level = () => S.levelFromXp(profile.xp);
   const saveProfile = () => store.set('profile', profile);
 
@@ -182,7 +183,37 @@
     $('xpBar').style.width = ((profile.xp - cur) / (next - cur)) * 100 + '%';
     $('statsText').innerHTML = `<span>对战 ${profile.matches}</span><span>胜利 ${profile.wins}</span><span>击倒 ${profile.kills}</span><span>涂地 ${profile.paint}</span>`;
     $('chipName').textContent = profile.name || '未命名机兵';
-    drawBotIcon($('chipBot'), profile.weapon, profile.head);
+    const P = S.pilot(profile.pilot);
+    $('chipBot').innerHTML = GP.portrait(P, { face: true });
+    $('chipBot').style.setProperty('--ring', P.accent);
+    $('heroPortrait').innerHTML = GP.portrait(P);
+    const hp = $('heroPilot');
+    hp.style.setProperty('--pc', P.accent);
+    hp.innerHTML = `<b>${P.name}<small>「${P.code}」${P.title}</small></b><i>“${P.line}”</i>`;
+    if (R3.preview($('preview'), { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: P.id })) PV_OK = true;
+  }
+  let PV_OK = false;
+  // ---------------- 驾驶员选择 ----------------
+  function renderPilots() {
+    const box = $('pilotList');
+    box.innerHTML = '';
+    for (const P of S.PILOTS) {
+      const el = document.createElement('button');
+      el.className = 'pcard' + (profile.pilot === P.id ? ' sel' : '');
+      el.style.setProperty('--pc', P.accent);
+      el.innerHTML = GP.portrait(P) + `<div class="pname"><small>「${P.code}」</small><b>${P.name}</b></div>`;
+      el.onclick = () => { profile.pilot = P.id; saveProfile(); sendLoadout(); renderPilots(); renderProfile(); sfx.click(); };
+      box.appendChild(el);
+    }
+    const P = S.pilot(profile.pilot), d = $('pilotDetail');
+    d.style.setProperty('--pc', P.accent);
+    const rec = S.WEAPONS[P.weapon];
+    d.innerHTML = `<h3>${P.name}<small>「${P.code}」</small></h3><div class="ttl">${P.title}</div>
+      <blockquote>“${P.line}”</blockquote><p>${P.bio}</p>
+      <p>擅长武器：<b style="color:#fff">${rec.name}</b></p>
+      ${profile.weapon === P.weapon ? '<small style="color:#7dff9a">✓ 已装备擅长武器</small>' : `<button class="btn small" id="recWpn">装备「${rec.name}」</button>`}`;
+    const b = $('recWpn');
+    if (b) b.onclick = () => { profile.weapon = P.weapon; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
   }
 
   // ---------------- 设置 ----------------
@@ -233,7 +264,7 @@
         el.className = 'wcard' + (profile.weapon === wid ? ' sel' : '');
         el.innerHTML = `<canvas width="112" height="112"></canvas><div><b>${w.name}</b>${compact ? '' : `<p>${w.desc}</p>`}<small>大招：${S.SPECIALS[w.special].name}${compact ? '' : ' — ' + S.SPECIALS[w.special].desc}</small></div>`;
         drawBotIcon(el.querySelector('canvas'), wid, profile.head);
-        el.onclick = () => { profile.weapon = wid; saveProfile(); sendLoadout(); renderWeaponLists(); renderProfile(); sfx.click(); };
+        el.onclick = () => { profile.weapon = wid; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
         box.appendChild(el);
       }
     }
@@ -315,8 +346,9 @@
       const ps = room.players.filter((p) => p.team === t);
       for (const p of ps) {
         const li = document.createElement('li');
-        li.innerHTML = `<canvas width="64" height="64"></canvas><span class="nm">${esc(p.name)}</span><span class="tag">Lv.${p.level || 1} ${S.WEAPONS[p.weapon].name}</span>${p.id === room.hostId ? '<span class="tag host">房主</span>' : ''}${p.id === myId ? '<span class="tag me">你</span>' : ''}`;
-        drawBotIcon(li.querySelector('canvas'), p.weapon, p.head, cs[t]);
+        li.innerHTML = `<div class="avatar"></div><span class="nm">${esc(p.name)}</span><span class="tag">Lv.${p.level || 1} ${S.WEAPONS[p.weapon].name}</span>${p.id === room.hostId ? '<span class="tag host">房主</span>' : ''}${p.id === myId ? '<span class="tag me">你</span>' : ''}`;
+        li.querySelector('.avatar').innerHTML = GP.portrait(S.pilot(p.pilot), { face: true });
+        li.querySelector('.avatar').style.setProperty('--ring', cs[t]);
         ul.appendChild(li);
       }
       if (room.settings.bots) {
@@ -411,7 +443,7 @@
     });
     addEventListener('pointerdown', () => setTimeout(updateNowPlaying, 150));
     addEventListener('keydown', () => setTimeout(updateNowPlaying, 150));
-    renderProfile(); renderWeaponLists(); renderHeads(); renderSettings();
+    renderProfile(); renderWeaponLists(); renderHeads(); renderPilots(); renderSettings();
     menuMusic();
     if (!FILE_MODE) fetch('/info').then((r) => r.json()).then((j) => { lanInfo = j; renderRoom(); }).catch(() => {});
     else $('copyBtn').textContent = '复制房间码';
@@ -427,8 +459,8 @@
   let net = null, localHub = null, peerHost = null, hostCode = null, p2pStatus = { text: '', cls: '' };
   const deliver = (str) => { let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
   const send = (o) => { if (net) net.send(o); };
-  const sendHello = () => send({ t: 'hello', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, level: level() });
-  const sendLoadout = () => send({ t: 'loadout', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, level: level() });
+  const sendHello = () => send({ t: 'hello', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot, level: level() });
+  const sendLoadout = () => send({ t: 'loadout', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot, level: level() });
   setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
   const LOCAL_TEXT = () => (window.Peer ? '单机模式 ✓ 创建房间后，朋友可用房间码联机' : '单机模式 ✓（P2P 组件未加载，只能和 AI 对战）');
 
@@ -622,6 +654,7 @@
     }
     G.me = G.players.get(myId) || null;
     if (G.me) Object.assign(G.me, { px: 0, py: 0, pz: 0, pvx: 0, pvy: 0, pvz: 0, onGround: true, sm: 1 });
+    G.ps = null; G.camDip = 0; G.camDipV = 0;
     view.yaw = G.me && G.me.team === 2 ? Math.PI : 0; view.pitch = -0.12;
     G.shades = [null, 1, 2].map((t) => (t ? [0, 0.12, -0.12].map((k) => shade(colors[t], k)) : null));
     G.mini = document.createElement('canvas'); G.mini.width = S.GW; G.mini.height = S.GH;
@@ -634,6 +667,24 @@
     showScreen('game');
     AU.music('battle');
     lockPointer();
+    showVs(m.players, colors);
+  }
+  // 开局对阵画面：两队驾驶员立绘滑入
+  function showVs(players, colors) {
+    const el = $('vsSplash');
+    const myTeam = G.me ? G.me.team : 1;
+    let html = '';
+    for (const [cls, t] of [['a', myTeam], ['b', 3 - myTeam]]) {
+      html += `<div class="side ${cls}" style="--tc:${rgba(colors[t], 0.85)}"><div class="tname" style="color:${colors[t]}">${teamName(t)}</div>`;
+      players.filter((p) => p.team === t).forEach((p, i) => {
+        html += `<div class="card${p.id === myId ? ' me' : ''}" style="animation-delay:${0.15 + i * 0.08}s">${GP.portrait(S.pilot(p.pilot))}<span>${esc(p.name)}</span></div>`;
+      });
+      html += `</div>`;
+    }
+    el.innerHTML = html + '<div class="vs">VS</div>';
+    el.classList.remove('hidden');
+    clearTimeout(showVs.h);
+    showVs.h = setTimeout(() => el.classList.add('hidden'), 2800);
   }
 
   function paintCell(i, team) { R3.paintCell(i, team); }
@@ -654,6 +705,10 @@
       else if (e[0] === 'ln' && e[9] === myId) handleEvent(e);
       else if (e[0] === 'hit' && e[1] === myId && !e[3]) { G.dmgFlash = 0.35; sfx.hurt(); }
       else if (e[0] === 'bm' && e[9] === myId) { sfx.throw(); addBomb(e); }
+      else if (e[0] === 'kb' && e[1] === myId && G.ps) {
+        S.impulse(G.ps, e[2], e[3], e[4]);
+        G.shake = Math.max(G.shake, Math.min(10, Math.hypot(e[2], e[3]) / 30));
+      }
     }
     if (m.sb) for (const r of m.sb) G.sb.set(r[0], r);
     G.snaps.push({ t: st, pm, o: m.o, d: m.d, e: m.e, done: false });
@@ -667,6 +722,7 @@
     if (a[13] !== G.sync || !alive) {
       G.sync = a[13];
       me.px = a[1]; me.py = a[2]; me.pz = a[17] || 0; me.pvx = 0; me.pvy = 0; me.pvz = 0; me.onGround = true;
+      G.ps = null;
     }
   }
   const OWNER_IDX = { pj: 11, ln: 9, bm: 9 };
@@ -808,7 +864,7 @@
     let w = keys.has('ShiftLeft') || keys.has('ShiftRight');
     if (me && me.spk === SP_BEAM && me.flags & 128) w = false;
     const aim = G.aim || { a: view.yaw, pt: view.pitch };
-    return { mx, my, w, f: mouse.down && !w, j: keys.has('Space'), a: aim.a, pt: aim.pt };
+    return { mx, my, w, f: mouse.down && !w, j: keys.has('Space'), jh: keys.has('Space'), a: aim.a, pt: aim.pt };
   }
 
   // ---------------- 第三人称摄像机 + 准星瞄准 ----------------
@@ -831,10 +887,13 @@
       fx = p.x; fy = p.y; fz = p.z || 0;
     }
     G.camZ = G.camZ == null || Math.abs(G.camZ - fz) > 120 ? fz : G.camZ + (fz - G.camZ) * Math.min(1, dt * 14);
+    // 镜头弹簧（落地下沉）
+    G.camDipV += (-180 * G.camDip - 16 * G.camDipV) * Math.min(dt, 0.05);
+    G.camDip = Math.max(-18, Math.min(8, G.camDip + G.camDipV * Math.min(dt, 0.05)));
     const d = S.dir3(view.yaw, view.pitch);
     const rx = -Math.sin(view.yaw), ry = Math.cos(view.yaw);
     const wheel = G.inp && G.inp.w && me && me.flags & 1;
-    const tx = fx + rx * 24, ty = fy + ry * 24, tz = G.camZ + (wheel ? 38 : 52);
+    const tx = fx + rx * 24, ty = fy + ry * 24, tz = G.camZ + (wheel ? 38 : 52) + G.camDip;
     const want = 138;
     const hit = camRay(tx, ty, tz, -d.x, -d.y, -d.z, want + 12);
     const dist = Math.max(10, Math.min(want, hit - 12));
@@ -842,9 +901,11 @@
     let cx = tx - d.x * G.camD, cy = ty - d.y * G.camD;
     const cz = Math.max(camTop(cx, cy) + 4, tz - d.z * G.camD);
     const sk = shakeOn ? G.shake : 0;
-    const zoom = me && me.weapon === 'charger' && me.charge > 0 ? 72 - 20 * me.charge : 72;
+    const spdN = me ? Math.min(1, Math.hypot(me.pvx || 0, me.pvy || 0) / 330) : 0;
+    G.fovK = (G.fovK || 0) + (spdN - (G.fovK || 0)) * Math.min(1, dt * 4);
+    const zoom = me && me.weapon === 'charger' && me.charge > 0 ? 72 - 20 * me.charge : 72 + 7 * G.fovK;
     G.cam = { x: cx, y: cy, z: cz, d };
-    G.camClose = G.camD < 32;
+    G.camClose = G.camD < 42;
     R3.setCamera(cx + (Math.random() - 0.5) * sk, cy + (Math.random() - 0.5) * sk, cz + (Math.random() - 0.5) * sk,
       cx + d.x * 300, cy + d.y * 300, cz + d.z * 300, zoom);
     // 准星射线：先撞地形，再看是否擦过敌人
@@ -876,9 +937,8 @@
       renderGame(now, dt);
     } else if (!$('title').classList.contains('hidden')) {
       menuBg(now);
-      const pc = $('preview'), c = pc.getContext('2d');
-      c.clearRect(0, 0, pc.width, pc.height);
-      drawBot(c, 100, 104, Math.sin(now / 900) * 0.9 - 0.3, '#ffdf2e', profile.head, profile.weapon, { scale: 3.4, spin: now / 200, gspin: now / 60, tank: 0.5 + 0.5 * Math.sin(now / 700) });
+      if (PV_OK) R3.previewFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
+      loop.last = now;
     }
   }
 
@@ -941,13 +1001,32 @@
     G.inp = inp;
     const alive = me && (me.flags & 1);
     if (me && alive && G.cd <= 0 && !G.over) {
-      const st = { x: me.px, y: me.py, z: me.pz, vx: me.pvx, vy: me.pvy, vz: me.pvz, onGround: me.onGround, team: me.team, sm: me.sm };
+      // 本地预测：完整物理状态（击退、土狼时间、跳跃缓冲）跨帧保留
+      if (!G.ps) G.ps = { x: me.px, y: me.py, z: me.pz, vx: 0, vy: 0, vz: 0, onGround: true };
+      const st = G.ps;
+      st.team = me.team; st.sm = me.sm;
       const spk = me.flags & 128 ? S.SPECIAL_IDS[me.spk] : null;
-      const fallV = me.pvz;
-      S.stepMove(st, inp, dt, G.grid, G.M, S.moveMul(me.weapon, inp.f, spk));
-      if (me.onGround && !st.onGround && st.vz > 100) sfx.jump();
-      if (!me.onGround && st.onGround && fallV < -260) { sfx.land(); const g = S.cellAt(G.grid, st.x, st.y); R3.burst(st.x, st.y, st.z + 2, g ? G.colors[g] : '#9aa0b8', 8, 90, 0.4); }
-      me.px = st.x; me.py = st.y; me.pz = st.z; me.pvx = st.vx; me.pvy = st.vy; me.pvz = st.vz; me.onGround = st.onGround;
+      const wasGround = st.onGround;
+      // 固定子步长，帧率高低手感一致
+      let rem = Math.min(dt, 0.1), landV = 0, jumped = false;
+      while (rem > 1e-5) {
+        const h = Math.min(rem, 1 / 120);
+        const g0 = st.onGround;
+        S.stepMove(st, inp, h, G.grid, G.M, S.moveMul(me.weapon, inp.f, spk));
+        if (g0 && !st.onGround && st.vz > 100) jumped = true;
+        if (st.landV < landV) landV = st.landV;
+        rem -= h;
+      }
+      if (jumped) sfx.jump();
+      if (landV < -260) {
+        sfx.land();
+        const g = S.cellAt(G.grid, st.x, st.y);
+        R3.burst(st.x, st.y, st.z + 2, g ? G.colors[g] : '#9aa0b8', Math.round(6 + Math.min(18, -landV / 50)), 90 + Math.min(160, -landV / 6), 0.4);
+        G.camDipV -= Math.min(260, -landV * 0.35);     // 落地时镜头下沉再回弹
+        if (landV < -700) G.shake = Math.max(G.shake, 5);
+      }
+      me.landT = landV < -200 && !wasGround ? now : me.landT;
+      me.px = st.x; me.py = st.y; me.pz = st.z; me.pvx = st.vx + st.kx; me.pvy = st.vy + st.ky; me.pvz = st.vz; me.onGround = st.onGround;
     }
     updateCamera(dt);
     G.inp = readInput();
@@ -1018,7 +1097,7 @@
       if (!p) continue;
       G.cur.add(id);
       if (id === myId) {
-        p.x = p.px; p.y = p.py; p.z = p.pz; p.vx = p.pvx; p.vy = p.pvy;
+        p.x = p.px; p.y = p.py; p.z = p.pz; p.vx = p.pvx; p.vy = p.pvy; p.vz = p.pvz;
         if (G.aim) { p.a = G.aim.a; p.pt = G.aim.pt; }
         continue;
       }
@@ -1027,7 +1106,7 @@
       p.x = lerp(pa[1], pb[1], k); p.y = lerp(pa[2], pb[2], k); p.z = lerp(pa[17] || 0, pb[17] || 0, k);
       p.a = lerpAngle(pa[3], pb[3], k); p.pt = lerp(pa[18] || 0, pb[18] || 0, k);
       p.hp = pb[4]; p.tank = pb[5]; p.sp = pb[6]; p.flags = pb[7]; p.resp = pb[8] / 10; p.carry = pb[9];
-      p.charge = pb[11] / 100; p.shield = pb[12]; p.vx = pb[14]; p.vy = pb[15]; p.spk = pb[16];
+      p.charge = pb[11] / 100; p.shield = pb[12]; p.vx = pb[14]; p.vy = pb[15]; p.spk = pb[16]; p.vz = pb[19] || 0;
     }
     G.obj = b.o; G.objA = a.o; G.objK = k;
     return true;
@@ -1453,6 +1532,13 @@
       }
     }
     $('resTable').innerHTML = html;
+    const mv = $('resMvp');
+    if (mvp) {
+      const P = S.pilot(mvp.pilot);
+      mv.style.setProperty('--pc', cs[mvp.team]);
+      mv.innerHTML = `<div class="mvp-art">${GP.portrait(P)}</div><div><b>★ MVP</b><h3 style="color:${cs[mvp.team]}">${esc(mvp.name)}</h3><p>“${P.line}”</p><small style="color:var(--muted)">击倒 ${mvp.kills} · 涂地 ${mvp.paint}</small></div>`;
+      mv.classList.remove('show'); void mv.offsetWidth; mv.classList.add('show');
+    } else mv.classList.remove('show');
     // 经验
     if (meRow) {
       const before = level();

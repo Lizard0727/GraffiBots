@@ -26,7 +26,7 @@
           <button class="mbtn" data-panel="settings"><b>设置</b><small>音乐 · 音效 · 画面</small></button>
         </nav>
         <div class="me-chip">
-          <canvas id="chipBot" width="96" height="96"></canvas>
+          <div id="chipBot" class="avatar"></div>
           <div><b id="chipName">机兵</b><div class="lvrow"><span id="lvText">Lv.1</span><small id="xpText"></small></div><div class="bar"><i id="xpBar"></i></div></div>
         </div>
         <div id="connStatus" class="conn">正在连接服务器…</div>
@@ -36,10 +36,14 @@
       <main class="menu-right">
         <div class="mpanel" id="panel-play">
           <div class="play-hero">
-            <canvas id="preview" width="220" height="220"></canvas>
+            <div class="hero-art">
+              <div id="heroPortrait" class="hero-portrait"></div>
+              <canvas id="preview"></canvas>
+            </div>
             <div class="hero-txt">
+              <div class="hero-pilot" id="heroPilot"></div>
               <h2>4v4 联机涂装对战</h2>
-              <p>和朋友组队，用涂料抢地盘、打比赛。创建房间后把邀请链接发给朋友，空位会由 AI 机兵补上。</p>
+              <p>和朋友组队，用涂料抢地盘、打比赛。创建房间后把邀请链接发给朋友，空位会由 AI 驾驶员补上。</p>
               <div class="stats" id="statsText"></div>
             </div>
           </div>
@@ -52,6 +56,11 @@
 
         <div class="mpanel hidden" id="panel-garage">
           <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
+          <h2>驾驶员</h2>
+          <div class="pilot-wrap">
+            <div id="pilotList" class="pilot-list"></div>
+            <div id="pilotDetail" class="pilot-detail"></div>
+          </div>
           <h2>武器</h2>
           <div id="weaponList" class="weapon-list"></div>
           <h2>头部涂装 <small>升级解锁</small></h2>
@@ -68,6 +77,8 @@
             <li>涂地会给<b>大招</b>充能，充满后按 <kbd>Q</kbd> 发动。被击倒会损失一半充能。</li>
             <li>涂料罐会被射击、炸弹消耗。不开火时自动缓慢恢复，变滚轮潜入己方涂料恢复更快。</li>
             <li>被击倒的位置会被炸开一片敌方涂料，5 秒后在基地重新部署。</li>
+            <li>机兵有重量：起步要加速、松手会滑行；<b>长按空格跳得高、短按小跳</b>。被打中或被炸到会被<b>击退</b>，滚轮形态更轻、被推得更远。</li>
+            <li>在「机兵整备」里挑选你的<b>驾驶员</b>，每位驾驶员都有擅长的武器，会坐在你的机兵驾驶舱里。</li>
           </ul>
           <h2>对战模式</h2>
           <div id="guideModes" class="guide-modes"></div>
@@ -140,6 +151,7 @@
       <div id="resSub" class="sub"></div>
       <div class="turfbar"><i id="resA"></i><i id="resB"></i></div>
       <div id="resScore" class="score"></div>
+      <div id="resMvp" class="res-mvp"></div>
       <table id="resTable"></table>
       <div id="resXp" class="xp"></div>
       <button id="resBack" class="btn big">返回房间</button>
@@ -155,10 +167,12 @@
     </div>
   </div>
 
+  <div id="vsSplash" class="vs-splash hidden"></div>
   <div id="toast"></div>
   <script src="vendor/three.min.js"></script>
   <script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"><\/script>')</script>
   <script src="shared.js"></script>
+  <script src="portraits.js"></script>
   <script src="audio.js"></script>
   <script src="vendor/peerjs.min.js"></script>
   <script src="core.js"></script>

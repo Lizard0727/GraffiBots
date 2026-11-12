@@ -97,7 +97,7 @@ kbd { display: inline-block; background: #2b2e43; color: var(--text); border-rad
 .team .sw { width: 18px; height: 18px; border-radius: 50%; display: inline-block; border: 2px solid #000; }
 .team ul { list-style: none; padding: 0; margin: 0 0 8px; min-height: 40px; }
 .team li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: #171822; margin-bottom: 6px; font-size: 14px; }
-.team li canvas { width: 32px; height: 32px; }
+.team li .avatar { width: 36px; height: 36px; flex: none; }
 .team li .nm { flex: 1; font-weight: 700; }
 .team li .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #2b2e43; color: var(--muted); }
 .team li .tag.me { background: var(--accent); color: #000; }
@@ -158,7 +158,7 @@ kbd { display: inline-block; background: #2b2e43; color: var(--text); border-rad
 .mbtn.sel { background: var(--accent); color: #111; }
 .mbtn.sel small { color: #4a4100; }
 .me-chip { display: flex; gap: 10px; align-items: center; background: #1d1f2ccc; border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; margin-top: 6px; }
-.me-chip canvas { width: 48px; height: 48px; }
+.me-chip .avatar { width: 52px; height: 52px; flex: none; }
 .me-chip > div { flex: 1; }
 .me-chip b { font-size: 15px; }
 .nowplay { font-size: 12px; color: var(--muted); }
@@ -169,7 +169,7 @@ kbd { display: inline-block; background: #2b2e43; color: var(--text); border-rad
 .mpanel h2:not(:first-child) { margin-top: 18px; }
 .mpanel h2 small { color: var(--muted); font-weight: 400; letter-spacing: 0; margin-left: 6px; }
 .play-hero { display: flex; gap: 20px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
-.play-hero #preview { width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, #2c2f45, #1a1b27 70%); border: 3px solid #000; flex: none; }
+
 .hero-txt { flex: 1; min-width: 220px; }
 .hero-txt h2 { font-size: 26px; color: var(--text); letter-spacing: 2px; margin: 0 0 8px; }
 .hero-txt p { color: var(--muted); line-height: 1.7; margin: 0 0 10px; font-size: 14px; }
@@ -195,3 +195,70 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .dlg-card { width: min(460px, 100%); background: var(--panel); border: 3px solid #000; border-radius: 18px; padding: 20px; box-shadow: 8px 8px 0 #000; display: flex; flex-direction: column; gap: 14px; }
 .dlg-card h2 { margin: 0; color: var(--accent); letter-spacing: 3px; }
 .dlg-card > .btn { align-self: flex-end; }
+
+/* ================= 驾驶员 / 立绘 ================= */
+.avatar { border-radius: 50%; overflow: hidden; border: 2px solid #000; box-shadow: 0 0 0 2px var(--ring, #ffffff33); background: #2a2440; }
+.avatar svg { width: 100%; height: 100%; display: block; }
+.hero-art { position: relative; width: 300px; height: 300px; flex: none; }
+.hero-portrait { position: absolute; left: 0; top: 0; width: 230px; height: 300px; border-radius: 18px; overflow: hidden; border: 3px solid #000;
+  box-shadow: 6px 6px 0 #000; transform: rotate(-2.5deg); }
+.hero-portrait svg { width: 100%; height: 100%; display: block; }
+.hero-art #preview { position: absolute; right: -10px; bottom: -14px; width: 150px; height: 150px; border-radius: 50%;
+  background: radial-gradient(circle, #3a3358, #17142a 72%); border: 3px solid #000; box-shadow: 4px 4px 0 #000; }
+.hero-pilot { display: inline-flex; flex-direction: column; margin-bottom: 10px; padding: 6px 14px 8px; border-radius: 10px;
+  background: #0007; border-left: 5px solid var(--pc, var(--accent)); }
+.hero-pilot b { font-size: 24px; letter-spacing: 2px; }
+.hero-pilot b small { font-size: 13px; color: var(--pc, var(--accent)); margin-left: 8px; letter-spacing: 1px; }
+.hero-pilot i { font-style: normal; color: #ddd; font-size: 13px; margin-top: 2px; }
+.pilot-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; margin-bottom: 8px; }
+.pilot-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pcard { position: relative; padding: 0; border: 3px solid #000; border-radius: 14px; overflow: hidden; cursor: pointer; background: #1a1726;
+  aspect-ratio: 4 / 5; transition: transform .15s, box-shadow .15s; box-shadow: 3px 3px 0 #000; color: #fff; font: inherit; }
+.pcard svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pcard:hover { transform: translateY(-3px) rotate(-1deg); }
+.pcard.sel { box-shadow: 0 0 0 3px var(--pc), 5px 5px 0 #000; transform: translateY(-3px); }
+.pcard .pname { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; text-align: left;
+  background: linear-gradient(transparent, #000c 55%); }
+.pcard .pname b { display: block; font-size: 17px; letter-spacing: 1px; }
+.pcard .pname small { color: var(--pc); font-weight: 700; font-size: 11px; }
+.pilot-detail { background: #15131fcc; border: 2px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.pilot-detail h3 { margin: 0; font-size: 26px; letter-spacing: 2px; }
+.pilot-detail h3 small { font-size: 14px; color: var(--pc); margin-left: 6px; }
+.pilot-detail .ttl { color: var(--pc); font-weight: 700; font-size: 13px; }
+.pilot-detail blockquote { margin: 0; padding: 8px 12px; border-left: 4px solid var(--pc); background: #0005; border-radius: 6px; font-weight: 700; }
+.pilot-detail p { margin: 0; color: var(--muted); line-height: 1.7; font-size: 13px; }
+.pilot-detail canvas { width: 100%; height: 170px; border-radius: 12px; background: radial-gradient(circle at 50% 60%, #3a3358, #15121f 75%); }
+@media (max-width: 900px) { .pilot-wrap { grid-template-columns: 1fr; } .hero-art { width: 250px; height: 270px; } .hero-portrait { width: 200px; height: 260px; } }
+
+/* 结算 MVP */
+.res-mvp { display: none; align-items: center; gap: 16px; margin: 6px auto 14px; padding: 10px 16px; max-width: 520px; text-align: left;
+  background: linear-gradient(90deg, #0008, transparent); border-left: 5px solid var(--pc, var(--accent)); border-radius: 12px; }
+.res-mvp.show { display: flex; animation: mvpIn .6s cubic-bezier(.2,1.4,.4,1) both; }
+.res-mvp .mvp-art { width: 110px; height: 140px; flex: none; border-radius: 12px; overflow: hidden; border: 3px solid #000; box-shadow: 4px 4px 0 #000; transform: rotate(-3deg); }
+.res-mvp .mvp-art svg { width: 100%; height: 100%; display: block; }
+.res-mvp b { font-size: 13px; color: var(--accent); letter-spacing: 3px; }
+.res-mvp h3 { margin: 2px 0 4px; font-size: 26px; }
+.res-mvp p { margin: 0; color: #ddd; font-weight: 700; }
+@keyframes mvpIn { from { opacity: 0; transform: translateX(-40px); } }
+
+/* 开局对阵画面 */
+.vs-splash { position: fixed; inset: 0; z-index: 30; pointer-events: none; display: flex; align-items: stretch; overflow: hidden; }
+.vs-splash .side { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 0; padding: 0 3vw 8vh; position: relative; }
+.vs-splash .side.a { background: linear-gradient(100deg, var(--tc) 0%, transparent 95%); clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%); animation: vsA .45s cubic-bezier(.2,1,.3,1) both, vsOutA .4s ease-in 2.3s forwards; }
+.vs-splash .side.b { background: linear-gradient(260deg, var(--tc) 0%, transparent 95%); clip-path: polygon(12% 0, 100% 0, 100% 100%, 0 100%); animation: vsB .45s cubic-bezier(.2,1,.3,1) both, vsOutB .4s ease-in 2.3s forwards; }
+.vs-splash .card { width: min(10.5vw, 170px); aspect-ratio: 4 / 5; border: 3px solid #000; border-radius: 14px; overflow: hidden; box-shadow: 5px 5px 0 #000;
+  margin: 0 -0.4vw; position: relative; background: #1a1726; animation: cardIn .5s cubic-bezier(.2,1.5,.4,1) both; }
+.vs-splash .card:nth-child(odd) { transform: translateY(-3vh) rotate(-3deg); }
+.vs-splash .card:nth-child(even) { transform: rotate(2deg); }
+.vs-splash .card svg { width: 100%; height: 100%; display: block; }
+.vs-splash .card span { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 5px; font-weight: 900; font-size: 15px; text-align: center; background: linear-gradient(transparent, #000d 60%); }
+.vs-splash .card.me { box-shadow: 0 0 0 4px #fff, 5px 5px 0 #000; }
+.vs-splash .tname { position: absolute; top: 12vh; font-size: clamp(28px, 4vw, 54px); font-weight: 900; letter-spacing: 6px; text-shadow: 4px 4px 0 #000; }
+.vs-splash .side.a .tname { left: 4vw; } .vs-splash .side.b .tname { right: 4vw; }
+.vs-splash .vs { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-8deg); font-size: clamp(60px, 10vw, 140px); font-weight: 900;
+  color: #ffdf2e; text-shadow: 6px 6px 0 #000, -2px -2px 0 #000; font-style: italic; animation: vsPop .5s .25s cubic-bezier(.2,1.8,.4,1) both, fadeOut .3s 2.4s forwards; }
+@keyframes vsA { from { transform: translateX(-100%); } } @keyframes vsB { from { transform: translateX(100%); } }
+@keyframes vsOutA { to { transform: translateX(-110%); } } @keyframes vsOutB { to { transform: translateX(110%); } }
+@keyframes vsPop { from { transform: translate(-50%, -50%) scale(3) rotate(-8deg); opacity: 0; } }
+@keyframes cardIn { from { opacity: 0; transform: translateY(40px) scale(.8); } }
+@keyframes fadeOut { to { opacity: 0; } }

@@ -96,16 +96,21 @@ class Game {
     const slots = { 1: 0, 2: 0 };
     for (const c of room.members.values()) {
       if (slots[c.team] >= S.MAX_PER_TEAM) continue;
-      this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++);
+      this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++, c.pilot);
     }
     if (st.bots) {
       let bi = 0;
       const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
+      // AI 机兵由驾驶员们驾驶：优先使用还没人选的驾驶员（名字就是驾驶员的名字）
+      const taken = new Set([...this.players.values()].map((p) => p.pilot));
+      const free = S.PILOTS.filter((pp) => !taken.has(pp.id)).sort(() => Math.random() - 0.5);
       for (const team of [1, 2])
         while (slots[team] < st.teamSize) {
           bi++;
-          this.addPlayer(-bi, names[bi % names.length], team, S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)],
-            S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++);
+          const pp = free.shift();
+          const pil = pp || S.PILOTS[randInt(S.PILOTS.length)];
+          this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, pp && Math.random() < 0.6 ? pp.weapon : S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)],
+            S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id);
         }
     }
     this.initMode();
@@ -116,14 +121,14 @@ class Game {
     }
     room.broadcast({
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
-      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, bot: p.bot })),
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot })),
     });
     if (!opts.manual) this.interval = setInterval(() => this.step(), 1000 / S.TICK);
   }
 
-  addPlayer(id, name, team, weapon, head, bot, slot) {
+  addPlayer(id, name, team, weapon, head, bot, slot, pilot) {
     const p = {
-      id, name, team, weapon, head, bot, slot,
+      id, name, team, weapon, head, bot, slot, pilot: S.pilot(pilot).id,
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, onGround: true,
       hp: 100, tank: 100, sp: 0, alive: true, respawnT: 0, invulnT: 0,
       lastHurt: -10, fireCd: 0, charge: 0, spin: 0, rolling: false, flickT: -10, prevFire: false,
@@ -180,15 +185,16 @@ class Game {
     // 客户端预测移动，服务器校验（限速 + 不穿墙 + 高度合理）
     if (p.alive && this.countdown <= 0 && !this.over && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z) && m.sync === p.sync) {
       const dtAllow = Math.min(0.6, this.time - p.lastPosT) + 0.05;
-      const maxStep = (330 * p.sm + 40) * dtAllow + 12;
+      const kb = this.time - (p.kbT || -9) < 1.2 ? 540 : 0;     // 刚被击退：放宽速度上限
+      const maxStep = (330 * p.sm + 40 + kb) * dtAllow + 12;
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       const gh = this.top(m.x, m.y);
       const test = { x: m.x, y: m.y, z: m.z };
       S.collide(test, S.R - 2, this.M);
-      const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30;
+      const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? 40 : 0);
       if (d <= maxStep && !bad) {
         p.x = m.x; p.y = m.y; p.z = Math.max(gh, m.z); p.lastPosT = this.time;
-        const vmax = 420 * p.sm;
+        const vmax = 420 * p.sm + kb;
         p.vx = clamp(+m.vx || 0, -vmax, vmax); p.vy = clamp(+m.vy || 0, -vmax, vmax); p.vz = clamp(+m.vz || 0, -2000, 600);
         p.onGround = p.z <= gh + 1;
       } else {
@@ -302,6 +308,7 @@ class Game {
 
   fireSpread(p, W) {
     const n = W.pellets || 1, a = p.input.a, pt = p.input.pt;
+    if (n > 1) this.knock(p, -Math.cos(a), -Math.sin(a), p.weapon === 'bucket' ? 110 : 60, 0);   // 泼桶 / 滚刷甩出的后坐力
     for (let i = 0; i < n; i++) {
       const off = n > 1 ? (i / (n - 1) - 0.5) * W.arc : 0;
       const k = n > 1 ? rand(0.85, 1.12) : 1;
@@ -354,9 +361,10 @@ class Game {
       if (b && Math.hypot(b.x - x, b.y - y, b.r - z) < b.r + 4) { b.vx += mz.d.x * (250 + 450 * ch); b.vy += mz.d.y * (250 + 450 * ch); b.last = p.team; return true; }
       return false;
     });
-    if (victim) this.hurt(victim, dmg, p);
+    if (victim) this.hurt(victim, dmg, p, mz.d.x, mz.d.y);
     this.paint(end.x, end.y, this.top(end.x, end.y), 18 + 12 * ch, p.team, p);
     this.ev(['ln', r1(mz.x), r1(mz.y), r1(mz.z), r1(end.x), r1(end.y), r1(end.z), p.team, r2(ch), p.id]);
+    if (ch > 0.5) this.knock(p, -mz.d.x, -mz.d.y, 170 * ch, 0);   // 狙击后坐力
   }
 
   paint(x, y, z, r, team, owner) {
@@ -370,8 +378,22 @@ class Game {
     if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.28);
   }
 
-  hurt(t, dmg, by) {
+  // 冲量：AI 直接作用在服务器状态上；真人玩家的位置由客户端预测，所以发事件让客户端施加
+  knock(t, dx, dy, power, up) {
+    const l = Math.hypot(dx, dy);
+    if (l < 1e-6 || !t.alive) return;
+    const ix = (dx / l) * power, iy = (dy / l) * power, iz = up || 0;
+    t.kbT = this.time;
+    if (t.bot) S.impulse(t, ix, iy, iz);
+    else this.ev(['kb', t.id, Math.round(ix), Math.round(iy), Math.round(iz)]);
+  }
+  hurt(t, dmg, by, kdx, kdy, kmul, kup) {
     if (!t.alive || t.invulnT > 0) return;
+    if (!(t.spT > 0 && t.spKind === 'charge')) {
+      // 受击击退：伤害越高推得越远，滚轮形态更轻、被推得更远
+      if (kdx == null && by) { kdx = t.x - by.x; kdy = t.y - by.y; }
+      if (kdx != null) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : 1), kup || 0);
+    }
     if (t.spT > 0 && t.spKind === 'charge') return;
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
@@ -398,7 +420,7 @@ class Game {
 
   respawn(p) {
     const sp = S.spawnPoint(p.team, p.slot);
-    p.x = sp.x; p.y = sp.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.onGround = true;
+    p.x = sp.x; p.y = sp.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.kx = p.ky = 0; p.onGround = true;
     p.hp = 100; p.tank = 100; p.alive = true; p.invulnT = 2.5;
     p.sync++; p.lastPosT = this.time;
     p.input.f = false;
@@ -463,7 +485,7 @@ class Game {
     for (const t of this.players.values()) {
       if (!t.alive || t.team === team) continue;
       const d = Math.hypot(t.x - x, t.y - y, t.z + 18 - z - 10);
-      if (d < r + S.R && S.los3(this.M, x, y, z + 10, t.x, t.y, t.z + 18)) this.hurt(t, minD + (maxD - minD) * Math.max(0, 1 - d / (r + S.R)), owner);
+      if (d < r + S.R && S.los3(this.M, x, y, z + 10, t.x, t.y, t.z + 18)) { const k = Math.max(0, 1 - d / (r + S.R)); this.hurt(t, minD + (maxD - minD) * k, owner, t.x - x, t.y - y, 1.6, 90 + 160 * k); }
     }
     const b = this.obj.ball;
     if (b && this.obj.resetT <= 0) {
@@ -587,7 +609,7 @@ class Game {
         }
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
-          this.hurt(victim, pr.dmg, owner);
+          this.hurt(victim, pr.dmg, owner, pr.vx, pr.vy);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
         }
@@ -779,7 +801,7 @@ class Game {
       const ch = p.weapon === 'charger' ? p.charge : p.weapon === 'gatling' ? p.spin / W.spinTime : 0;
       pl.push([p.id, r1(p.x), r1(p.y), r2(p.input.a), Math.ceil(p.hp), r1(p.tank), r1(p.sp), flags,
         Math.ceil(p.respawnT * 10), p.carry, Math.round(p.sm * 100), Math.round(ch * 100), r1(p.shield), p.sync,
-        r1(p.vx), r1(p.vy), S.SPECIAL_IDS.indexOf(p.spKind), r1(p.z), r2(p.input.pt)]);
+        r1(p.vx + (p.kx || 0)), r1(p.vy + (p.ky || 0)), S.SPECIAL_IDS.indexOf(p.spKind), r1(p.z), r2(p.input.pt), Math.round(p.vz || 0)]);
     }
     const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState() };
     if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj]);
@@ -806,7 +828,7 @@ class Game {
     const result = {
       mode: this.mode, map: this.mapIdx, winner, reason, turf: [pa, pb], score: o.score.slice(),
       count: o.count ? o.count.map((c) => Math.ceil(c)) : null, colorSet: this.colorSet,
-      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, bot: p.bot, ...p.stats })),
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, ...p.stats })),
     };
     this.result = result;
     if (this.room.manual) return;
@@ -1025,7 +1047,7 @@ class Room {
   lobbyInfo() {
     return {
       code: this.code, hostId: this.hostId, state: this.state, settings: this.settings, colorSet: this.colorSet,
-      players: [...this.members.values()].map((c) => ({ id: c.id, name: c.name, team: c.team, weapon: c.weapon, head: c.head, level: c.level })),
+      players: [...this.members.values()].map((c) => ({ id: c.id, name: c.name, team: c.team, weapon: c.weapon, head: c.head, pilot: c.pilot, level: c.level })),
     };
   }
   broadcastLobby() { this.broadcast({ t: 'lobby', room: this.lobbyInfo() }); }
@@ -1067,6 +1089,7 @@ function setProfile(c, m) {
   if (m.name !== undefined) c.name = sanitizeName(m.name);
   if (m.weapon in S.WEAPONS) c.weapon = m.weapon;
   if (S.HEADS.some((h) => h.id === m.head)) c.head = m.head;
+  if (S.PILOTS.some((p) => p.id === m.pilot)) c.pilot = m.pilot;
   if (Number.isInteger(m.level)) c.level = clamp(m.level, 1, 999);
 }
 
@@ -1125,7 +1148,7 @@ function handle(hub, c, m) {
 class Hub {
   constructor() { this.clients = new Map(); this.rooms = new Map(); this.nextId = 1; }
   connect(conn) {
-    const c = { id: this.nextId++, conn, name: '机兵', weapon: 'blaster', head: 'antenna', level: 1, room: null, team: 1 };
+    const c = { id: this.nextId++, conn, name: '机兵', weapon: 'blaster', head: 'antenna', pilot: 'blaze', level: 1, room: null, team: 1 };
     this.clients.set(c.id, c);
     conn.send({ t: 'welcome', id: c.id });
     return c;
