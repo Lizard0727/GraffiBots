@@ -875,7 +875,7 @@
   // 摄像机碰撞：场地外一圈是 30 高的天台护栏，再往外是空地
   function camTop(x, y) {
     if (x >= 0 && y >= 0 && x < S.W && y < S.H) return S.topAt(G.M, x, y);
-    return x > -40 && y > -40 && x < S.W + 40 && y < S.H + 40 ? 30 : -50;
+    return x > -40 && y > -40 && x < S.W + 40 && y < S.H + 40 ? 54 : -50;
   }
   function camRay(x, y, z, dx, dy, dz, max, step = 4) {
     for (let t = 0; t < max; t += step) if (z + dz * t < camTop(x + dx * t, y + dy * t)) return t;

@@ -74,30 +74,57 @@
   // =====================================================================
   // 构建场景
   // =====================================================================
+  // 每张地图一套天空 / 光照 / 配色
+  const SKIES = [
+    { // 霓虹工厂：黄昏
+      zen: 0x231f5c, mid: 0xc4528c, hor: 0xffb877, sunC: 0xffd7a8, sunI: 0.95, hemiS: 0xffe2ef, hemiG: 0x4a3656, hemiI: 0.78, fill: 0x6f8dff, fog: 0x9a5f8a,
+      sun: [-0.55, 0.42, -0.72], floor: ['#7d7f96', '#73758c'], seam: '#5e6078', tops: ['#8d8fa8', '#a3a6c2', '#55586e'], win: 0.95,
+      sides: [['#ffb02e', '#14151d'], ['#4f7cff', '#2a3d8f'], ['#e9e6f2', '#9a97b0']], trim: ['#14151d', '#f4f2ff', '#ffd23f'], night: false,
+    },
+    { // 涂鸦天台：晴天
+      zen: 0x2a6ee8, mid: 0x6fb4ff, hor: 0xe4f5ff, sunC: 0xfff3dc, sunI: 0.9, hemiS: 0xeaf4ff, hemiG: 0x5a6070, hemiI: 0.75, fill: 0x9ab8ff, fog: 0xb3d2f2,
+      sun: [0.5, 0.75, -0.45], floor: ['#80848f', '#7a7e89'], seam: '#6a6e7a', tops: ['#9497a6', '#a88b66', '#5b5f70'], win: 0.35,
+      sides: [['#ff6a3d', '#2b2b33'], ['#2ec7a6', '#1b6e6a'], ['#f2efe6', '#a8a39a']], trim: ['#2b2b33', '#ffffff', '#ff6a3d'], night: false,
+    },
+    { // 齿轮广场：霓虹夜
+      zen: 0x05071a, mid: 0x1b1450, hor: 0x5b2a80, sunC: 0xb7c6ff, sunI: 0.62, hemiS: 0x8f9cff, hemiG: 0x2a1a3a, hemiI: 0.72, fill: 0xff4fd8, fog: 0x2a1f52,
+      sun: [0.35, 0.6, 0.6], floor: ['#4d4f6a', '#45475f'], seam: '#35364c', tops: ['#5b5e7c', '#6a5a8c', '#33354a'], win: 1.25,
+      sides: [['#ff3ea5', '#20142e'], ['#3a4a8a', '#1fd6ee'], ['#2a2c40', '#8c5cff']], trim: ['#1fd6ee', '#ff3ea5', '#ffdf2e'], night: true,
+    },
+  ];
+
   function build(G) {
     if (!init()) return false;
     dispose();
     shared();
     scene = new T.Scene();
-    scene.background = new T.Color(0x1d1636);
-    scene.fog = new T.Fog(0x1d1636, 1300, 4200);
-    scene.add(new T.HemisphereLight(0xd4dcff, 0x3a2f4a, 0.9));
-    const sun = new T.DirectionalLight(0xfff0dc, 0.72);
-    sun.position.set(S.W / 2 - 520, 1400, S.H / 2 - 760);
+    const SK = SKIES[G.map % SKIES.length];
+    scene.background = new T.Color(SK.hor);
+    scene.fog = new T.Fog(SK.fog, 1500, 5200);
+    scene.add(new T.HemisphereLight(SK.hemiS, SK.hemiG, SK.hemiI));
+    const sun = new T.DirectionalLight(SK.sunC, SK.sunI);
+    const sd = new T.Vector3(...SK.sun).normalize();
+    sun.position.set(S.W / 2 + sd.x * 1500, sd.y * 1500 + 300, S.H / 2 + sd.z * 1500);
     sun.target.position.set(S.W / 2, 0, S.H / 2);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(HQ ? 2048 : 1024, HQ ? 2048 : 1024);
     const sc = sun.shadow.camera;
-    sc.left = -1250; sc.right = 1250; sc.top = 1250; sc.bottom = -1250; sc.near = 200; sc.far = 3600;
+    sc.left = -1250; sc.right = 1250; sc.top = 1250; sc.bottom = -1250; sc.near = 200; sc.far = 3800;
     sun.shadow.bias = -0.0006;
     scene.add(sun, sun.target);
+    // 冷色补光（从背光侧打轮廓）
+    const fill = new T.DirectionalLight(SK.fill, 0.32);
+    fill.position.set(S.W / 2 - sd.x * 1200, 600, S.H / 2 - sd.z * 1200);
+    scene.add(fill);
 
-    W = { G, M: G.M, colors: G.colors, bots: new Map(), pools: {}, dirty: true, pd: new Array(PN).fill(null), pi: 0 };
+    W = { G, M: G.M, colors: G.colors, bots: new Map(), pools: {}, dirty: true, pd: new Array(PN).fill(null), pi: 0, SK };
+    buildSky(SK, sd);
     buildSurface(G);
     buildFloor();
     buildBlocks();
     buildBounds();
     buildCity(G.map);
+    buildProps(G.map);
     buildModeDecor(G);
     buildDynamic(G);
     buildParticles();
@@ -105,52 +132,195 @@
     return true;
   }
 
+  // ---------------- 天空穹顶：渐变 + 太阳光晕 + 云 ----------------
+  function buildSky(SK, sd) {
+    const mat = new T.ShaderMaterial({
+      side: T.BackSide, depthWrite: false, fog: false,
+      uniforms: { zen: { value: new T.Color(SK.zen) }, mid: { value: new T.Color(SK.mid) }, hor: { value: new T.Color(SK.hor) },
+        sunC: { value: new T.Color(SK.sunC) }, sunD: { value: sd.clone() }, night: { value: SK.night ? 1 : 0 } },
+      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: `uniform vec3 zen, mid, hor, sunC, sunD; uniform float night; varying vec3 vD;
+        float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,45.164))) * 43758.5453); }
+        void main(){
+          float y = clamp(vD.y, -0.2, 1.0);
+          vec3 c = y < 0.18 ? mix(hor, mid, smoothstep(-0.05, 0.18, y)) : mix(mid, zen, smoothstep(0.18, 0.85, y));
+          float s = max(dot(normalize(vD), normalize(sunD)), 0.0);
+          c += sunC * (pow(s, 600.0) * 2.5 + pow(s, 24.0) * 0.35 + pow(s, 4.0) * 0.12);
+          if (night > 0.5) { vec3 q = floor(vD * 260.0); float st = step(0.9975, h(q)) * smoothstep(0.1, 0.5, y); c += vec3(st); }
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    });
+    const sky = new T.Mesh(new T.SphereGeometry(5500, 32, 16), mat);
+    sky.position.set(S.W / 2, 0, S.H / 2);
+    sky.renderOrder = -10;
+    scene.add(sky);
+    // 云：柔和的贴图平面
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const x = c.getContext('2d'), R = rng(7);
+    for (let i = 0; i < 26; i++) {
+      const px = 40 + R() * 176, py = 60 + (R() - 0.5) * 40, r = 18 + R() * 30;
+      const g = x.createRadialGradient(px, py, 0, px, py, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+    }
+    const tex = new T.CanvasTexture(c);
+    const cm = new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, color: SK.night ? 0x6a5a9a : new T.Color(SK.mid).lerp(new T.Color(0xffffff), 0.6), opacity: SK.night ? 0.35 : 0.85 });
+    const R2 = rng(31);
+    for (let i = 0; i < 14; i++) {
+      const a = R2() * Math.PI * 2, d = 4200 + R2() * 900, y = 700 + R2() * 1400;
+      const m = new T.Mesh(new T.PlaneGeometry(1400 + R2() * 1400, 500 + R2() * 300), cm);
+      m.position.set(S.W / 2 + Math.cos(a) * d, y, S.H / 2 + Math.sin(a) * d);
+      m.lookAt(S.W / 2, y * 0.6, S.H / 2);
+      m.renderOrder = -9;
+      scene.add(m);
+    }
+  }
+
+  // ---------------- 地面材质：细节贴图 + 环境光遮蔽 + 涂料光泽（着色器注入） ----------------
+  function detailTexture(SK) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d'), R = rng(5);
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, 256, 256);
+    // 混凝土噪点
+    const img = x.getImageData(0, 0, 256, 256), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const v = 232 + R() * 23 - (R() < 0.02 ? 30 : 0); d[i] = d[i + 1] = d[i + 2] = v; }
+    x.putImageData(img, 0, 0);
+    // 斑驳
+    for (let i = 0; i < 14; i++) { x.fillStyle = `rgba(0,0,0,${0.02 + R() * 0.04})`; x.beginPath(); x.ellipse(R() * 256, R() * 256, 10 + R() * 40, 6 + R() * 20, R() * 3, 0, 7); x.fill(); }
+    // 板缝（每 4 格一块地砖）
+    x.fillStyle = 'rgba(0,0,0,0.28)'; x.fillRect(0, 0, 256, 3); x.fillRect(0, 0, 3, 256);
+    x.fillStyle = 'rgba(255,255,255,0.35)'; x.fillRect(0, 3, 256, 1); x.fillRect(3, 0, 1, 256);
+    // 裂纹
+    x.strokeStyle = 'rgba(0,0,0,0.18)'; x.lineWidth = 1;
+    for (let i = 0; i < 3; i++) { x.beginPath(); let px = R() * 256, py = R() * 256; x.moveTo(px, py); for (let k = 0; k < 5; k++) { px += (R() - 0.5) * 40; py += (R() - 0.5) * 40; x.lineTo(px, py); } x.stroke(); }
+    const t = new T.CanvasTexture(c);
+    t.wrapS = t.wrapT = T.RepeatWrapping;
+    t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    return t;
+  }
+  function aoTexture(M) {
+    // 每格统计周围更高的格子数量 → 墙根变暗；低分辨率 + 线性过滤 = 柔和渐变
+    const K = 2, w = S.GW * K, h = S.GH * K;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'), img = x.createImageData(w, h), d = img.data;
+    for (let py = 0; py < h; py++)
+      for (let px = 0; px < w; px++) {
+        const fx = (px + 0.5) / K, fy = (py + 0.5) / K, cx = Math.floor(fx), cy = Math.floor(fy);
+        const t0 = M.top[cy * S.GW + cx];
+        let occ = 0;
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= S.GW || ny >= S.GH) continue;
+            const dt = M.top[ny * S.GW + nx] - t0;
+            if (dt <= 5) continue;
+            const ddx = Math.max(0, Math.abs(nx + 0.5 - fx) - 0.5), ddy = Math.max(0, Math.abs(ny + 0.5 - fy) - 0.5);
+            const dist = Math.hypot(ddx, ddy);
+            occ += Math.max(0, 1 - dist / 2.2) * Math.min(1, dt / 60) * 0.22;
+          }
+        const v = Math.round(255 * (1 - Math.min(0.55, occ)));
+        const i = (py * w + px) * 4; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
+    x.putImageData(img, 0, 0);
+    const t = new T.CanvasTexture(c);
+    t.magFilter = t.minFilter = T.LinearFilter;
+    return t;
+  }
+  function groundMaterial() {
+    const m = lambert(0xffffff, { map: W.surfTex });
+    const detail = W.detailTex, ao = W.aoTex;
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.detailMap = { value: detail };
+      sh.uniforms.aoTex = { value: ao };
+      sh.uniforms.detailRep = { value: new T.Vector2(S.W / 64, S.H / 64) };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform sampler2D detailMap; uniform sampler2D aoTex; uniform vec2 detailRep; varying vec3 vWP;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          vec3 dtl = texture2D(detailMap, vUv * detailRep).rgb;
+          float sat = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b));
+          float ink = smoothstep(0.25, 0.5, sat);
+          diffuseColor.rgb *= mix(dtl * 1.04, vec3(0.97 + dtl.r * 0.05), ink);
+          diffuseColor.rgb *= texture2D(aoTex, vUv).r;`)
+        .replace('#include <output_fragment>', `#include <output_fragment>
+          // 涂料光泽：饱和度高的像素（涂料）加一层随视角变化的高光
+          vec3 Vd = normalize(cameraPosition - vWP);
+          float fres = pow(1.0 - clamp(Vd.y, 0.0, 1.0), 3.0);
+          float glint = pow(max(0.0, sin(vWP.x * 0.21 + vWP.z * 0.17) * sin(vWP.x * 0.13 - vWP.z * 0.23)), 8.0);
+          gl_FragColor.rgb += ink * (fres * 0.22 + glint * 0.12) * vec3(1.0);`);
+    };
+    return m;
+  }
+
   // ---------------- 地面 + 平台顶面共用的涂料贴图 ----------------
   function buildSurface(G) {
+    const SK = W.SK;
     const cv = document.createElement('canvas');
     cv.width = S.W * PK; cv.height = S.H * PK;
     const x = cv.getContext('2d'), M = G.M, C = S.CELL * PK, R = rng(G.map * 977 + 13);
-    const A = ['#2b2e40', '#3f4565', '#4c5479', '#1e1f2a'];
-    const B = ['#272a3a', '#3a405e', '#474e72', '#1a1b25'];
     for (let cy = 0; cy < S.GH; cy++)
       for (let cx = 0; cx < S.GW; cx++) {
         const lv = M.lv[cy * S.GW + cx];
-        x.fillStyle = ((cx >> 2) + (cy >> 2)) % 2 ? A[lv] : B[lv];
+        x.fillStyle = lv ? SK.tops[lv - 1] : SK.floor[((cx >> 3) + (cy >> 3)) % 2];
         x.fillRect(cx * C, cy * C, C, C);
       }
-    x.strokeStyle = 'rgba(255,255,255,0.05)'; x.lineWidth = 1;
-    for (let i = 0; i <= S.GW; i += 4) { x.beginPath(); x.moveTo(i * C, 0); x.lineTo(i * C, cv.height); x.stroke(); }
-    for (let j = 0; j <= S.GH; j += 4) { x.beginPath(); x.moveTo(0, j * C); x.lineTo(cv.width, j * C); x.stroke(); }
-    // 地面涂鸦装饰
     x.save(); x.scale(PK, PK);
-    const words = ['GB', '07', 'SPRAY', '★', 'BOTS', '42', 'INK?', 'NO.9'];
-    for (let i = 0; i < 34; i++) {
+    // 车道线 / 中线 / 中圈
+    x.globalAlpha = 0.5; x.strokeStyle = '#f4f4ff'; x.lineWidth = 6; x.setLineDash([28, 22]);
+    x.beginPath(); x.moveTo(S.W / 2, 20); x.lineTo(S.W / 2, S.H - 20); x.stroke();
+    x.setLineDash([]); x.lineWidth = 8;
+    x.beginPath(); x.arc(S.W / 2, S.H / 2, 150, 0, 7); x.stroke();
+    x.lineWidth = 4; x.beginPath(); x.arc(S.W / 2, S.H / 2, 130, 0, 7); x.stroke();
+    // 两侧基地：队伍色箭头
+    for (const t of [1, 2]) {
+      const b = S.basePos(t), col = G.colors[t];
+      x.globalAlpha = 0.35; x.fillStyle = col;
+      for (let k = 0; k < 3; k++) {
+        const ox = b.x + (t === 1 ? 1 : -1) * (130 + k * 46);
+        x.beginPath();
+        const s = t === 1 ? 1 : -1;
+        x.moveTo(ox, b.y - 60); x.lineTo(ox + s * 30, b.y); x.lineTo(ox, b.y + 60); x.lineTo(ox - s * 16, b.y + 60); x.lineTo(ox + s * 14, b.y); x.lineTo(ox - s * 16, b.y - 60);
+        x.closePath(); x.fill();
+      }
+      x.globalAlpha = 0.25; x.strokeStyle = col; x.lineWidth = 10;
+      x.strokeRect(b.x - 80, b.y - 200, 160, 400);
+    }
+    // 地面涂鸦（低透明度）
+    const words = ['GB', '07', 'SPRAY', '★', 'BOTS', '42', 'INK!', 'NO.9'];
+    for (let i = 0; i < 22; i++) {
       x.save(); x.translate(R() * S.W, R() * S.H); x.rotate(R() * 6.28);
-      x.globalAlpha = 0.05 + R() * 0.05; x.fillStyle = '#fff'; x.strokeStyle = '#fff';
+      x.globalAlpha = 0.07 + R() * 0.06; x.fillStyle = '#fff'; x.strokeStyle = '#fff';
       const t = R();
       if (t < 0.35) { x.beginPath(); x.moveTo(-30, -10); x.lineTo(10, -10); x.lineTo(10, -24); x.lineTo(36, 0); x.lineTo(10, 24); x.lineTo(10, 10); x.lineTo(-30, 10); x.closePath(); x.fill(); }
-      else if (t < 0.7) { x.font = 'bold 46px sans-serif'; x.fillText(words[Math.floor(R() * words.length)], -40, 16); }
+      else if (t < 0.7) { x.font = '900 46px Impact, sans-serif'; x.fillText(words[Math.floor(R() * words.length)], -40, 16); }
       else { x.lineWidth = 6; x.beginPath(); x.arc(0, 0, 20 + R() * 30, 0, 7); x.stroke(); }
       x.restore();
     }
     // 场地边缘警示条
-    x.globalAlpha = 0.3;
-    for (let i = 0; i < S.W; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(i, 0, 32, 8); x.fillRect(i, S.H - 8, 32, 8); }
-    for (let i = 0; i < S.H; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(0, i, 8, 32); x.fillRect(S.W - 8, i, 8, 32); }
+    x.globalAlpha = 0.55;
+    for (let i = 0; i < S.W; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(i, 0, 32, 10); x.fillRect(i, S.H - 10, 32, 10); }
+    for (let i = 0; i < S.H; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(0, i, 10, 32); x.fillRect(S.W - 10, i, 10, 32); }
     x.restore();
-    // 高墙顶部：黄黑斜纹
-    x.save();
+    // 平台顶面：边缘警示带 + 高墙顶部斜纹
     for (const [rx, ry, rw, rh, lv] of M.rects) {
-      if (lv < 3) continue;
       x.save(); x.beginPath(); x.rect(rx * C, ry * C, rw * C, rh * C); x.clip();
-      x.strokeStyle = 'rgba(255,210,63,0.35)'; x.lineWidth = 4;
-      for (let k = -rh * C; k < rw * C; k += 14) { x.beginPath(); x.moveTo(rx * C + k, ry * C); x.lineTo(rx * C + k + rh * C, ry * C + rh * C); x.stroke(); }
+      if (lv >= 3) {
+        x.strokeStyle = 'rgba(255,210,63,0.45)'; x.lineWidth = 5;
+        for (let k = -rh * C; k < rw * C; k += 14) { x.beginPath(); x.moveTo(rx * C + k, ry * C); x.lineTo(rx * C + k + rh * C, ry * C + rh * C); x.stroke(); }
+      } else {
+        x.strokeStyle = lv === 1 ? 'rgba(255,190,40,0.7)' : 'rgba(255,255,255,0.55)'; x.lineWidth = 3;
+        x.strokeRect(rx * C + 2.5, ry * C + 2.5, rw * C - 5, rh * C - 5);
+        x.fillStyle = 'rgba(0,0,0,0.12)';
+        for (let k = 0; k < rw * C; k += 6) x.fillRect(rx * C + k, ry * C, 1, rh * C);
+      }
       x.restore();
     }
-    x.restore();
     W.surf = cv; W.sctx = x;
     W.surfTex = new T.CanvasTexture(cv);
     W.surfTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    W.detailTex = detailTexture(SK);
+    W.aoTex = aoTexture(M);
     // 高度交界的格子：涂料只填满本格，避免溢到台阶上/下
     W.edge = new Uint8Array(S.GW * S.GH);
     for (let cy = 0; cy < S.GH; cy++)
@@ -164,15 +334,17 @@
       }
   }
 
+  // 涂料：大一点、互相重叠的圆 → 连成一片的涂料，而不是一颗颗圆点
   function paintCell(i, team) {
     if (!W || !team) return;
     const x = W.sctx, C = S.CELL * PK, cx = i % S.GW, cy = (i / S.GW) | 0;
-    x.fillStyle = W.G.shades[team][(i * 7919) % 3];
-    if (W.edge[i]) x.fillRect(cx * C, cy * C, C, C);
+    const sh = W.G.shades[team];
+    if (W.edge[i]) { x.fillStyle = sh[0]; x.fillRect(cx * C, cy * C, C, C); }
     else {
-      x.beginPath();
-      x.arc(cx * C + C / 2 + (((i * 13) % 5) - 2) * PK, cy * C + C / 2 + (((i * 29) % 5) - 2) * PK, 11.5 * PK, 0, 6.2832);
-      x.fill();
+      const ox = cx * C + C / 2 + (((i * 13) % 5) - 2) * 0.6 * PK, oy = cy * C + C / 2 + (((i * 29) % 5) - 2) * 0.6 * PK;
+      x.fillStyle = sh[(i * 7919) % 3 === 2 ? 2 : 0];
+      x.beginPath(); x.arc(ox, oy, 13.5 * PK, 0, 6.2832); x.fill();
+      if ((i * 31) % 7 === 0) { x.fillStyle = sh[1]; x.beginPath(); x.arc(ox - 3 * PK, oy - 3 * PK, 4 * PK, 0, 6.2832); x.fill(); }
     }
     W.dirty = true;
   }
@@ -180,64 +352,125 @@
   function buildFloor() {
     const g = new T.PlaneGeometry(S.W, S.H);
     g.rotateX(-Math.PI / 2); g.translate(S.W / 2, 0, S.H / 2);
-    const m = new T.Mesh(g, lambert(0xffffff, { map: W.surfTex }));
+    W.groundMat = groundMaterial();
+    const m = new T.Mesh(g, W.groundMat);
     m.receiveShadow = true;
     scene.add(m);
+    // 场外的天台地面
     const g2 = new T.PlaneGeometry(9000, 9000);
-    g2.rotateX(-Math.PI / 2); g2.translate(S.W / 2, -3, S.H / 2);
-    scene.add(new T.Mesh(g2, lambert(0x17142a)));
+    g2.rotateX(-Math.PI / 2); g2.translate(S.W / 2, -40, S.H / 2);
+    scene.add(new T.Mesh(g2, lambert(new T.Color(W.SK.floor[1]).multiplyScalar(0.45))));
   }
 
-  function wallTexture() {
-    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
-    const x = c.getContext('2d'), R = rng(99);
-    x.fillStyle = '#c9cde0'; x.fillRect(0, 0, 128, 128);
-    x.fillStyle = '#b4b9d0'; x.fillRect(0, 60, 128, 4); x.fillRect(62, 0, 4, 128);
-    const cols = ['#ff5fa2', '#ffd23f', '#3ee8ff', '#a3ff3a', '#ff8a1f', '#b38cff'];
-    for (let i = 0; i < 5; i++) {
-      x.strokeStyle = cols[Math.floor(R() * cols.length)]; x.globalAlpha = 0.55; x.lineWidth = 4 + R() * 6; x.lineCap = 'round';
-      x.beginPath(); x.moveTo(R() * 128, R() * 128);
-      for (let k = 0; k < 3; k++) x.quadraticCurveTo(R() * 128, R() * 128, R() * 128, R() * 128);
-      x.stroke();
+  // ---------------- 方块侧面贴图（三种高度三种风格） ----------------
+  function sideTexture(lv, SK, seed) {
+    const [a, b] = SK.sides[lv - 1];
+    const c = document.createElement('canvas'); c.width = 256; c.height = lv === 3 ? 512 : 256;
+    const x = c.getContext('2d'), R = rng(seed), H = c.height;
+    if (lv === 1) {
+      // 矮掩体：工业路障箱，上下警示斜纹 + 铆钉
+      x.fillStyle = a; x.fillRect(0, 0, 256, H);
+      const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0.25)');
+      x.fillStyle = g; x.fillRect(0, 0, 256, H);
+      for (const y0 of [0, H - 46]) {
+        x.save(); x.beginPath(); x.rect(0, y0, 256, 46); x.clip();
+        x.fillStyle = b; x.fillRect(0, y0, 256, 46);
+        x.fillStyle = a; for (let k = -60; k < 300; k += 40) { x.beginPath(); x.moveTo(k, y0 + 46); x.lineTo(k + 20, y0 + 46); x.lineTo(k + 66, y0); x.lineTo(k + 46, y0); x.closePath(); x.fill(); }
+        x.restore();
+      }
+      x.fillStyle = 'rgba(0,0,0,0.35)'; x.fillRect(0, 46, 256, 3); x.fillRect(0, H - 49, 256, 3); x.fillRect(126, 49, 4, H - 98);
+      x.fillStyle = 'rgba(255,255,255,0.5)';
+      for (const px of [14, 112, 144, 242]) for (const py of [62, H - 62]) { x.beginPath(); x.arc(px, py, 4, 0, 7); x.fill(); }
+      x.font = '900 40px Impact, sans-serif'; x.fillStyle = 'rgba(0,0,0,0.45)'; x.textAlign = 'center'; x.fillText(['01', 'B7', '42', 'GB'][seed % 4], 64, H / 2 + 14);
+    } else if (lv === 2) {
+      // 高台：拼接金属板 + 通风格栅 + 指示灯
+      x.fillStyle = a; x.fillRect(0, 0, 256, H);
+      x.fillStyle = 'rgba(0,0,0,0.22)';
+      for (let k = 0; k < 4; k++) x.fillRect(0, k * 64, 256, 3);
+      x.fillRect(0, 0, 3, H); x.fillRect(128, 0, 3, H);
+      x.fillStyle = 'rgba(255,255,255,0.16)';
+      for (let k = 0; k < 4; k++) x.fillRect(0, k * 64 + 3, 256, 2);
+      x.fillStyle = b; x.fillRect(150, 90, 86, 74);
+      x.fillStyle = 'rgba(0,0,0,0.55)'; for (let k = 0; k < 7; k++) x.fillRect(156, 96 + k * 10, 74, 5);
+      x.fillStyle = 'rgba(255,255,255,0.75)'; x.fillRect(20, 26, 80, 10);
+      x.fillStyle = SK.night ? '#7dfcff' : '#ffe14d'; x.beginPath(); x.arc(40, 200, 8, 0, 7); x.fill();
+      x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(0, H - 16, 256, 16);
+    } else {
+      // 高墙：大面积涂鸦壁画（宽 1024 像素，两段不同内容，减少重复感）
+      c.width = 1024; x.fillStyle = a; x.fillRect(0, 0, 1024, H);
+      const cols = ['#ff3ea5', '#ffd23f', '#1fd6ee', '#9cff2e', '#ff8a1f', '#8c5cff'];
+      const words = ['INK', 'GB!', 'ZAP', 'POW', 'YO!', 'SPLAT', 'BOTS', 'WOW'];
+      for (let seg = 0; seg < 2; seg++) {
+        const ox = seg * 512;
+        for (let i = 0; i < 4; i++) { x.fillStyle = cols[Math.floor(R() * cols.length)]; x.globalAlpha = 0.75; x.beginPath(); x.ellipse(ox + 40 + R() * 430, 140 + R() * 260, 60 + R() * 90, 40 + R() * 70, R(), 0, 7); x.fill(); }
+        x.globalAlpha = 1;
+        const word = words[(seed + seg * 3) % words.length], col = cols[(seed + seg * 2) % cols.length];
+        x.font = `900 ${word.length > 3 ? 110 : 140}px Impact, "Arial Black", sans-serif`; x.textAlign = 'center'; x.lineJoin = 'round';
+        x.save(); x.translate(ox + 256, 300 + (seg ? 30 : 0)); x.rotate(seg ? 0.08 : -0.12);
+        x.lineWidth = 20; x.strokeStyle = '#14151d'; x.strokeText(word, 0, 0);
+        x.fillStyle = '#fff'; x.fillText(word, -5, -6); x.fillStyle = col; x.fillText(word, 0, 0);
+        x.restore();
+        // 喷漆滴落
+        for (let i = 0; i < 8; i++) { x.fillStyle = cols[Math.floor(R() * cols.length)]; const px = ox + R() * 512, py = 210 + R() * 150, l = 30 + R() * 90; x.fillRect(px, py, 5, l); x.beginPath(); x.arc(px + 2.5, py + l, 4, 0, 7); x.fill(); }
+        // 小图案：星星 / 箭头 / 笑脸
+        x.strokeStyle = '#fff'; x.lineWidth = 6; x.lineCap = 'round';
+        const k = (seed + seg) % 3, sx = ox + 60 + R() * 380, sy = 90 + R() * 40;
+        x.beginPath();
+        if (k === 0) { for (let j = 0; j < 5; j++) { const an = -Math.PI / 2 + j * 2.513; x.lineTo(sx + Math.cos(an) * 28, sy + Math.sin(an) * 28); } x.closePath(); }
+        else if (k === 1) { x.moveTo(sx - 30, sy + 20); x.lineTo(sx + 30, sy - 10); x.lineTo(sx + 18, sy - 28); x.moveTo(sx + 30, sy - 10); x.lineTo(sx + 8, sy - 2); }
+        else { x.arc(sx, sy, 26, 0, 7); x.moveTo(sx - 14, sy + 8); x.quadraticCurveTo(sx, sy + 20, sx + 14, sy + 8); }
+        x.stroke();
+      }
+      // 顶部压顶与底部踢脚线
+      x.fillStyle = b; x.fillRect(0, 0, 1024, 22); x.fillRect(0, H - 40, 1024, 40);
+      x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(0, 22, 1024, 4); x.fillRect(0, H - 44, 1024, 4);
+      x.fillStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 1024; k += 256) x.fillRect(k, 0, 3, H);
     }
-    x.globalAlpha = 1; x.fillStyle = '#8a8fa8';
-    for (const [px, py] of [[8, 8], [120, 8], [8, 120], [120, 120], [56, 56], [72, 72]]) { x.beginPath(); x.arc(px, py, 3, 0, 7); x.fill(); }
     const t = new T.CanvasTexture(c);
     t.wrapS = t.wrapT = T.RepeatWrapping;
-    t.anisotropy = 4;
+    t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     return t;
   }
 
   // ---------------- 方块（由高度网格合并） ----------------
   function buildBlocks() {
-    const M = W.M, GW = S.GW, GH = S.GH, C = S.CELL;
+    const M = W.M, GW = S.GW, GH = S.GH, C = S.CELL, SK = W.SK;
     const used = new Uint8Array(GW * GH);
-    const top = { p: [], n: [], uv: [] }, side = { p: [], n: [], uv: [], c: [] }, edge = { p: [], c: [] };
-    const sideCol = [null, new T.Color(0x8f98c8), new T.Color(0xa7b0e2), new T.Color(0x666b8c)];
-    const edgeCol = [null, new T.Color(0x5ef0ff), new T.Color(0xff5fd2), new T.Color(0xffd23f)];
-    const quad = (o, v, n, uv, color) => {
-      for (const k of [0, 1, 2, 0, 2, 3]) {
-        o.p.push(v[k][0], v[k][1], v[k][2]); o.n.push(n[0], n[1], n[2]); o.uv.push(uv[k][0], uv[k][1]);
-        if (o.c) o.c.push(color.r, color.g, color.b);
-      }
+    const geo = () => ({ p: [], n: [], uv: [] });
+    const top = geo(), sides = [null, geo(), geo(), geo()], trim = [null, geo(), geo(), geo()];
+    const quad = (o, v, n, uv) => {
+      for (const k of [0, 1, 2, 0, 2, 3]) { o.p.push(v[k][0], v[k][1], v[k][2]); o.n.push(n[0], n[1], n[2]); o.uv.push(uv[k][0], uv[k][1]); }
     };
+    const cuboid = (o, x0, y0, z0, x1, y1, z1) => {
+      const uv = [[0, 0], [1, 0], [1, 1], [0, 1]];
+      quad(o, [[x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0]], [0, 1, 0], uv);
+      quad(o, [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], [0, 0, -1], uv);
+      quad(o, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1], uv);
+      quad(o, [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [-1, 0, 0], uv);
+      quad(o, [[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], [1, 0, 0], uv);
+    };
+    let faceSeed = 0;
     const box = (x0, z0, w, d, H, lv) => {
       const x1 = x0 + w, z1 = z0 + d;
       const tuv = (x, z) => [x / S.W, 1 - z / S.H];
       quad(top, [[x0, H, z0], [x0, H, z1], [x1, H, z1], [x1, H, z0]], [0, 1, 0], [tuv(x0, z0), tuv(x0, z1), tuv(x1, z1), tuv(x1, z0)]);
-      const sc = sideCol[lv];
-      const suv = (len) => [[0, 0], [len / 64, 0], [len / 64, H / 64], [0, H / 64]];
-      quad(side, [[x1, 0, z0], [x0, 0, z0], [x0, H, z0], [x1, H, z0]], [0, 0, -1], suv(w), sc);
-      quad(side, [[x0, 0, z1], [x1, 0, z1], [x1, H, z1], [x0, H, z1]], [0, 0, 1], suv(w), sc);
-      quad(side, [[x0, 0, z0], [x0, 0, z1], [x0, H, z1], [x0, H, z0]], [-1, 0, 0], suv(d), sc);
-      quad(side, [[x1, 0, z1], [x1, 0, z0], [x1, H, z0], [x1, H, z1]], [1, 0, 0], suv(d), sc);
-      const e = edgeCol[lv], y = H + 0.4;
-      const pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
-      for (let k = 0; k < 4; k++) {
-        const a = pts[k], b = pts[(k + 1) % 4];
-        edge.p.push(a[0], y, a[1], b[0], y, b[1]);
-        edge.c.push(e.r, e.g, e.b, e.r, e.g, e.b);
-      }
+      const o = sides[lv];
+      // 每个面随机水平偏移，避免相邻墙面图案一模一样
+      const ul = lv === 3 ? 512 : 128;
+      const suv = (len) => { const u0 = (faceSeed++ * 0.37) % 1; return [[u0, 0], [u0 + len / ul, 0], [u0 + len / ul, 1], [u0, 1]]; };
+      quad(o, [[x1, 0, z0], [x0, 0, z0], [x0, H, z0], [x1, H, z0]], [0, 0, -1], suv(w));
+      quad(o, [[x0, 0, z1], [x1, 0, z1], [x1, H, z1], [x0, H, z1]], [0, 0, 1], suv(w));
+      quad(o, [[x0, 0, z0], [x0, 0, z1], [x0, H, z1], [x0, H, z0]], [-1, 0, 0], suv(d));
+      quad(o, [[x1, 0, z1], [x1, 0, z0], [x1, H, z0], [x1, H, z1]], [1, 0, 0], suv(d));
+      // 顶部外沿压边（只在外侧，不挡住顶面涂料）
+      const t = 2.2, y0 = H - 4, y1 = H + 0.8, tg = trim[lv];
+      cuboid(tg, x0 - t, y0, z0 - t, x1 + t, y1, z0);
+      cuboid(tg, x0 - t, y0, z1, x1 + t, y1, z1 + t);
+      cuboid(tg, x0 - t, y0, z0, x0, y1, z1);
+      cuboid(tg, x1, y0, z0, x1 + t, y1, z1);
+      // 底部踢脚
+      cuboid(tg, x0 - 1.2, 0, z0 - 1.2, x1 + 1.2, 3, z0); cuboid(tg, x0 - 1.2, 0, z1, x1 + 1.2, 3, z1 + 1.2);
+      cuboid(tg, x0 - 1.2, 0, z0, x0, 3, z1); cuboid(tg, x1, 0, z0, x1 + 1.2, 3, z1);
     };
     for (let cy = 0; cy < GH; cy++)
       for (let cx = 0; cx < GW; cx++) {
@@ -258,53 +491,87 @@
       g.setAttribute('position', new T.Float32BufferAttribute(o.p, 3));
       g.setAttribute('normal', new T.Float32BufferAttribute(o.n, 3));
       g.setAttribute('uv', new T.Float32BufferAttribute(o.uv, 2));
-      if (o.c) g.setAttribute('color', new T.Float32BufferAttribute(o.c, 3));
       return g;
     };
     if (top.p.length) {
-      const tm = new T.Mesh(mk(top), lambert(0xffffff, { map: W.surfTex }));
+      const tm = new T.Mesh(mk(top), W.groundMat);
       tm.receiveShadow = true; tm.castShadow = true; scene.add(tm);
-      W.wallTex = wallTexture();
-      const sm = new T.Mesh(mk(side), lambert(0xffffff, { map: W.wallTex, vertexColors: true }));
+    }
+    for (let lv = 1; lv <= 3; lv++) {
+      if (!sides[lv].p.length) continue;
+      const sm = new T.Mesh(mk(sides[lv]), lambert(0xffffff, { map: sideTexture(lv, SK, lv * 3 + W.G.map) }));
       sm.receiveShadow = true; sm.castShadow = true; scene.add(sm);
-      const eg = new T.BufferGeometry();
-      eg.setAttribute('position', new T.Float32BufferAttribute(edge.p, 3));
-      eg.setAttribute('color', new T.Float32BufferAttribute(edge.c, 3));
-      scene.add(new T.LineSegments(eg, new T.LineBasicMaterial({ vertexColors: true })));
+      const tc = new T.Color(SK.trim[lv - 1]);
+      const glow = SK.night && lv !== 3;
+      const tmm = new T.Mesh(mk(trim[lv]), glow ? basic(tc) : lambert(tc));
+      tmm.castShadow = true; tmm.receiveShadow = !glow; scene.add(tmm);
     }
   }
 
+  // ---------------- 场地围栏：矮墙 + 玻璃护栏 + 立柱 ----------------
   function buildBounds() {
-    const H = 30, th = 40;
-    const mat = lambert(0x4b4f6c);
-    const trim = basic(0xffd23f);
-    for (const [x, z, w, d] of [[S.W / 2, -th / 2, S.W + th * 2, th], [S.W / 2, S.H + th / 2, S.W + th * 2, th], [-th / 2, S.H / 2, th, S.H], [S.W + th / 2, S.H / 2, th, S.H]]) {
-      const m = part(SH.box, mat, w, H, d, x, H / 2, z);
-      m.receiveShadow = true; scene.add(m);
-      scene.add(part(SH.box, trim, w + 1, 3, d + 1, x, H + 1.5, z));
+    const th = 40, SK = W.SK;
+    const wall = lambert(new T.Color(SK.sides[2][0]).multiplyScalar(0.8));
+    const capM = lambert(SK.trim[2]);
+    const glass = new T.MeshPhongMaterial({ color: SK.night ? 0x7af0ff : 0xbfefff, transparent: true, opacity: 0.22, shininess: 90, depthWrite: false, side: T.DoubleSide });
+    const post = lambert(0x3a3e52);
+    const lampM = basic(SK.night ? 0x7dfcff : 0xfff1c2);
+    const segs = [[S.W / 2, -th / 2, S.W + th * 2, th, 0], [S.W / 2, S.H + th / 2, S.W + th * 2, th, 0], [-th / 2, S.H / 2, th, S.H, 1], [S.W + th / 2, S.H / 2, th, S.H, 1]];
+    for (const [x, z, w, d, vert] of segs) {
+      const m = part(SH.box, wall, w, 30, d, x, 15, z); m.receiveShadow = true; scene.add(m);
+      scene.add(part(SH.box, capM, w + 2, 4, d + 2, x, 32, z));
+      // 玻璃护栏（外侧一圈）
+      const len = vert ? d : w;
+      const gx = vert ? x + (x < 0 ? -th / 2 + 4 : th / 2 - 4) : x, gz = vert ? z : z + (z < 0 ? -th / 2 + 4 : th / 2 - 4);
+      // 护栏比镜头低（镜头在出生点会退到场外这一圈上方）
+      const gp = new T.Mesh(new T.PlaneGeometry(len, 14), glass);
+      gp.position.set(gx, 41, gz); if (vert) gp.rotation.y = Math.PI / 2; scene.add(gp);
+      scene.add(part(SH.box, capM, vert ? 3 : len, 2, vert ? len : 3, gx, 48.5, gz));
+      for (let k = -len / 2; k <= len / 2; k += 160) {
+        const px = vert ? gx : gx + k, pz = vert ? gz + k : gz;
+        scene.add(part(SH.box, post, 4, 18, 4, px, 42, pz));
+        scene.add(part(SH.sph, lampM, 2.6, 2.6, 2.6, px, 52, pz));
+      }
     }
   }
 
+  // ---------------- 远景城市 ----------------
   function buildCity(mapIdx) {
-    const R = rng(mapIdx * 131 + 5);
-    const wc = document.createElement('canvas'); wc.width = 32; wc.height = 64;
+    const SK = W.SK, R = rng(mapIdx * 131 + 5);
+    const wc = document.createElement('canvas'); wc.width = 64; wc.height = 128;
     const x = wc.getContext('2d');
-    x.fillStyle = '#000'; x.fillRect(0, 0, 32, 64);
+    x.fillStyle = '#000'; x.fillRect(0, 0, 64, 128);
     const lit = ['#ffd58a', '#9ae6ff', '#ff9ad5', '#fff3c4'];
-    for (let j = 2; j < 64; j += 6) for (let i = 2; i < 32; i += 6) if (R() < 0.38) { x.fillStyle = lit[Math.floor(R() * lit.length)]; x.fillRect(i, j, 3, 3); }
-    const wt = new T.CanvasTexture(wc); wt.wrapS = wt.wrapT = T.RepeatWrapping; wt.repeat.set(3, 6);
-    const mat = lambert(0x161828, { emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.9 });
+    for (let j = 3; j < 128; j += 8) for (let i = 3; i < 64; i += 8) if (R() < (SK.night ? 0.45 : 0.3)) { x.fillStyle = lit[Math.floor(R() * lit.length)]; x.fillRect(i, j, 4, 5); }
+    const wt = new T.CanvasTexture(wc); wt.wrapS = wt.wrapT = T.RepeatWrapping; wt.repeat.set(3, 5);
+    const tones = SK.night ? [0x141628, 0x1b1d34, 0x221c38] : SK.win < 0.5 ? [0x8fa3c4, 0xb6c0d6, 0x7d8db0, 0xd2c6b8] : [0x2a2648, 0x3a3060, 0x4a3a66];
+    const mats = tones.map((c) => lambert(c, { emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: SK.win }));
+    const roofM = lambert(new T.Color(tones[0]).multiplyScalar(0.7));
     const neon = ['#ff3ea5', '#1fd6ee', '#9cff2e', '#ffdf2e', '#8c5cff'];
     let placed = 0;
-    for (let k = 0; k < 400 && placed < 70; k++) {
-      const px = -1500 + R() * (S.W + 3000), pz = -1500 + R() * (S.H + 3000);
-      if (px > -260 && px < S.W + 260 && pz > -260 && pz < S.H + 260) continue;
-      const w = 120 + R() * 220, d = 120 + R() * 220, h = 180 + R() * 900;
-      const b = part(SH.box, mat, w, h, d, px, h / 2 - 3, pz);
+    for (let k = 0; k < 500 && placed < 80; k++) {
+      const px = -1700 + R() * (S.W + 3400), pz = -1700 + R() * (S.H + 3400);
+      if (px > -280 && px < S.W + 280 && pz > -280 && pz < S.H + 280) continue;
+      const w = 140 + R() * 240, d = 140 + R() * 240, h = 160 + R() * 1000;
+      const b = part(SH.box, mats[Math.floor(R() * mats.length)], w, h, d, px, h / 2 - 40, pz);
       b.castShadow = false; scene.add(b);
-      if (R() < 0.5) scene.add(part(SH.box, basic(neon[Math.floor(R() * neon.length)]), w + 2, 4, d + 2, px, h - 3, pz));
+      // 屋顶：压顶 + 水塔 / 天线
+      scene.add(part(SH.box, roofM, w + 6, 8, d + 6, px, h - 36, pz));
+      if (R() < 0.45) { const tw = part(SH.cyl, roofM, 18, 30, 18, px + (R() - 0.5) * w * 0.5, h - 10, pz + (R() - 0.5) * d * 0.5); tw.castShadow = false; scene.add(tw); }
+      if (R() < 0.35) { scene.add(part(SH.cyl, roofM, 2, 90, 2, px, h + 5, pz)); scene.add(part(SH.sph, basic(0xff3b52), 4, 4, 4, px, h + 52, pz)); }
+      if (R() < 0.5) scene.add(part(SH.box, basic(neon[Math.floor(R() * neon.length)]), w + 2, 5, d + 2, px, h - 44 - R() * h * 0.5, pz));
       placed++;
     }
+    // 远处天际线剪影（一圈贴图圆柱）
+    const sc = document.createElement('canvas'); sc.width = 1024; sc.height = 128;
+    const sx = sc.getContext('2d');
+    sx.fillStyle = '#fff';
+    for (let px = 0; px < 1024;) { const w = 10 + R() * 40, h = 20 + R() * 100; sx.fillRect(px, 128 - h, w, h); if (R() < 0.2) sx.fillRect(px + w / 2 - 1, 128 - h - 20, 2, 20); px += w + R() * 4; }
+    const stex = new T.CanvasTexture(sc); stex.wrapS = T.RepeatWrapping; stex.repeat.set(3, 1);
+    const ring = new T.Mesh(new T.CylinderGeometry(4600, 4600, 900, 48, 1, true),
+      new T.MeshBasicMaterial({ map: stex, transparent: true, side: T.BackSide, depthWrite: false, fog: false, color: new T.Color(SK.mid).lerp(new T.Color(SK.zen), 0.55) }));
+    ring.position.set(S.W / 2, 380, S.H / 2); ring.renderOrder = -8;
+    scene.add(ring);
     // 霓虹广告牌
     const texts = ['GRAFFI BOTS', '涂鸦机兵', 'SPRAY ON!', 'INK ZONE'];
     for (let i = 0; i < 4; i++) {
@@ -315,13 +582,69 @@
       g.font = '900 64px "Microsoft YaHei", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.shadowColor = neon[i]; g.shadowBlur = 18; g.fillStyle = '#fff'; g.fillText(texts[i], 256, 68);
       const tex = new T.CanvasTexture(c);
-      const bb = new T.Mesh(new T.PlaneGeometry(520, 130), basic(0xffffff, { map: tex }));
+      const bb = new T.Mesh(new T.PlaneGeometry(520, 130), basic(0xffffff, { map: tex, fog: false }));
       const ang = (i / 4) * Math.PI * 2 + 0.6;
       bb.position.set(S.W / 2 + Math.cos(ang) * 1700, 420 + i * 60, S.H / 2 + Math.sin(ang) * 1400);
       bb.lookAt(S.W / 2, 200, S.H / 2);
       scene.add(bb);
     }
   }
+
+  // ---------------- 装饰物：只放在不可站立的高墙顶和场外，不影响碰撞 ----------------
+  function buildProps(mapIdx) {
+    const R = rng(mapIdx * 71 + 3), SK = W.SK, M = W.M, C = S.CELL;
+    const g = new T.Group();
+    const metal = lambert(0xb9bfd0), dark = lambert(0x3a3e52), fan = lambert(0x23252f);
+    const lamp = basic(SK.night ? 0x7dfcff : 0xfff1c2);
+    for (const [rx, ry, rw, rh, lv] of M.rects) {
+      if (lv < 3) continue;
+      const H = S.LEVEL_H[3], cx = (rx + rw / 2) * C, cz = (ry + rh / 2) * C;
+      const long = rw >= rh, L = (long ? rw : rh) * C;
+      const n = Math.max(1, Math.floor(L / 110));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n - 0.5;
+        const px = long ? cx + t * L : cx, pz = long ? cz : cz + t * L;
+        const kind = R();
+        if (kind < 0.4) {
+          // 空调外机
+          g.add(part(SH.box, metal, 26, 16, 20, px, H + 8, pz));
+          const f = part(SH.cyl, fan, 8, 1, 8, px, H + 16.6, pz); g.add(f);
+        } else if (kind < 0.65) {
+          // 通风管
+          const v = part(SH.cyl, metal, 6, 22, 6, px, H + 11, pz); g.add(v);
+          g.add(part(SH.cyl, dark, 8, 4, 8, px, H + 23, pz));
+        } else if (kind < 0.85) {
+          // 灯柱
+          g.add(part(SH.cyl, dark, 1.6, 40, 1.6, px, H + 20, pz));
+          g.add(part(SH.box, dark, 10, 3, 4, px, H + 40, pz));
+          g.add(part(SH.sph, lamp, 3, 2, 3, px, H + 38, pz));
+        } else {
+          // 小天线
+          g.add(part(SH.cyl, dark, 1, 30, 1, px, H + 15, pz));
+          g.add(part(SH.sph, basic(0xff3b52), 2, 2, 2, px, H + 31, pz));
+        }
+      }
+    }
+    // 场外：水塔、管道、配电箱
+    for (let i = 0; i < 10; i++) {
+      const side = i % 4, t = R();
+      let px, pz;
+      if (side === 0) { px = t * S.W; pz = -140 - R() * 120; } else if (side === 1) { px = t * S.W; pz = S.H + 140 + R() * 120; }
+      else if (side === 2) { px = -140 - R() * 120; pz = t * S.H; } else { px = S.W + 140 + R() * 120; pz = t * S.H; }
+      if (R() < 0.5) {
+        g.add(part(SH.cyl, lambert(0x8a6a4a), 40, 60, 40, px, 50, pz));
+        g.add(part(SH.cone, lambert(0x5a4632), 44, 24, 44, px, 92, pz));
+        for (const [ox, oz] of [[-26, -26], [26, -26], [-26, 26], [26, 26]]) g.add(part(SH.cyl, dark, 2, 40, 2, px + ox, 0, pz + oz));
+      } else {
+        g.add(part(SH.box, metal, 50, 40, 30, px, -20, pz));
+        g.add(part(SH.box, lambert(0xffd23f), 50, 4, 30.5, px, -4, pz));
+      }
+    }
+    scene.add(g);
+    bakeStatic(g);
+  }
+  // 场景静态物体合并（复用机兵的 bake）
+  function bakeStatic(g) { bake(g, true); for (const m of g.children) { m.receiveShadow = true; } }
 
   function flat(mesh, x, y, z) { mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, y); return mesh; }
 
@@ -1190,6 +1513,7 @@
 
   window.GB3D = {
     get ok() { return init(); },
+    get scene() { return scene; },
     build, paintCell, burst, setCamera, project, render, clear, show, preview, previewFrame, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
