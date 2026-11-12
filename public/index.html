@@ -2,7 +2,15 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#15131f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="涂鸦机兵">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <title>涂鸦机兵 GraffiBots</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -176,6 +184,20 @@
   </div>
 
   <div id="vsSplash" class="vs-splash hidden"></div>
+
+  <!-- ============ 触屏操作层 ============ -->
+  <div id="touchUI" class="hidden">
+    <div id="tStick" class="t-stick"><i></i></div>
+    <button class="tb t-fire" data-tb="fire" id="tFire"><span>开火</span></button>
+    <button class="tb t-jump" data-tb="jump" id="tJump"><span>跳跃</span></button>
+    <button class="tb t-wheel" data-tb="wheel" id="tWheel"><span>滚轮</span></button>
+    <button class="tb t-bomb" data-tb="bomb" id="tBomb"><span>💣</span></button>
+    <button class="tb t-sp" data-tb="sp" id="tSp"><span>大招</span></button>
+    <button class="tb t-mini t-menu" data-tb="menu"><span>⏸</span></button>
+    <button class="tb t-mini t-board" data-tb="board"><span>☰</span></button>
+    <button class="tb t-mini t-chat" data-tb="chat"><span>💬</span></button>
+  </div>
+  <div id="rotateHint"><div><b>⟳</b><p>请把手机横过来玩</p></div></div>
   <div id="toast"></div>
   <script src="vendor/three.min.js"></script>
   <script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"><\/script>')</script>

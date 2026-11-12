@@ -46,7 +46,10 @@
   // ================= 音频（见 audio.js） =================
   const AU = window.GBAudio, sfx = AU.sfx;
   let shakeOn = store.get('shake', true);
-  let hqOn = store.get('hq', true);
+  // 触屏设备（手机 / 平板）：虚拟摇杆 + 按钮，默认低画质
+  const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+  if (TOUCH) document.body.classList.add('touch');
+  let hqOn = store.get('hq', !TOUCH);
   let sens = store.get('sens', 1);
   function toggleMute() { const m = AU.toggleMute(); toast(m ? '已静音' : '已开启声音', 1000); renderSettings(); }
 
@@ -471,7 +474,9 @@
   //   ws    —— 通过 node server.js 打开网页时，连接服务器
   //   local —— 直接双击 HTML 打开时，浏览器里运行内置服务器（单机 + 当 P2P 房主）
   //   peer  —— 输入房间码加入别人的 P2P 房间（WebRTC 直连房主）
-  const FILE_MODE = location.protocol === 'file:' || new URLSearchParams(location.search).has('p2p');
+  // 本地文件 / 单文件版 / 静态网页托管：用浏览器内置服务器 + P2P；连不上 Node 服务器时也会自动切换到这个模式
+  let FILE_MODE = location.protocol === 'file:' || new URLSearchParams(location.search).has('p2p') || !!window.GB_SINGLE;
+  let wsEverOpen = false;
   const PEER_PREFIX = 'graffibots-v1-';
   let net = null, localHub = null, peerHost = null, hostCode = null, p2pStatus = { text: '', cls: '' };
   const deliver = (str) => { let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
@@ -489,12 +494,14 @@
     ws = new WebSocket(`${proto}://${location.host}/ws`);
     net = { kind: 'ws', send: (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); } };
     ws.onopen = () => {
+      wsEverOpen = true;
       setConn('已连接服务器 ✓', 'ok');
       sendHello();
       if (wantRoom) { send({ t: 'join', code: wantRoom }); wantRoom = null; }
     };
     ws.onmessage = (e) => deliver(e.data);
     ws.onclose = () => {
+      if (!wsEverOpen) { FILE_MODE = true; ws = null; startLocal(); return; }   // 没有 Node 服务器（静态网页托管）
       setConn('与服务器断开，正在重连…', 'bad');
       if (room) { toast('与服务器断开连接，正在重连…'); wantRoom = room.code; }
       resetToTitle();
@@ -650,7 +657,7 @@
   let lastUnlock = 0, wasLocked = false;
   const locked = () => document.pointerLockElement === cv;
   function lockPointer() {
-    if (!G || locked() || !cv.requestPointerLock) return;
+    if (TOUCH || !G || locked() || !cv.requestPointerLock) return;
     try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* ignore */ }
   }
 
@@ -685,6 +692,7 @@
     showScreen('game');
     AU.music('battle');
     lockPointer();
+    touchShow(true);
     showVs(m.players, colors);
   }
   // 开局对阵画面：两队驾驶员立绘滑入
@@ -868,6 +876,112 @@
     if (G && !G.over && $('settingsDlg').classList.contains('hidden') && $('results').classList.contains('hidden')) openSettings();
   });
 
+  // ================= 触屏操作 =================
+  const TT = { on: false, sx: 0, sy: 0, fire: false, jump: false, wheel: false, ptr: new Map(), board: false };
+  function setupTouch() {
+    if (!TOUCH) return;
+    const ui = $('touchUI'), stick = $('tStick'), knob = stick.querySelector('i');
+    const R = 56;
+    const goFull = () => {
+      const de = document.documentElement;
+      if (!document.fullscreenElement && de.requestFullscreen) {
+        de.requestFullscreen({ navigationUI: 'hide' }).then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* ignore */ } }).catch(() => {});
+      }
+    };
+    const btnOf = (el) => el && el.closest && el.closest('[data-tb]');
+    ui.addEventListener('pointerdown', (e) => {
+      if (!G) return;
+      e.preventDefault();
+      AU.resume();
+      if (store.get('fullscreen', true)) goFull();
+      const b = btnOf(e.target);
+      const rec = { x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, kind: 'look' };
+      if (b) {
+        const k = b.dataset.tb;
+        rec.kind = k; b.classList.add('on');
+        rec.el = b;
+        if (k === 'fire') TT.fire = true;
+        else if (k === 'jump') TT.jump = true;
+        else if (k === 'wheel') { TT.wheel = !TT.wheel; b.classList.toggle('lit', TT.wheel); }
+        else if (k === 'bomb') { G.sq++; G.edge = true; }
+        else if (k === 'sp') { G.qq++; G.edge = true; }
+        else if (k === 'menu') openSettings();
+        else if (k === 'board') TT.board = !TT.board;
+        else if (k === 'chat') send({ t: 'chat', k: (TT.chatK = ((TT.chatK || 0) + 1) % 4) });
+      } else if (e.clientX < innerWidth * 0.42) {
+        rec.kind = 'stick';
+        stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px';
+        stick.classList.add('show'); knob.style.transform = 'translate(-50%,-50%)';
+      }
+      TT.ptr.set(e.pointerId, rec);
+      try { ui.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    }, { passive: false });
+    ui.addEventListener('pointermove', (e) => {
+      const rec = TT.ptr.get(e.pointerId);
+      if (!rec || !G) return;
+      e.preventDefault();
+      if (rec.kind === 'stick') {
+        let dx = e.clientX - rec.x0, dy = e.clientY - rec.y0;
+        const l = Math.hypot(dx, dy);
+        // 拖太远时摇杆底座跟着手指走
+        if (l > R * 1.6) { rec.x0 += (dx / l) * (l - R * 1.6); rec.y0 += (dy / l) * (l - R * 1.6); stick.style.left = rec.x0 + 'px'; stick.style.top = rec.y0 + 'px'; dx = e.clientX - rec.x0; dy = e.clientY - rec.y0; }
+        const k = Math.min(1, Math.hypot(dx, dy) / R), a = Math.atan2(dy, dx);
+        TT.sx = Math.cos(a) * k; TT.sy = -Math.sin(a) * k;
+        if (k < 0.12) { TT.sx = 0; TT.sy = 0; }
+        knob.style.transform = `translate(calc(-50% + ${Math.cos(a) * k * R}px), calc(-50% + ${Math.sin(a) * k * R}px))`;
+      } else if (rec.kind === 'look' || rec.kind === 'fire') {
+        const dx = e.clientX - rec.lx, dy = e.clientY - rec.ly;
+        view.yaw += dx * 0.0062 * sens;
+        view.pitch = clamp(view.pitch - dy * 0.0052 * sens, -1.25, 1.05);
+      }
+      rec.lx = e.clientX; rec.ly = e.clientY;
+    }, { passive: false });
+    const end = (e) => {
+      const rec = TT.ptr.get(e.pointerId);
+      if (!rec) return;
+      TT.ptr.delete(e.pointerId);
+      if (rec.el) rec.el.classList.remove('on');
+      if (rec.kind === 'stick') { TT.sx = 0; TT.sy = 0; stick.classList.remove('show'); }
+      else if (rec.kind === 'fire') TT.fire = false;
+      else if (rec.kind === 'jump') TT.jump = false;
+    };
+    ui.addEventListener('pointerup', end); ui.addEventListener('pointercancel', end);
+    ui.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  function touchShow(on) {
+    if (!TOUCH) return;
+    TT.on = on;
+    $('touchUI').classList.toggle('hidden', !on);
+    document.body.classList.toggle('ingame', on);
+    if (!on) { TT.fire = TT.jump = TT.wheel = false; TT.sx = TT.sy = 0; TT.ptr.clear(); $('tWheel').classList.remove('lit'); }
+  }
+  // 触屏辅助瞄准：开火时准星会被附近的敌人轻轻吸过去
+  function aimAssist(dt) {
+    const me = G.me;
+    if (!TT.on || !TT.fire || !me || !G.cam) return;
+    let best = null, bd = 0.16;
+    for (const id of G.cur) {
+      const p = G.players.get(id);
+      if (!p || !(p.flags & 1) || p.team === me.team || p.flags & 4) continue;
+      const dx = p.x - me.px, dy = p.y - me.py, d = Math.hypot(dx, dy);
+      if (d > S.weaponRange(me.weapon) * 1.1 || d < 20) continue;
+      const da = Math.atan2(Math.sin(Math.atan2(dy, dx) - view.yaw), Math.cos(Math.atan2(dy, dx) - view.yaw));
+      if (Math.abs(da) < bd) { bd = Math.abs(da); best = da; }
+    }
+    if (best != null) view.yaw += best * Math.min(1, dt * 3.2);
+  }
+  function updateTouchHud() {
+    if (!TT.on || !G.me) return;
+    const me = G.me, W = S.WEAPONS[me.weapon];
+    const spk = Math.min(1, me.sp / W.spNeed);
+    const sp = $('tSp');
+    sp.style.setProperty('--p', spk);
+    sp.classList.toggle('lit', spk >= 1);
+    $('tBomb').classList.toggle('dim', me.tank < S.SUB_COST);
+    if (TT.wheel && TT.fire) $('tWheel').classList.remove('lit');
+    if (TT.fire) TT.wheel = false;
+  }
+
   function readInput() {
     let f = 0, r = 0;
     if (keys.has('KeyW')) f += 1;
@@ -878,11 +992,16 @@
     let mx = c * f - s * r, my = s * f + c * r;
     const l = Math.hypot(mx, my);
     if (l > 1) { mx /= l; my /= l; }
+    if (TT.on && (TT.sx || TT.sy)) {
+      // 摇杆是模拟量：轻推慢走
+      mx = c * TT.sy - s * TT.sx; my = s * TT.sy + c * TT.sx;
+    }
     const me = G.me;
-    let w = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    let w = keys.has('ShiftLeft') || keys.has('ShiftRight') || (TT.on && TT.wheel && !TT.fire);
     if (me && me.spk === SP_BEAM && me.flags & 128) w = false;
     const aim = G.aim || { a: view.yaw, pt: view.pitch };
-    return { mx, my, w, f: mouse.down && !w, j: keys.has('Space'), jh: keys.has('Space'), a: aim.a, pt: aim.pt };
+    const jump = keys.has('Space') || (TT.on && TT.jump);
+    return { mx, my, w, f: (mouse.down || (TT.on && TT.fire)) && !w, j: jump, jh: jump, a: aim.a, pt: aim.pt };
   }
 
   // ---------------- 第三人称摄像机 + 准星瞄准 ----------------
@@ -1047,6 +1166,8 @@
       me.px = st.x; me.py = st.y; me.pz = st.z; me.pvx = st.vx + st.kx; me.pvy = st.vy + st.ky; me.pvz = st.vz; me.onGround = st.onGround;
     }
     updateCamera(dt);
+    aimAssist(dt);
+    updateTouchHud();
     G.inp = readInput();
     if (me && !G.over) {
       G.sendAcc += dt;
@@ -1350,14 +1471,17 @@
     txt(`延迟 ${ping}ms`, 12, 16, 12, '#9a9db5', 'left', 0);
     if (now - G.startedAt < 16000 && !G.over) {
       ctx.globalAlpha = Math.min(1, (16000 - (now - G.startedAt)) / 1500);
-      const lines = ['WASD 移动 · 鼠标转视角 · 左键开火 · 空格跳跃', 'Shift 变滚轮：己方涂料上加速、隐身、补涂料；滚轮跳得更高', '右键/E 炸弹 · Q 大招 · 1-4 快捷语音 · Tab 记分板 · Esc 暂停'];
-      lines.forEach((l, i) => txt(l, 12, 230 + i * 20, 13, '#dfe1ee', 'left', 3));
+      const lines = TOUCH
+        ? ['左半屏：摇杆移动 · 右半屏：滑动转视角', '按住「开火」射击（按住时也能滑动瞄准）', '「滚轮」切换形态 · 💣 炸弹 · 大招充满后点击']
+        : ['WASD 移动 · 鼠标转视角 · 左键开火 · 空格跳跃', 'Shift 变滚轮：己方涂料上加速、隐身、补涂料；滚轮跳得更高', '右键/E 炸弹 · Q 大招 · 1-4 快捷语音 · Tab 记分板 · Esc 暂停'];
+      lines.forEach((l, i) => txt(l, 12, (TOUCH ? 190 : 230) + i * 20, 13, '#dfe1ee', 'left', 3));
       ctx.globalAlpha = 1;
     }
 
     // ---- 左下：状态 ----
     if (me) {
-      const bx = 18, by = VH - 22;
+      // 触屏：状态栏放在左上角，给摇杆让出左下
+      const bx = 18, by = TOUCH ? 158 : VH - 22;
       const W = S.WEAPONS[me.weapon];
       // 涂料罐
       const th = 110, tw = 30, tx0 = bx, ty0 = by - th;
@@ -1374,8 +1498,9 @@
       ctx.fillStyle = me.hp > 40 ? '#7dff9a' : '#ff5a6a'; rr(ctx, hx, by - 22, (hw * Math.max(0, me.hp)) / 100, 22, 7); ctx.fill();
       if (me.shield > 0) { ctx.fillStyle = 'rgba(190,246,255,.7)'; rr(ctx, hx, by - 22, Math.min(hw, (hw * me.shield) / 100), 8, 4); ctx.fill(); }
       txt(`${Math.max(0, Math.ceil(me.hp))}`, hx + 8, by - 11, 15, '#111', 'left', 0);
-      // 大招
+      // 大招（触屏版由按钮显示）
       const spx = hx + 30, spy = by - 66, spr = 26;
+      if (!TOUCH) {
       const spk = Math.min(1, me.sp / W.spNeed), ready = spk >= 1;
       ctx.fillStyle = '#000b'; ctx.beginPath(); ctx.arc(spx, spy, spr + 5, 0, 7); ctx.fill();
       ctx.strokeStyle = ready ? '#fff36b' : G.colors[me.team]; ctx.lineWidth = 6;
@@ -1386,12 +1511,13 @@
       // 炸弹
       const canBomb = me.tank >= S.SUB_COST;
       txt(`💣 E / 右键${canBomb ? '' : '（涂料不足）'}`, hx, by - 108 + 6, 12, canBomb ? '#fff' : '#777', 'left', 3);
-      if (alive && me.tank < 12 && !(G.inp && G.inp.w)) txt('涂料不足！按住 Shift 在己方涂料上补充', VW / 2, VH - 120, 18, '#ffdf2e', 'center', 4);
+      }
+      if (alive && me.tank < 12 && !(G.inp && G.inp.w)) txt(TOUCH ? '涂料不足！切换「滚轮」在己方涂料上补充' : '涂料不足！按住 Shift 在己方涂料上补充', VW / 2, TOUCH ? 110 : VH - 120, 18, '#ffdf2e', 'center', 4);
       if (me.carry) txt(`携带电池 ×${me.carry}（送回充电站）`, hx, by - 128 + 6, 13, '#b8ff3a', 'left', 3);
     }
 
     // ---- 小地图 ----
-    const mw = small ? 150 : 228, mh = (mw * S.GH) / S.GW, mx = VW - mw - 14, my = VH - mh - 14;
+    const mw = TOUCH ? 132 : small ? 150 : 228, mh = (mw * S.GH) / S.GW, mx = VW - mw - 14, my = TOUCH ? 14 : VH - mh - 14;
     ctx.fillStyle = '#000c'; rr(ctx, mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.fill();
     ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
     const ms = mw / S.W;
@@ -1460,11 +1586,11 @@
     }
 
     // ---- 记分板 ----
-    if (keys.has('Tab')) drawScoreboard();
+    if (keys.has('Tab') || TT.board) drawScoreboard();
 
     // ---- 准星（屏幕中心） ----
     const chx = VW / 2, chy = VH / 2;
-    if (!locked() && !G.over && $('settingsDlg').classList.contains('hidden')) {
+    if (!TOUCH && !locked() && !G.over && $('settingsDlg').classList.contains('hidden')) {
       ctx.fillStyle = '#000b'; rr(ctx, chx - 150, chy + 120, 300, 40, 12); ctx.fill();
       txt('🖱 点击画面锁定鼠标，开始操控', chx, chy + 140, 16, '#ffdf2e', 'center', 0);
     }
@@ -1518,6 +1644,7 @@
     const myTeam = meRow ? meRow.team : 1;
     const cs = S.COLOR_SETS[r.colorSet].c;
     G = null;
+    touchShow(false);
     if (document.exitPointerLock && locked()) document.exitPointerLock();
     setTimeout(menuMusic, 2500);
     $('results').classList.remove('hidden');
@@ -1579,6 +1706,9 @@
   // ================= 启动 =================
   window.__gbDebug = () => ({ G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
+  setupTouch();
+  // 通过网址打开时注册离线缓存（双击本地文件打开时浏览器不支持，自动跳过）
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.GB_SINGLE) navigator.serviceWorker.register('sw.js').catch(() => {});
   connect();
   requestAnimationFrame(loop);
 })();
