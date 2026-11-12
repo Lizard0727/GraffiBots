@@ -6,7 +6,7 @@
   const T = window.THREE;
   const PK = 0.5;              // 涂料贴图分辨率（像素/游戏单位）
   const PN = 2500;             // 粒子上限
-  let renderer = null, scene = null, camera = null, W = null, failed = false;
+  let renderer = null, scene = null, camera = null, W = null, failed = false, HQ = true;
 
   function rng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
   const lambert = (c, extra) => new T.MeshLambertMaterial(Object.assign({ color: c }, extra));
@@ -18,8 +18,8 @@
     try {
       renderer = new T.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, powerPreference: 'high-performance' });
     } catch (e) { failed = true; console.error(e); return false; }
-    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1));
+    renderer.shadowMap.enabled = HQ;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     camera = new T.PerspectiveCamera(72, 1, 2, 7000);
     resize();
@@ -60,7 +60,7 @@
     SH.dark = lambert(0x1b1c26); SH.metal = lambert(0x3c4056); SH.visor = lambert(0x0d0e15);
     SH.glow = basic(0xc4fbff); SH.yellow = basic(0xfff36b); SH.white = lambert(0xf4efe6); SH.orange = lambert(0xff7a1a);
     SH.gold = lambert(0xffd23f, { emissive: 0x4a2c00 }); SH.red = basic(0xff3e6c); SH.phone = lambert(0x23252f);
-    SH.box = new T.BoxGeometry(1, 1, 1); SH.cyl = new T.CylinderGeometry(1, 1, 1, 14); SH.sph = new T.SphereGeometry(1, 14, 10);
+    SH.box = new T.BoxGeometry(1, 1, 1); SH.cyl = new T.CylinderGeometry(1, 1, 1, 14); SH.sph = new T.SphereGeometry(1, 12, 8); SH.sphL = new T.SphereGeometry(1, 8, 6);
     SH.cone = new T.ConeGeometry(1, 1, 12); SH.ring = new T.RingGeometry(0.86, 1, 56); SH.tube = new T.CylinderGeometry(1, 1, 1, 8, 1, true);
     SH.disc = new T.CircleGeometry(1, 40); SH.glowW = basic(0xffffff);
     return SH;
@@ -577,7 +577,7 @@
   const toon = (c, extra) => new T.MeshToonMaterial(Object.assign({ color: c, gradientMap: toonGrad() }, extra));
   // 圆角方块：把细分方块的顶点推到「内盒 + 半径」的表面上
   const RB = new Map();
-  function rbox(w, h, d, r, seg = 3) {
+  function rbox(w, h, d, r, seg = 2) {
     const key = [w, h, d, r, seg].join(',');
     if (RB.has(key)) return RB.get(key);
     const g = new T.BoxGeometry(w, h, d, seg * 2, seg * 2, seg * 2);
@@ -595,6 +595,19 @@
     return g;
   }
   const OUTLINE = new T.MeshBasicMaterial({ color: 0x1a1024, side: T.BackSide });
+  // 画质：低画质关闭阴影、描边，降低分辨率（阴影开关在下一次建场景时生效）
+  function setQuality(hq) {
+    HQ = !!hq;
+    OUTLINE.visible = HQ;
+    if (renderer) {
+      renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1));
+      resize();
+      if (renderer.shadowMap.enabled !== HQ) {
+        renderer.shadowMap.enabled = HQ;
+        if (scene) scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; });
+      }
+    }
+  }
   // 反向外壳描边：同一几何体放大一点、只画背面
   function outlined(geo, mat, sx, sy, sz, x, y, z, k = 1) {
     const g = new T.Group();
@@ -611,6 +624,47 @@
     return g;
   }
 
+  // 合并静态部件：同一材质的网格合成一个，大幅减少绘制调用。
+  // 带 userData.dyn（会动的关节组）或 userData.keep（单独动画的零件）的对象不会被合并。
+  function bake(g, shadows = true) {
+    g.updateMatrixWorld(true);
+    const inv = new T.Matrix4().copy(g.matrixWorld).invert();
+    const buckets = new Map(), removed = [];
+    const visit = (o) => {
+      for (const c of o.children) {
+        if (c.userData.dyn || c.userData.keep) continue;
+        if (c.isMesh) {
+          const m = new T.Matrix4().multiplyMatrices(inv, c.matrixWorld);
+          if (!buckets.has(c.material)) buckets.set(c.material, { items: [], shadow: false });
+          const bk = buckets.get(c.material);
+          bk.items.push([c.geometry, m]); bk.shadow = bk.shadow || c.castShadow;
+          removed.push(c);
+        } else if (c.children.length) visit(c);
+      }
+    };
+    visit(g);
+    for (const c of removed) c.parent.remove(c);
+    // 清理空掉的静态子组
+    const prune = (o) => { for (const c of [...o.children]) { if (c.userData.dyn || c.userData.keep || c.isMesh) continue; prune(c); if (!c.children.length) o.remove(c); } };
+    prune(g);
+    for (const [mat, bk] of buckets) {
+      let n = 0;
+      const parts = bk.items.map(([geo, m]) => { const gg = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m); n += gg.attributes.position.count; return gg; });
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+      let o = 0;
+      for (const gg of parts) { pos.set(gg.attributes.position.array, o * 3); nor.set(gg.attributes.normal.array, o * 3); o += gg.attributes.position.count; gg.dispose(); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
+      geo.computeBoundingSphere();
+      const mesh = new T.Mesh(geo, mat);
+      mesh.castShadow = shadows && bk.shadow && mat !== OUTLINE;
+      g.add(mesh);
+    }
+    return g;
+  }
+  const dyn = (o) => { o.userData.dyn = true; return o; };
+
   // =====================================================================
   // 驾驶员（驾驶舱里的 3D 小人头）
   // =====================================================================
@@ -618,13 +672,13 @@
     const P = S.pilot(pilotId);
     const g = new T.Group();
     const skin = toon(P.skin), hair = toon(P.hair), hair2 = toon(P.hair2), acc = toon(P.accent);
-    const sph = SH.sph;
+    const sph = SH.sphL;
     const add = (o) => { g.add(o); return o; };
     // 身体（驾驶服）+ 脖子
     add(part(sph, toon(teamColor), 4.4, 3.2, 4.8, -0.6, -5.2, 0));
     add(part(SH.cyl, skin, 1.4, 2.4, 1.4, 0, -3.2, 0));
     // 头
-    add(part(sph, skin, 4.2, 4.5, 4.2, 0, 0.4, 0));
+    add(part(SH.sph, skin, 4.2, 4.5, 4.2, 0, 0.4, 0));
     // 眼睛（大大的动漫眼：白底 + 彩色虹膜 + 高光）
     for (const z of [-1.5, 1.5]) {
       add(part(sph, SH.white, 0.5, 1.25, 0.95, 3.75, 0.2, z));
@@ -632,7 +686,7 @@
       add(part(sph, SH.glowW, 0.2, 0.32, 0.3, 4.3, 0.55, z - 0.2));
     }
     // 头发主体
-    const cap = add(part(sph, hair, 4.7, 4.5, 4.7, -0.7, 1.4, 0));
+    const cap = add(part(SH.sph, hair, 4.7, 4.5, 4.7, -0.7, 1.4, 0));
     cap.scale.set(4.75, 4.4, 4.75);
     // 刘海
     for (let i = -2; i <= 2; i++) {
@@ -683,7 +737,7 @@
     // 等级解锁的头部涂装，缩小后戴在驾驶员头上
     const hc = new T.Group(); hc.position.set(-0.5, 4.2, 0); hc.scale.setScalar(0.42); g.add(hc);
     buildHead(hc, headCosmetic, teamColor);
-    return g;
+    return bake(g, false);
   }
 
   // =====================================================================
@@ -698,23 +752,23 @@
     const tint = toon(new T.Color(color).multiplyScalar(0.62));
     const light = toon(new T.Color(color).lerp(new T.Color(0xffffff), 0.55));
     const frame = toon(0x3a3e52), joint = toon(0x23252f);
-    const body = new T.Group(); root.add(body);            // 双足形态（滚轮形态时隐藏）
-    const hips = new T.Group(); body.add(hips);              // 髋部高度随步态 / 悬挂变化
-    const lower = new T.Group(); hips.add(lower);            // 腿部朝向
-    const upper = new T.Group(); hips.add(upper);            // 上身（朝向瞄准方向）
-    const lean = new T.Group(); upper.add(lean);              // 弹簧倾斜
+    const body = dyn(new T.Group()); root.add(body);            // 双足形态（滚轮形态时隐藏）
+    const hips = dyn(new T.Group()); body.add(hips);              // 髋部高度随步态 / 悬挂变化
+    const lower = dyn(new T.Group()); hips.add(lower);            // 腿部朝向
+    const upper = dyn(new T.Group()); hips.add(upper);            // 上身（朝向瞄准方向）
+    const lean = dyn(new T.Group()); upper.add(lean);              // 弹簧倾斜
     // ---- 腿 ----
     lower.add(outlined(rbox(10, 5, 15, 2), frame, 1, 1, 1, 0, 0, 0));
     const legs = [];
     for (const side of [-1, 1]) {
-      const hip = new T.Group(); hip.position.set(0, -0.5, side * LEG.hipZ); lower.add(hip);
+      const hip = dyn(new T.Group()); hip.position.set(0, -0.5, side * LEG.hipZ); lower.add(hip);
       hip.add(part(s.sph, joint, 2.4, 2.4, 2.4, 0, 0, 0));
       hip.add(outlined(rbox(5.4, LEG.L1 + 1.4, 5, 1.8), bodyMat, 1, 1, 1, 0, -LEG.L1 / 2, 0));
-      const knee = new T.Group(); knee.position.y = -LEG.L1; hip.add(knee);
+      const knee = dyn(new T.Group()); knee.position.y = -LEG.L1; hip.add(knee);
       knee.add(part(s.sph, joint, 2.1, 2.1, 2.1, 0, 0, 0));
       knee.add(outlined(rbox(4.6, LEG.L2 + 1, 4.4, 1.5), frame, 1, 1, 1, 0, -LEG.L2 / 2, 0));
       knee.add(outlined(rbox(3, 4, 4.8, 1.2), light, 1, 1, 1, 2.4, -1.6, 0));      // 膝盖护甲
-      const ankle = new T.Group(); ankle.position.y = -LEG.L2; knee.add(ankle);
+      const ankle = dyn(new T.Group()); ankle.position.y = -LEG.L2; knee.add(ankle);
       ankle.add(outlined(rbox(10, 3, 6.4, 1.3), tint, 1, 1, 1, 1.4, -0.4, 0));
       ankle.add(part(s.box, joint, 3, 1.2, 6.6, -2.6, -1.4, 0));
       legs.push({ hip, knee, ankle, side });
@@ -731,28 +785,29 @@
     // 背后涂料罐（玻璃 + 液位）
     lean.add(outlined(rbox(6, 15, 11, 2.4), frame, 1, 1, 1, -10.5, 9.5, 0));
     const tankGlass = new T.Mesh(s.cyl, new T.MeshLambertMaterial({ color: 0xd8f3ff, transparent: true, opacity: 0.35, depthWrite: false }));
-    tankGlass.scale.set(3.4, 12, 3.4); tankGlass.position.set(-13.6, 9.5, 0); lean.add(tankGlass);
-    const tankFill = part(s.cyl, basic(color), 2.9, 11, 2.9, -13.6, 9.5, 0); lean.add(tankFill);
+    tankGlass.scale.set(3.4, 12, 3.4); tankGlass.position.set(-13.6, 9.5, 0); tankGlass.userData.keep = true; lean.add(tankGlass);
+    const tankFill = part(s.cyl, basic(color), 2.9, 11, 2.9, -13.6, 9.5, 0); tankFill.userData.keep = true; tankFill.castShadow = false; lean.add(tankFill);
     // 驾驶舱 + 驾驶员
     const cockpit = new T.Group(); cockpit.position.set(2, 16, 0); lean.add(cockpit);
     cockpit.add(outlined(rbox(14, 3, 14, 1.4), frame, 1, 1, 1, 0, 0, 0));
-    const pilot = buildPilot(pilotId, head, color); pilot.position.set(0, 7, 0); cockpit.add(pilot);
+    const pilot = dyn(buildPilot(pilotId, head, color)); pilot.position.set(0, 7, 0); cockpit.add(pilot);
     const dome = new T.Mesh(new T.SphereGeometry(8.2, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.55),
       new T.MeshPhongMaterial({ color: 0xbdefff, transparent: true, opacity: 0.22, shininess: 120, specular: 0xffffff, depthWrite: false }));
-    dome.position.y = 1; cockpit.add(dome);
+    dome.position.y = 1; dome.userData.keep = true; cockpit.add(dome);
     const rim = new T.Mesh(new T.TorusGeometry(7.7, 0.8, 6, 24), frame); rim.rotation.x = Math.PI / 2; rim.position.y = 1.4; cockpit.add(rim);
     // 武器臂
-    const wpnMount = new T.Group(); wpnMount.position.set(3, 9, 15.5); lean.add(wpnMount);
+    const wpnMount = dyn(new T.Group()); wpnMount.position.set(3, 9, 15.5); lean.add(wpnMount);
     wpnMount.add(part(s.sph, joint, 3, 3, 3, -2, 0, 0));
-    const wpn = new T.Group(); wpnMount.add(wpn);
+    const wpn = dyn(new T.Group()); wpnMount.add(wpn);
     buildWeapon(wpn, weapon, color);
-    const arm = new T.Group(); arm.position.set(1, 10, -15.5); lean.add(arm);
+    for (const k of ['roller', 'spinner', 'tip']) if (wpn.userData[k]) wpn.userData[k].userData.keep = true;
+    const arm = dyn(new T.Group()); arm.position.set(1, 10, -15.5); lean.add(arm);
     arm.add(outlined(rbox(9, 4, 4, 1.6), frame, 1, 1, 1, 2.6, -1, 0));
     arm.add(outlined(rbox(3.6, 4.6, 4.6, 1.6), bodyMat, 1, 1, 1, 7, -1, 0));
     // ---- 滚轮形态 ----
-    const wheel = new T.Group(); wheel.position.y = 14; root.add(wheel);
-    const wheelTilt = new T.Group(); wheel.add(wheelTilt);
-    const spinG = new T.Group(); wheelTilt.add(spinG);
+    const wheel = dyn(new T.Group()); wheel.position.y = 14; root.add(wheel);
+    const wheelTilt = dyn(new T.Group()); wheel.add(wheelTilt);
+    const spinG = dyn(new T.Group()); wheelTilt.add(spinG);
     const wheelMat = toon(color, { transparent: true });
     const tireMat = toon(0x24242e, { transparent: true });
     const tor = new T.Mesh(new T.TorusGeometry(10.5, 3.8, 10, 26), tireMat); tor.castShadow = true; spinG.add(tor);
@@ -765,7 +820,10 @@
     for (let i = 0; i < 3; i++) { const sp = part(s.box, spokeMat, 18, 2.2, 6.6, 0, 0, 0); sp.rotation.z = (i * Math.PI) / 3; spinG.add(sp); }
     wheel.visible = false;
     const shield = new T.Mesh(s.sph, new T.MeshBasicMaterial({ color: 0xbef6ff, transparent: true, opacity: 0.22, depthWrite: false }));
-    shield.scale.setScalar(31); shield.position.y = 18; shield.visible = false; root.add(shield);
+    shield.scale.setScalar(31); shield.position.y = 18; shield.visible = false; shield.userData.keep = true; root.add(shield);
+    // 合并每个关节组里的静态零件
+    for (const g of [lower, lean, wpnMount, wpn, arm, spinG]) bake(g);
+    for (const L of legs) { bake(L.hip); bake(L.knee); bake(L.ankle); }
     return {
       root, body, hips, lower, upper, lean, legs, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
       fadeMats: [wheelMat, hubMat, spokeMat, tireMat, treadMat], shield, ud: wpn.userData,
@@ -1132,7 +1190,7 @@
 
   window.GB3D = {
     get ok() { return init(); },
-    build, paintCell, burst, setCamera, project, render, clear, show, preview, previewFrame,
+    build, paintCell, burst, setCamera, project, render, clear, show, preview, previewFrame, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();

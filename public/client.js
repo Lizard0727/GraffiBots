@@ -46,6 +46,7 @@
   // ================= 音频（见 audio.js） =================
   const AU = window.GBAudio, sfx = AU.sfx;
   let shakeOn = store.get('shake', true);
+  let hqOn = store.get('hq', true);
   let sens = store.get('sens', 1);
   function toggleMute() { const m = AU.toggleMute(); toast(m ? '已静音' : '已开启声音', 1000); renderSettings(); }
 
@@ -225,6 +226,7 @@
       <label class="set-row toggle"><span>全部静音（快捷键 M）</span><input type="checkbox" data-set="muted" ${c.muted ? 'checked' : ''}></label>
       <div class="set-row"><span>鼠标灵敏度</span><input type="range" min="20" max="300" data-set="sens" value="${Math.round(sens * 100)}"><output>${Math.round(sens * 100)}</output></div>
       <label class="set-row toggle"><span>屏幕震动</span><input type="checkbox" data-set="shake" ${shakeOn ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
       <div><div class="set-note" style="margin-bottom:6px">原创曲目试听：</div><div class="jukebox">${Object.entries(AU.TRACK_NAMES).map(([k, n]) => `<button data-track="${k}" class="${cur === k ? 'sel' : ''}">♪ ${n}</button>`).join('')}</div></div>
       <div class="set-note">所有音乐和音效都由浏览器实时合成，均为原创。主界面播放「霓虹喷漆街」，对战中播放「涂装突击」，最后 30 秒切换为「倒数冲刺」。</div>`;
     for (const box of document.querySelectorAll('.settings-box')) {
@@ -240,6 +242,7 @@
       for (const cb of box.querySelectorAll('input[type=checkbox]')) {
         cb.onchange = () => {
           if (cb.dataset.set === 'muted') AU.setMuted(cb.checked);
+          else if (cb.dataset.set === 'hq') { hqOn = cb.checked; store.set('hq', hqOn); R3.setQuality(hqOn); }
           else { shakeOn = cb.checked; store.set('shake', shakeOn); }
           renderSettings();
         };
@@ -660,6 +663,7 @@
     G.mini = document.createElement('canvas'); G.mini.width = S.GW; G.mini.height = S.GH;
     G.miniCtx = G.mini.getContext('2d'); G.miniImg = G.miniCtx.createImageData(S.GW, S.GH);
     G.paintable = 0; for (let i = 0; i < M.solid.length; i++) if (!M.solid[i]) G.paintable++;
+    R3.setQuality(hqOn);
     if (!R3.build(G)) toast('你的浏览器不支持 WebGL，无法显示 3D 画面。请换用新版 Chrome / Edge / Firefox。', 8000);
     keys.clear(); mouse.down = false;
     $('results').classList.add('hidden');
@@ -1559,7 +1563,7 @@
   }
 
   // ================= 启动 =================
-  window.__gbDebug = () => ({ G, keys: [...keys], mouse, myId, view, R3, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
+  window.__gbDebug = () => ({ G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   connect();
   requestAnimationFrame(loop);
