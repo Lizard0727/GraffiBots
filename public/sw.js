@@ -1,5 +1,5 @@
 // 涂鸦机兵：离线缓存（网页通过 http/https 打开时生效，可「添加到主屏幕」当 App 用）
-const CACHE = 'graffibots-v3';
+const CACHE = 'graffibots-v4';
 const FILES = ['./', 'index.html', 'style.css', 'shared.js', 'portraits.js', 'audio.js', 'core.js', 'render3d.js', 'client.js',
   'vendor/three.min.js', 'vendor/peerjs.min.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
