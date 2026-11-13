@@ -231,7 +231,9 @@
   function closeSettings() { $('settingsDlg').classList.add('hidden'); if (G && !G.over) lockPointer(); }
   function menuMusic() { if (!G) AU.music('menu'); setTimeout(updateNowPlaying, 100); }
   // ================= 大厅 =================
-  const MODE_ICON = { turf: '🎨', zone: '🎯', escort: '💎', soccer: '⚽', battery: '🔋' };
+  const MODE_ICON = { turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery' };
+  const MODE_COL = { turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'] };
+  const ic = (n, c, size) => GI.svg(n, c, size);
   const mapName = (i) => (i < 0 ? '随机地图' : S.MAPS[i].name);
   function nextHead() { return S.HEADS.find((h) => h.tr > (profile.trophies || 0)); }
   function renderProfile() {
@@ -259,14 +261,16 @@
     hp.style.setProperty('--pc', P.accent);
     hp.innerHTML = `<b>${P.name}<small>「${P.code}」${P.title}</small></b><i>“${P.line}”</i>`;
     const sk = S.SKILLS[P.skill], sp = S.SPECIALS[W.special];
-    $('heroLoadout').innerHTML = `<span class="pill mech">🤖 ${W.name}</span><span class="pill">💥 大招 · ${sp.name}</span><span class="pill" style="--pc:${P.accent}">✨ 技能 · ${sk.name}</span><span class="pill" style="--pc:${P.accent}">🛡 被动 · ${P.passive.name}</span>`;
+    $('heroLoadout').innerHTML = `<span class="pill mech">${ic('mech')}${W.name}</span><span class="pill">${ic('super')}大招 · ${sp.name}</span><span class="pill">${ic('skill', P.accent)}技能 · ${sk.name}</span><span class="pill">${ic('passive', P.accent)}被动 · ${P.passive.name}</span>`;
     $('title').style.setProperty('--pc', P.accent);
     renderModeCard();
     mountPreview();
   }
   function renderModeCard() {
     const m = S.MODES[profile.mode] || S.MODES.turf;
-    $('modeIcon').textContent = MODE_ICON[profile.mode] || '🎨';
+    $('modeIcon').innerHTML = ic(MODE_ICON[profile.mode] || 'turf');
+    const mc = MODE_COL[profile.mode] || MODE_COL.turf;
+    $('modeCard').style.setProperty('--mc1', mc[0]); $('modeCard').style.setProperty('--mc2', mc[1]);
     $('modeName').textContent = m.name;
     $('modeMap').textContent = `${mapName(profile.map)} · ${profile.size}v${profile.size}`;
   }
@@ -310,8 +314,8 @@
     d.innerHTML = `<div class="det-art">${GP.portrait(P)}</div>
       <h3>${P.name}<small>「${P.code}」</small></h3><div class="ttl">${P.title}</div>
       <blockquote>“${P.line}”</blockquote>
-      <div class="abil"><b>✨ 技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
-      <div class="abil"><b>🛡 被动 · ${P.passive.name}</b><p>${P.passive.desc}</p></div>
+      <div class="abil"><b>${ic('skill', P.accent)}技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
+      <div class="abil"><b>${ic('passive', P.accent)}被动 · ${P.passive.name}</b><p>${P.passive.desc}</p></div>
       <p class="bio">${P.bio}</p>
       ${profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>`}`;
     const b = $('recWpn');
@@ -340,7 +344,7 @@
       const W = S.WEAPONS[profile.weapon], sp = S.SPECIALS[W.special];
       $('mechDetail').innerHTML = `<h3>${W.name}<small>${W.role}</small></h3><p class="bio">${W.desc}</p>
         <div class="statbars">${mechStats(profile.weapon).map(([k, v, f]) => `<div><span>${k}</span><i><em style="width:${Math.round(f * 100)}%"></em></i><b>${v}</b></div>`).join('')}</div>
-        <div class="abil"><b>💥 大招 · ${sp.name}</b><p>${sp.desc}</p></div>`;
+        <div class="abil"><b>${ic('super')}大招 · ${sp.name}</b><p>${sp.desc}</p></div>`;
     }
     const rbox = $('roomWeaponList');
     if (rbox) {
@@ -393,7 +397,7 @@
       const m = S.MODES[id];
       const el = document.createElement('button');
       el.className = 'mode-tile m-' + id + (profile.mode === id ? ' sel' : '');
-      el.innerHTML = `<span class="mt-ico">${MODE_ICON[id]}</span><b>${m.name}</b>${m.original ? '<span class="orig">原创</span>' : ''}<p>${m.desc}</p>`;
+      el.innerHTML = `<span class="mt-ico">${ic(MODE_ICON[id])}</span><b>${m.name}</b>${m.original ? '<span class="orig">原创</span>' : ''}<p>${m.desc}</p>`;
       el.onclick = () => { profile.mode = id; saveProfile(); renderModes(); renderModeCard(); sfx.click(); };
       box.appendChild(el);
     }
@@ -590,6 +594,9 @@
     });
     addEventListener('pointerdown', () => setTimeout(updateNowPlaying, 150));
     addEventListener('keydown', () => setTimeout(updateNowPlaying, 150));
+    GI.fill();
+    GWall.apply();
+    if (document.fonts && document.fonts.load) Promise.all([document.fonts.load('40px GBTag'), document.fonts.load('40px GBHead'), document.fonts.load('40px GBNum')]).then(() => GWall.apply()).catch(() => {});
     renderProfile(); renderWeaponLists(); renderHeads(); renderPilots(); renderSettings();
     for (const b of document.querySelectorAll('#stageModes button')) b.onclick = () => {
       for (const o of document.querySelectorAll('#stageModes button')) o.classList.toggle('sel', o === b);
@@ -1719,7 +1726,7 @@
   }
   // ================= HUD =================
   function txt(s, x, y, size, color, align = 'center', stroke = 4) {
-    ctx.font = `900 ${size}px "Microsoft YaHei", sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.font = `${size}px GBHead, "Microsoft YaHei", sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle';
     if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
     ctx.fillStyle = color; ctx.fillText(s, x, y);
   }
@@ -2012,7 +2019,7 @@
     for (const t of [myTeam, 3 - myTeam]) {
       for (const p of rows.filter((q) => q.team === t)) {
         const sb = G.sb.get(p.id) || [0, 0, 0, 0];
-        txt((p.bot ? '🤖 ' : '') + p.name + (p.id === myId ? '（你）' : ''), cols[0], ry, 14, G.colors[t], 'left', 0);
+        txt((p.bot ? 'AI · ' : '') + p.name + (p.id === myId ? '（你）' : ''), cols[0], ry, 14, G.colors[t], 'left', 0);
         txt(S.WEAPONS[p.weapon].name, cols[1], ry, 13, '#ddd', 'left', 0);
         txt(String(sb[1]), cols[2], ry, 14, '#fff', 'left', 0);
         txt(String(sb[2]), cols[3], ry, 14, '#fff', 'left', 0);
@@ -2059,7 +2066,7 @@
     let html = `<tr><th style="text-align:left">驾驶员</th><th>机体</th><th>击毁</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
     for (const t of [myTeam, 3 - myTeam]) {
       for (const p of r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a))) {
-        html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}">${p.bot ? '🤖 ' : ''}${esc(p.name)}${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
+        html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}">${esc(p.name)}${p.bot ? '<small class="aitag">AI</small>' : ''}${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
       }
     }
     $('resTable').innerHTML = html;

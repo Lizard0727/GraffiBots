@@ -10,7 +10,9 @@ const cdn = artifact || process.argv.includes('--cdn');
 const CDN = { 'vendor/three.min.js': 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js', 'vendor/peerjs.min.js': 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js' };
 let html = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
 const esc = (js) => js.replace(/<\/script/gi, '<\\/script');
-html = html.replace(/<link rel="stylesheet" href="style.css">/, () => `<style>\n${fs.readFileSync(path.join(PUB, 'style.css'), 'utf8')}\n</style>`);
+// 样式表内联，字体文件转成 data URI
+const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8').replace(/url\('fonts\/([^']+)'\)/g, (m, f) => `url('data:font/woff2;base64,${fs.readFileSync(path.join(PUB, 'fonts', f)).toString('base64')}')`);
+html = html.replace(/<link rel="stylesheet" href="style.css">/, () => `<style>\n${css}\n</style>`);
 // 图标内联成 data URI，去掉 manifest（单文件无法被安装为 PWA）
 const icon = 'data:image/png;base64,' + fs.readFileSync(path.join(PUB, 'icon-192.png')).toString('base64');
 html = html.replace(/<link rel="manifest"[^>]*>\n?/, '').replace(/href="icon-192.png"/g, () => `href="${icon}"`);
