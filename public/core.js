@@ -90,7 +90,8 @@ class Game {
     this.grid = new Uint8Array(S.GW * S.GH);
     this.duration = st.duration; this.timeLeft = st.duration;
     this.countdown = 3.5; this.time = 0; this.tick = 0; this.over = false;
-    this.players = new Map(); this.projs = []; this.bombs = []; this.missiles = [];
+    this.players = new Map(); this.projs = []; this.bombs = []; this.missiles = []; this.shells = []; this.helpers = [];
+    this.reveal = [0, 0, 0];   // 全队扫描（义眼扫描）结束时间
     this.nextId = 1; this.diff = []; this.events = [];
     this.colorSet = room.colorSet;
     const slots = { 1: 0, 2: 0 };
@@ -109,7 +110,8 @@ class Game {
           bi++;
           const pp = free.shift();
           const pil = pp || S.PILOTS[randInt(S.PILOTS.length)];
-          this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, pp && Math.random() < 0.6 ? pp.weapon : S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)],
+          // 驾驶员和机体分开选：一半用擅长机体，一半随机
+          this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 ? pil.weapon : S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)],
             S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id);
         }
     }
@@ -127,14 +129,20 @@ class Game {
   }
 
   addPlayer(id, name, team, weapon, head, bot, slot, pilot) {
+    if (!S.WEAPONS[weapon]) weapon = 'blaster';
+    const pid = S.pilot(pilot).id;
+    const W = S.WEAPONS[weapon];
     const p = {
-      id, name, team, weapon, head, bot, slot, pilot: S.pilot(pilot).id,
+      id, name, team, weapon, head, bot, slot, pilot: pid,
+      maxHp: Math.round(W.hp * (pid === 'titan' ? 1.15 : 1)),
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, onGround: true,
-      hp: 100, tank: 100, sp: 0, alive: true, respawnT: 0, invulnT: 0,
-      lastHurt: -10, fireCd: 0, charge: 0, spin: 0, rolling: false, flickT: -10, prevFire: false,
+      hp: 100, ammo: S.AMMO, sp: 0, alive: true, respawnT: 0, invulnT: 0,
+      lastHurt: -10, lastAtk: -10, atkCd: 0, burst: null, rollT: 0, charge: 0, prevFire: false,
       spT: 0, spKind: null, spWave: 0, shield: 0, shieldT: 0, sm: 1, carry: 0, hidden: false, wheel: false, firing: false,
-      input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, sq: 0, qq: 0 },
-      lastSq: 0, lastQq: 0, sync: 0, lastPosT: 0, hitCd: {},
+      foot: false, rebuildT: 0, skillUses: S.SKILL_USES, skillCd: 0, rushT: 0, slowT: 0, silenceT: 0, smokeT: 0, odN: 0, dmgMul: 1,
+      quakeT: 0, quakeArm: 0,
+      input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, qq: 0, gq: 0, aq: 0, ad: 200 },
+      lastQq: 0, lastGq: 0, lastAq: 0, sync: 0, lastPosT: 0, hitCd: {},
       stats: { kills: 0, deaths: 0, paint: 0, obj: 0 },
     };
     this.players.set(id, p);
@@ -165,6 +173,8 @@ class Game {
       for (const p of this.players.values()) this.updatePlayer(p, dt);
       this.updateProjs(dt);
       this.updateBombs(dt);
+      this.updateShells(dt);
+      this.updateHelpers(dt);
       this.updateMissiles(dt);
       this.updateMode(dt);
       if (this.timeLeft <= 0) this.finish(null);
@@ -181,7 +191,8 @@ class Game {
     if (Number.isFinite(m.a)) inp.a = m.a;
     if (Number.isFinite(m.pt)) inp.pt = clamp(m.pt, -1.4, 1.4);
     inp.f = !!m.f; inp.w = !!m.w;
-    inp.sq = m.sq | 0; inp.qq = m.qq | 0;
+    inp.qq = m.qq | 0; inp.gq = m.gq | 0; inp.aq = m.aq | 0;
+    if (Number.isFinite(m.ad)) inp.ad = clamp(m.ad, 0, 1200);
     // 客户端预测移动，服务器校验（限速 + 不穿墙 + 高度合理）
     if (p.alive && this.countdown <= 0 && !this.over && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z) && m.sync === p.sync) {
       const dtAllow = Math.min(0.6, this.time - p.lastPosT) + 0.05;
@@ -190,7 +201,7 @@ class Game {
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       const gh = this.top(m.x, m.y);
       const test = { x: m.x, y: m.y, z: m.z };
-      S.collide(test, S.R - 2, this.M);
+      S.collide(test, (p.foot ? S.PILOT_R : S.R) - 2, this.M);
       const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? 40 : 0);
       if (d <= maxStep && !bad) {
         p.x = m.x; p.y = m.y; p.z = Math.max(gh, m.z); p.lastPosT = this.time;
@@ -204,6 +215,7 @@ class Game {
   }
 
   // ------------------------------------------------------------------
+  maxHpOf(p) { return p.foot ? S.PILOT_HP : p.maxHp; }
   updatePlayer(p, dt) {
     if (!p.alive) {
       p.respawnT -= dt;
@@ -213,117 +225,267 @@ class Game {
     const inp = p.input, W = S.WEAPONS[p.weapon];
     p.invulnT = Math.max(0, p.invulnT - dt);
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) p.shield = 0; }
+    p.skillCd = Math.max(0, p.skillCd - dt);
+    p.rushT = Math.max(0, p.rushT - dt); p.slowT = Math.max(0, p.slowT - dt);
+    p.silenceT = Math.max(0, p.silenceT - dt); p.smokeT = Math.max(0, p.smokeT - dt);
     const spAct = p.spT > 0;
-    let sm = 1;
-    if (this.obj.tr && this.obj.tr.carrier === p.id) sm *= 0.72;
-    if (p.carry) sm *= 1 - 0.04 * p.carry;
-    if (spAct && p.spKind === 'charge') sm *= 1.45;
-    p.sm = sm;
-    const wheel = !!inp.w && !(spAct && p.spKind === 'beam');
-    p.wheel = wheel;
-    if (p.bot) { S.stepMove(p, inp, dt, this.grid, this.M, S.moveMul(p.weapon, inp.f && !wheel, spAct ? p.spKind : null)); inp.j = false; }
-
     const gh = this.top(p.x, p.y);
     const grounded = p.z <= gh + 1;
     const ground = grounded ? S.cellAt(this.grid, p.x, p.y) : -1;
     const own = ground === p.team, enemy = ground > 0 && !own;
-    if (enemy && p.invulnT <= 0 && !(spAct && p.spKind === 'charge') && p.hp > 30) p.hp = Math.max(30, p.hp - 12 * dt);
-    if (!enemy && this.time - p.lastHurt > 1.3) p.hp = Math.min(100, p.hp + (wheel && own ? 60 : 22) * dt);
+    const inBush = S.inBush(this.M, p.x, p.y, p.z);
+    let sm = p.foot ? (p.pilot === 'gale' ? 1.3 : 1) : W.spd;
+    if (this.obj.tr && this.obj.tr.carrier === p.id) sm *= 0.72;
+    if (p.carry) sm *= 1 - 0.04 * p.carry;
+    if (spAct && p.spKind === 'charge') sm *= 1.45;
+    if (p.rushT > 0) sm *= 1.35;
+    if (p.slowT > 0) sm *= 0.55;
+    if (p.pilot === 'raven' && (inBush || own)) sm *= 1.1;
+    p.sm = sm;
+    const wheel = !!inp.w && !p.foot && !(spAct && p.spKind === 'beam');
+    p.wheel = wheel;
+    if (p.bot) { S.stepMove(p, inp, dt, this.grid, this.M, S.moveMul(p.weapon, p.firing && !wheel, spAct ? p.spKind : null)); inp.j = false; }
+
+    // 敌方涂料持续掉血；脱战 3 秒后快速回血（大厨更快）
+    const maxHp = this.maxHpOf(p);
+    if (enemy && p.invulnT <= 0 && !(spAct && p.spKind === 'charge') && p.hp > maxHp * 0.3) p.hp = Math.max(maxHp * 0.3, p.hp - maxHp * 0.1 * dt);
+    if (!enemy && this.time - p.lastHurt > 3 && this.time - p.lastAtk > 2) {
+      const k = (wheel && own ? 0.32 : 0.16) * (p.pilot === 'chef' ? 1.5 : 1);
+      p.hp = Math.min(maxHp, p.hp + maxHp * k * dt);
+    }
+
+    // 装填：攻击过程中不装填；己方涂料上的滚轮形态装填更快
+    if (!p.burst && p.rollT <= 0 && !(p.charge > 0)) {
+      const rt = p.foot ? S.PISTOL.reload : W.reload;
+      p.ammo = Math.min(S.AMMO, p.ammo + (dt / rt) * (p.rushT > 0 ? 2 : 1) * (wheel && own ? 1.6 : 1));
+    }
 
     let firing = false;
-    p.hidden = wheel && own;
     if (wheel) {
-      p.tank = Math.min(100, p.tank + (own ? 48 : 8) * dt);
-      if (p.weapon === 'charger' && p.charge > 0.08 && p.tank >= W.minCost) this.fireCharger(p, p.charge, W);
-      p.charge = 0; p.spin = Math.max(0, p.spin - dt * 2); p.rolling = false;
-    } else {
-      firing = this.weaponLogic(p, inp, dt, W, grounded);
-      if (!firing) p.tank = Math.min(100, p.tank + 12 * dt);
-    }
+      if (inp.aq !== p.lastAq) p.lastAq = inp.aq;
+      p.charge = 0; p.burst = null;
+    } else firing = this.weaponLogic(p, inp, dt, W, grounded);
     p.firing = firing;
 
-    if (inp.sq !== p.lastSq) {
-      p.lastSq = inp.sq;
-      if (!wheel && p.tank >= S.SUB_COST) this.throwBomb(p);
-    }
+    // 隐身：草丛 / 己方涂料里的滚轮 / 墨雾；攻击后 0.9 秒内会暴露（墨雾除外）
+    const recentAtk = this.time - p.lastAtk < 0.9;
+    p.hidden = p.smokeT > 0 || ((inBush || (wheel && own)) && !recentAtk);
+
     if (inp.qq !== p.lastQq) {
       p.lastQq = inp.qq;
-      if (p.sp >= W.spNeed && !spAct) this.activateSpecial(p);
+      if (!p.foot && p.sp >= W.spNeed && !spAct && p.silenceT <= 0) this.activateSpecial(p);
+    }
+    if (inp.gq !== p.lastGq) {
+      p.lastGq = inp.gq;
+      if (p.skillUses > 0 && p.skillCd <= 0) this.useSkill(p);
     }
     if (p.spT > 0) this.updateSpecial(p, dt);
+    if (p.quakeT > 0) {
+      p.quakeT -= dt;
+      if ((this.time > p.quakeArm && grounded) || p.quakeT <= 0) this.quakeSlam(p);
+    }
+    if (p.foot) {
+      p.rebuildT -= dt;
+      if (p.rebuildT <= 0) this.redeploy(p);
+    }
     p.prevFire = !!inp.f;
   }
 
   muzzle(p) {
     const d = S.dir3(p.input.a, p.input.pt);
-    return { x: p.x + d.x * 16, y: p.y + d.y * 16, z: p.z + S.MUZZLE + d.z * 16, d };
+    const r = p.foot ? 8 : 16, h = p.foot ? 14 : S.MUZZLE;
+    return { x: p.x + d.x * r, y: p.y + d.y * r, z: p.z + h + d.z * r, d };
   }
 
+  // 每次攻击消耗 1 格弹药；inp.f = 按住（电脑），inp.aq 计数 = 点一下 / 松开摇杆（手机）
   weaponLogic(p, inp, dt, W, grounded) {
+    p.atkCd -= dt;
     if (p.spT > 0 && p.spKind === 'beam') return true;
-    p.fireCd -= dt;
-    switch (p.weapon) {
-      case 'blaster':
-      case 'bucket': {
-        if (!inp.f) return false;
-        if (p.fireCd <= 0 && p.tank >= W.cost) { p.fireCd = W.rate; p.tank -= W.cost; this.fireSpread(p, W); }
+    let pulse = false;
+    if (inp.aq !== p.lastAq) { p.lastAq = inp.aq; pulse = true; }
+    if (p.silenceT > 0) { p.charge = 0; return false; }
+    if (p.burst) { this.stepBurst(p, W, dt); return true; }
+    if (p.rollT > 0) this.stepRoll(p, W, dt);
+    if (p.foot) {
+      if ((inp.f || pulse) && p.atkCd <= 0 && p.ammo >= 1) {
+        const P = S.PISTOL;
+        p.ammo -= 1; p.atkCd = P.atkCd; p.lastAtk = this.time; p.dmgMul = 1;
+        this.spawnProj(p, inp.a + (Math.random() - 0.5) * 0.04, inp.pt, P.speed, P.range, P.dmg, P.splat, P.trail, P.size);
         return true;
       }
-      case 'gatling': {
-        if (!inp.f) { p.spin = Math.max(0, p.spin - dt * 1.5); return false; }
-        p.spin = Math.min(W.spinTime, p.spin + dt);
-        if (p.spin >= W.spinTime && p.fireCd <= 0 && p.tank >= W.cost) {
-          p.fireCd = W.rate; p.tank -= W.cost;
-          this.spawnProj(p, inp.a + (Math.random() - 0.5) * W.spread, inp.pt + (Math.random() - 0.5) * W.spread * 0.5, W.speed, W.range, W.dmg, W.splat, W.trail, W.size);
-        }
-        return true;
-      }
-      case 'charger': {
-        if (inp.f && p.tank >= W.minCost) { p.charge = Math.min(1, p.charge + dt / W.chargeTime); return true; }
-        if (p.charge > 0.08) this.fireCharger(p, p.charge, W);
-        p.charge = 0;
-        return false;
-      }
-      case 'roller': {
-        if (!inp.f) { p.rolling = false; return false; }
-        if (!p.prevFire && p.fireCd <= 0 && p.tank >= W.cost) {
-          p.fireCd = W.rate; p.tank -= W.cost; p.flickT = this.time;
-          this.fireSpread(p, W);
-        }
-        const spd = Math.hypot(p.vx, p.vy);
-        p.rolling = grounded && this.time - p.flickT > 0.3 && spd > 40 && p.tank > 0;
-        if (p.rolling) {
-          p.tank = Math.max(0, p.tank - W.rollCost * dt);
-          const dir = Math.atan2(p.vy, p.vx);
-          const fx = p.x + Math.cos(dir) * 14, fy = p.y + Math.sin(dir) * 14;
-          this.paint(fx, fy, p.z, W.rollWidth, p.team, p);
-          this.contactDamage(p, fx, fy, W.rollWidth + S.R - 4, W.rollDmg, 0.5);
-          this.pushBall(p, fx, fy, W.rollWidth, 320);
-        }
-        return true;
-      }
+      return false;
     }
-    return false;
+    if (W.attack === 'charge') {
+      if (inp.f && p.ammo >= 1) { p.charge = Math.min(1, p.charge + dt / W.chargeTime); return true; }
+      const ch = Math.max(p.charge, pulse ? 0.35 : 0);
+      if (ch > 0.08 && p.ammo >= 1 && p.atkCd <= 0) {
+        p.ammo -= 1; p.atkCd = W.atkCd; p.lastAtk = this.time; this.takeOverdrive(p);
+        this.fireCharger(p, ch, W);
+      }
+      p.charge = 0;
+      return false;
+    }
+    const want = inp.f || pulse;
+    if (want && p.atkCd <= 0 && p.ammo >= 1) {
+      p.ammo -= 1; p.atkCd = W.atkCd; p.lastAtk = this.time; this.takeOverdrive(p);
+      switch (W.attack) {
+        case 'burst': p.burst = { n: W.shots, t: 0 }; this.stepBurst(p, W, 0); break;
+        case 'fan': this.fireSpread(p, W); break;
+        case 'flick':
+          this.fireSpread(p, W);
+          if (grounded) { this.knock(p, Math.cos(inp.a), Math.sin(inp.a), W.lunge, 0); p.rollT = 0.45; p.rollA = inp.a; }
+          break;
+        case 'lob': {
+          const d = clamp(inp.ad || 200, W.minRange, W.range);
+          this.spawnShell(p, p.x + Math.cos(inp.a) * d, p.y + Math.sin(inp.a) * d, W.dmg * p.dmgMul, W.blast, W.flight);
+          break;
+        }
+        case 'punch': this.punch(p, W); break;
+      }
+      return true;
+    }
+    return p.rollT > 0;
+  }
+  takeOverdrive(p) { p.dmgMul = p.odN > 0 ? 1.4 : 1; if (p.odN > 0) p.odN--; }
+  stepBurst(p, W, dt) {
+    const b = p.burst;
+    b.t -= dt;
+    while (b.t <= 0 && b.n > 0) {
+      this.spawnProj(p, p.input.a + (Math.random() - 0.5) * W.spread, p.input.pt + (Math.random() - 0.5) * W.spread * 0.4, W.speed, W.range, W.dmg, W.splat, W.trail, W.size);
+      b.n--; b.t += W.interval;
+    }
+    if (b.n <= 0) p.burst = null;
+  }
+  stepRoll(p, W, dt) {
+    p.rollT -= dt;
+    const fx = p.x + Math.cos(p.rollA) * 14, fy = p.y + Math.sin(p.rollA) * 14;
+    this.paint(fx, fy, p.z, W.rollWidth, p.team, p);
+    this.contactDamage(p, fx, fy, W.rollWidth + S.R - 4, W.rollDmg * p.dmgMul, 0.45);
+    this.pushBall(p, fx, fy, W.rollWidth, 320);
+  }
+  punch(p, W) {
+    const a = p.input.a;
+    this.knock(p, Math.cos(a), Math.sin(a), W.lunge, 0);
+    const fx = p.x + Math.cos(a) * 30, fy = p.y + Math.sin(a) * 30;
+    this.paint(fx, fy, p.z, 30, p.team, p);
+    for (const t of this.players.values()) {
+      if (!t.alive || t.team === p.team) continue;
+      const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
+      if (d > W.range + S.R + 10 || Math.abs(t.z - p.z) > 40) continue;
+      let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+      if (Math.abs(da) > W.arc / 2) continue;
+      const dmg = W.dmg * p.dmgMul;
+      this.hurt(t, dmg, p, dx, dy, W.kb / (dmg * 1.8), 120);
+    }
+    this.pushBall(p, fx, fy, W.range, 1100);
+    this.ev(['pu', p.id, r2(a)]);
   }
 
   fireSpread(p, W) {
     const n = W.pellets || 1, a = p.input.a, pt = p.input.pt;
-    if (n > 1) this.knock(p, -Math.cos(a), -Math.sin(a), p.weapon === 'bucket' ? 110 : 60, 0);   // 泼桶 / 滚刷甩出的后坐力
+    if (W.attack === 'fan') this.knock(p, -Math.cos(a), -Math.sin(a), 100, 0);   // 泼桶的后坐力
     for (let i = 0; i < n; i++) {
       const off = n > 1 ? (i / (n - 1) - 0.5) * W.arc : 0;
       const k = n > 1 ? rand(0.85, 1.12) : 1;
-      this.spawnProj(p, a + off + (Math.random() - 0.5) * W.spread, pt + (Math.random() - 0.5) * W.spread * 0.6 + (n > 1 ? rand(-0.04, 0.06) : 0),
+      this.spawnProj(p, a + off + (Math.random() - 0.5) * W.spread, pt + (Math.random() - 0.5) * W.spread * 0.6 + (n > 1 ? rand(-0.02, 0.04) : 0),
         W.speed * k, W.range * k, W.dmg, W.splat, W.trail, W.size);
     }
   }
 
-  spawnProj(p, yaw, pitch, speed, range, dmg, splat, trail, size) {
+  spawnProj(p, yaw, pitch, speed, range, dmg, splat, trail, size, origin) {
     const d = S.dir3(yaw, pitch);
-    const x = p.x + d.x * 16, y = p.y + d.y * 16, z = p.z + S.MUZZLE + d.z * 16;
-    if (S.insideAt(this.M, x, y, z)) { this.paint(p.x, p.y, p.z, splat * 0.7, p.team, p); return; }
-    const pr = { id: this.nextId++, x0: x, y0: y, z0: z, x, y, z, vx: d.x * speed, vy: d.y * speed, vz: d.z * speed, ts: range / speed, t: 0, team: p.team, owner: p.id, dmg, splat, trail, size, acc: 0 };
+    const o = origin || { x: p.x, y: p.y, z: p.z + (p.foot ? 14 : S.MUZZLE), r: p.foot ? 8 : 16 };
+    const x = o.x + d.x * (o.r || 0), y = o.y + d.y * (o.r || 0), z = o.z + d.z * (o.r || 0);
+    if (S.insideAt(this.M, x, y, z)) { this.paint(o.x, o.y, o.z - 10, splat * 0.7, p.team, p); return; }
+    const pr = { id: this.nextId++, x0: x, y0: y, z0: z, x, y, z, vx: d.x * speed, vy: d.y * speed, vz: d.z * speed, ts: range / speed, t: 0, team: p.team, owner: p.id,
+      dmg: dmg * (origin ? 1 : p.dmgMul || 1), splat, trail, size, acc: 0, range };
     this.projs.push(pr);
     this.ev(['pj', pr.id, r1(x), r1(y), r1(z), r1(pr.vx), r1(pr.vy), r1(pr.vz), r2(pr.ts), p.team, size, p.id]);
+  }
+  // 曲射炮弹：飞行 T 秒后落在 (x1, y1)，可以越过墙
+  spawnShell(p, x1, y1, dmg, r, T) {
+    x1 = clamp(x1, 10, S.W - 10); y1 = clamp(y1, 10, S.H - 10);
+    let z1 = this.top(x1, y1);
+    if (this.M.solid[Math.floor(y1 / S.CELL) * S.GW + Math.floor(x1 / S.CELL)]) z1 = S.LEVEL_H[3];
+    const sh = { id: this.nextId++, x0: p.x, y0: p.y, z0: p.z + S.MUZZLE + 6, x1, y1, z1, T, t: 0, team: p.team, owner: p.id, dmg, r };
+    this.shells.push(sh);
+    this.ev(['lb', sh.id, r1(sh.x0), r1(sh.y0), r1(sh.z0), r1(x1), r1(y1), r1(z1), r2(T), p.team]);
+  }
+  updateShells(dt) {
+    this.shells = this.shells.filter((s) => {
+      s.t += dt;
+      if (s.t < s.T) return true;
+      this.explode(s.x1, s.y1, s.z1, s.r, s.dmg, s.dmg * 0.45, s.team, this.players.get(s.owner));
+      this.ev(['bx', r1(s.x1), r1(s.y1), r1(s.z1), s.team, s.r, 0]);
+      return false;
+    });
+  }
+
+  // ---------------- 驾驶员技能 ----------------
+  useSkill(p) {
+    const P = S.pilot(p.pilot);
+    p.skillUses--; p.skillCd = S.SKILL_CD;
+    this.ev(['sk', p.id, P.skill, r1(p.x), r1(p.y), r1(p.z)]);
+    switch (P.skill) {
+      case 'rush': p.rushT = 3; break;
+      case 'scan': this.reveal[p.team] = this.time + 5; break;
+      case 'cheer':
+        for (const a of this.players.values()) if (a.alive && a.team === p.team && dist(a, p) < 170) a.hp = Math.min(this.maxHpOf(a), a.hp + 40);
+        break;
+      case 'guard': p.shield = Math.max(p.shield, 60); p.shieldT = 4; break;
+      case 'smoke': this.paint(p.x, p.y, p.z, 95, p.team, p); p.smokeT = 3; break;
+      case 'turret': this.helpers.push({ id: this.nextId++, kind: 'turret', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 7, cd: 0.3 }); break;
+      case 'dash': {
+        let dx = p.input.mx, dy = p.input.my;
+        if (Math.hypot(dx, dy) < 0.2) { dx = Math.cos(p.input.a); dy = Math.sin(p.input.a); }
+        this.knock(p, dx, dy, 520, 0); p.invulnT = Math.max(p.invulnT, 0.35);
+        break;
+      }
+      case 'emp':
+        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 170) { e.slowT = 2.5; e.silenceT = 1.2; e.charge = 0; e.burst = null; }
+        break;
+      case 'bento': this.helpers.push({ id: this.nextId++, kind: 'bento', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 15, armed: 0.6 }); break;
+      case 'overdrive': p.ammo = S.AMMO; p.odN = 3; break;
+      case 'drone': this.helpers.push({ id: this.nextId++, kind: 'drone', x: p.x, y: p.y, z: p.z + 40, team: p.team, owner: p.id, t: 6, cd: 0.3, ang: 0 }); break;
+    }
+  }
+  updateHelpers(dt) {
+    this.helpers = this.helpers.filter((h) => {
+      h.t -= dt;
+      const o = this.players.get(h.owner);
+      if (h.t <= 0 || !o) return false;
+      if (h.kind === 'bento') {
+        h.armed -= dt;
+        if (h.armed > 0) return true;
+        for (const a of this.players.values()) {
+          if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < 26 && Math.abs(a.z - h.z) < 30) {
+            a.hp = Math.min(this.maxHpOf(a), a.hp + 60); this.ev(['heal', a.id, 60]); return false;
+          }
+        }
+        return true;
+      }
+      if (h.kind === 'drone') {
+        if (!o.alive) return false;
+        h.ang += dt * 2.4;
+        h.x = o.x + Math.cos(h.ang) * 26; h.y = o.y + Math.sin(h.ang) * 26; h.z = o.z + 44;
+      }
+      h.cd -= dt;
+      if (h.cd > 0) return true;
+      const range = h.kind === 'turret' ? 300 : 260;
+      let best = null, bd = range;
+      for (const e of this.players.values()) {
+        if (!e.alive || e.team === h.team || (e.hidden && !(this.reveal[h.team] > this.time))) continue;
+        const d = Math.hypot(e.x - h.x, e.y - h.y);
+        if (d < bd && S.los3(this.M, h.x, h.y, h.z + 16, e.x, e.y, e.z + 16)) { bd = d; best = e; }
+      }
+      if (best) {
+        h.cd = h.kind === 'turret' ? 0.45 : 0.5;
+        const hz = h.kind === 'turret' ? h.z + 18 : h.z;
+        const a = Math.atan2(best.y - h.y, best.x - h.x), pt = Math.atan2(best.z + 16 - hz, bd);
+        this.spawnProj(o, a, pt, 620, range + 20, h.kind === 'turret' ? 12 : 11, 12, 0, 5, { x: h.x, y: h.y, z: hz, r: 6 });
+      } else h.cd = 0.15;
+      return true;
+    });
   }
 
   // 3D 射线：每步回调 (x,y,z,t) 返回 true 则停止；返回终点
@@ -339,29 +501,31 @@ class Game {
   hitPlayerAt(team, x, y, z, pad) {
     for (const t of this.players.values()) {
       if (!t.alive || t.team === team) continue;
-      if (Math.hypot(t.x - x, t.y - y) < S.R + pad && z > t.z - pad && z < t.z + S.PH + pad) return t;
+      const R = t.foot ? S.PILOT_R : S.R, H = t.foot ? 22 : S.PH;
+      if (Math.hypot(t.x - x, t.y - y) < R + pad && z > t.z - pad && z < t.z + H + pad) return t;
     }
     return null;
   }
 
   fireCharger(p, ch, W) {
-    const cost = W.minCost + (W.cost - W.minCost) * ch;
-    p.tank = Math.max(0, p.tank - cost);
     const range = W.range * (0.35 + 0.65 * ch);
     const mz = this.muzzle(p);
-    const dmg = ch >= 1 ? W.dmg : 30 + 90 * ch;
+    let dmg = (W.minDmg + (W.dmg - W.minDmg) * ch) * p.dmgMul;
     const pr = 10 + 6 * ch;
-    let victim = null, lastPaint = -99;
+    let victim = null, lastPaint = -99, hitT = 0;
     const b = this.obj.ball && this.obj.resetT <= 0 ? this.obj.ball : null;
     const end = this.trace(mz.x, mz.y, mz.z, mz.d, range, (x, y, z, t) => {
       const gh = this.top(x, y);
       if (z - gh < 45 && t - lastPaint > 12) { lastPaint = t; this.paint(x, y, gh, pr, p.team, p); }
       victim = this.hitPlayerAt(p.team, x, y, z, 5);
-      if (victim) return true;
+      if (victim) { hitT = t; return true; }
       if (b && Math.hypot(b.x - x, b.y - y, b.r - z) < b.r + 4) { b.vx += mz.d.x * (250 + 450 * ch); b.vy += mz.d.y * (250 + 450 * ch); b.last = p.team; return true; }
       return false;
     });
-    if (victim) this.hurt(victim, dmg, p, mz.d.x, mz.d.y);
+    if (victim) {
+      if (p.pilot === 'frost' && hitT > W.range * 0.6) dmg *= 1.12;
+      this.hurt(victim, dmg, p, mz.d.x, mz.d.y);
+    }
     this.paint(end.x, end.y, this.top(end.x, end.y), 18 + 12 * ch, p.team, p);
     this.ev(['ln', r1(mz.x), r1(mz.y), r1(mz.z), r1(end.x), r1(end.y), r1(end.z), p.team, r2(ch), p.id]);
     if (ch > 0.5) this.knock(p, -mz.d.x, -mz.d.y, 170 * ch, 0);   // 狙击后坐力
@@ -375,7 +539,7 @@ class Game {
   credit(owner, n) {
     if (!this.players.has(owner.id)) return;
     owner.stats.paint += n;
-    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.28);
+    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 2 : 1));
   }
 
   // 冲量：AI 直接作用在服务器状态上；真人玩家的位置由客户端预测，所以发事件让客户端施加
@@ -389,30 +553,59 @@ class Game {
   }
   hurt(t, dmg, by, kdx, kdy, kmul, kup) {
     if (!t.alive || t.invulnT > 0) return;
-    if (!(t.spT > 0 && t.spKind === 'charge')) {
-      // 受击击退：伤害越高推得越远，滚轮形态更轻、被推得更远
-      if (kdx == null && by) { kdx = t.x - by.x; kdy = t.y - by.y; }
-      if (kdx != null) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : 1), kup || 0);
-    }
     if (t.spT > 0 && t.spKind === 'charge') return;
+    // 受击击退：伤害越高推得越远，滚轮形态和驾驶员更轻
+    if (kdx == null && by) { kdx = t.x - by.x; kdy = t.y - by.y; }
+    if (kdx != null) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
       t.shield -= a; dmg -= a;
       if (t.shield <= 0) t.shieldT = 0;
-      if (dmg <= 0) { this.ev(['hit', t.id, by ? by.id : 0, 1]); return; }
+      if (dmg <= 0) { this.ev(['hit', t.id, by ? by.id : 0, 1, 0]); return; }
     }
     if (this.obj.tr && this.obj.tr.carrier === t.id) dmg *= 0.75;
     t.hp -= dmg; t.lastHurt = this.time;
-    this.ev(['hit', t.id, by ? by.id : 0, 0]);
-    if (t.hp <= 0) this.kill(t, by);
+    // 打中敌人给大招充能
+    if (by && by.team !== t.team && this.players.has(by.id) && !by.foot && !(by.spT > 0)) {
+      by.sp = Math.min(S.WEAPONS[by.weapon].spNeed, by.sp + dmg * (by.pilot === 'candy' ? 1.2 : 1));
+    }
+    this.ev(['hit', t.id, by ? by.id : 0, 0, Math.round(dmg)]);
+    if (t.hp <= 0) { if (t.foot) this.kill(t, by); else this.wreck(t, by); }
   }
-
+  onTakedown(by) {
+    if (!by || !this.players.has(by.id)) return;
+    by.stats.kills++;
+    if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.3);
+  }
+  // 机体被摧毁：驾驶员弹出，6 秒后在驾驶员所在位置空投新机体
+  wreck(t, by) {
+    const x = t.x, y = t.y, z = t.z;
+    if (by && by !== t) this.onTakedown(by);
+    this.paint(x, y, this.top(x, y), 55, by ? by.team : 3 - t.team, by && this.players.has(by.id) ? by : null);
+    this.dropItems(t);
+    t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = S.REBUILD - (t.pilot === 'aurora' ? 2 : 0);
+    t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.quakeT = 0;
+    t.invulnT = 0.7; t.ammo = S.AMMO; t.wheel = false;
+    this.ev(['wreck', by ? by.id : 0, t.id, r1(x), r1(y), r1(z)]);
+    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 60, 30, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
+    this.knock(t, Math.random() - 0.5, Math.random() - 0.5, 150, 300);
+  }
+  redeploy(p) {
+    p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.invulnT = 1.0; p.rebuildT = 0;
+    this.ev(['mdrop', p.id, r1(p.x), r1(p.y), r1(p.z)]);
+    for (const t of this.players.values()) {
+      if (!t.alive || t.team === p.team || Math.hypot(t.x - p.x, t.y - p.y) > 75) continue;
+      this.hurt(t, 20, p, t.x - p.x, t.y - p.y, 6, 150);
+    }
+    this.paint(p.x, p.y, p.z, 60, p.team, p);
+  }
+  // 驾驶员被击倒：回基地复活
   kill(t, by) {
-    t.alive = false; t.hp = 0; t.respawnT = S.RESPAWN; t.stats.deaths++;
-    t.charge = 0; t.spin = 0; t.rolling = false; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0;
+    t.alive = false; t.hp = 0; t.respawnT = S.KO_RESPAWN; t.stats.deaths++;
+    t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.foot = false;
     const team = by ? by.team : 3 - t.team;
-    this.paint(t.x, t.y, this.top(t.x, t.y), 55, team, by && this.players.has(by.id) ? by : null);
-    if (by && by !== t) by.stats.kills++;
+    this.paint(t.x, t.y, this.top(t.x, t.y), 40, team, by && this.players.has(by.id) ? by : null);
+    if (by && by !== t) this.onTakedown(by);
     t.sp = Math.floor(t.sp * 0.5);
     this.dropItems(t);
     this.ev(['kill', by ? by.id : 0, t.id, r1(t.x), r1(t.y), r1(t.z)]);
@@ -421,7 +614,7 @@ class Game {
   respawn(p) {
     const sp = S.spawnPoint(p.team, p.slot);
     p.x = sp.x; p.y = sp.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.kx = p.ky = 0; p.onGround = true;
-    p.hp = 100; p.tank = 100; p.alive = true; p.invulnT = 2.5;
+    p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.alive = true; p.invulnT = 2.5;
     p.sync++; p.lastPosT = this.time;
     p.input.f = false;
     p.input.a = p.team === 1 ? 0 : Math.PI;
@@ -451,15 +644,6 @@ class Game {
     }
   }
 
-  throwBomb(p) {
-    p.tank -= S.SUB_COST;
-    const mz = this.muzzle(p);
-    const v = S.bombVel(p.input.a, p.input.pt);
-    const b = { id: this.nextId++, x: mz.x, y: mz.y, z: mz.z, vx: v.vx, vy: v.vy, vz: v.vz, landed: false, fuse: 0.55, life: 0, team: p.team, owner: p.id };
-    if (S.insideAt(this.M, b.x, b.y, b.z)) { b.x = p.x; b.y = p.y; b.z = p.z + S.MUZZLE; }
-    this.bombs.push(b);
-    this.ev(['bm', b.id, r1(b.x), r1(b.y), r1(b.z), r1(b.vx), r1(b.vy), r1(b.vz), b.team, p.id]);
-  }
   updateBombs(dt) {
     this.bombs = this.bombs.filter((b) => {
       S.stepBomb(b, dt, this.M);
@@ -510,6 +694,7 @@ class Game {
     const W = S.WEAPONS[p.weapon];
     p.sp = 0; p.spKind = W.special;
     this.ev(['sp', p.id, p.spKind]);
+    const a = p.input.a;
     switch (p.spKind) {
       case 'storm': p.spT = 0.8; p.spWave = 0; break;
       case 'charge': p.spT = 4; break;
@@ -532,13 +717,38 @@ class Game {
       }
       case 'bubble': {
         p.spT = 0.3;
-        for (const a of this.players.values()) {
-          if (!a.alive || a.team !== p.team || dist(a, p) > 170) continue;
-          a.shield = Math.max(a.shield, a === p ? 130 : 80); a.shieldT = 7;
+        for (const al of this.players.values()) {
+          if (!al.alive || al.team !== p.team || dist(al, p) > 170) continue;
+          al.shield = Math.max(al.shield, al === p ? 130 : 80); al.shieldT = 7;
         }
         break;
       }
+      case 'barrage': {
+        p.spT = 0.6;
+        for (let i = 0; i < 6; i++) {
+          const d = 110 + i * 62, s = (Math.random() - 0.5) * 30;
+          this.spawnShell(p, p.x + Math.cos(a) * d - Math.sin(a) * s, p.y + Math.sin(a) * d + Math.cos(a) * s, 55, 58, 0.55 + i * 0.11);
+        }
+        break;
+      }
+      case 'quake': {
+        const d = clamp(p.input.ad || 200, 80, 280);
+        this.knock(p, Math.cos(a), Math.sin(a), Math.min(520, d * 2.1), 340);
+        p.quakeT = 1.4; p.quakeArm = this.time + 0.3; p.invulnT = Math.max(p.invulnT, 0.5); p.spT = 0.3;
+        break;
+      }
     }
+  }
+  quakeSlam(p) {
+    p.quakeT = 0;
+    this.paint(p.x, p.y, p.z, 95, p.team, p);
+    for (const t of this.players.values()) {
+      if (!t.alive || t.team === p.team) continue;
+      const d = Math.hypot(t.x - p.x, t.y - p.y);
+      if (d < 95 + S.R && Math.abs(t.z - p.z) < 50) this.hurt(t, 80, p, t.x - p.x, t.y - p.y, 2.2, 220);
+    }
+    this.pushBall(p, p.x, p.y, 100, 1400);
+    this.ev(['qk', r1(p.x), r1(p.y), r1(p.z), p.team]);
   }
   updateSpecial(p, dt) {
     p.spT -= dt;
@@ -546,7 +756,7 @@ class Game {
       case 'storm': {
         const elapsed = 0.8 - p.spT;
         while (p.spWave < 3 && elapsed >= p.spWave * 0.35) {
-          for (let i = 0; i < 18; i++) this.spawnProj(p, (i / 18) * Math.PI * 2 + p.spWave * 0.17, 0.12, 500, 280, 45, 24, 12, 8);
+          for (let i = 0; i < 18; i++) this.spawnProj(p, (i / 18) * Math.PI * 2 + p.spWave * 0.17, 0.12, 500, 280, 34, 24, 12, 8);
           this.paint(p.x, p.y, p.z, 70 + p.spWave * 15, p.team, p);
           p.spWave++;
         }
@@ -554,7 +764,7 @@ class Game {
       }
       case 'charge':
         this.paint(p.x, p.y, p.z, 42, p.team, p);
-        this.contactDamage(p, p.x, p.y, S.R + 30, 200, 0.3);
+        this.contactDamage(p, p.x, p.y, S.R + 30, 90, 0.4);
         this.pushBall(p, p.x, p.y, S.R + 10, 900);
         break;
       case 'beam': {
@@ -566,7 +776,7 @@ class Game {
           const gh = this.top(x, y);
           if (z - gh < 70 && t - lastPaint > 14) { lastPaint = t; this.paint(x, y, gh, 20, p.team, p); }
           const v = this.hitPlayerAt(p.team, x, y, z, 16);
-          if (v && !hitOnce.has(v.id)) { hitOnce.add(v.id); this.hurt(v, 230 * dt, p); }
+          if (v && !hitOnce.has(v.id)) { hitOnce.add(v.id); this.hurt(v, 150 * dt, p); }
           if (b && Math.hypot(b.x - x, b.y - y, b.r - z) < b.r + 16) { b.vx += mz.d.x * 900 * dt; b.vy += mz.d.y * 900 * dt; b.last = p.team; }
           return false;
         });
@@ -609,7 +819,8 @@ class Game {
         }
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
-          this.hurt(victim, pr.dmg, owner, pr.vx, pr.vy);
+          const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
+          this.hurt(victim, pr.dmg * (far ? 1.12 : 1), owner, pr.vx, pr.vy);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
         }
@@ -794,16 +1005,20 @@ class Game {
       if (p.hidden) flags |= 4;
       if (p.invulnT > 0) flags |= 8;
       if (p.firing) flags |= 16;
-      if (p.rolling) flags |= 32;
+      if (p.rollT > 0 || (p.spT > 0 && p.spKind === 'charge')) flags |= 32;
       if (this.obj.tr && this.obj.tr.carrier === p.id) flags |= 64;
       if (p.spT > 0) flags |= 128;
       if (p.sp >= W.spNeed) flags |= 256;
-      const ch = p.weapon === 'charger' ? p.charge : p.weapon === 'gatling' ? p.spin / W.spinTime : 0;
-      pl.push([p.id, r1(p.x), r1(p.y), r2(p.input.a), Math.ceil(p.hp), r1(p.tank), r1(p.sp), flags,
-        Math.ceil(p.respawnT * 10), p.carry, Math.round(p.sm * 100), Math.round(ch * 100), r1(p.shield), p.sync,
-        r1(p.vx + (p.kx || 0)), r1(p.vy + (p.ky || 0)), S.SPECIAL_IDS.indexOf(p.spKind), r1(p.z), r2(p.input.pt), Math.round(p.vz || 0)]);
+      if (p.foot) flags |= 512;
+      const buffs = (p.rushT > 0 ? 1 : 0) | (p.slowT > 0 ? 2 : 0) | (p.silenceT > 0 ? 4 : 0) | (p.smokeT > 0 ? 8 : 0) | (p.odN > 0 ? 16 : 0) | (p.quakeT > 0 ? 32 : 0);
+      pl.push([p.id, r1(p.x), r1(p.y), r2(p.input.a), Math.ceil(p.hp), Math.round(p.ammo * 100), Math.round(p.sp), flags,
+        Math.ceil((p.foot ? p.rebuildT : p.respawnT) * 10), p.carry, Math.round(p.sm * 100), Math.round(p.charge * 100), r1(p.shield), p.sync,
+        r1(p.vx + (p.kx || 0)), r1(p.vy + (p.ky || 0)), S.SPECIAL_IDS.indexOf(p.spKind), r1(p.z), r2(p.input.pt), Math.round(p.vz || 0),
+        this.maxHpOf(p), p.skillUses, Math.ceil(p.skillCd * 10), buffs]);
     }
-    const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState() };
+    const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState(),
+      rv: [0, this.reveal[1] > this.time ? 1 : 0, this.reveal[2] > this.time ? 1 : 0],
+      h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team]) };
     if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj]);
     this.room.broadcast(msg, true);
     this.diff = []; this.events = [];
@@ -847,21 +1062,28 @@ function aimAt(p, tx, ty, tz) {
   const d = Math.hypot(tx - p.x, ty - p.y);
   return { a: Math.atan2(ty - p.y, tx - p.x), pt: Math.atan2(tz - (p.z + S.MUZZLE), d) + d * 0.00011, d };
 }
+// AI 能否看见敌人：草丛 / 隐身的敌人只有靠近或全队被扫描时才看得见
+function botSees(g, p, e, d) {
+  if (!e.hidden || g.reveal[p.team] > g.time) return true;
+  return d < (p.pilot === 'hex' ? 170 : S.BUSH_DETECT);
+}
 function botThink(g, p, dt) {
   const inp = p.input;
   if (!p.alive) { inp.f = false; inp.w = false; p.ai = null; return; }
-  const ai = p.ai || (p.ai = { goal: null, path: [], pi: 0, replan: 0, nextSub: g.time + rand(2, 6), stuckT: 0, lastX: p.x, lastY: p.y, wob: rand(0, 6), strafe: 1, strafeT: 0, jumpT: rand(1, 4) });
+  const ai = p.ai || (p.ai = { goal: null, path: [], pi: 0, replan: 0, stuckT: 0, lastX: p.x, lastY: p.y, wob: rand(0, 6), strafe: 1, strafeT: 0, jumpT: rand(1, 4), react: rand(0.15, 0.35), seenT: 0, paintT: rand(0.5, 2) });
   const W = S.WEAPONS[p.weapon];
-  const range = S.weaponRange(p.weapon);
+  const range = p.foot ? S.PISTOL.range : S.weaponRange(p.weapon);
   ai.replan -= dt;
 
   let enemy = null, ed = Infinity;
   for (const e of g.players.values()) {
     if (!e.alive || e.team === p.team) continue;
     const d = Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z);
-    if (e.hidden && d > 110) continue;
-    if (d < range + 160 && d < ed && S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18)) { enemy = e; ed = d; }
+    if (!botSees(g, p, e, d)) continue;
+    const lobber = p.weapon === 'mortar' && !p.foot;
+    if (d < range + 160 && d < ed && (lobber || S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18))) { enemy = e; ed = d; }
   }
+  ai.seenT = enemy ? ai.seenT + dt : 0;
 
   ai.stuckT += dt;
   if (ai.stuckT > 1.2) {
@@ -871,7 +1093,7 @@ function botThink(g, p, dt) {
 
   if (ai.replan <= 0 || !ai.goal) {
     ai.replan = rand(0.5, 0.9);
-    ai.goal = ai.forceRandom ? randomGoal(g, p) : chooseGoal(g, p);
+    ai.goal = ai.forceRandom ? randomGoal(g, p) : p.foot ? fleeGoal(g, p) : chooseGoal(g, p);
     ai.forceRandom = false;
     ai.path = findPath(g.nav, p.x, p.y, ai.goal.x, ai.goal.y);
     ai.pi = 0;
@@ -889,64 +1111,101 @@ function botThink(g, p, dt) {
 
   const gh = S.topAt(g.M, p.x, p.y);
   const onOwn = p.z <= gh + 1 && S.cellAt(g.grid, p.x, p.y) === p.team;
-  let wantFire = false;
-  let aim = { a: mx || my ? Math.atan2(my, mx) : inp.a, pt: -0.12 };
+  const hpK = p.hp / g.maxHpOf(p);
+  let wantAtk = false, hold = false;
+  let aim = { a: mx || my ? Math.atan2(my, mx) : inp.a, pt: -0.05 };
+  inp.ad = 220;
 
-  if (enemy && ed < range * 1.05) {
+  if (enemy && ed < range * 1.05 && ai.seenT > ai.react) {
     const lead = ed / 650;
     aim = aimAt(p, enemy.x + enemy.vx * lead * 0.6, enemy.y + enemy.vy * lead * 0.6, enemy.z + 16);
-    aim.a += (Math.random() - 0.5) * 0.2; aim.pt += (Math.random() - 0.5) * 0.08;
-    wantFire = true;
+    aim.a += (Math.random() - 0.5) * 0.18; aim.pt += (Math.random() - 0.5) * 0.06;
+    inp.ad = ed;
+    wantAtk = true;
     ai.strafeT -= dt;
     if (ai.strafeT <= 0) { ai.strafeT = rand(0.4, 1.1); ai.strafe = Math.random() < 0.5 ? -1 : 1; }
     const ea = Math.atan2(enemy.y - p.y, enemy.x - p.x);
-    if (p.weapon === 'roller' || p.weapon === 'bucket') { mx = Math.cos(ea); my = Math.sin(ea); }
+    if (p.foot) {
+      // 驾驶员：边退边打
+      mx = -Math.cos(ea) * 0.7 + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.6; my = -Math.sin(ea) * 0.7 + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.6;
+    } else if (p.weapon === 'roller' || p.weapon === 'bucket' || p.weapon === 'fist') { mx = Math.cos(ea); my = Math.sin(ea); }
     else if (p.weapon === 'charger') { mx = Math.cos(ea + Math.PI / 2) * ai.strafe * 0.5; my = Math.sin(ea + Math.PI / 2) * ai.strafe * 0.5; }
     else {
-      const back = ed < range * 0.5 ? -0.5 : 0.3;
+      const want = p.weapon === 'mortar' ? 0.75 : 0.55;
+      const back = ed < range * want ? -0.6 : 0.3;
       mx = Math.cos(ea) * back + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.8;
       my = Math.sin(ea) * back + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.8;
     }
     if (g.mode === 'escort' && g.obj.tr.carrier === p.id) { const a2 = Math.atan2(ty - p.y, tx - p.x); mx = Math.cos(a2); my = Math.sin(a2); }
+    if (!p.foot && hpK < 0.3 && enemy.hp > p.hp) { mx = -Math.cos(ea); my = -Math.sin(ea); }   // 残血撤退
     ai.jumpT -= dt;
     if (ai.jumpT <= 0) { ai.jumpT = rand(1.2, 3.5); inp.j = true; }
-  } else {
+  } else if (!p.foot) {
+    // 没有敌人：边走边涂地
     ai.wob += dt * 2.2;
-    aim.a += Math.sin(ai.wob) * 0.5;
-    aim.pt = -0.1 + Math.sin(ai.wob * 0.7) * 0.08;
-    wantFire = p.tank > 22 || (p.weapon === 'roller' && p.tank > 6);
+    aim.a += Math.sin(ai.wob) * 0.6;
+    ai.paintT -= dt;
+    if (ai.paintT <= 0 && p.ammo > 2.2) { wantAtk = true; ai.paintT = rand(0.6, 1.6); inp.ad = rand(150, 320); }
     if (g.mode === 'soccer' && g.obj.resetT <= 0) {
       const b = g.obj.ball, bd = dist(p, b);
       const gx = p.team === 1 ? S.W : 0;
       const toGoal = Math.atan2(S.H / 2 - b.y, gx - b.x), toBall = Math.atan2(b.y - p.y, b.x - p.x);
       let diff = Math.abs(toGoal - toBall); if (diff > Math.PI) diff = Math.PI * 2 - diff;
-      if (bd < 380 && diff < 0.9 && S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, b.x, b.y, b.r)) { aim = aimAt(p, b.x, b.y, b.r); wantFire = p.tank > 3; }
+      if (bd < Math.min(range, 380) && diff < 0.9 && S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, b.x, b.y, b.r)) { aim = aimAt(p, b.x, b.y, b.r); wantAtk = p.ammo >= 1; inp.ad = bd; }
     }
   }
 
   let wheel = false;
-  if (!wantFire || !enemy) {
-    if (onOwn && (p.tank < 25 || (!enemy && dl > 260 && p.tank < 85))) { wheel = true; wantFire = false; }
+  if (!p.foot && !enemy && onOwn && (p.ammo < 1.5 || (dl > 260 && p.ammo < 2.8))) { wheel = true; wantAtk = false; }
+  if (!p.foot && p.carry >= 3 && onOwn && !enemy) { wheel = true; wantAtk = false; }
+
+  if (W.attack === 'charge' && !p.foot) {
+    hold = wantAtk && p.ammo >= 1 && p.charge < (enemy ? 0.92 : 0.4);
+    inp.f = hold;
+  } else {
+    inp.f = false;
+    if (wantAtk && p.ammo >= 1 && p.atkCd <= 0 && !p.burst && Math.random() < 0.5) inp.aq++;
   }
-  if (p.weapon === 'charger') {
-    if (wantFire) inp.f = p.charge < (enemy ? 0.92 : 0.45);
-    else inp.f = false;
-  } else inp.f = wantFire;
-  if (p.carry >= 3 && onOwn && !enemy) { wheel = true; inp.f = false; }
 
   inp.w = wheel;
   inp.mx = mx; inp.my = my; inp.a = aim.a; inp.pt = clamp(aim.pt, -1.2, 1.2);
 
-  if (enemy && ed < 270 && ed > 90 && p.tank > 75 && g.time > ai.nextSub) {
-    inp.sq++;
-    const a2 = aimAt(p, enemy.x, enemy.y, enemy.z);
-    inp.a = a2.a; inp.pt = clamp(-0.42 + (ed - 90) / 600, -0.4, 0.3);
-    ai.nextSub = g.time + rand(4, 9);
+  // 大招
+  if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
+    const sp = W.special;
+    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260 }[sp];
+    if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < 0.002) {
+      inp.qq++;
+      if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
+    }
   }
-  if (p.sp >= W.spNeed && p.spT <= 0) {
-    const use = W.special === 'missiles' || (enemy && ed < (W.special === 'beam' ? 700 : 300)) || Math.random() < 0.003;
-    if (use) { inp.qq++; if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; } }
+  // 驾驶员技能
+  if (p.skillUses > 0 && p.skillCd <= 0 && Math.random() < 0.04) {
+    const sk = S.pilot(p.pilot).skill;
+    const fight = enemy && ed < 300;
+    const use = {
+      rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
+      turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, overdrive: fight && p.ammo < 1, drone: fight,
+    }[sk];
+    if (use) {
+      if (sk === 'dash' && enemy && !p.foot) { inp.mx = Math.cos(aim.a); inp.my = Math.sin(aim.a); }
+      inp.gq++;
+    }
   }
+}
+// 弹出的驾驶员：躲开敌人，等新机体空投
+function fleeGoal(g, p) {
+  let ex = 0, ey = 0, n = 0;
+  for (const e of g.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 450) { ex += e.x; ey += e.y; n++; }
+  if (!n) return randomGoal(g, p);
+  ex /= n; ey /= n;
+  const dx = p.x - ex, dy = p.y - ey, l = Math.hypot(dx, dy) || 1;
+  for (let k = 0; k < 12; k++) {
+    const d = 200 + k * 20, a = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+    const x = clamp(p.x + Math.cos(a) * d, 40, S.W - 40), y = clamp(p.y + Math.sin(a) * d, 40, S.H - 40);
+    if (S.topAt(g.M, x, y) === 0) return { x, y };
+  }
+  return S.basePos(p.team);
 }
 
 function randomGoal(g, p) {

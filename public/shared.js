@@ -26,80 +26,152 @@
   ];
   S.TEAM_NAMES = [null, 'α队', 'β队'];
 
-  // ---------------- 武器 ----------------
+  // ---------------- 机体（每种机体 = 一套武器 + 大招 + 属性） ----------------
+  // 攻击消耗 1 格弹药（共 3 格），不攻击时自动装填；击中敌人给大招充能
+  S.AMMO = 3;
   S.WEAPONS = {
     blaster: {
-      name: '喷罐枪', desc: '均衡的全自动喷枪，射速快、好上手，适合任何场合。',
-      special: 'storm', rate: 0.1, cost: 1.4, speed: 620, range: 330, dmg: 26, spread: 0.1,
-      splat: 22, trail: 13, size: 6, spNeed: 180,
+      name: '喷罐机兵', short: '喷罐', role: '均衡射手', desc: '每次攻击连射 5 发涂料弹，射程中等、上手简单，适合任何场合。',
+      hp: 100, spd: 1, reload: 1.3, atkCd: 0.42, attack: 'burst', shots: 5, interval: 0.07,
+      speed: 650, range: 340, dmg: 15, spread: 0.05, splat: 22, trail: 13, size: 6, special: 'storm', spNeed: 260,
     },
     roller: {
-      name: '滚刷机', desc: '按住开火向前滚动，刷出宽阔道路并碾压敌人；每次按下会先甩出一扇涂料。',
-      special: 'charge', rate: 0.6, cost: 9, speed: 500, range: 210, dmg: 32, pellets: 5, arc: 0.6, spread: 0.05,
-      splat: 20, trail: 0, size: 7, rollCost: 8, rollWidth: 26, rollDmg: 140, spNeed: 170,
+      name: '滚刷机兵', short: '滚刷', role: '冲锋开路', desc: '甩出一扇涂料并向前突进滚压，碾过的敌人受到伤害。生命值高。',
+      hp: 130, spd: 1, reload: 1.15, atkCd: 0.5, attack: 'flick', pellets: 5, arc: 0.7, speed: 520, range: 200, dmg: 24,
+      spread: 0.05, splat: 20, trail: 0, size: 7, rollWidth: 26, rollDmg: 36, lunge: 330, special: 'charge', spNeed: 230,
     },
     charger: {
-      name: '狙击笔', desc: '按住蓄力、松开射出长距离直线，满蓄力一击必杀，蓄力时移动变慢。',
-      special: 'missiles', chargeTime: 0.9, range: 760, dmg: 160, cost: 20, minCost: 5, spNeed: 190,
+      name: '狙击机兵', short: '狙击', role: '远程狙击', desc: '按住蓄力、松开射出贯穿直线，满蓄力伤害极高。蓄力时移动变慢，生命值低。',
+      hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.9, range: 720, dmg: 115, minDmg: 32,
+      special: 'missiles', spNeed: 240,
     },
     bucket: {
-      name: '泼桶机', desc: '近距离泼出大片涂料，覆盖面积大，贴脸爆发极高。',
-      special: 'bubble', rate: 0.75, cost: 8, speed: 480, range: 240, dmg: 22, pellets: 7, arc: 0.55, spread: 0.06,
-      splat: 26, trail: 12, size: 7, spNeed: 180,
+      name: '泼桶机兵', short: '泼桶', role: '近距爆发', desc: '近距离泼出一大片涂料弹，覆盖面积大，贴脸伤害很高。',
+      hp: 115, spd: 0.95, reload: 1.6, atkCd: 0.55, attack: 'fan', pellets: 7, arc: 0.6, speed: 480, range: 240, dmg: 17,
+      spread: 0.06, splat: 26, trail: 12, size: 7, special: 'bubble', spNeed: 250,
     },
     gatling: {
-      name: '旋转喷管', desc: '需要预热的重型喷管，射程远、火力持续，开火时移动较慢。',
-      special: 'beam', spinTime: 0.55, rate: 0.065, cost: 1.0, speed: 700, range: 440, dmg: 15, spread: 0.07,
-      splat: 18, trail: 12, size: 5, spNeed: 190,
+      name: '旋转机兵', short: '旋转', role: '持续压制', desc: '每次攻击持续扫射 1 秒，射程远、火力持续，但装填慢。',
+      hp: 110, spd: 0.92, reload: 2.1, atkCd: 0.3, attack: 'burst', shots: 14, interval: 0.075,
+      speed: 700, range: 430, dmg: 8, spread: 0.09, splat: 18, trail: 12, size: 5, special: 'beam', spNeed: 300,
+    },
+    mortar: {
+      name: '迫击机兵', short: '迫击', role: '曲射炮手', desc: '把涂料炮弹抛到瞄准的位置，能越过墙壁和掩体，落地爆炸涂一大片。',
+      hp: 85, spd: 0.95, reload: 1.6, atkCd: 0.5, attack: 'lob', range: 420, minRange: 70, dmg: 44, blast: 54, flight: 0.75,
+      special: 'barrage', spNeed: 250, isNew: true,
+    },
+    fist: {
+      name: '重拳机兵', short: '重拳', role: '贴身格斗', desc: '向前冲出一记重拳，伤害高并把敌人击飞。生命值最高、移动最快，但只能近身。',
+      hp: 150, spd: 1.08, reload: 0.85, atkCd: 0.38, attack: 'punch', range: 68, arc: 1.7, dmg: 40, kb: 260, lunge: 200,
+      special: 'quake', spNeed: 210, isNew: true,
     },
   };
-  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling'];
+  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist'];
   S.weaponRange = function (id) {
     const w = S.WEAPONS[id];
     if (id === 'charger') return 620;
-    if (id === 'roller') return 170;
+    if (id === 'roller') return 180;
+    if (id === 'fist') return 80;
     return w.range;
   };
 
   S.SPECIALS = {
     storm: { name: '涂装风暴', desc: '向四周连续爆发三圈涂料弹。' },
-    charge: { name: '碾压冲锋', desc: '4 秒无敌高速冲刺，碾过的敌人直接击倒。' },
+    charge: { name: '碾压冲锋', desc: '4 秒无敌高速冲刺，碾过的敌人受到重创。' },
     missiles: { name: '锁定导弹', desc: '锁定所有敌人当前位置，1.5 秒后导弹落下。' },
     bubble: { name: '气泡护盾', desc: '为自己和附近队友套上吸收伤害的护盾。' },
     beam: { name: '极光喷射', desc: '2.6 秒持续高压光束，贯穿并涂满整条直线。' },
+    barrage: { name: '地毯轰炸', desc: '沿瞄准方向连续落下 6 发炮弹。' },
+    quake: { name: '地震重锤', desc: '跳向瞄准位置，落地砸出冲击波，击飞周围敌人。' },
   };
-  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam'];
+  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake'];
+  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge';
+
+  // ---------------- 驾驶员技能（每局 3 次，冷却 6 秒；驾驶员弹出后也能用） ----------------
+  S.SKILL_USES = 3; S.SKILL_CD = 6;
+  S.SKILLS = {
+    rush: { name: '肾上腺素', desc: '3 秒内移动速度 +35%，装填速度翻倍。' },
+    scan: { name: '义眼扫描', desc: '5 秒内全队能看到所有敌人，包括草丛里和隐身的。' },
+    cheer: { name: '应援音波', desc: '为自己和附近队友回复 40 点生命。' },
+    guard: { name: '钢铁护盾', desc: '获得可吸收 60 点伤害的护盾，持续 4 秒。' },
+    smoke: { name: '墨雾', desc: '在脚下炸开一片己方涂料，并隐身 3 秒（攻击也不会现形）。' },
+    turret: { name: '涂装炮台', desc: '在原地放下一座自动炮台，7 秒内攻击附近敌人。' },
+    dash: { name: '冲刺推进', desc: '朝移动方向高速冲刺，冲刺瞬间无敌。' },
+    emp: { name: '电磁脉冲', desc: '附近敌人减速 45%，并在 1.2 秒内无法攻击。' },
+    bento: { name: '能量便当', desc: '在脚下放一份便当，第一个碰到的队友回复 60 点生命。' },
+    overdrive: { name: '火力全开', desc: '立即装满弹药，接下来 3 次攻击伤害 +40%。' },
+    drone: { name: '猫猫无人机', desc: '召唤跟随自己的无人机，6 秒内自动射击附近敌人。' },
+  };
+
+  // ---------------- 驾驶员被摧毁后：弹出继续战斗 ----------------
+  S.PILOT_HP = 50;          // 弹出驾驶员的生命值
+  S.PILOT_R = 9;            // 驾驶员碰撞半径
+  S.PILOT_SPEED = 205;
+  S.REBUILD = 6;            // 新机体重建时间（秒），驾驶员活下来就在原地空投新机体
+  S.KO_RESPAWN = 4;         // 驾驶员被击倒后回基地复活的时间
+  S.PISTOL = { range: 260, dmg: 13, speed: 620, reload: 0.85, atkCd: 0.32, size: 5, splat: 12, trail: 0 };
+  S.BUSH_DETECT = 90;       // 草丛里的敌人在这个距离内会被看见
+
+  // ---------------- 奖杯之路（解锁头部涂装） ----------------
+  S.TROPHY_WIN = 8; S.TROPHY_DRAW = 2; S.TROPHY_LOSS = 3;
 
   // ---------------- 头部涂装（随等级解锁） ----------------
   S.HEADS = [
-    { id: 'antenna', name: '天线', lv: 1 },
-    { id: 'mohawk', name: '莫西干', lv: 2 },
-    { id: 'phones', name: '耳机', lv: 3 },
-    { id: 'cone', name: '路锥', lv: 4 },
-    { id: 'crown', name: '王冠', lv: 6 },
-    { id: 'horns', name: '恶魔角', lv: 8 },
+    { id: 'antenna', name: '天线', lv: 1, tr: 0 },
+    { id: 'mohawk', name: '莫西干', lv: 2, tr: 30 },
+    { id: 'phones', name: '耳机', lv: 3, tr: 80 },
+    { id: 'cone', name: '路锥', lv: 4, tr: 150 },
+    { id: 'crown', name: '王冠', lv: 6, tr: 250 },
+    { id: 'horns', name: '恶魔角', lv: 8, tr: 400 },
   ];
   // ---------------- 驾驶员（立绘 + 3D 驾驶舱里的角色） ----------------
   // hair/skin/eye 同时用于 SVG 立绘与 3D 模型；style 决定发型
   S.PILOTS = [
     { id: 'blaze', name: '凌焰', code: '烈焰', title: '热血突击手', weapon: 'blaster', accent: '#ff4d3d',
       hair: '#e8382f', hair2: '#8f1022', skin: '#ffd9bf', eye: '#ffb21f', style: 'spiky', eyeShape: 'sharp', mouth: 'grin', outfit: 'jacket',
+      skill: 'rush', passive: { name: '越战越勇', desc: '击毁机体或击倒驾驶员后回复 30% 生命。' },
       line: '涂料都装满了？那就冲啊！', bio: '街头涂鸦队的队长，永远第一个冲进敌阵。说话大声、笑声更大，护目镜是他唯一不肯借人的东西。' },
     { id: 'frost', name: '白夜', code: '霜刃', title: '冷面狙击手', weapon: 'charger', accent: '#5fd3ff',
       hair: '#e6eef8', hair2: '#8796b8', skin: '#fde3d2', eye: '#47c8ff', style: 'swept', eyeShape: 'cool', mouth: 'calm', outfit: 'coat',
+      skill: 'scan', passive: { name: '远距精准', desc: '对 60% 射程以外的目标伤害 +12%。' },
       line: '一发，就够了。', bio: '曾经的天台竞速冠军，退役后只用一支狙击笔说话。刘海下藏着一只机械义眼，能看清八百米外的涂料滴。' },
     { id: 'candy', name: '苏糖', code: '电音', title: '元气偶像主播', weapon: 'gatling', accent: '#ff5fc1',
       hair: '#ff8fcf', hair2: '#c0367e', skin: '#ffe2d3', eye: '#b56bff', style: 'twintail', eyeShape: 'round', mouth: 'open', outfit: 'idol',
+      skill: 'cheer', passive: { name: '人气爆棚', desc: '大招充能速度 +20%。' },
       line: '大家～今天也要涂得闪闪发光哦！', bio: '拥有百万粉丝的直播主，猫耳耳机连着直播间。看起来软萌，实际是旋转喷管的火力狂人。' },
     { id: 'titan', name: '雷豹', code: '铁拳', title: '重装开路者', weapon: 'roller', accent: '#ffb000',
       hair: '#2a2420', hair2: '#0d0b0a', skin: '#b97a55', eye: '#ffcc33', style: 'dreads', eyeShape: 'bold', mouth: 'smirk', outfit: 'tank',
+      skill: 'guard', passive: { name: '钢筋铁骨', desc: '机体生命值 +15%。' },
       line: '挡路的，统统碾过去。', bio: '前码头起重机驾驶员，力气大到能单手扛起滚刷。外表凶悍，其实是全队最会照顾人的大哥。' },
     { id: 'raven', name: '夜鸢', code: '墨鸦', title: '神秘涂鸦师', weapon: 'bucket', accent: '#a46bff',
       hair: '#3b2b5c', hair2: '#160f26', skin: '#f6d8c8', eye: '#c18bff', style: 'hood', eyeShape: 'sleepy', mouth: 'smirk', outfit: 'hoodie',
+      skill: 'smoke', passive: { name: '暗影步', desc: '在草丛和己方涂料上移动速度 +10%。' },
       line: '这面墙……归我了。', bio: '城市里最神秘的涂鸦作者，没人见过她摘下兜帽。她泼出的每一桶涂料都是一幅画。' },
     { id: 'aurora', name: '星澜', code: '极光', title: '天才机兵工程师', weapon: 'blaster', accent: '#2ee6b0',
       hair: '#35d6c4', hair2: '#1c6f8c', skin: '#ffe4d6', eye: '#3fe0a0', style: 'ponytail', eyeShape: 'round', mouth: 'smile', outfit: 'engineer',
+      skill: 'turret', passive: { name: '快速装配', desc: '机体被摧毁后，新机体重建时间 -2 秒。' },
       line: '机兵的参数我都调好啦，交给我吧！', bio: '十四岁就设计出第一台涂鸦机兵的天才少女。头上的护目镜是工作用的，扳手总是插在腰间。' },
+    // ---- 新驾驶员 ----
+    { id: 'gale', name: '风羽', code: '疾风', title: '天空竞速手', weapon: 'fist', accent: '#4fb8ff', isNew: true,
+      hair: '#d6ecff', hair2: '#6f8fc8', skin: '#ffe0cc', eye: '#2f9bff', style: 'braid', eyeShape: 'sharp', mouth: 'smile', outfit: 'aviator',
+      skill: 'dash', passive: { name: '轻装上阵', desc: '弹出后的驾驶员移动速度 +30%。' },
+      line: '追得上我的话，就来试试吧！', bio: '滑翔伞联赛三连冠，把机兵当成会走路的滑翔翼来开。长辫子和围巾是她在风里最好认的标志。' },
+    { id: 'hex', name: '洛奇', code: '骇客', title: '天才黑客', weapon: 'charger', accent: '#c06bff', isNew: true,
+      hair: '#2b2140', hair2: '#120a1c', skin: '#f4d9c6', eye: '#ff6bf0', style: 'undercut', eyeShape: 'cool', mouth: 'smirk', outfit: 'hacker',
+      skill: 'emp', passive: { name: '信号侦测', desc: '能看见更远处草丛里的敌人（170 范围）。' },
+      line: '你的机兵，现在归我了。', bio: '十六岁黑进了城市所有的广告屏，只为播放自己的涂鸦动画。护目镜上永远滚动着看不懂的代码。' },
+    { id: 'chef', name: '包大福', code: '大厨', title: '后勤大厨', weapon: 'bucket', accent: '#ff9f2e', isNew: true,
+      hair: '#c4652c', hair2: '#7a3612', skin: '#ffd9b8', eye: '#7a4a24', style: 'chef', eyeShape: 'happy', mouth: 'grin', outfit: 'chefcoat',
+      skill: 'bento', passive: { name: '吃饱才有力气', desc: '脱离战斗后回血速度 +50%。' },
+      line: '打完这局，大家来吃饭！', bio: '街角夜宵摊老板，用泼桶机兵炒菜火候刚好。队友受伤了，他总能从驾驶舱里掏出热腾腾的便当。' },
+    { id: 'vet', name: '秦岳', code: '老兵', title: '退役王牌', weapon: 'mortar', accent: '#9bc94a', isNew: true,
+      hair: '#c2c6ce', hair2: '#6c7078', skin: '#e3b894', eye: '#7aa8c0', style: 'veteran', eyeShape: 'bold', mouth: 'calm', outfit: 'military',
+      skill: 'overdrive', passive: { name: '同归于尽', desc: '机体被摧毁时自爆，对周围敌人造成 60 点伤害。' },
+      line: '小鬼们，看好了。', bio: '第一代机兵测试驾驶员，一只眼睛在当年的事故里留下了伤。退休后在训练场当教官，嘴硬心软。' },
+    { id: 'yuzu', name: '小柚', code: '机仆', title: '无人机少女', weapon: 'gatling', accent: '#ffc531', isNew: true,
+      hair: '#ff9a3d', hair2: '#c25a12', skin: '#ffe4d2', eye: '#ff6a2e', style: 'buns', eyeShape: 'round', mouth: 'open', outfit: 'kid',
+      skill: 'drone', passive: { name: '涂鸦小能手', desc: '涂地给大招的充能翻倍。' },
+      line: '小喵，出动！把那边涂满！', bio: '星澜的邻居小妹妹，自己改装了一架猫咪无人机。个子最小，背包里的零件却最多。' },
   ];
   S.pilot = (id) => S.PILOTS.find((p) => p.id === id) || S.PILOTS[0];
 
@@ -133,16 +205,19 @@
   S.MAPS = [
     {
       name: '霓虹工厂', desc: '经典对称布局，中路开阔，矮掩体可跳上去，两侧有高台。', goalX: 24,
+      bush: [[22, 14, 6, 6], [30, 57, 8, 5], [46, 35, 5, 10], [9, 22, 5, 5]],
       rects: [[16, 10, 4, 18, 3], [16, 52, 4, 18, 3], [28, 30, 10, 4, 1], [28, 46, 10, 4, 1], [40, 4, 6, 12, 3],
         [44, 64, 8, 6, 2], [42, 64, 2, 6, 1], [56, 20, 8, 5, 2], [56, 25, 8, 2, 1]],
     },
     {
       name: '涂鸦天台', desc: '长条通道与高台狙击点，基地前有矮墙，适合远程武器。', goalX: 31,
+      bush: [[16, 22, 10, 5], [28, 50, 8, 6], [46, 20, 6, 6], [50, 50, 6, 8]],
       rects: [[14, 18, 22, 3, 3], [14, 59, 22, 3, 3], [40, 0, 4, 14, 3], [40, 34, 3, 12, 2], [37, 36, 3, 8, 1],
         [24, 36, 6, 8, 1], [52, 10, 16, 3, 3]],
     },
     {
       name: '齿轮广场', desc: '中央被可攀爬的环形高台包围，上下层立体乱斗。', goalX: 37,
+      bush: [[12, 24, 6, 8], [22, 48, 8, 6], [36, 26, 6, 6], [53, 33, 5, 5]],
       rects: [[44, 22, 12, 3, 2], [44, 22, 3, 10, 2], [64, 22, 12, 3, 2], [73, 22, 3, 10, 2], [48, 19, 4, 3, 1],
         [18, 12, 8, 8, 2], [26, 14, 2, 4, 1], [30, 38, 4, 4, 1], [8, 18, 10, 3, 3], [8, 59, 10, 3, 3]],
     },
@@ -165,7 +240,17 @@
           if (i >= 0 && i < GW && j >= 0 && j < GH) lv[j * GW + i] = Math.max(lv[j * GW + i], l);
     const top = new Float32Array(GW * GH), solid = new Uint8Array(GW * GH);
     for (let i = 0; i < lv.length; i++) { top[i] = S.LEVEL_H[lv[i]]; solid[i] = lv[i] >= 3 ? 1 : 0; }
-    return { top, solid, lv, rects };
+    // 草丛：只长在地面上，进去之后敌人看不见你（靠得很近或你攻击时会暴露）
+    const bush = new Uint8Array(GW * GH), bushes = [];
+    for (const r of m.bush || []) {
+      for (const rr of [r, [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3]]]) {
+        bushes.push(rr);
+        for (let j = rr[1]; j < rr[1] + rr[3]; j++)
+          for (let i = rr[0]; i < rr[0] + rr[2]; i++)
+            if (i >= 0 && i < GW && j >= 0 && j < GH && !lv[j * GW + i]) bush[j * GW + i] = 1;
+      }
+    }
+    return { top, solid, lv, rects, bush, bushes };
   };
 
   S.basePos = (team) => ({ x: team === 1 ? 6 * CELL : S.W - 6 * CELL, y: S.H / 2 });
@@ -188,6 +273,7 @@
     if (!S.inBounds(cx, cy)) return 0;
     return grid[cy * GW + cx];
   };
+  S.inBush = (M, x, y, z) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return S.inBounds(cx, cy) && M.bush[cy * GW + cx] === 1 && z < 6; };
   S.insideAt = (M, x, y, z) => z < S.topAt(M, x, y) - 0.01; // 该点在方块/地面以下
 
   // 圆柱与方块碰撞：比脚底高出 STEP 以上的格子视为墙
@@ -233,11 +319,16 @@
   S.moveMul = function (weapon, firing, spKind) {
     if (spKind === 'beam') return 0.4;
     if (!firing) return 1;
-    return { blaster: 0.85, roller: 0.95, charger: 0.45, bucket: 0.8, gatling: 0.55 }[weapon] || 1;
+    return { blaster: 0.9, roller: 1, charger: 0.5, bucket: 0.85, gatling: 0.6, mortar: 0.9, fist: 1 }[weapon] || 1;
   };
   // ground: 脚下涂料（-1 表示在空中）
-  S.speedFor = function (team, sm, ground, wheel, mul) {
+  S.speedFor = function (team, sm, ground, wheel, mul, foot) {
     let s;
+    if (foot) {
+      // 弹出的驾驶员：跑得快，不能变滚轮
+      const enemy = ground > 0 && ground !== team;
+      return (enemy ? 125 : S.PILOT_SPEED) * (sm || 1);
+    }
     if (ground < 0) s = wheel ? 250 : 165 * mul;
     else {
       const own = ground === team, enemy = ground !== 0 && ground !== team;
@@ -299,9 +390,11 @@
     let mx = inp.mx || 0, my = inp.my || 0;
     const l = Math.hypot(mx, my);
     if (l > 1) { mx /= l; my /= l; }
-    const wheel = !!inp.w;
+    const foot = !!p.foot;
+    const wheel = !!inp.w && !foot;
     const ground = p.onGround ? S.cellAt(grid, p.x, p.y) : -1;
-    const spd = S.speedFor(p.team, p.sm, ground, wheel, mul);
+    const spd = S.speedFor(p.team, p.sm, ground, wheel, mul, foot);
+    const RAD = foot ? S.PILOT_R : S.R;
     approach(p, mx * spd, my * spd, surfaceFor(p.team, ground, wheel), dt);
     // 击退衰减
     const kd = Math.exp(-dt * (p.onGround ? P.kbGround : P.kbAir));
@@ -320,7 +413,7 @@
     const ox = p.x, oy = p.y;
     const ex = (p.vx + p.kx) * dt, ey = (p.vy + p.ky) * dt;
     p.x += ex; p.y += ey;
-    S.collide(p, S.R, M);
+    S.collide(p, RAD, M);
     const nx = p.x - (ox + ex), ny = p.y - (oy + ey);
     const nl = Math.hypot(nx, ny);
     if (nl > 0.01) {
