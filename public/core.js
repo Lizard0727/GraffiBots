@@ -1,9 +1,9 @@
 // 涂鸦机兵 GraffiBots — 对局核心（Node 服务器与浏览器内置服务器共用）
 // 包含：对局模拟 Game、AI 机兵、房间 Room、消息处理 Hub
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./shared.js'));
-  else root.GBCore = factory(root.GS);
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (S) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./shared.js'), require('./economy.js'));
+  else root.GBCore = factory(root.GS, root.GE);
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (S, E) {
 'use strict';
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (n) => Math.floor(Math.random() * n);
@@ -114,10 +114,19 @@ class Game {
     this.nextId = 1; this.diff = []; this.events = [];
     this.colorSet = room.colorSet;
     const slots = { 1: 0, 2: 0 };
+    // 角色等级：公平模式下所有人按同一等级；AI 的等级跟着真人玩家的平均等级
+    this.fair = !!st.fair;
+    this.tutorial = !!st.tutorial;   // 新手教程：敌人是不动的训练靶，时间不走，玩家不会倒下
+    const FAIR = { lv: E.FAIR_LV, bt: E.FAIR_BT };
+    const humans = [];
     for (const c of room.members.values()) {
       if (slots[c.team] >= S.MAX_PER_TEAM) continue;
-      this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++, c.pilot);
+      const pw = this.fair ? FAIR : c.power || { lv: 1, bt: 0 };
+      humans.push(pw);
+      this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++, c.pilot, pw);
     }
+    const avgLv = humans.length ? Math.round(humans.reduce((a, b) => a + b.lv, 0) / humans.length) : 1;
+    const botPw = this.fair ? FAIR : { lv: avgLv, bt: avgLv >= 9 ? 2 : avgLv >= 5 ? 1 : 0 };
     if (st.bots) {
       let bi = 0;
       const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
@@ -125,13 +134,13 @@ class Game {
       const taken = new Set([...this.players.values()].map((p) => p.pilot));
       const free = S.PILOTS.filter((pp) => !taken.has(pp.id)).sort(() => Math.random() - 0.5);
       for (const team of [1, 2])
-        while (slots[team] < st.teamSize) {
+        while (slots[team] < st.teamSize && !(this.tutorial && team === 1)) {
           bi++;
           const pp = free.shift();
           const pil = pp || S.PILOTS[randInt(S.PILOTS.length)];
           // 驾驶员和机体分开选：一半用擅长机体，一半随机
           this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 ? pil.weapon : S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)],
-            S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id);
+            S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id, botPw);
         }
     }
     this.initMode();
@@ -142,18 +151,21 @@ class Game {
     }
     room.broadcast({
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
-      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot })),
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt })),
+      fair: this.fair,
     });
     if (!opts.manual) this.interval = setInterval(() => this.step(), 1000 / S.TICK);
   }
 
-  addPlayer(id, name, team, weapon, head, bot, slot, pilot) {
+  addPlayer(id, name, team, weapon, head, bot, slot, pilot, power) {
     if (!S.WEAPONS[weapon]) weapon = 'blaster';
     const pid = S.pilot(pilot).id;
     const W = S.WEAPONS[weapon];
+    const lv = clamp((power && power.lv) | 0 || 1, 1, E.MAX_LV), bt = clamp((power && power.bt) | 0, 0, 2);
+    const pmul = E.statMul(lv);   // 等级加成：生命和伤害每级 +4%
     const p = {
-      id, name, team, weapon, head, bot, slot, pilot: pid,
-      maxHp: Math.round(W.hp * (pid === 'titan' ? 1.15 : 1)),
+      id, name, team, weapon, head, bot, slot, pilot: pid, lv, bt, pmul,
+      maxHp: Math.round(W.hp * (pid === 'titan' ? 1.15 : 1) * pmul),
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, onGround: true,
       hp: 100, ammo: S.AMMO, sp: 0, alive: true, respawnT: 0, invulnT: 0,
       lastHurt: -10, lastAtk: -10, atkCd: 0, burst: null, rollT: 0, charge: 0, prevFire: false,
@@ -187,7 +199,7 @@ class Game {
     if (this.countdown > 0) {
       this.countdown -= dt;
     } else if (!this.over) {
-      this.time += dt; this.timeLeft -= dt;
+      this.time += dt; if (!this.tutorial) this.timeLeft -= dt;
       for (const p of this.players.values()) if (p.bot) botThink(this, p, dt);
       for (const p of this.players.values()) this.updatePlayer(p, dt);
       this.updateProjs(dt);
@@ -584,6 +596,8 @@ class Game {
       if (dmg <= 0) { this.ev(['hit', t.id, by ? by.id : 0, 1, 0]); return; }
     }
     if (this.obj.tr && this.obj.tr.carrier === t.id) dmg *= 0.75;
+    if (by && by.pmul && by !== t) dmg *= by.pmul;   // 等级加成
+    if (this.tutorial && !t.bot) dmg = Math.min(dmg, Math.max(0, t.hp - 1));   // 教程里玩家不会倒下
     t.hp -= dmg; t.lastHurt = this.time;
     // 打中敌人给大招充能
     if (by && by.team !== t.team && this.players.has(by.id) && !by.foot && !(by.spT > 0)) {
@@ -1090,6 +1104,7 @@ function botSees(g, p, e, d) {
 function botThink(g, p, dt) {
   const inp = p.input;
   if (!p.alive) { inp.f = false; inp.w = false; p.ai = null; return; }
+  if (g.tutorial) { inp.mx = 0; inp.my = 0; inp.f = false; inp.w = false; return; }   // 训练靶：站着不动
   const ai = p.ai || (p.ai = { goal: null, path: [], pi: 0, replan: 0, stuckT: 0, lastX: p.x, lastY: p.y, wob: rand(0, 6), strafe: 1, strafeT: 0, jumpT: rand(1, 4), react: rand(0.15, 0.35), seenT: 0, paintT: rand(0.5, 2) });
   const W = S.WEAPONS[p.weapon];
   const range = p.foot ? S.PISTOL.range : S.weaponRange(p.weapon);
@@ -1298,7 +1313,7 @@ class Room {
   constructor(code, host, opts = {}) {
     this.code = code; this.hostId = host ? host.id : 0;
     this.members = new Map();
-    this.settings = { mode: 'turf', map: -1, duration: 180, teamSize: 3, bots: true };
+    this.settings = { mode: 'turf', map: -1, duration: 180, teamSize: 3, bots: true, fair: false };
     this.state = 'lobby'; this.game = null;
     this.colorSet = randInt(S.COLOR_SETS.length);
     this.manual = !!opts.manual;
@@ -1326,7 +1341,7 @@ class Room {
   lobbyInfo() {
     return {
       code: this.code, hostId: this.hostId, state: this.state, settings: this.settings, colorSet: this.colorSet,
-      players: [...this.members.values()].map((c) => ({ id: c.id, name: c.name, team: c.team, weapon: c.weapon, head: c.head, pilot: c.pilot, level: c.level })),
+      players: [...this.members.values()].map((c) => ({ id: c.id, name: c.name, team: c.team, weapon: c.weapon, head: c.head, pilot: c.pilot, level: c.level, lv: c.power ? c.power.lv : 1 })),
     };
   }
   broadcastLobby() { this.broadcast({ t: 'lobby', room: this.lobbyInfo() }); }
@@ -1345,6 +1360,8 @@ class Room {
     if ([120, 180, 240, 300].includes(m.duration)) s.duration = m.duration;
     if (Number.isInteger(m.teamSize) && m.teamSize >= 1 && m.teamSize <= 4) s.teamSize = m.teamSize;
     if (typeof m.bots === 'boolean') s.bots = m.bots;
+    if (typeof m.fair === 'boolean') s.fair = m.fair;
+    if (typeof m.tutorial === 'boolean' && this.hub && this.hub.local) s.tutorial = m.tutorial;   // 只有浏览器里的本机服务器能开教程
     this.broadcastLobby();
   }
   start() {
@@ -1372,6 +1389,8 @@ function setProfile(c, m) {
   if (S.HEADS.some((h) => h.id === m.head)) c.head = m.head;
   if (S.PILOTS.some((p) => p.id === m.pilot)) c.pilot = m.pilot;
   if (Number.isInteger(m.level)) c.level = clamp(m.level, 1, 999);
+  // 没登录在线账号（本机 / P2P）时相信客户端报的角色等级
+  if (m.power && typeof m.power === 'object') c.power = { lv: clamp(m.power.lv | 0 || 1, 1, E.MAX_LV), bt: clamp(m.power.bt | 0, 0, 2) };
 }
 
 function handle(hub, c, m) {
@@ -1381,6 +1400,7 @@ function handle(hub, c, m) {
     case 'hello': if (!c.acct) setProfile(c, m); c.conn.send({ t: 'caps', accounts: !!hub.accounts }); break;
     case 'auth': if (hub.accounts) hub.accounts.handle(c, m); else c.conn.send({ t: 'auth', ok: false, op: m.op, err: '这里没有账号服务器' }); break;
     case 'saveProfile': if (hub.accounts) hub.accounts.saveProfile(c, m); break;
+    case 'eco': if (hub.accounts) hub.accounts.eco(c, m); else c.conn.send({ t: 'eco', op: m.op, req: m.req, ok: false, err: '这里没有账号服务器' }); break;
     case 'create': {
       if (r) r.remove(c);
       const room = new Room(genCode(hub.rooms), c, { hub });
@@ -1399,6 +1419,13 @@ function handle(hub, c, m) {
       break;
     }
     case 'leave': if (r) r.remove(c); c.conn.send({ t: 'left' }); break;
+    case 'tut': {   // 教程脚本：充满大招 / 打爆机体（练习弹出驾驶员）
+      const g = r && r.game, p = g && g.tutorial && g.players.get(c.id);
+      if (!p) break;
+      if (m.op === 'sp' && p.alive && !p.foot) p.sp = S.WEAPONS[p.weapon].spNeed;
+      if (m.op === 'wreck' && p.alive && !p.foot) g.wreck(p, null);
+      break;
+    }
     case 'team': {
       if (!r || r.state !== 'lobby') return;
       const t = m.team === 2 ? 2 : 1;
@@ -1406,7 +1433,7 @@ function handle(hub, c, m) {
       c.team = t; r.broadcastLobby();
       break;
     }
-    case 'loadout': { const nm = c.name; setProfile(c, m); if (c.acct) c.name = nm; if (r) r.broadcastLobby(); break; }   // 登录后名字就是账号名
+    case 'loadout': if (!c.acct) setProfile(c, m); if (r) r.broadcastLobby(); break;   // 在线账号的出战配置以服务器资料为准（saveProfile）
     case 'settings': if (r && r.hostId === c.id && r.state === 'lobby') r.applySettings(m); break;
     case 'start': if (r && r.hostId === c.id && r.state === 'lobby') r.start(); break;
     case 'in': if (r && r.game) r.game.input(c.id, m); break;

@@ -20,21 +20,13 @@
   };
   // ---------------- 资料 + 账号 ----------------
   // 三种身份：guest 游客（进度存在 gb_profile）、local 本机账号（存在这台设备）、online 在线账号（Node 服务器结算，换设备也在）
-  const PROFILE_DEFAULT = { name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', trophies: 0, mode: 'turf', map: -1, size: 3, dur: 180, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 };
+  const E = window.GE;
   const profile = {};
+  // 任何来源的资料都先过一遍 normalize：旧版本自动重置成新手号，字段做范围检查
   function loadProfile(p) {
+    const n = E.normalize(p, p && typeof p.name === 'string' ? p.name : '');
     for (const k of Object.keys(profile)) delete profile[k];
-    Object.assign(profile, PROFILE_DEFAULT, p || {});
-    if (typeof profile.name !== 'string') profile.name = '';
-    for (const k of ['trophies', 'xp', 'matches', 'wins', 'kills', 'paint']) profile[k] = Math.max(0, Math.floor(+profile[k] || 0));
-    if (!S.WEAPONS[profile.weapon]) profile.weapon = 'blaster';
-    if (!S.HEADS.some((h) => h.id === profile.head)) profile.head = 'antenna';
-    if (!S.PILOTS.some((p) => p.id === profile.pilot)) profile.pilot = 'blaze';
-    if (!S.MODES[profile.mode]) profile.mode = 'turf';
-    if (!(profile.map >= -1 && profile.map < S.MAPS.length)) profile.map = -1;
-    if (!(profile.size >= 1 && profile.size <= 4)) profile.size = 3;
-    if (![120, 180, 240].includes(profile.dur)) profile.dur = 180;
-    if (S.HEADS.some((h) => h.id === profile.head && h.tr > (profile.trophies || 0))) profile.head = 'antenna';
+    Object.assign(profile, n);
   }
   const LACC = GAcc.LocalAccounts(store, S);
   const onlineKey = (n) => 'online_' + String(n).toLowerCase();
@@ -54,7 +46,7 @@
     else {
       store.set(onlineKey(session.name), profile);      // 本地缓存一份，离线时也能看到
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => { if (onlineReady) send({ t: 'saveProfile', profile: pickFields(profile, S.PROFILE_FIELDS) }); }, 400);
+      saveTimer = setTimeout(() => { if (onlineReady) send({ t: 'saveProfile', profile: pickFields(profile, E.LOADOUT_FIELDS) }); }, 400);
     }
   }
 
@@ -283,12 +275,14 @@
     $('chipBot').innerHTML = GP.portrait(P, { face: true });
     $('chipBot').style.setProperty('--ring', P.accent);
     $('sidePilot').innerHTML = GP.portrait(P, { face: true });
-    $('sidePilotName').textContent = P.name;
+    $('sidePilotName').textContent = profile.pilot ? `${P.name} · Lv.${E.power(profile, profile.pilot).lv}` : '还没有驾驶员';
     $('sideMechName').textContent = W.name;
     $('heroPortrait').innerHTML = GP.portrait(P);
     const hp = $('heroPilot');
     hp.style.setProperty('--pc', P.accent);
-    hp.innerHTML = `<b>${P.name}<small>「${P.code}」${P.title}</small></b><i>“${P.line}”</i>`;
+    hp.innerHTML = profile.pilot ? `<b>${P.name}<small>「${P.code}」${P.title} · Lv.${E.power(profile, profile.pilot).lv}</small></b><i>“${P.line}”</i>`
+      : `<b>还没有驾驶员<small>完成新手教程，领取新手宝箱</small></b><i>点「对战」开始教程</i>`;
+    $('heroPortrait').classList.toggle('ghost', !profile.pilot);
     const sk = S.SKILLS[P.skill], sp = S.SPECIALS[W.special];
     $('heroLoadout').innerHTML = `<span class="pill mech">${ic('mech')}${W.name}</span><span class="pill">${ic('super')}大招 · ${sp.name}</span><span class="pill">${ic('skill', P.accent)}技能 · ${sk.name}</span><span class="pill">${ic('passive', P.accent)}被动 · ${P.passive.name}</span>`;
     $('title').style.setProperty('--pc', P.accent);
@@ -315,7 +309,9 @@
     for (const o of document.querySelectorAll('.ov')) o.classList.toggle('hidden', o.id !== 'ov-' + name);
     if (name === 'road') renderRoad();
     if (name === 'modes') renderModes();
-    if (name === 'mechs') renderWeaponLists();
+    if (name === 'mechs') { viewMech = null; renderWeaponLists(); }
+    if (name === 'pilots') { viewPilot = null; renderPilots(); }
+    if (name === 'chests') renderChests();
     mountPreview();
     sfx.click();
   }
@@ -326,18 +322,26 @@
     return any;
   }
   // ---------------- 驾驶员选择 ----------------
+  let viewPilot = null, viewMech = null;   // 详情里正在看的（可以看没拥有的）
   function renderPilots() {
     const box = $('pilotList');
     box.innerHTML = '';
-    for (const P of S.PILOTS) {
+    // 已拥有的排前面
+    const list = S.PILOTS.slice().sort((a, b) => E.hasPilot(profile, b.id) - E.hasPilot(profile, a.id));
+    for (const P of list) {
+      const own = profile.pilots[P.id];
       const el = document.createElement('button');
-      el.className = 'pcard' + (profile.pilot === P.id ? ' sel' : '');
+      el.className = 'pcard' + (profile.pilot === P.id ? ' sel' : '') + (own ? '' : ' locked') + ((viewPilot || profile.pilot) === P.id ? ' viewing' : '');
       el.style.setProperty('--pc', P.accent);
-      el.innerHTML = GP.portrait(P) + `${P.isNew ? '<span class="new-badge">NEW</span>' : ''}<div class="pname"><small>「${P.code}」</small><b>${P.name}</b></div>`;
-      el.onclick = () => { profile.pilot = P.id; saveProfile(); sendLoadout(); renderPilots(); renderProfile(); sfx.click(); };
+      el.innerHTML = GP.portrait(P) + `${E.SEASON_PILOTS.includes(P.id) ? '<span class="new-badge s1">S1</span>' : ''}${own ? `<span class="lv-badge">Lv.${own.lv}</span>` : `<span class="lock-badge">${ic('lock')}</span>`}<div class="pname"><small>「${P.code}」</small><b>${P.name}</b></div>`;
+      el.onclick = () => {
+        viewPilot = P.id;
+        if (own) { profile.pilot = P.id; saveProfile(); sendLoadout(); renderProfile(); }
+        renderPilots(); sfx.click();
+      };
       box.appendChild(el);
     }
-    const P = S.pilot(profile.pilot), d = $('pilotDetail');
+    const P = S.pilot(viewPilot || profile.pilot), d = $('pilotDetail');
     d.style.setProperty('--pc', P.accent);
     const rec = S.WEAPONS[P.weapon], sk = S.SKILLS[P.skill];
     d.innerHTML = `<div class="det-art">${GP.portrait(P)}</div>
@@ -345,8 +349,10 @@
       <blockquote>“${P.line}”</blockquote>
       <div class="abil"><b>${ic('skill', P.accent)}技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
       <div class="abil"><b>${ic('passive', P.accent)}被动 · ${P.passive.name}</b><p>${P.passive.desc}</p></div>
+      ${upgradeHtml(P)}
       <p class="bio">${P.bio}</p>
-      ${profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>`}`;
+      ${!E.hasPilot(profile, P.id) ? '' : profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : E.hasMech(profile, P.weapon) ? `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>` : `<small class="okline dim">擅长机体「${rec.name}」还没拥有</small>`}`;
+    bindUpgrade(P);
     const b = $('recWpn');
     if (b) b.onclick = () => { profile.weapon = P.weapon; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
   }
@@ -361,24 +367,31 @@
     const box = $('weaponList');
     if (box) {
       box.innerHTML = '';
-      for (const wid of S.WEAPON_ORDER) {
-        const W = S.WEAPONS[wid];
+      const order = S.WEAPON_ORDER.slice().sort((a, b) => E.hasMech(profile, b) - E.hasMech(profile, a));
+      for (const wid of order) {
+        const W = S.WEAPONS[wid], own = E.hasMech(profile, wid);
         const el = document.createElement('button');
-        el.className = 'mcard2' + (profile.weapon === wid ? ' sel' : '');
+        el.className = 'mcard2' + (profile.weapon === wid ? ' sel' : '') + (own ? '' : ' locked');
         const img = R3.mechThumb ? R3.mechThumb({ color: P.accent, head: profile.head, weapon: wid, pilot: P.id }) : '';
-        el.innerHTML = `${W.isNew ? '<span class="new-badge">NEW</span>' : ''}<div class="thumb">${img ? `<img src="${img}" alt="">` : ''}</div><b>${W.name}</b><small>${W.role}</small>`;
-        el.onclick = () => { profile.weapon = wid; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
+        el.innerHTML = `${E.SEASON_MECHS.includes(wid) ? '<span class="new-badge s1">S1</span>' : ''}${own ? '' : `<span class="lock-badge">${ic('lock')}</span>`}<div class="thumb">${img ? `<img src="${img}" alt="">` : ''}</div><b>${W.name}</b><small>${W.role}</small>`;
+        el.onclick = () => {
+          viewMech = wid;
+          if (own) { profile.weapon = wid; saveProfile(); sendLoadout(); renderPilots(); renderProfile(); }
+          renderWeaponLists(); sfx.click();
+        };
         box.appendChild(el);
       }
-      const W = S.WEAPONS[profile.weapon], sp = S.SPECIALS[W.special];
+      const vid = viewMech || profile.weapon, W = S.WEAPONS[vid], sp = S.SPECIALS[W.special];
       $('mechDetail').innerHTML = `<h3>${W.name}<small>${W.role}</small></h3><p class="bio">${W.desc}</p>
-        <div class="statbars">${mechStats(profile.weapon).map(([k, v, f]) => `<div><span>${k}</span><i><em style="width:${Math.round(f * 100)}%"></em></i><b>${v}</b></div>`).join('')}</div>
+        ${E.hasMech(profile, vid) ? '' : `<div class="upg locked">${ic('lock')}<div><b>还没有这台机体</b><small>街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出</small></div><button class="btn small" id="goChest2">去宝箱</button></div>`}
+        <div class="statbars">${mechStats(vid).map(([k, v, f]) => `<div><span>${k}</span><i><em style="width:${Math.round(f * 100)}%"></em></i><b>${v}</b></div>`).join('')}</div>
         <div class="abil"><b>${ic('super')}大招 · ${sp.name}</b><p>${sp.desc}</p></div>`;
+      const g2 = $('goChest2'); if (g2) g2.onclick = () => openOv('chests');
     }
     const rbox = $('roomWeaponList');
     if (rbox) {
       rbox.innerHTML = '';
-      for (const wid of S.WEAPON_ORDER) {
+      for (const wid of S.WEAPON_ORDER.filter((w) => E.hasMech(profile, w))) {
         const W = S.WEAPONS[wid];
         const el = document.createElement('button');
         el.className = 'wcard' + (profile.weapon === wid ? ' sel' : '');
@@ -446,6 +459,7 @@
   // 「对战」：建一个只有自己的房间，AI 补满后立刻开打
   let quick = null, quickRoom = false;
   function quickPlay() {
+    if (needPilot()) return;
     ensureName();
     quick = { mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, bots: true };
     $('playBtn').classList.add('busy');
@@ -492,7 +506,7 @@
       ['正在给墙面打底…', async () => { GWall.apply(); }],
       ['驾驶员正在换装…', async () => { for (const P of S.PILOTS) { faceImg(P.id); GP.portrait(P); await nextFrame(); } }],
       ['正在组装机兵…', async () => { const P = S.pilot(profile.pilot); for (const w of S.WEAPON_ORDER) { if (R3.mechThumb) R3.mechThumb({ color: P.accent, head: profile.head, weapon: w, pilot: P.id }); await nextFrame(); } }],
-      ['点亮霓虹灯…', async () => { renderProfile(); renderPilots(); await nextFrame(); }],
+      ['点亮霓虹灯…', async () => { renderProfile(); renderPilots(); renderWallet(); renderChests(); await nextFrame(); }],
     ];
     const t0 = performance.now();
     for (let i = 0; i < steps.length; i++) {
@@ -520,6 +534,7 @@
   function joinByInput() {
     const code = $('codeInput').value.trim().toUpperCase();
     if (code.length !== 4) return toast('请输入 4 位房间码');
+    if (needPilot()) return;
     ensureName();
     if (FILE_MODE) joinP2P(code); else send({ t: 'join', code });
   }
@@ -623,7 +638,8 @@
     $('durSel').value = String(room.settings.duration);
     $('sizeSel').value = String(room.settings.teamSize);
     $('botChk').checked = room.settings.bots;
-    for (const id of ['durSel', 'sizeSel', 'botChk']) $(id).disabled = !isHost;
+    $('fairChk').checked = !!room.settings.fair;
+    for (const id of ['durSel', 'sizeSel', 'botChk', 'fairChk']) $(id).disabled = !isHost;
     document.querySelector('.settings').classList.toggle('readonly', !isHost);
     $('startBtn').classList.toggle('hidden', !isHost);
     $('startBtn').disabled = room.state !== 'lobby';
@@ -631,10 +647,13 @@
   }
 
   function bindUI() {
+    $('infoOk').onclick = () => { $('infoDlg').classList.add('hidden'); sfx.click(); };
+    $('tutReplay').onclick = () => { closeOv(); if (profile.tut) startTutorial(); else showTutorialPrompt(); };
     $('nameInput').value = profile.name;
     $('nameInput').addEventListener('input', (e) => { profile.name = e.target.value.slice(0, 12); saveProfile(); $('chipName').textContent = profile.name || '未命名机兵'; });
     $('nameInput').addEventListener('change', () => sendLoadout());
     $('createBtn').onclick = () => {
+      if (needPilot()) return;
       ensureName();
       if (net && net.kind === 'peer') { backToLocal(); setTimeout(() => send({ t: 'create' }), 50); } else send({ t: 'create' });
     };
@@ -651,6 +670,7 @@
     $('durSel').onchange = (e) => send({ t: 'settings', duration: +e.target.value });
     $('sizeSel').onchange = (e) => send({ t: 'settings', teamSize: +e.target.value });
     $('botChk').onchange = (e) => send({ t: 'settings', bots: e.target.checked });
+    $('fairChk').onchange = (e) => send({ t: 'settings', fair: e.target.checked });
     $('startBtn').onclick = () => send({ t: 'start' });
     $('resBack').onclick = () => {
       $('results').classList.add('hidden'); R3.clear();
@@ -706,8 +726,9 @@
   let net = null, localHub = null, peerHost = null, hostCode = null, p2pStatus = { text: '', cls: '' };
   const deliver = (str) => { let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
   const send = (o) => { if (net) net.send(o); };
-  const sendHello = () => send({ t: 'hello', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot, level: level() });
-  const sendLoadout = () => send({ t: 'loadout', name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot, level: level() });
+  const loadoutMsg = (t) => ({ t, name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot || 'blaze', level: level(), power: E.power(profile, profile.pilot) });
+  const sendHello = () => send(loadoutMsg('hello'));
+  const sendLoadout = () => send(loadoutMsg('loadout'));
   setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
   const NO_P2P = window.GB_ARTIFACT ? '网页版只能和 AI 对战；和朋友联机请用 ZIP 版' : 'P2P 组件未加载，只能和 AI 对战';
   const LOCAL_TEXT = () => (window.Peer ? '单机模式 ✓ 创建房间后，朋友可用房间码联机' : `单机模式 ✓（${NO_P2P}）`);
@@ -843,8 +864,9 @@
       case 'caps': onCaps(m); break;
       case 'auth': onAuth(m); break;
       case 'profile': onServerProfile(m); break;
+      case 'eco': onEco(m); break;
       case 'joined':
-        if (!FILE_MODE) { try { history.replaceState(null, '', '?room=' + m.code); } catch (e) { /* ignore */ } }
+        if (!FILE_MODE && !TUT) { try { history.replaceState(null, '', '?room=' + m.code); } catch (e) { /* ignore */ } }
         if (net && net.kind === 'local') hostP2P(m.code);
         sfx.click(); break;
       case 'lobby':
@@ -861,6 +883,7 @@
         renderRoom();
         break;
       case 'left':
+        if (TUT) break;
         room = null; quickRoom = false;
         if (!FILE_MODE) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ } }
         showScreen('title');
@@ -877,7 +900,7 @@
           if (myTeam) (m.winner === myTeam ? sfx.win : sfx.lose)();
         }
         break;
-      case 'end': showResults(m.result); break;
+      case 'end': if (TUT) break; showResults(m.result); break;
       case 'qc': if (G) G.chats.set(m.id, { k: m.k, t: performance.now() }); break;
       case 'pong': ping = Math.round(performance.now() - m.ts); break;
     }
@@ -976,6 +999,7 @@
       else if (e[0] === 'px') { const pr = G.projs.get(e[1]); if (pr && pr.mine) killProj(pr, e[2], e[3], e[4]); }
       else if (e[0] === 'ln' && e[9] === myId) handleEvent(e);
       else if (e[0] === 'hit' && e[1] === myId && !e[3]) { G.dmgFlash = 0.35; sfx.hurt(); }
+      if (TUT && e[0] === 'hit' && e[2] === myId && e[1] !== myId) TUT.hits++;
       else if (e[0] === 'bm' && e[9] === myId) { sfx.throw(); addBomb(e); }
       else if (e[0] === 'kb' && e[1] === myId && G.ps) {
         S.impulse(G.ps, e[2], e[3], e[4]);
@@ -1661,6 +1685,7 @@
   }
 
   function updateGame(now, dt) {
+    if (TUT) tutTick();
     const me = G.me;
     const turn = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
     const tilt = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0);
@@ -2307,23 +2332,317 @@
         if (onlineReady) { pendingReward = { trBefore: profile.trophies || 0, lvBefore: level(), t: performance.now() }; $('resXp').textContent = '服务器结算中…'; }
         else $('resXp').textContent = '没有连上账号服务器，这局不计入战绩';
       } else {
-        const trBefore = profile.trophies || 0, lvBefore = level();
-        profile.xp += rw.xp; profile.matches++; if (rw.won) profile.wins++;
-        profile.kills += rw.kills; profile.paint += rw.paint;
-        profile.trophies = Math.max(0, trBefore + rw.trophies);
+        const res = E.applyMatch(profile, rw);
         saveProfile();
-        showReward(rw, trBefore, lvBefore);
+        showReward(rw, res.trBefore, res.lvBefore, res.items);
       }
     } else $('resXp').textContent = '';
   }
-  function showReward(rw, trBefore, lvBefore) {
+  function showReward(rw, trBefore, lvBefore, items) {
     const after = level();
     let msg = `${rw.trophies >= 0 ? '+' : ''}${rw.trophies} 🏆（共 ${profile.trophies}）　+${rw.xp} XP`;
+    for (const it of items || []) if (E.CUR[it.k]) msg += `　+${it.n} ${E.CUR[it.k].name}${it.why ? `（${it.why}）` : ''}`;
     if (after > lvBefore) msg += `　🎉 升级到 Lv.${after}！`;
     const un = S.HEADS.filter((h) => h.tr > trBefore && h.tr <= profile.trophies).map((h) => h.name);
     if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
     $('resXp').textContent = msg;
     renderProfile(); renderHeads(); sendLoadout();
+  }
+
+  // ================= 养成：货币 / 宝箱 / 升级 / 突破 =================
+  // 本机账号和游客直接在浏览器里执行规则；在线账号把操作发给服务器，由服务器开箱、扣钱，再把新资料发回来
+  let ecoReq = 0;
+  const ecoWait = new Map();
+  function eco(op, args) {
+    args = args || {};
+    if (session && session.kind === 'online') {
+      if (!onlineReady) return Promise.resolve({ ok: false, err: '没有连上账号服务器，暂时不能操作' });
+      const req = ++ecoReq;
+      return new Promise((res) => {
+        const t = setTimeout(() => { ecoWait.delete(req); res({ ok: false, err: '服务器没有回应，请稍后再试' }); }, 8000);
+        ecoWait.set(req, (m) => { clearTimeout(t); res(m); });
+        send(Object.assign({ t: 'eco', op, req }, args));
+      });
+    }
+    const r = E.apply(profile, op, args);
+    if (r.ok) { saveProfile(); afterEco(); }
+    return Promise.resolve(r);
+  }
+  function onEco(m) {
+    if (m.ok && m.profile && session && session.kind === 'online') applyServerProfile(m.profile);
+    const cb = ecoWait.get(m.req);
+    if (cb) { ecoWait.delete(m.req); cb(m); }
+  }
+  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); sendLoadout(); }
+  const fmtN = (n) => (n >= 100000 ? Math.floor(n / 1000) + 'k' : String(n));
+  const cur = (k, n, cls) => `<span class="cur cur-${k} ${cls || ''}">${ic(k)}<b>${fmtN(n)}</b></span>`;
+  function renderWallet() {
+    const html = ['coins', 'gems', 'parts', 'crystals'].map((k) => cur(k, profile[k] || 0)).join('');
+    for (const id of ['wallet', 'wallet2']) { const el = $(id); if (el) el.innerHTML = html; }
+    const n = Object.values(profile.chests || {}).reduce((a, b) => a + b, 0), badge = $('chestBadge');
+    if (badge) { badge.textContent = n; badge.classList.toggle('hidden', !n); }
+    const t = $('sideChestTxt'); if (t) t.textContent = n ? `有 ${n} 个宝箱没开` : '商店 · 兑换';
+  }
+  function showInfo(title, html) {
+    $('infoTitle').textContent = title; $('infoBody').innerHTML = html;
+    $('infoDlg').classList.remove('hidden');
+  }
+  function oddsHtml(cid) {
+    const C = E.CHESTS[cid];
+    return `<p class="odds-sub">${C.desc}。每一项单独判定，概率公开，没有保底；角色和机体只会开出你还没有的，全部拥有后换成 ${C.dup} 金币。</p>
+      <table class="odds">${E.odds(cid).map((o) => `<tr><td>${ic(o.k === 'pilot' ? 'pilot' : o.k === 'mech' ? 'mech' : o.k)}</td><td>${o.name}</td><td><b>${+(o.p * 100).toFixed(1)}%</b></td></tr>`).join('')}</table>`;
+  }
+  function renderChests() {
+    const my = $('myChests');
+    if (!my) return;
+    const owned = Object.entries(profile.chests || {}).filter(([, n]) => n > 0);
+    my.innerHTML = owned.length ? '' : '<p class="empty-note">还没有宝箱。宝箱来自新手教程、商店，以及第一赛季通行证（即将上线）。</p>';
+    for (const [cid, n] of owned) {
+      const C = E.CHESTS[cid], el = document.createElement('div');
+      el.className = 'chest-card t' + C.tier;
+      el.innerHTML = `<div class="cc-art">${GI.chestArt(cid)}</div><b>${C.name}</b><small>×${n}</small><button class="btn small">打开</button>`;
+      el.querySelector('button').onclick = () => openChestFlow(cid, 'open');
+      my.appendChild(el);
+    }
+    const shop = $('shopChests');
+    shop.innerHTML = '';
+    for (const cid of E.CHEST_ORDER) {
+      const C = E.CHESTS[cid], el = document.createElement('div');
+      el.className = 'chest-card t' + C.tier;
+      el.innerHTML = `<div class="cc-art">${GI.chestArt(cid)}</div><b>${C.name}</b><small>${C.desc}</small>
+        <button class="btn small buy" ${profile.gems < C.price ? 'disabled' : ''}>${ic('gems')}${C.price}</button><button class="odds-btn">概率</button>`;
+      el.querySelector('.buy').onclick = () => openChestFlow(cid, 'buy');
+      el.querySelector('.odds-btn').onclick = () => { showInfo(`${C.name} · 开出概率`, oddsHtml(cid)); sfx.click(); };
+      shop.appendChild(el);
+    }
+    const xl = $('exchangeList');
+    xl.innerHTML = '';
+    for (const [id, X] of Object.entries(E.EXCHANGE)) {
+      const [gk, gv] = Object.entries(X.give)[0];
+      const el = document.createElement('div');
+      el.className = 'xchg';
+      el.innerHTML = `<div class="x-ico">${ic(gk)}</div><div><b>${X.name}</b><small>${X.gems} 宝石 → ${gv} ${E.CUR[gk].name}</small></div>
+        <button class="btn small" data-n="1" ${profile.gems < X.gems ? 'disabled' : ''}>×1</button><button class="btn small" data-n="5" ${profile.gems < X.gems * 5 ? 'disabled' : ''}>×5</button>`;
+      for (const b of el.querySelectorAll('button')) b.onclick = async () => {
+        const r = await eco('exchange', { what: id, n: +b.dataset.n });
+        if (!r.ok) return toast(r.err);
+        sfx.pick(); toast(`兑换成功：+${r.items[0].n} ${E.CUR[r.items[0].k].name}`);
+      };
+      xl.appendChild(el);
+    }
+  }
+  // ---------------- 开箱动画 ----------------
+  let coBusy = false;
+  function itemCard(it) {
+    if (it.k === 'pilot') {
+      const P = S.pilot(it.id);
+      return `<div class="co-card pilot" style="--pc:${P.accent}"><div class="co-new">新驾驶员！</div><div class="co-art">${GP.portrait(P)}</div><b>${P.name}</b><small>「${P.code}」${P.title}</small></div>`;
+    }
+    if (it.k === 'mech') {
+      const W = S.WEAPONS[it.id], P = S.pilot(profile.pilot);
+      const img = R3.mechThumb ? R3.mechThumb({ color: P.accent, head: profile.head, weapon: it.id, pilot: P.id }) : '';
+      return `<div class="co-card mech"><div class="co-new">新机体！</div><div class="co-art">${img ? `<img src="${img}" alt="">` : ic('mech')}</div><b>${W.name}</b><small>${W.role}</small></div>`;
+    }
+    if (it.k === 'chest') return `<div class="co-card"><div class="co-art small">${GI.chestArt(it.id)}</div><b>${E.CHESTS[it.id].name}</b><small>×${it.n}</small></div>`;
+    return `<div class="co-card cur-card c-${it.k}"><div class="co-art small">${ic(it.k)}</div><b>+${it.n}</b><small>${E.CUR[it.k].name}${it.dup ? '（重复转换）' : ''}</small></div>`;
+  }
+  function openChestFlow(cid, mode) {
+    if (coBusy) return;
+    const C = E.CHESTS[cid], el = $('chestOpen');
+    coBusy = true;
+    el.className = 't' + C.tier;
+    $('coTitle').textContent = C.name;
+    $('coChest').innerHTML = GI.chestArt(cid);
+    $('coItems').innerHTML = '';
+    $('coHint').textContent = '点一下打开';
+    $('coHint').classList.remove('hidden');
+    $('coBtns').classList.add('hidden');
+    sfx.click();
+    let opened = false;
+    el.onclick = async (e) => {
+      if (opened || e.target.closest('.co-btns')) return;
+      opened = true;
+      $('coHint').textContent = '…';
+      AU.resume();
+      const r = await eco(mode, { chest: cid });
+      if (!r.ok) { toast(r.err); closeChest(); return; }
+      el.classList.add('shake');
+      await wait(520);
+      el.classList.remove('shake'); el.classList.add('open');
+      $('coChest').innerHTML = GI.chestArt(cid, true);
+      sfx.win();
+      $('coHint').classList.add('hidden');
+      const box = $('coItems');
+      const items = r.items.slice().sort((a, b) => (b.k === 'pilot') - (a.k === 'pilot') || (b.k === 'mech') - (a.k === 'mech'));
+      for (const it of items) {
+        box.insertAdjacentHTML('beforeend', itemCard(it));
+        const card = box.lastElementChild;
+        void card.offsetWidth; card.classList.add('in');
+        if (it.k === 'pilot' || it.k === 'mech') { sfx.capture && sfx.capture(); await wait(900); } else { sfx.pick(); await wait(260); }
+      }
+      const again = mode === 'buy' ? profile.gems >= C.price : (profile.chests[cid] || 0) > 0;
+      $('coAgain').classList.toggle('hidden', !again);
+      $('coAgain').textContent = mode === 'buy' ? `再买一个（${C.price} 宝石）` : `再开一个（还剩 ${profile.chests[cid] || 0}）`;
+      $('coAgain').onclick = () => { closeChest(); setTimeout(() => openChestFlow(cid, mode), 60); };
+      $('coBtns').classList.remove('hidden');
+    };
+    $('coDone').onclick = closeChest;
+    el.classList.remove('hidden');
+  }
+  function closeChest() {
+    const el = $('chestOpen');
+    el.classList.add('hidden'); el.classList.remove('open', 'shake'); el.onclick = null;
+    coBusy = false;
+    renderChests(); renderWallet();
+    // 第一次拿到驾驶员：顺手提示去大厅开打
+    if (profile.pilot && !store.get('seenFirstPilot', false)) { store.set('seenFirstPilot', true); closeOv(); toast(`${S.pilot(profile.pilot).name} 加入了你的队伍！点「对战」开打吧`, 3600); }
+  }
+  // ---------------- 新手流程：没有驾驶员时先教程 / 开新手宝箱 ----------------
+  function needPilot() {
+    if (profile.pilot && E.hasPilot(profile, profile.pilot)) return false;
+    if ((profile.chests.starter || 0) > 0) openChestFlow('starter', 'open');
+    else if (!profile.tut) showTutorialPrompt();
+    else { openOv('chests'); toast('你还没有驾驶员：从宝箱里开一位吧'); }
+    return true;
+  }
+  function showTutorialPrompt() {
+    showInfo('欢迎来到涂鸦机兵！', `<p>灰城的墙被刷成了一片灰，是时候把颜色涂回去了。</p>
+      <p>先花 2 分钟跟着教官 <b>秦岳</b> 学会移动、开火、技能和大招。完成教程会得到 <b>新手宝箱</b>：必得 1 位常驻驾驶员。你已经有 3 台初始机体：喷罐、滚刷、狙击。</p>
+      <div class="info-btns"><button class="btn" id="tutGo">开始教程</button><button class="btn ghost" id="tutSkip">跳过教程</button><button class="link-btn" id="tutLater">先逛逛</button></div>`);
+    $('infoOk').classList.add('hidden');
+    $('tutLater').onclick = () => { $('infoDlg').classList.add('hidden'); $('infoOk').classList.remove('hidden'); toast('随时点「对战」开始新手教程'); };
+    $('tutGo').onclick = () => { $('infoDlg').classList.add('hidden'); $('infoOk').classList.remove('hidden'); startTutorial(); };
+    $('tutSkip').onclick = async () => {
+      $('infoDlg').classList.add('hidden'); $('infoOk').classList.remove('hidden');
+      const r = await eco('tutorial');
+      if (!r.ok) return toast(r.err);
+      openChestFlow('starter', 'open');
+    };
+  }
+  // ---------------- 新手教程（在浏览器里开一个单独的本机服务器，联网时也一样） ----------------
+  let TUT = null;
+  const TUT_STEPS = [
+    { t: '移动', pc: '用 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动，往前走一段', mob: '用<b>左半屏摇杆</b>移动，往前走一段' },
+    { t: '开火', pc: '<b>鼠标</b>瞄准，按住<b>左键</b>开火，打中对面的训练靶', mob: '拖动<b>右下角开火摇杆</b>瞄准，松手开火，打中对面的训练靶' },
+    { t: '涂地', pc: '朝地面开火把地涂满颜色！涂地多的一队获胜，站在己方颜色上跑得更快', mob: '朝地面开火把地涂满颜色！涂地多的一队获胜，站在己方颜色上跑得更快' },
+    { t: '跳跃', pc: '按 <kbd>空格</kbd> 跳上旁边的矮台（高台要走楼梯或踩弹跳板）', mob: '按<b>跳跃</b>键跳上旁边的矮台（高台要走楼梯或踩弹跳板）' },
+    { t: '技能', pc: '按 <kbd>Q</kbd> 使用驾驶员技能（每局 3 次）', mob: '按<b>技能</b>键使用驾驶员技能（每局 3 次）' },
+    { t: '大招', pc: '大招充满了！按 <kbd>E</kbd> 发动（平时靠打中敌人和涂地充能）', mob: '大招充满了！按<b>大招</b>键发动（平时靠打中敌人和涂地充能）' },
+    { t: '弹出驾驶员', pc: '糟糕，机体被打爆了！驾驶员会<b>弹出</b>继续战斗，躲好活过 6 秒，新机体就会空投到你脚下', mob: '糟糕，机体被打爆了！驾驶员会<b>弹出</b>继续战斗，躲好活过 6 秒，新机体就会空投到你脚下' },
+  ];
+  function startTutorial() {
+    if (TUT) return;
+    const hub = new window.GBCore.Hub();
+    hub.local = true;
+    const conn = { open: true, congested: false, send(o) { this.sendRaw(JSON.stringify(o)); }, sendRaw(str) { if (this.open) Promise.resolve().then(() => { if (conn.open) deliver(str); }); } };
+    TUT = { prevNet: net, prevRoom: room, hub, conn, step: -1, hits: 0, x0: null, y0: null, paint0: 0, sk0: 0, spSent: false, wasFoot: false, doneT: 0 };
+    const c = hub.connect(conn);
+    net = { kind: 'tut', send: (o) => hub.message(c, JSON.parse(JSON.stringify(o))), close: () => { conn.open = false; hub.disconnect(c); } };
+    room = null;
+    // 教程用凌焰 + 喷罐机兵
+    send({ t: 'hello', name: profile.name || '新兵', weapon: 'blaster', head: 'antenna', pilot: 'blaze', level: 1, power: { lv: 1, bt: 0 } });
+    quick = { mode: 'turf', map: 0, teamSize: 2, duration: 300, bots: true, tutorial: true };
+    send({ t: 'create' });
+    $('tutFace').innerHTML = GP.portrait(S.pilot('vet'), { face: true });
+    $('tutBox').classList.remove('hidden');
+    $('tutSkipBtn').onclick = () => tutEnd(false);
+  }
+  function tutSet(i) {
+    TUT.step = i;
+    const me = G && G.me;
+    if (me) {   // 每一步开始时记下基准值
+      if (i === 2) TUT.paint0 = countPaint(me.team);
+      if (i === 4) TUT.sk0 = me.skUses;
+    }
+    const box = $('tutBox');
+    if (i >= TUT_STEPS.length) {
+      $('tutText').innerHTML = '<b>全部学会了！</b>去大厅打开你的新手宝箱吧。';
+      $('tutStep').textContent = '完成';
+      box.classList.add('done');
+      sfx.win();
+      TUT.doneT = performance.now();
+      return;
+    }
+    const st = TUT_STEPS[i];
+    $('tutStep').textContent = `${i + 1} / ${TUT_STEPS.length} · ${st.t}`;
+    $('tutText').innerHTML = TOUCH ? st.mob : st.pc;
+    $('tutDots').innerHTML = TUT_STEPS.map((_, k) => `<i class="${k < i ? 'ok' : k === i ? 'cur' : ''}"></i>`).join('');
+    box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
+    if (i > 0) sfx.pick();
+  }
+  function tutTick() {
+    if (!TUT || !G || !G.me || G.cd > 0) return;
+    const me = G.me, foot = !!(me.flags & 512);
+    if (TUT.step < 0) { TUT.x0 = me.px; TUT.y0 = me.py; tutSet(0); return; }
+    const myTeam = me.team;
+    switch (TUT.step) {
+      case 0: if (Math.hypot(me.px - TUT.x0, me.py - TUT.y0) > 240) tutSet(1); break;
+      case 1: if (TUT.hits >= 2) tutSet(2); break;
+      case 2: if (countPaint(myTeam) - TUT.paint0 > 60) tutSet(3); break;
+      case 3: if ((me.pz || 0) > 20 && !foot) tutSet(4); break;
+      case 4: if (me.skUses < TUT.sk0) tutSet(5); break;
+      case 5:
+        if (!TUT.spSent) { TUT.spSent = true; send({ t: 'tut', op: 'sp' }); }
+        else if (me.spk || (me.sp === 0 && TUT.spFull)) tutSet(6);
+        if (me.sp >= S.WEAPONS[me.weapon].spNeed) TUT.spFull = true;
+        break;
+      case 6:
+        if (!TUT.wrSent && !me.spk) { TUT.wrSent = true; setTimeout(() => send({ t: 'tut', op: 'wreck' }), 1200); }
+        if (foot) TUT.wasFoot = true;
+        else if (TUT.wasFoot) tutSet(7);
+        break;
+      default: if (performance.now() - TUT.doneT > 2200 && !TUT.ending) { TUT.ending = true; setTimeout(() => tutEnd(true), 0); }   // 等这一帧跑完再收尾
+    }
+  }
+  function countPaint(team) { let n = 0; const g = G.grid; for (let i = 0; i < g.length; i++) if (g[i] === team) n++; return n; }
+  async function tutEnd(done) {
+    if (!TUT) return;
+    const T = TUT;
+    send({ t: 'leave' });
+    if (net && net.close) net.close();
+    net = T.prevNet; room = T.prevRoom; TUT = null;
+    quick = null; quickRoom = false;
+    $('tutBox').classList.add('hidden'); $('tutBox').classList.remove('done');
+    G = null; R3.clear(); touchShow(false);
+    if (document.exitPointerLock && locked()) document.exitPointerLock();
+    $('results').classList.add('hidden');
+    showScreen('title'); menuMusic();
+    sendHello();
+    if (!profile.tut) {
+      const r = await eco('tutorial');
+      if (!r.ok) return toast(r.err);
+      toast(done ? '教程完成！送你一个新手宝箱' : '已跳过教程，送你一个新手宝箱');
+      setTimeout(() => openChestFlow('starter', 'open'), 500);
+    } else toast('教程结束');
+  }
+
+  function upgradeHtml(P) {
+    const q = profile.pilots[P.id];
+    if (!q) {
+      const inStarter = E.STARTER_PILOTS.includes(P.id);
+      return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${inStarter ? '常驻角色：新手宝箱、角色宝箱、街头宝箱都可能开出' : E.SEASON_PILOTS.includes(P.id) ? '赛季角色：街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '常驻角色：角色宝箱、街头宝箱都可能开出'}</small></div><button class="btn small" id="goChest">去宝箱</button></div>`;
+    }
+    const cap = E.lvCap(q.bt), bonus = Math.round((E.statMul(q.lv) - 1) * 100);
+    const stars = [1, 2].map((i) => `<i class="bt ${q.bt >= i ? 'on' : ''}" title="${E.BREAKS[i].name}">${i === 1 ? 'Ⅰ' : 'Ⅱ'}</i>`).join('');
+    let act;
+    if (q.lv >= E.MAX_LV) act = '<span class="maxed">已满级</span>';
+    else if (q.lv >= cap) {
+      const B = E.BREAKS[q.bt + 1], okB = profile.crystals >= B.crystals && profile.coins >= B.coins;
+      act = `<button class="btn small brk" id="doBreak" ${okB ? '' : 'disabled'}>${B.name}：${ic('crystals')}${B.crystals} ${ic('coins')}${B.coins}</button><small class="brk-desc">${B.desc}</small>`;
+    } else {
+      const c = E.UP_COINS[q.lv], pt = E.UP_PARTS[q.lv], okU = profile.coins >= c && profile.parts >= pt;
+      act = `<button class="btn small" id="doUp" ${okU ? '' : 'disabled'}>${ic('up')}升到 ${q.lv + 1} 级：${ic('coins')}${c} ${ic('parts')}${pt}</button>`;
+    }
+    return `<div class="upg"><div class="lvbig"><small>等级</small><b>${q.lv}</b><small>/ ${cap}</small></div>
+      <div class="upg-mid"><div class="bts">突破 ${stars}</div><small>生命 / 伤害 +${bonus}%${q.bt >= 1 ? ' · 超载技能已解锁（第 ② 阶段上线）' : ''}</small></div>
+      <div class="upg-act">${act}</div></div>`;
+  }
+  function bindUpgrade(P) {
+    const g = $('goChest'); if (g) g.onclick = () => { openOv('chests'); };
+    const u = $('doUp');
+    if (u) u.onclick = async () => { const r = await eco('upgrade', { pilot: P.id }); if (!r.ok) return toast(r.err); sfx.win(); toast(`${P.name} 升到了 ${r.lv} 级！`); };
+    const b = $('doBreak');
+    if (b) b.onclick = async () => { const r = await eco('break', { pilot: P.id }); if (!r.ok) return toast(r.err); sfx.win(); toast(`${P.name} 完成${E.BREAKS[r.bt].name}！`); };
   }
 
   // ================= 账号：登录 / 注册 / 退出 =================
@@ -2352,6 +2671,7 @@
       applyServerProfile(m.profile);
       if (mine) { hideLogin(); toast(mine.op === 'register' ? `注册成功，欢迎加入，${session.name}！` : `欢迎回来，${session.name}！`); }
       else if (first) toast(`已登录在线账号 ${session.name}`);
+      if (mine || first) onboard();
       return;
     }
     if (mine) { lgError(m.err || '登录失败'); return; }
@@ -2364,26 +2684,32 @@
     }
   }
   function applyServerProfile(p) {
-    const keepUi = pickFields(profile, ['mode', 'map', 'size', 'dur']);
-    loadProfile(Object.assign({}, keepUi, p, { name: session.name }));
+    loadProfile(Object.assign({}, p, { name: session.name }));
     store.set(onlineKey(session.name), profile);
     afterAccountChange();
   }
   function onServerProfile(m) {
     if (!session || session.kind !== 'online') return;
     applyServerProfile(m.profile);
-    if (m.reward && pendingReward) { showReward(m.reward, pendingReward.trBefore, pendingReward.lvBefore); pendingReward = null; }
+    if (m.reward && pendingReward) { showReward(m.reward, pendingReward.trBefore, pendingReward.lvBefore, m.items); pendingReward = null; }
   }
   function afterAccountChange() {
     $('nameInput').value = profile.name;
-    renderProfile(); renderPilots(); renderHeads();
+    renderProfile(); renderPilots(); renderHeads(); renderWallet(); renderChests();
     if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists();
     sendLoadout();
   }
   // 开场动画结束后：已登录就直接进大厅，否则先登录
   function startAccount() {
     if (needLogin || !session) showLogin(LACC.list().length || (store.get('profile', {}).matches || 0) === 0 ? 'login' : 'register');
-    else if (session.kind === 'guest') ensureName();
+    else { if (session.kind === 'guest') ensureName(); onboard(); }
+  }
+  // 进入大厅后：新手号先走教程 / 开新手宝箱
+  function onboard() {
+    setTimeout(() => {
+      if (!$('login').classList.contains('hidden') || $('boot') || G || room) return;
+      if (!profile.pilot) needPilot();
+    }, 500);
   }
   function showLogin(tab) {
     lgTab = tab || lgTab;
@@ -2418,7 +2744,7 @@
     const g = store.get('profile', {}), hasGuest = (g.matches || 0) > 0;
     let note = online ? '在线账号的奖杯和经验由服务器结算，换手机或电脑登录进度都在。'
       : serverAccounts === null && !FILE_MODE ? '正在连接服务器…' : '现在没有连上游戏服务器，账号保存在这台设备的浏览器里（换设备不会同步）。电脑上运行 node server.js 开服后，就能注册在线账号。';
-    if (reg && hasGuest) note += online ? ' 游客的出战配置会带进新账号（奖杯和经验从 0 开始）。' : ` 游客进度（${g.trophies || 0} 🏆、${g.matches} 场）会带进新账号。`;
+    if (reg && hasGuest) note += online ? ' 在线账号从新手开始（游客在这台设备上的进度不会上传）。' : ` 游客进度（${g.trophies || 0} 🏆、${g.matches} 场、角色和宝箱）会带进新账号。`;
     $('lgNote').textContent = note;
     const known = $('lgKnown');
     known.innerHTML = '';
@@ -2446,14 +2772,14 @@
       const op = reg ? 'register' : 'login';
       pendingAuth = { op, timer: setTimeout(() => { pendingAuth = null; renderLogin(); lgError('服务器没有回应，请稍后再试'); }, 8000) };
       $('lgGo').disabled = true;
-      send({ t: 'auth', op, name, pass, profile: reg ? pickFields(Object.assign({}, PROFILE_DEFAULT, guestProgress()), S.PROFILE_FIELDS) : undefined });
+      send({ t: 'auth', op, name, pass });
       return;
     }
     if (reg) {
       const g = guestProgress();
-      const res = LACC.register(name, pass, Object.assign({}, PROFILE_DEFAULT, g));
+      const res = LACC.register(name, pass, E.normalize(g, name));
       if (!res.ok) return lgError(res.err);
-      if ((g.matches || 0) > 0) store.set('profile', Object.assign({}, PROFILE_DEFAULT, pickFields(g, S.PROFILE_FIELDS), { name: g.name || '', head: 'antenna' }));   // 进度已搬进账号
+      if ((g.matches || 0) > 0 || g.tut) store.set('profile', E.newProfile(g.name || ''));   // 进度已搬进账号，游客重新开始
       enterAs({ kind: 'local', name: res.name }, res.profile, `注册成功，欢迎加入，${res.name}！`);
     } else {
       const res = LACC.login(name, pass);
@@ -2469,6 +2795,7 @@
     if (sess.kind === 'guest') ensureName();
     sfx.click();
     if (msg) toast(msg);
+    onboard();
   }
   function logout() {
     if (session && session.kind === 'online') send({ t: 'auth', op: 'logout', token: session.token });
@@ -2504,7 +2831,7 @@
   $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 
   // ================= 启动 =================
-  window.__gbDebug = () => ({ G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
+  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
   boot().then(startAccount);

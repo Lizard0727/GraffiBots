@@ -23,12 +23,17 @@ const MIME = {
 // 奖杯 / 经验 / 战绩由服务器在比赛结束时结算，客户端只能改出战配置
 // =====================================================================
 const S = require('./public/shared.js');
+const E = require('./public/economy.js');
+// 服务器开箱用的随机数（加密随机，客户端无法预测）
+const cryptoRand = () => crypto.randomBytes(4).readUInt32BE(0) / 4294967296;
 class AccountStore {
   constructor(file) {
     this.file = file;
     this.data = { accounts: {}, tokens: {} };
     try { this.data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* 第一次运行：还没有账号文件 */ }
     this.data.accounts = this.data.accounts || {}; this.data.tokens = this.data.tokens || {};
+    // 老版本的账号统一重置成新手号（保留账号名和密码）
+    for (const acc of Object.values(this.data.accounts)) acc.profile = E.normalize(acc.profile, acc.name);
     this.fails = new Map();
     this.saveT = null;
   }
@@ -63,9 +68,16 @@ class AccountStore {
     c.acct = acc.key;
     c.name = acc.name;
     const p = acc.profile;
-    c.weapon = p.weapon; c.head = p.head; c.pilot = p.pilot; c.level = S.levelFromXp(p.xp);
+    this.syncConn(c, acc);
     c.conn.send({ t: 'auth', ok: true, token, account: { name: acc.name, created: acc.created }, profile: this.publicProfile(acc) });
     if (c.room) c.room.broadcastLobby();
+  }
+  // 对战用的配置和等级只认服务器上的资料（客户端改不了）
+  syncConn(c, acc) {
+    const p = acc.profile;
+    c.weapon = p.weapon; c.head = p.head; c.pilot = p.pilot || 'blaze'; c.level = S.levelFromXp(p.xp);
+    c.power = E.power(p, p.pilot);
+    c.owned = { pilots: Object.keys(p.pilots), mechs: p.mechs.slice() };
   }
   handle(c, m) {
     const err = (msg) => c.conn.send({ t: 'auth', ok: false, op: m.op, err: msg });
@@ -79,8 +91,8 @@ class AccountStore {
         if (!S.ACCOUNT.passOk(pass)) return err(S.ACCOUNT.passHint);
         if (this.find(name)) return err('这个账号名已经被注册了');
         const salt = crypto.randomBytes(16).toString('hex');
-        // 游客的进度可以带进新账号：只接受出战配置，奖杯和经验从 0 开始（避免伪造）
-        const acc = { key: name.toLowerCase(), name, salt, hash: AccountStore.hashPass(pass, salt), created: now, profile: S.cleanProfile(m.profile) };
+        // 在线账号一律从新手开始（游客在本机的进度不能带上服务器，避免伪造）
+        const acc = { key: name.toLowerCase(), name, salt, hash: AccountStore.hashPass(pass, salt), created: now, profile: E.newProfile(name) };
         this.data.accounts[acc.key] = acc;
         const token = this.issueToken(acc);
         this.save(true);
@@ -111,13 +123,26 @@ class AccountStore {
       }
     }
   }
-  // 客户端只能保存出战配置
+  // 客户端只能保存出战配置（而且只能选已拥有的驾驶员 / 机体）
   saveProfile(c, m) {
     const acc = c.acct && this.data.accounts[c.acct];
     if (!acc || !m.profile) return;
-    const p = {}; for (const k of S.PROFILE_FIELDS) if (m.profile[k] !== undefined) p[k] = m.profile[k];
-    acc.profile = S.cleanProfile(Object.assign({}, acc.profile, p), acc.profile);
+    E.setLoadout(acc.profile, m.profile);
+    this.syncConn(c, acc);
+    if (c.room) c.room.broadcastLobby();
     this.save();
+  }
+  // 开箱 / 购买 / 兑换 / 升级 / 突破 / 完成教程：全部在服务器上执行
+  eco(c, m) {
+    const acc = c.acct && this.data.accounts[c.acct];
+    const reply = (o) => c.conn.send(Object.assign({ t: 'eco', op: m.op, req: m.req }, o));
+    if (!acc) return reply({ ok: false, err: '请先登录在线账号' });
+    const now = Date.now();
+    if (now - (c.lastEco || 0) < 150) return reply({ ok: false, err: '操作太快了' });
+    c.lastEco = now;
+    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, pilot: m.pilot }, cryptoRand);
+    if (r.ok) { this.syncConn(c, acc); this.save(); }
+    reply(Object.assign({}, r, { profile: this.publicProfile(acc) }));
   }
   // 比赛结束：服务器按同一套规则发奖励
   applyResult(c, result) {
@@ -125,13 +150,10 @@ class AccountStore {
     if (!acc) return;
     const r = S.matchReward(result, c.id);
     if (!r) return;
-    const p = acc.profile;
-    p.xp += r.xp; p.matches++; if (r.won) p.wins++;
-    p.kills += r.kills; p.paint += r.paint;
-    p.trophies = Math.max(0, (p.trophies || 0) + r.trophies);
-    c.level = S.levelFromXp(p.xp);
+    const res = E.applyMatch(acc.profile, r);
+    this.syncConn(c, acc);
     this.save();
-    c.conn.send({ t: 'profile', profile: this.publicProfile(acc), reward: r });
+    c.conn.send({ t: 'profile', profile: this.publicProfile(acc), reward: r, items: res.items });
   }
 }
 

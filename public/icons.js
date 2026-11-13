@@ -48,8 +48,49 @@
     team: (c = '#4fb8ff') => `<circle cx="17" cy="17" r="8" fill="${c}" ${st()}/><circle cx="32" cy="19" r="7" fill="#ff5fc1" ${st()}/>
       <path d="M5,42 C5,31 11,27 17,27 C23,27 28,31 28,42 Z" fill="${c}" ${st()}/><path d="M24,42 C25,33 28,29 32,29 C38,29 43,33 43,42 Z" fill="#ff5fc1" ${st()}/>`,
     back: (c = '#141018') => `<path d="M28,8 L12,24 L28,40" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`,
+    // 货币
+    coins: (c = '#ffc531') => `<path d="M24,6 C35,6 42,13 42,23 C42,34 35,42 24,42 C13,42 6,34 6,23 C6,13 13,6 24,6 Z" fill="${c}" ${st()}/>
+      <path d="M24,12 C31,12 36,16 36,23 C36,30 31,35 24,35 C17,35 12,30 12,23 C12,16 17,12 24,12 Z" fill="none" stroke="#b9800a" stroke-width="2.6"/>
+      <path d="M19,17 L24,23 L29,17 M24,23 L24,31 M19,25 L29,25" fill="none" stroke="${K}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14,15 Q17,10 22,9" stroke="#fff9" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    gems: (c = '#ff3ea5') => `<path d="M12,8 L36,8 L44,19 L24,43 L4,19 Z" fill="${c}" ${st()}/><path d="M4,19 L44,19 M12,8 L18,19 L24,43 L30,19 L36,8 M18,19 L24,8 L30,19" fill="none" ${st(2.2)}/>
+      <path d="M14,12 L17,16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`,
+    parts: (c = '#7af0ff') => `<path d="M30,6 C36,6 41,10 42,16 L36,16 L33,20 L36,24 L42,24 C40,30 34,33 28,31 L14,44 C11,47 5,42 8,39 L21,25 C19,18 23,6 30,6 Z" fill="${c}" ${st()}/><circle cx="11.5" cy="40.5" r="2" fill="${K}"/>`,
+    crystals: (c = '#b78cff') => `<path d="M24,3 L33,15 L29,41 L19,41 L15,15 Z" fill="${c}" ${st()}/><path d="M15,15 L33,15 M24,3 L24,41" ${st(2.2)}/>
+      <path d="M8,22 L14,18 L16,38 L11,39 Z M40,22 L34,18 L32,38 L37,39 Z" fill="${c}" ${st(2.4)}/><path d="M20,9 L19,14" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`,
+    chest: (c = '#ff8a1f') => `<path d="M6,20 L42,20 L41,41 L7,41 Z" fill="${c}" ${st()}/><path d="M6,20 C6,10 12,7 24,7 C36,7 42,10 42,20 Z" fill="${c}" ${st()}/>
+      <path d="M6,20 L42,20" ${st()}/><path d="M20,17 L28,17 L28,27 L20,27 Z" fill="#ffe600" ${st(2.6)}/><path d="M24,21 L24,24" ${st(2.4)}/><path d="M12,26 L12,37 M36,26 L36,37" stroke="#0005" stroke-width="3" stroke-linecap="round"/>`,
+    lock: (c = '#c9d3dc') => `<path d="M15,22 L15,15 C15,9 19,6 24,6 C29,6 33,9 33,15 L33,22" fill="none" ${st(4)}/><path d="M10,21 L38,21 L37,42 L11,42 Z" fill="${c}" ${st()}/><circle cx="24" cy="30" r="3" fill="${K}"/><path d="M24,31 L24,36" ${st(3)}/>`,
+    up: (c = '#9cff2e') => `<path d="M24,4 L42,24 L31,24 L31,43 L17,43 L17,24 L6,24 Z" fill="${c}" ${st()}/>`,
     star: (c = '#ffdf2e') => `<path d="M24,4 L30,17 L44,18 L33,28 L37,43 L24,35 L11,43 L15,28 L4,18 L18,17 Z" fill="${c}" ${st()}/>`,
   };
+  // 各档宝箱的大图（开箱动画用）：tier 决定配色和装饰
+  const CHEST_LOOK = {
+    starter: { body: '#ff5fc1', lid: '#ff8fd6', band: '#ffe600', deco: 'bow' },
+    supply: { body: '#9a8a6a', lid: '#b8a882', band: '#5b5246', deco: 'stencil' },
+    military: { body: '#4f6b3a', lid: '#63854a', band: '#ffe600', deco: 'stripes' },
+    airdrop: { body: '#ffb42e', lid: '#ffd35e', band: '#141018', deco: 'chute' },
+    hero: { body: '#7a4dff', lid: '#9a76ff', band: '#ffe600', deco: 'star' },
+  };
+  function chestArt(id, open) {
+    const L = CHEST_LOOK[id] || CHEST_LOOK.supply;
+    let deco = '';
+    if (L.deco === 'bow') deco = `<path d="M60,58 C46,40 34,50 44,60 C34,70 46,78 60,62 C74,78 86,70 76,60 C86,50 74,40 60,58 Z" fill="${L.band}" ${st(3)}/>`;
+    if (L.deco === 'stencil') deco = `<text x="60" y="104" text-anchor="middle" font-family="Impact, sans-serif" font-size="17" fill="#2a241c" opacity=".75" letter-spacing="2">SUPPLY</text>`;
+    if (L.deco === 'stripes') deco = `<path d="M22,112 L34,90 M40,112 L52,90 M68,112 L80,90 M86,112 L98,90" stroke="#141018" stroke-width="6" opacity=".55"/>`;
+    if (L.deco === 'chute') deco = `<path d="M18,30 C24,0 96,0 102,30 Z" fill="#fff6e3" ${st(3)}/><path d="M18,30 L34,62 M102,30 L86,62 M48,24 L52,62 M72,24 L68,62" stroke="#141018" stroke-width="2.4"/><path d="M38,30 C42,6 58,4 60,30 M60,30 C62,4 78,6 82,30" fill="#ff3ea5" ${st(2.4)}/>`;
+    if (L.deco === 'star') deco = `<path d="M60,84 L65,95 L77,96 L68,104 L71,116 L60,110 L49,116 L52,104 L43,96 L55,95 Z" fill="${L.band}" ${st(2.6)}/>`;
+    const lid = open
+      ? `<g transform="translate(60 66) rotate(-28) translate(-60 -66)"><path d="M16,66 C16,38 32,30 60,30 C88,30 104,38 104,66 Z" fill="${L.lid}" ${st(4)}/><path d="M52,52 L68,52 L68,68 L52,68 Z" fill="${L.band}" ${st(3)}/></g>`
+      : `<path d="M16,70 C16,42 32,34 60,34 C88,34 104,42 104,70 Z" fill="${L.lid}" ${st(4)}/><path d="M52,60 L68,60 L68,80 L52,80 Z" fill="${L.band}" ${st(3)}/><circle cx="60" cy="72" r="3" fill="${K}"/>`;
+    return `<svg class="chest-art" viewBox="0 0 120 130" aria-hidden="true">
+      <ellipse cx="60" cy="122" rx="48" ry="7" fill="#0006"/>
+      <path d="M14,70 L106,70 L103,120 L17,120 Z" fill="${L.body}" ${st(4)}/>
+      <path d="M14,84 L106,84" stroke="${L.band}" stroke-width="7"/><path d="M14,84 L106,84" ${st(2)} fill="none"/>
+      <path d="M24,74 L24,116 M96,74 L96,116" stroke="#0004" stroke-width="4" stroke-linecap="round"/>
+      ${open ? '<path d="M18,72 L102,72 L98,80 L22,80 Z" fill="#1d1b2a"/><g class="chest-glow"><path d="M30,72 L10,10 M60,70 L60,0 M90,72 L110,10" stroke="#fff8" stroke-width="8" stroke-linecap="round"/></g>' : ''}
+      ${lid}${deco}
+    </svg>`;
+  }
   const svg = (name, color, size) => `<svg class="gi gi-${name}" viewBox="0 0 48 48" width="${size || 48}" height="${size || 48}" aria-hidden="true">${(I[name] || I.star)(color)}</svg>`;
   // 把页面上 data-icon 的元素填成图标
   function fill(root) {
@@ -59,5 +100,5 @@
       el.dataset.iconDone = '1';
     }
   }
-  window.GI = { svg, fill, names: Object.keys(I) };
+  window.GI = { svg, fill, chestArt, names: Object.keys(I) };
 })();

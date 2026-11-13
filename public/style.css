@@ -949,3 +949,124 @@ kbd { background: var(--ink); color: var(--ny); border: 0; font-family: var(--nu
 .acct-box .who small { display: block; color: #6b5f78; font-size: 12px; }
 .acct-box .btn { transform: rotate(-1.5deg); }
 #toast { z-index: 110 !important; }
+
+/* ================= 养成：货币 / 宝箱 / 升级 ================= */
+.wallet { display: flex; gap: 6px; align-items: center; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; flex-wrap: wrap; }
+.cur { display: inline-flex; align-items: center; gap: 3px; background: var(--ink); color: #fff; border-radius: 20px; padding: 2px 10px 2px 3px; border: 2px solid #fff3; box-shadow: 2px 3px 0 #0008; }
+.cur .gi { width: 24px; height: 24px; }
+.cur b { font-family: var(--num); font-size: 17px; letter-spacing: 1px; font-weight: 400; }
+.cur-coins b { color: #ffd65a; } .cur-gems b { color: #ff8fd0; } .cur-parts b { color: #9ff6ff; } .cur-crystals b { color: #d2b6ff; }
+.wallet:hover .cur { transform: translateY(-1px); }
+.wallet.in-ov { margin-left: auto; cursor: default; }
+@media (max-width: 760px) { .home-top .wallet .cur-parts, .home-top .wallet .cur-crystals { display: none; } .cur b { font-size: 14px; } .cur .gi { width: 19px; height: 19px; } }
+.side-btn .badge { position: absolute; right: -6px; top: -8px; min-width: 24px; height: 24px; border-radius: 12px; background: var(--np); color: #fff; font: 15px var(--num); font-style: normal; display: flex; align-items: center; justify-content: center; border: 2px solid var(--ink); animation: badgePop 1.2s ease-in-out infinite; z-index: 2; }
+@keyframes badgePop { 50% { transform: scale(1.15) rotate(-6deg); } }
+
+.chest-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.chest-card { position: relative; width: 172px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 10px 12px; background: var(--paper); color: var(--ink); box-shadow: 6px 7px 0 #000a; transform: rotate(-1deg); }
+.chest-card:nth-child(even) { transform: rotate(1.2deg); }
+.chest-card::before { content: ''; position: absolute; top: -9px; left: 50%; width: 60px; height: 18px; margin-left: -30px; background: var(--tape); transform: rotate(3deg); }
+.chest-card.t3 { background: linear-gradient(160deg, #fff3c4, #ffd76b); }
+.chest-card.t2 { background: linear-gradient(160deg, #f2ffe8, #d9f0c8); }
+.cc-art { width: 112px; height: 112px; } .cc-art svg { width: 100%; height: 100%; }
+.chest-card b { font-family: var(--head); font-size: 20px; font-weight: 400; }
+.chest-card small { color: #6b5f78; font-size: 12px; text-align: center; min-height: 16px; }
+.chest-card .btn { margin-top: 4px; display: inline-flex; align-items: center; gap: 2px; }
+.chest-card .btn .gi { width: 20px; height: 20px; }
+.odds-btn { position: absolute; right: 8px; top: 8px; font: 12px var(--head); background: var(--ink); color: var(--ny); border: 0; border-radius: 10px; padding: 2px 8px; cursor: pointer; }
+.empty-note { color: #fff; font-family: var(--head); background: #0007; padding: 10px 14px; display: inline-block; }
+.xchg-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.xchg { display: flex; align-items: center; gap: 10px; background: var(--paper); color: var(--ink); padding: 10px 12px; box-shadow: 5px 6px 0 #000a; min-width: 290px; }
+.xchg .x-ico { width: 42px; height: 42px; flex: none; }
+.xchg > div:nth-child(2) { flex: 1; } .xchg b { font-family: var(--head); font-weight: 400; font-size: 17px; display: block; } .xchg small { color: #6b5f78; }
+.info-card { width: min(520px, 100%) !important; max-height: 90vh; overflow-y: auto; }
+.info-card p { margin: 0; line-height: 1.6; }
+.info-btns { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.odds-sub { font-size: 13px; color: #5a4e66; }
+table.odds { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: var(--head); }
+table.odds td { padding: 5px 6px; border-bottom: 2px dashed #0002; }
+table.odds td:first-child { width: 34px; } table.odds .gi { width: 28px; height: 28px; }
+table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { font-weight: 400; font-family: var(--num); letter-spacing: 1px; }
+
+/* 锁住的角色 / 机体、等级角标 */
+.pcard.locked > svg, .mcard2.locked .thumb { filter: grayscale(1) brightness(.55); }
+.pcard.locked .pname b, .mcard2.locked b { opacity: .6; }
+.pcard.viewing { outline: 4px dashed var(--ny); outline-offset: 2px; }
+.lv-badge { position: absolute; left: 6px; top: 6px; z-index: 2; font: 15px var(--num); letter-spacing: 1px; background: var(--ink); color: var(--ny); padding: 1px 7px; border-radius: 6px; transform: rotate(-4deg); }
+.lock-badge { position: absolute; right: 6px; top: 6px; z-index: 2; width: 30px; height: 30px; }
+.new-badge.s1 { background: #9aa0a8 !important; color: #fff !important; border-color: var(--ink) !important; text-shadow: 1px 1px 0 var(--np); }
+.upg { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; padding: 10px 12px; background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 4px 5px 0 var(--ink); transform: rotate(-.6deg); }
+.upg.locked > .gi { width: 40px; height: 40px; flex: none; }
+.upg.locked > div { flex: 1; min-width: 160px; } .upg.locked b { font-family: var(--head); font-weight: 400; font-size: 17px; display: block; } .upg.locked small { color: #6b5f78; }
+.lvbig { display: flex; align-items: baseline; gap: 3px; font-family: var(--num); }
+.lvbig b { font-size: 46px; line-height: 1; color: var(--np); text-shadow: 2px 2px 0 var(--ink); font-weight: 400; }
+.lvbig small { font-family: var(--head); color: #6b5f78; }
+.upg-mid { flex: 1; min-width: 150px; font-family: var(--head); }
+.upg-mid small { color: #4a3e56; display: block; margin-top: 3px; }
+.bts .bt { display: inline-block; width: 26px; height: 26px; line-height: 24px; text-align: center; font-style: normal; border: 2px solid var(--ink); border-radius: 50%; margin-left: 4px; background: #ddd; color: #888; }
+.bts .bt.on { background: #b78cff; color: #fff; box-shadow: 0 0 8px #b78cff; }
+.upg-act { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.upg-act .btn { display: inline-flex; align-items: center; gap: 2px; } .upg-act .gi { width: 20px; height: 20px; }
+.upg-act .brk { background: #b78cff; color: #fff; }
+.brk-desc { color: #6b5f78; font-size: 12px; max-width: 260px; }
+.maxed { font: 22px var(--head); color: var(--np); }
+.okline.dim { color: #8a7d96 !important; }
+.hero-portrait.ghost { filter: grayscale(1) brightness(.25) blur(1px); opacity: .7; }
+
+/* ---------------- 开箱动画 ---------------- */
+#chestOpen { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; overflow: hidden; cursor: pointer;
+  background: radial-gradient(circle at 50% 45%, #3a2f52 0%, #120f1e 70%); animation: ovIn .25s ease-out; }
+#chestOpen.t2 { background: radial-gradient(circle at 50% 45%, #2f5236 0%, #0f1a12 70%); }
+#chestOpen.t3 { background: radial-gradient(circle at 50% 45%, #6b4a10 0%, #1e1406 70%); }
+.co-burst { position: absolute; left: 50%; top: 45%; width: 1400px; height: 1400px; margin: -700px 0 0 -700px; opacity: .0; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, #fff2 0deg 8deg, transparent 8deg 20deg); transition: opacity .4s; animation: spin 18s linear infinite; }
+#chestOpen.open .co-burst { opacity: 1; }
+#chestOpen.t3 .co-burst { background: repeating-conic-gradient(from 0deg, #ffd35e44 0deg 8deg, transparent 8deg 20deg); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.co-title { position: relative; font: clamp(30px, 6vw, 48px) var(--head); color: #fff; text-shadow: var(--spray), 5px 6px 0 var(--np); transform: rotate(-3deg); }
+.co-chest { position: relative; width: min(260px, 50vw); height: min(280px, 54vw); animation: chestDrop .6s cubic-bezier(.3, 1.6, .5, 1) both; }
+.co-chest svg { width: 100%; height: 100%; filter: drop-shadow(0 10px 0 #0007); }
+#chestOpen:not(.open) .co-chest svg { animation: chestBob 1.4s ease-in-out infinite; }
+#chestOpen.shake .co-chest svg { animation: chestShake .5s linear; }
+#chestOpen.open .co-chest { height: min(170px, 34vw); transition: height .3s; }
+.chest-glow { animation: glowPulse 1s ease-in-out infinite; }
+@keyframes chestDrop { from { transform: translateY(-120vh) rotate(-12deg); } }
+@keyframes chestBob { 50% { transform: translateY(-8px) rotate(2deg); } }
+@keyframes chestShake { 0%, 100% { transform: none; } 20% { transform: rotate(-8deg) scale(1.05); } 40% { transform: rotate(8deg) scale(1.1); } 60% { transform: rotate(-10deg) scale(1.12); } 80% { transform: rotate(10deg) scale(1.15); } }
+@keyframes glowPulse { 50% { opacity: .4; } }
+.co-hint { position: relative; font: 18px var(--head); color: #fff; background: var(--ink); padding: 4px 14px; animation: badgePop 1.2s infinite; }
+.co-items { position: relative; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
+.co-card { width: 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px; background: var(--paper); color: var(--ink); box-shadow: 5px 6px 0 #000a; text-align: center;
+  opacity: 0; transform: scale(.3) rotate(-20deg); transition: transform .45s cubic-bezier(.3, 1.7, .5, 1), opacity .2s; }
+.co-card.in { opacity: 1; transform: rotate(-2deg); }
+.co-card:nth-child(even).in { transform: rotate(2deg); }
+.co-card b { font: 20px var(--head); font-weight: 400; } .co-card small { font-size: 11px; color: #6b5f78; }
+.co-art { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.co-art svg, .co-art img { width: 100%; height: 100%; object-fit: contain; }
+.co-art.small { width: 64px; }
+.co-card.pilot, .co-card.mech { width: 190px; background: linear-gradient(170deg, #fff, color-mix(in srgb, var(--pc, #ffe600) 40%, #fff)); box-shadow: 0 0 0 4px var(--ink), 0 0 40px var(--pc, #ffe600); }
+.co-card.pilot.in, .co-card.mech.in { animation: cardHero .9s ease-out; }
+@keyframes cardHero { 0% { filter: brightness(4); } 100% { filter: none; } }
+.co-new { font: 16px var(--head); background: var(--np); color: #fff; padding: 1px 10px; transform: rotate(-4deg); margin-top: -18px; box-shadow: 2px 2px 0 var(--ink); }
+.co-btns { position: relative; display: flex; gap: 12px; }
+@media (max-height: 520px) { #chestOpen { gap: 4px; } .co-title { font-size: 26px; } .co-chest { height: 120px; } #chestOpen.open .co-chest { height: 70px; } .co-card { width: 90px; } .co-card.pilot, .co-card.mech { width: 130px; } }
+.co-items { align-items: center; }
+
+/* ---------------- 新手教程提示卡 ---------------- */
+#tutBox { position: fixed; left: 50%; top: max(70px, env(safe-area-inset-top)); transform: translateX(-50%) rotate(-1deg); z-index: 30; width: min(560px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; background: var(--paper); color: var(--ink); box-shadow: 7px 8px 0 #000a; pointer-events: auto; }
+#tutBox::before { content: ''; position: absolute; left: 30px; top: -10px; width: 70px; height: 20px; background: var(--tape); transform: rotate(-5deg); }
+#tutBox.pop { animation: tutPop .35s cubic-bezier(.3, 1.7, .5, 1); }
+@keyframes tutPop { from { transform: translateX(-50%) rotate(-1deg) scale(.7); } }
+#tutBox.done { background: var(--ny); }
+.tut-face { width: 64px; height: 64px; flex: none; border: 3px solid var(--ink); border-radius: 50%; overflow: hidden; background: #9bc94a; }
+.tut-face svg { width: 100%; height: 100%; }
+.tut-main { flex: 1; min-width: 0; }
+.tut-main small { font: 13px var(--head); background: var(--ink); color: var(--ny); padding: 1px 8px; }
+.tut-main p { margin: 5px 0 4px; font-size: 15px; line-height: 1.45; font-weight: 700; }
+.tut-main kbd { font-size: 13px; padding: 0 5px; margin: 0 1px; }
+.tut-dots { display: flex; gap: 5px; } .tut-dots i { width: 22px; height: 6px; background: #0002; border-radius: 3px; } .tut-dots i.ok { background: #1fbf6e; } .tut-dots i.cur { background: var(--np); }
+.tut-skip { align-self: flex-start; font: 13px var(--head); background: none; border: 2px solid var(--ink); border-radius: 8px; padding: 2px 8px; cursor: pointer; color: var(--ink); }
+#tutReplay { margin-bottom: 14px; }
+@media (max-height: 520px) { #tutBox { top: 8px; padding: 6px 10px 6px 6px; } .tut-face { width: 44px; height: 44px; } .tut-main p { font-size: 13px; margin: 3px 0; } }
+.link-btn { background: none; border: 0; font: 15px var(--head); color: #6b5f78; text-decoration: underline; cursor: pointer; }

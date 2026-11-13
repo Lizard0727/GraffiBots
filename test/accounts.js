@@ -27,7 +27,7 @@ A.say({ t: 'auth', op: 'register', name: '凌焰粉丝', pass: '123' });
 ok(A.last('auth').ok === false, `密码太短被拒绝：「${A.last('auth').err}」`);
 A.say({ t: 'auth', op: 'register', name: '凌焰粉丝', pass: 'paint123', profile: { weapon: 'fist', pilot: 'gale', trophies: 9999, xp: 99999 } });
 const reg = A.last('auth');
-ok(reg.ok && reg.token && reg.profile.weapon === 'fist' && reg.profile.pilot === 'gale', '注册成功，游客的出战配置带进了新账号');
+ok(reg.ok && reg.token && reg.profile.v === S.ECO.VERSION && !Object.keys(reg.profile.pilots).length, '注册成功，在线账号从新手号开始');
 ok(reg.profile.trophies === 0 && reg.profile.xp === 0, '伪造的奖杯 / 经验不会被带进来（从 0 开始）');
 ok(A.c.name === '凌焰粉丝' && A.c.acct, '登录后名字就是账号名');
 const raw = fs.readFileSync(file, 'utf8');
@@ -48,7 +48,7 @@ C.say({ t: 'auth', op: 'login', name: '凌焰粉丝', pass: 'paint123' });
 ok(C.last('auth').ok === false && /30/.test(C.last('auth').err), `连续输错会被锁 30 秒：「${C.last('auth').err}」`);
 hub.accounts.fails.clear();
 C.say({ t: 'auth', op: 'login', name: '凌焰粉丝', pass: 'paint123' });
-ok(C.last('auth').ok && C.last('auth').profile.pilot === 'gale', '正确密码登录成功，读到保存的资料');
+ok(C.last('auth').ok && C.last('auth').profile.v === S.ECO.VERSION, '正确密码登录成功，读到保存的资料');
 
 const D = client();
 D.say({ t: 'auth', op: 'token', token: reg.token });
@@ -58,9 +58,9 @@ ok(D.last('auth').ok === false, '伪造的令牌无效');
 
 // 只能改出战配置
 D.say({ t: 'auth', op: 'token', token: reg.token });
-D.say({ t: 'saveProfile', profile: { weapon: 'mortar', pilot: 'vet', trophies: 5000, xp: 1e6, head: 'horns' } });
+D.say({ t: 'saveProfile', profile: { weapon: 'roller', mode: 'zone', pilot: 'vet', trophies: 5000, xp: 1e6, head: 'horns' } });
 const acc = hub.accounts.find('凌焰粉丝');
-ok(acc.profile.weapon === 'mortar' && acc.profile.pilot === 'vet', '可以保存出战配置');
+ok(acc.profile.weapon === 'roller' && acc.profile.mode === 'zone' && acc.profile.pilot !== 'vet', '可以保存出战配置（只能选已拥有的）');
 ok(acc.profile.trophies === 0 && acc.profile.xp === 0 && acc.profile.head === 'antenna', '不能自己改奖杯 / 经验，也不能戴没解锁的头部涂装');
 
 // 比赛结束：服务器发奖励
