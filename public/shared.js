@@ -65,13 +65,40 @@
       hp: 150, spd: 1.08, reload: 0.85, atkCd: 0.38, attack: 'punch', range: 68, arc: 1.7, dmg: 40, kb: 260, lunge: 200,
       special: 'quake', spNeed: 210, isNew: true,
     },
+    // ---- S1 灰城重涂：赛季机甲 ----
+    dozer: {
+      name: '推土机兵', short: '推土', role: '前排推进', desc: '铲斗推出一排厚重涂料，近距离把敌人推开。生命值极高，是冲在最前面的墙。',
+      hp: 165, spd: 0.94, reload: 1.35, atkCd: 0.5, attack: 'fan', pellets: 6, arc: 0.95, speed: 480, range: 175, dmg: 15, kb: 2.2,
+      spread: 0.04, splat: 24, trail: 14, size: 8, special: 'bulldoze', spNeed: 240, season: 1,
+    },
+    flamer: {
+      name: '喷火罐车', short: '喷火', role: '近距压制', desc: '持续喷出一道滚烫的涂料火焰，射程短但覆盖面极大，能把整条巷子烧成你的颜色。',
+      hp: 120, spd: 0.97, reload: 1.7, atkCd: 0.3, attack: 'burst', shots: 12, interval: 0.055, speed: 430, range: 215, dmg: 8.5,
+      spread: 0.24, splat: 25, trail: 15, size: 7, special: 'napalm', spNeed: 260, season: 1,
+    },
+    carrier: {
+      name: '无人机母舰', short: '母舰', role: '追踪骚扰', desc: '放出会自动追踪敌人的小型涂装无人机，打不准也能命中，适合远距离骚扰。',
+      hp: 95, spd: 0.96, reload: 1.6, atkCd: 0.45, attack: 'burst', shots: 3, interval: 0.13, speed: 400, range: 470, dmg: 17, homing: 2.6,
+      spread: 0.12, splat: 18, trail: 0, size: 6, special: 'swarm', spNeed: 270, season: 1,
+    },
+    wrecker: {
+      name: '拆楼锤', short: '拆楼', role: '重型挥击', desc: '抡起拆楼大锤横扫一大片，命中的敌人被狠狠砸飞。出手慢，但一锤定音。',
+      hp: 145, spd: 1.02, reload: 1.15, atkCd: 0.62, attack: 'punch', range: 96, arc: 2.4, dmg: 50, kb: 340, lunge: 110,
+      special: 'whirl', spNeed: 220, season: 1,
+    },
+    megaphone: {
+      name: '喇叭车', short: '喇叭', role: '穿墙音波', desc: '用巨型喇叭放出音波涂料，音波能穿过墙壁和掩体，专治躲在墙后的敌人。',
+      hp: 105, spd: 1, reload: 1.45, atkCd: 0.45, attack: 'fan', pellets: 3, arc: 0.42, speed: 560, range: 330, dmg: 18, ghost: true,
+      spread: 0.02, splat: 16, trail: 10, size: 10, special: 'sonic', spNeed: 250, season: 1,
+    },
   };
-  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist'];
+  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone'];
   S.weaponRange = function (id) {
     const w = S.WEAPONS[id];
     if (id === 'charger') return 620;
     if (id === 'roller') return 180;
     if (id === 'fist') return 80;
+    if (id === 'wrecker') return 100;
     return w.range;
   };
 
@@ -83,9 +110,14 @@
     beam: { name: '极光喷射', desc: '2.6 秒持续高压光束，贯穿并涂满整条直线。' },
     barrage: { name: '地毯轰炸', desc: '沿瞄准方向连续落下 6 发炮弹。' },
     quake: { name: '地震重锤', desc: '跳向瞄准位置，落地砸出冲击波，击飞周围敌人。' },
+    bulldoze: { name: '推平', desc: '朝瞄准方向推出一整排涂料墙，沿路碾过并推飞所有敌人。' },
+    napalm: { name: '燃料罐', desc: '把燃料罐扔到瞄准位置，烧出一片持续 4 秒的火海，站在里面的敌人不断掉血。' },
+    swarm: { name: '蜂群', desc: '放出 3 架跟随自己的攻击无人机，8 秒内自动扫射附近敌人。' },
+    whirl: { name: '大摆锤', desc: '抡着大锤原地旋转 2.2 秒，持续砸飞靠近的敌人，移动速度不减。' },
+    sonic: { name: '音爆', desc: '以自己为中心炸开一圈巨大音波，穿墙伤害并击退周围所有敌人。' },
   };
-  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake'];
-  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge';
+  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic'];
+  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm';
 
   // ---------------- 驾驶员技能（每局 3 次，冷却 6 秒；驾驶员弹出后也能用） ----------------
   S.SKILL_USES = 3; S.SKILL_CD = 6;
@@ -101,7 +133,57 @@
     bento: { short: '便当', name: '能量便当', desc: '在脚下放一份便当，第一个碰到的队友回复 60 点生命。' },
     overdrive: { short: '火力', name: '火力全开', desc: '立即装满弹药，接下来 3 次攻击伤害 +40%。' },
     drone: { short: '无人机', name: '猫猫无人机', desc: '召唤跟随自己的无人机，6 秒内自动射击附近敌人。' },
+    rally: { short: '集结', name: '集结号', desc: '插下反抗军旗帜，5 秒内自己和附近队友伤害 +20%、移动速度 +15%。' },
+    blast: { short: '爆破', name: '定向爆破', desc: '在脚下放一包炸药，1.2 秒后爆炸，造成 70 点伤害并涂满周围。' },
+    jam: { short: '干扰', name: '声波干扰', desc: '附近敌人的大招充能减少 30%，并暴露位置 4 秒（草丛里也藏不住）。' },
   };
+  // ---------------- 超载技能（突破 I 解锁，每局 1 次，打出伤害充能） ----------------
+  // dmg / def：伤害倍率 / 受伤倍率；spd：移速倍率；其余字段是专属效果
+  S.OV_NEED = 360;      // 充满需要打出的伤害
+  S.OV_TIME = 6;        // 持续时间（突破 II 后 +2 秒、效果更强）
+  S.OVERLOADS = {
+    blaze: { name: '燃烧模式', desc: '伤害 +30%，移动速度 +20%。', dmg: 1.3, spd: 1.2 },
+    frost: { name: '绝对零度', desc: '伤害 +40%，被命中的敌人减速 1 秒。', dmg: 1.4, frostHit: 1 },
+    candy: { name: '安可！', desc: '每秒为自己和附近队友回复 14 生命，大招充能翻倍。', regen: 14, spGain: 2 },
+    titan: { name: '钢铁意志', desc: '受到的伤害 -50%，不会被击退。', def: 0.5, noKb: 1 },
+    raven: { name: '影袭', desc: '完全隐身，移动速度 +25%。', stealth: 1, spd: 1.25 },
+    aurora: { name: '超频装配', desc: '弹药无限，攻击不用等装填。', infAmmo: 1 },
+    gale: { name: '乘风', desc: '移动速度 +45%，立刻刷新技能冷却并多 1 次技能。', spd: 1.45, skillReset: 1 },
+    hex: { name: '全网瘫痪', desc: '发动时全部敌人暴露并沉默 3 秒（不能放技能和大招）。', hack: 1 },
+    chef: { name: '满汉全席', desc: '立刻为自己和附近队友回复 50 生命，之后每秒回复 8。', burstHeal: 50, regen: 8 },
+    vet: { name: '老兵不死', desc: '持续期间不会倒下，伤害 +20%。', undying: 1, dmg: 1.2 },
+    yuzu: { name: '喵喵军团', desc: '召唤 2 架猫猫无人机，攻击速度 +20%。', drones: 2, rof: 1.2 },
+    flag: { name: '全军突击', desc: '附近 300 范围内的队友伤害 +20%、移动速度 +15%。', rally: 1 },
+    hammer: { name: '爆破专家', desc: '伤害 +40%，击退距离翻倍。', dmg: 1.4, kb: 2 },
+    echo: { name: '音浪风暴', desc: '每秒向四周放出一圈音波，穿墙造成 22 点伤害。', pulse: 22 },
+  };
+  // ---------------- 天赋树（账号共用；每局最多装 3 个已点亮的天赋） ----------------
+  S.TALENT_BRANCHES = [
+    { id: 'atk', name: '进攻', color: '#ff4d3d' },
+    { id: 'def', name: '防守', color: '#4fb8ff' },
+    { id: 'paint', name: '涂装', color: '#ffc531' },
+    { id: 'sup', name: '辅助', color: '#9cff2e' },
+  ];
+  S.TALENTS = [
+    { id: 'a1', br: 'atk', tier: 1, cost: 1, name: '精准喷涂', desc: '伤害 +6%' },
+    { id: 'a2', br: 'atk', tier: 2, cost: 1, name: '快速装填', desc: '装填速度 +12%' },
+    { id: 'a3', br: 'atk', tier: 3, cost: 2, name: '大招猎手', desc: '打中敌人给的大招充能 +15%' },
+    { id: 'a4', br: 'atk', tier: 4, cost: 2, name: '终结者', desc: '对生命低于 30% 的敌人伤害 +15%' },
+    { id: 'd1', br: 'def', tier: 1, cost: 1, name: '加厚装甲', desc: '机体生命 +8%' },
+    { id: 'd2', br: 'def', tier: 2, cost: 1, name: '弹射护盾', desc: '驾驶员弹出时获得 25 点护盾' },
+    { id: 'd3', br: 'def', tier: 3, cost: 2, name: '快速重建', desc: '新机体重建时间 -1 秒' },
+    { id: 'd4', br: 'def', tier: 4, cost: 2, name: '背水一战', desc: '生命低于 30% 时受到的伤害 -15%' },
+    { id: 'p1', br: 'paint', tier: 1, cost: 1, name: '大号喷嘴', desc: '涂料溅开的范围 +12%' },
+    { id: 'p2', br: 'paint', tier: 2, cost: 1, name: '滑行高手', desc: '在己方涂料上移动速度 +6%' },
+    { id: 'p3', br: 'paint', tier: 3, cost: 2, name: '涂地充能', desc: '涂地给的大招充能 +25%' },
+    { id: 'p4', br: 'paint', tier: 4, cost: 2, name: '墨水回复', desc: '站在己方涂料上每秒回复 3 生命' },
+    { id: 's1', br: 'sup', tier: 1, cost: 1, name: '技能专精', desc: '技能冷却 -25%' },
+    { id: 's2', br: 'sup', tier: 2, cost: 1, name: '额外技能', desc: '每局技能次数 +1' },
+    { id: 's3', br: 'sup', tier: 3, cost: 2, name: '超载预热', desc: '超载技能充能速度 +20%' },
+    { id: 's4', br: 'sup', tier: 4, cost: 2, name: '急救包', desc: '击毁机体或击倒驾驶员后回复 15 生命' },
+  ];
+  S.talent = (id) => S.TALENTS.find((t) => t.id === id);
+  S.TALENT_SLOTS = 3;
 
   // ---------------- 驾驶员被摧毁后：弹出继续战斗 ----------------
   S.PILOT_HP = 50;          // 弹出驾驶员的生命值
@@ -172,6 +254,19 @@
       hair: '#ff9a3d', hair2: '#c25a12', skin: '#ffe4d2', eye: '#ff6a2e', style: 'buns', eyeShape: 'round', mouth: 'open', outfit: 'kid',
       skill: 'drone', passive: { name: '涂鸦小能手', desc: '涂地给大招的充能翻倍。' },
       line: '小喵，出动！把那边涂满！', bio: '星澜的邻居小妹妹，自己改装了一架猫咪无人机。个子最小，背包里的零件却最多。' },
+    // ---- S1 灰城重涂：赛季驾驶员 ----
+    { id: 'flag', name: '岚', code: '旗手', title: '灰城反抗军队长', weapon: 'dozer', accent: '#ff5a36', season: 1,
+      hair: '#3a3a44', hair2: '#16161c', skin: '#f2c9a8', eye: '#ff7a3d', style: 'swept', eyeShape: 'sharp', mouth: 'calm', outfit: 'rebel',
+      skill: 'rally', passive: { name: '众志成城', desc: '附近每有 1 名队友，受到的伤害 -5%（最多 -15%）。' },
+      line: '墙刷白一次，我们就涂回去一次。', bio: '灰石集团把整座城刷成灰色的那天，她在市政厅门口喷下了第一面红旗。现在，整个反抗军都跟着那面旗走。' },
+    { id: 'hammer', name: '石磊', code: '拆楼', title: '拆迁队工头', weapon: 'wrecker', accent: '#ffb000', season: 1,
+      hair: '#4a3020', hair2: '#1e120a', skin: '#c98f66', eye: '#8a5a2e', style: 'veteran', eyeShape: 'bold', mouth: 'grin', outfit: 'worker',
+      skill: 'blast', passive: { name: '安全第一', desc: '驾驶员弹出时自动获得 40 点护盾（安全帽）。' },
+      line: '这堵灰墙？三锤之内给你拆了。', bio: '原本是灰石集团的拆迁队工头，被派去拆掉城里所有的涂鸦墙。拆到第一百面墙时，他扔下合同，扛着大锤加入了反抗军。' },
+    { id: 'echo', name: '叶声', code: '电台', title: '地下电台 DJ', weapon: 'megaphone', accent: '#2ef0c8', season: 1,
+      hair: '#1fd6a8', hair2: '#0b6b5a', skin: '#ffe0cf', eye: '#a46bff', style: 'spiky', eyeShape: 'cool', mouth: 'open', outfit: 'dj',
+      skill: 'jam', passive: { name: '节拍同步', desc: '附近 180 范围内的队友装填速度 +15%。' },
+      line: '各位灰城的夜猫子，今晚的歌，叫《反击》！', bio: '每天午夜，灰城所有的收音机都会被一个神秘频道占领。没人知道 DJ 长什么样，只知道她的音波能震碎灰石集团的扩音器。' },
   ];
   S.pilot = (id) => S.PILOTS.find((p) => p.id === id) || S.PILOTS[0];
 

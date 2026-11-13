@@ -20,8 +20,9 @@
   // 常驻角色：新手宝箱从这 5 位里给 1 位
   E.STARTER_PILOTS = ['blaze', 'frost', 'candy', 'titan', 'raven'];
   E.STARTER_MECHS = ['blaster', 'roller', 'charger'];
-  E.SEASON_PILOTS = [];           // 本赛季新角色（第 ② 阶段加入）
-  E.SEASON_MECHS = [];
+  E.SEASON = { id: 1, name: '灰城重涂', en: 'REPAINT' };
+  E.SEASON_PILOTS = ['flag', 'hammer', 'echo'];      // 本赛季新角色：只能从街头宝箱开出
+  E.SEASON_MECHS = ['dozer', 'flamer', 'carrier', 'wrecker', 'megaphone'];
   E.START = { coins: 200, gems: 40, parts: 30, crystals: 0 };
 
   // ---------------- 升级与突破 ----------------
@@ -80,6 +81,7 @@
       pilots: {}, mechs: E.STARTER_MECHS.slice(), chests: {},
       pilot: '', weapon: E.STARTER_MECHS[0], head: 'antenna', mode: 'turf', map: -1, size: 3, dur: 180, fair: false,
       trophies: 0, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0, day: 0, dayWin: 0,
+      talents: [], tal: [], tpBonus: 0,
     }, E.START);
   };
   // 读取任意来源的资料：旧版本直接重置成新手号；字段做类型和范围检查
@@ -87,7 +89,11 @@
     if (!p || typeof p !== 'object' || p.v !== E.VERSION) return E.newProfile(name != null ? name : p && typeof p.name === 'string' ? p.name : '');
     const o = E.newProfile(typeof p.name === 'string' ? p.name : name || '');
     o.tut = p.tut ? 1 : 0;
-    for (const k of ['coins', 'gems', 'parts', 'crystals', 'trophies', 'xp', 'matches', 'wins', 'kills', 'paint', 'day', 'dayWin']) o[k] = int(p[k], 0, 1e9);
+    for (const k of ['coins', 'gems', 'parts', 'crystals', 'trophies', 'xp', 'matches', 'wins', 'kills', 'paint', 'day', 'dayWin', 'tpBonus']) o[k] = int(p[k], 0, 1e9);
+    // 天赋：只保留按顺序点亮的（同一支必须先点前一级）
+    const want = new Set(Array.isArray(p.talents) ? p.talents : []);
+    o.talents = S.TALENTS.filter((t) => want.has(t.id)).filter((t, _, arr) => t.tier === 1 || arr.some((u) => u.br === t.br && u.tier === t.tier - 1)).map((t) => t.id);
+    while (E.tpSpent(o) > E.tpTotal(o)) o.talents.pop();
     o.pilots = {};
     if (p.pilots && typeof p.pilots === 'object') {
       for (const P of S.PILOTS) {
@@ -116,15 +122,21 @@
     if (Number.isInteger(p.size) && p.size >= 1 && p.size <= 4) o.size = p.size;
     if ([120, 180, 240].includes(p.dur)) o.dur = p.dur;
     if (typeof p.fair === 'boolean') o.fair = p.fair;
+    if (Array.isArray(p.tal)) o.tal = [...new Set(p.tal)].filter((id) => o.talents.includes(id)).slice(0, S.TALENT_SLOTS);
+    o.tal = (o.tal || []).filter((id) => o.talents.includes(id));
     const head = S.HEADS.find((h) => h.id === p.head);
     if (head && head.tr <= (o.trophies || 0)) o.head = p.head;
     if (!S.HEADS.some((h) => h.id === o.head && h.tr <= (o.trophies || 0))) o.head = 'antenna';
     return o;
   };
-  E.LOADOUT_FIELDS = ['pilot', 'weapon', 'head', 'mode', 'map', 'size', 'dur', 'fair'];
+  E.LOADOUT_FIELDS = ['pilot', 'weapon', 'head', 'mode', 'map', 'size', 'dur', 'fair', 'tal'];
+  // 天赋点：账号每升 1 级 +1，开局送 2 点，通行证还会给
+  E.tpTotal = (o) => 2 + S.levelFromXp(o.xp || 0) - 1 + (o.tpBonus || 0);
+  E.tpSpent = (o) => (o.talents || []).reduce((a, id) => a + ((S.talent(id) || {}).cost || 0), 0);
+  E.tpFree = (o) => E.tpTotal(o) - E.tpSpent(o);
   E.hasPilot = (o, id) => !!(o.pilots && o.pilots[id]);
   E.hasMech = (o, id) => !!(o.mechs && o.mechs.includes(id));
-  E.power = (o, id) => { const q = o.pilots && o.pilots[id]; return q ? { lv: q.lv, bt: q.bt } : { lv: 1, bt: 0 }; };
+  E.power = (o, id) => { const q = o.pilots && o.pilots[id]; return Object.assign(q ? { lv: q.lv, bt: q.bt } : { lv: 1, bt: 0 }, { tal: (o.tal || []).slice(0, S.TALENT_SLOTS) }); };
   E.dayIndex = (now) => Math.floor(((now || Date.now()) + 8 * 3600e3) / 86400e3);   // 按北京时间换天
 
   // ---------------- 宝箱概率（给界面显示） ----------------
@@ -230,6 +242,21 @@
         if (o.coins < B.coins) return no(`金币不够（需要 ${B.coins}）`);
         o.crystals -= B.crystals; o.coins -= B.coins; q.bt++;
         return { ok: true, items: [], bt: q.bt, spent: { crystals: B.crystals, coins: B.coins } };
+      }
+      case 'talent': {
+        const T = S.talent(a.id);
+        if (!T) return no('没有这个天赋');
+        if (o.talents.includes(T.id)) return no('已经点亮了');
+        if (T.tier > 1 && !o.talents.some((id) => { const u = S.talent(id); return u.br === T.br && u.tier === T.tier - 1; })) return no('要先点亮这一支的上一级天赋');
+        if (E.tpFree(o) < T.cost) return no(`天赋点不够（需要 ${T.cost}）`);
+        o.talents.push(T.id);
+        if (o.tal.length < S.TALENT_SLOTS) o.tal.push(T.id);   // 有空位就直接装上
+        return { ok: true, items: [] };
+      }
+      case 'resetTalents': {
+        if (o.gems < 30) return no('重置天赋需要 30 宝石');
+        o.gems -= 30; o.talents = []; o.tal = [];
+        return { ok: true, items: [], spent: { gems: 30 } };
       }
       default: return no('未知操作');
     }

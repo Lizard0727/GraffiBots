@@ -1070,3 +1070,32 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
 #tutReplay { margin-bottom: 14px; }
 @media (max-height: 520px) { #tutBox { top: 8px; padding: 6px 10px 6px 6px; } .tut-face { width: 44px; height: 44px; } .tut-main p { font-size: 13px; margin: 3px 0; } }
 .link-btn { background: none; border: 0; font: 15px var(--head); color: #6b5f78; text-decoration: underline; cursor: pointer; }
+.t-ov { right: calc(196px + env(safe-area-inset-right)); bottom: 128px; width: 50px; height: 50px; background: conic-gradient(#b78cff calc(var(--p, 0) * 360deg), #0007 0) !important; }
+.t-ov span { font-size: 14px; }
+.t-ov.lit { box-shadow: 0 0 0 4px #fff, 0 0 18px 6px #b78cff !important; animation: pulseSp .8s ease-in-out infinite; }
+.t-ov.dim { opacity: .4; }
+
+/* ---------------- 天赋树 ---------------- */
+.tal-top { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.tal-top .tp { display: inline-flex; align-items: center; gap: 4px; background: var(--ink); color: #fff; padding: 3px 12px 3px 4px; border-radius: 20px; }
+.tal-top .tp .gi { width: 26px; height: 26px; } .tal-top .tp b { font: 22px var(--num); color: var(--ny); font-weight: 400; } .tal-top .tp small { color: #bbb; }
+.tal-equip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--paper); color: var(--ink); padding: 10px 14px; margin-bottom: 16px; box-shadow: 5px 6px 0 #000a; font-family: var(--head); transform: rotate(-.4deg); }
+.tal-equip b { font-weight: 400; font-size: 18px; } .tal-equip small { color: #6b5f78; font-family: inherit; }
+.tal-slot { min-width: 90px; text-align: center; padding: 4px 10px; border: 3px dashed #0003; color: #0005; }
+.tal-slot.on { border: 3px solid var(--ink); background: var(--bc); color: var(--ink); box-shadow: 2px 3px 0 var(--ink); }
+.tal-tree { display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .tal-tree { grid-template-columns: repeat(2, 1fr); } }
+.tal-col { display: flex; flex-direction: column; gap: 12px; position: relative; padding-top: 4px; }
+.tal-col::before { content: ''; position: absolute; left: 50%; top: 40px; bottom: 20px; width: 6px; margin-left: -3px; background: repeating-linear-gradient(var(--bc) 0 10px, transparent 10px 18px); opacity: .7; }
+.tal-col h4 { margin: 0; text-align: center; font: 26px var(--head); color: var(--bc); text-shadow: var(--spray); }
+.tal-node { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px 8px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 4px 5px 0 #000a; cursor: pointer; font: inherit; text-align: center; transform: rotate(-1deg); }
+.tal-node:nth-child(odd) { transform: rotate(1deg); }
+.tal-node i { position: absolute; left: -10px; top: -10px; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--bc); font: 15px var(--num); display: flex; align-items: center; justify-content: center; font-style: normal; }
+.tal-node b { font: 18px var(--head); font-weight: 400; } .tal-node small { font-size: 12px; color: #5a4e66; } .tal-node em { font: 13px var(--head); font-style: normal; color: #6b5f78; }
+.tal-node.off { filter: grayscale(1); opacity: .55; }
+.tal-node.can { box-shadow: 0 0 0 3px var(--bc), 4px 5px 0 #000a; animation: talGlow 1.4s ease-in-out infinite; }
+@keyframes talGlow { 50% { box-shadow: 0 0 0 5px var(--bc), 0 0 22px var(--bc), 4px 5px 0 #000a; } }
+.tal-node.on { background: color-mix(in srgb, var(--bc) 30%, var(--paper)); }
+.tal-node.eq { background: var(--bc); } .tal-node.eq em { color: var(--ink); }
+.abil.ovl.locked { opacity: .6; } .abil small { margin-left: 8px; font-size: 12px; color: #6b5f78; font-family: var(--head); }
+.pill.ovp { background: #e6d9ff !important; } .pill.tal { background: #fff3b0 !important; }

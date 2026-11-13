@@ -284,7 +284,7 @@
       : `<b>还没有驾驶员<small>完成新手教程，领取新手宝箱</small></b><i>点「对战」开始教程</i>`;
     $('heroPortrait').classList.toggle('ghost', !profile.pilot);
     const sk = S.SKILLS[P.skill], sp = S.SPECIALS[W.special];
-    $('heroLoadout').innerHTML = `<span class="pill mech">${ic('mech')}${W.name}</span><span class="pill">${ic('super')}大招 · ${sp.name}</span><span class="pill">${ic('skill', P.accent)}技能 · ${sk.name}</span><span class="pill">${ic('passive', P.accent)}被动 · ${P.passive.name}</span>`;
+    $('heroLoadout').innerHTML = `<span class="pill mech">${ic('mech')}${W.name}</span><span class="pill">${ic('super')}大招 · ${sp.name}</span><span class="pill">${ic('skill', P.accent)}技能 · ${sk.name}</span><span class="pill">${ic('passive', P.accent)}被动 · ${P.passive.name}</span>${(profile.pilots[P.id] || {}).bt >= 1 ? `<span class="pill ovp">${ic('super', '#b78cff')}超载 · ${S.OVERLOADS[P.id].name}</span>` : ''}${profile.tal.map((id) => `<span class="pill tal">${ic('star')}${S.talent(id).name}</span>`).join('')}`;
     $('title').style.setProperty('--pc', P.accent);
     renderModeCard();
     mountPreview();
@@ -312,6 +312,7 @@
     if (name === 'mechs') { viewMech = null; renderWeaponLists(); }
     if (name === 'pilots') { viewPilot = null; renderPilots(); }
     if (name === 'chests') renderChests();
+    if (name === 'talents') renderTalents();
     mountPreview();
     sfx.click();
   }
@@ -349,6 +350,7 @@
       <blockquote>“${P.line}”</blockquote>
       <div class="abil"><b>${ic('skill', P.accent)}技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
       <div class="abil"><b>${ic('passive', P.accent)}被动 · ${P.passive.name}</b><p>${P.passive.desc}</p></div>
+      <div class="abil ovl ${(profile.pilots[P.id] || {}).bt >= 1 ? '' : 'locked'}"><b>${ic('super', '#b78cff')}超载 · ${S.OVERLOADS[P.id].name}<small>${(profile.pilots[P.id] || {}).bt >= 1 ? 'R 键 · 每局 1 次' : '突破 I 解锁'}</small></b><p>${S.OVERLOADS[P.id].desc} 打出 ${S.OV_NEED} 点伤害充满，持续 ${S.OV_TIME} 秒（突破 II 后 ${S.OV_TIME + 2} 秒，效果更强）。</p></div>
       ${upgradeHtml(P)}
       <p class="bio">${P.bio}</p>
       ${!E.hasPilot(profile, P.id) ? '' : profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : E.hasMech(profile, P.weapon) ? `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>` : `<small class="okline dim">擅长机体「${rec.name}」还没拥有</small>`}`;
@@ -1016,6 +1018,7 @@
     me.hp = a[4]; me.ammo = a[5] / 100; me.tank = a[5] / 3; me.sp = a[6]; me.flags = a[7]; me.resp = a[8] / 10; me.carry = a[9];
     me.sm = a[10] / 100; me.charge = a[11] / 100; me.shield = a[12]; me.spk = a[16];
     me.maxHp = a[20] || 100; me.skUses = a[21]; me.skCd = (a[22] || 0) / 10; me.buffs = a[23] || 0;
+    me.ovk = (a[24] || 0) / 100; me.ovT = (a[25] || 0) / 10; me.ovOn = !!((a[26] || 0) & 1); me.ovUsed = !!((a[26] || 0) & 2);
     const alive = a[7] & 1;
     if (a[13] !== G.sync || !alive) {
       G.sync = a[13];
@@ -1082,7 +1085,7 @@
         const p = G.players.get(e[1]);
         if (!p) break;
         const P = S.pilot(p.pilot), sk = S.SKILLS[e[2]];
-        const r = { emp: 170, cheer: 170, smoke: 95 }[e[2]] || 40;
+        const r = { emp: 170, cheer: 170, smoke: 95, rally: 180, jam: 220 }[e[2]] || 40;
         G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r, color: e[2] === 'emp' ? '#7af0ff' : e[2] === 'cheer' ? '#7dff9a' : P.accent, t0: now, dur: 520 });
         if (e[2] === 'smoke') R3.burst(e[3], e[4], (e[5] || 0) + 10, '#2a1f3a', 40, 160);
         skillFx(p, e[2], e[3], e[4], e[5] || 0);
@@ -1127,7 +1130,24 @@
         break;
       }
       case 'bm': addBomb(e); break;
+      case 'ov': {
+        const p = G.players.get(e[1]);
+        if (!p) break;
+        const O = S.OVERLOADS[e[2]], P = S.pilot(e[2]);
+        for (let i = 0; i < 3; i++) ringFx(e[3], e[4], e[5], 90 + i * 80, i ? P.accent : '#ffffff', 600, i * 120);
+        R3.emit(e[3], e[4], (e[5] || 0) + 20, P.accent, 50, 320, 1, { sys: 'pg', size: 14, life: 0.7, grav: -60, drag: 2 });
+        if (silent) break;
+        if (e[1] === myId) { cutinBig(p, O.name, 'OVERLOAD!', `${P.name} · 超载技能`); G.camPunch = 1; G.flashT = now; G.speedLines = now; G.shake = Math.max(G.shake, 7); sfx.special(); }
+        else cutinSide(p, O.name, '超载');
+        break;
+      }
+      case 'fz': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0 }); break;
       case 'bx':
+        if (e[6] === 2) {   // 音波：穿墙的大圈
+          for (let i = 0; i < 3; i++) ringFx(e[1], e[2], e[3], e[5] * (0.5 + i * 0.25), i === 1 ? '#ffffff' : G.colors[e[4]], 420, i * 90);
+          if (!silent && nearMe(e[1], e[2], 600)) { sfx.boom(); G.shake = Math.max(G.shake, 4); }
+          break;
+        }
         if (e[6]) G.bombs.delete(e[6]);
         boomFx(e[1], e[2], e[3], G.colors[e[4]], e[5] > 70);
         G.fx.push({ k: 'ring', x: e[1], y: e[2], z: e[3], r: e[5], color: G.colors[e[4]], t0: now, dur: 380 });
@@ -1162,7 +1182,7 @@
     }
   }
   function addProj(e, mine) {
-    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4] });
+    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12] });
     // 枪口火光：白色核心 + 队伍色火花，沿射击方向喷出
     const L = Math.hypot(e[5], e[6], e[7]) || 1, dir = { x: e[5] / L, y: e[6] / L, z: e[7] / L };
     R3.emit(e[2], e[3], e[4], '#ffffff', 1, 0, 0, { sys: 'pg', size: 16, life: 0.07, grav: 0 });
@@ -1216,11 +1236,19 @@
       case 'beam': ringFx(x, y, z, 80, col, 300); G.shake = Math.max(G.shake, p.id === myId ? 6 : 0); break;
       case 'barrage': ringFx(x, y, z, 110, col, 420); break;
       case 'quake': ringFx(x, y, z, 70, col, 300); R3.emit(x, y, z + 2, '#cfcbdc', 16, 140, 0.2, { sys: 'pk', size: 20, life: 0.7, grav: -10, drag: 3, grow: 1.2 }); break;
+      case 'bulldoze': ringFx(x, y, z, 110, col, 400); R3.emit(x, y, z + 4, '#cfcbdc', 24, 200, 0.2, { sys: 'pk', size: 24, life: 0.8, grav: -10, drag: 3, grow: 1.2 }); G.shake = Math.max(G.shake, p.id === myId ? 6 : 0); break;
+      case 'napalm': ringFx(x, y, z, 70, '#ff7a2e', 300); break;
+      case 'swarm': for (let i = 0; i < 3; i++) R3.emit(x, y, z + 40, '#ffc531', 10, 180, 1, { sys: 'pg', size: 9, life: 0.5, grav: 0, drag: 3 }); ringFx(x, y, z, 60, col, 300); break;
+      case 'whirl': for (let i = 0; i < 4; i++) ringFx(x, y, z, 112, i % 2 ? '#ffffff' : col, 500, i * 500); break;
+      case 'sonic': break;   // 音波大圈由 bx 事件画
     }
   }
   function skillFx(p, kind, x, y, z) {
     const P = S.pilot(p.pilot);
     switch (kind) {
+      case 'rally': ringFx(x, y, z, 180, '#ff5a36', 600); R3.emit(x, y, z + 50, '#ff5a36', 26, 160, 1, { sys: 'pg', size: 12, life: 0.7, grav: 60, drag: 2 }); break;
+      case 'blast': ringFx(x, y, z, 110, '#ff3b52', 1200); break;
+      case 'jam': for (let i = 0; i < 3; i++) ringFx(x, y, z, 220 * (0.4 + i * 0.3), '#2ef0c8', 500, i * 110); break;
       case 'rush': ringFx(x, y, z, 70, '#fff36b', 380); R3.emit(x, y, z + 16, '#fff36b', 20, 220, 0.6, { sys: 'pg', size: 10, life: 0.4, grav: 0, drag: 3 }); break;
       case 'scan': ringFx(x, y, z, 700, '#7af0ff', 1000); ringFx(x, y, z, 360, '#7af0ff', 700, 150); if (G.me && p.team === G.me.team) G.scanUntil = performance.now() + 5000; break;
       case 'cheer':
@@ -1255,6 +1283,7 @@
     if (e.repeat) return;
     keys.add(k);
     if (k === 'KeyE') { G.qq++; G.edge = true; }   // 大招
+    if (k === 'KeyR') { G.oq = (G.oq || 0) + 1; G.edge = true; }   // 超载技能
     if (k === 'KeyQ') { G.gq++; G.edge = true; }   // 驾驶员技能
     if (k >= 'Digit1' && k <= 'Digit4') send({ t: 'chat', k: +k.slice(5) - 1 });
     if (k === 'KeyM') toggleMute();
@@ -1321,6 +1350,7 @@
         } else if (k === 'jump') TT.jump = true;
         else if (k === 'wheel') { TT.wheel = !TT.wheel; b.classList.toggle('lit', TT.wheel); }
         else if (k === 'skill') { G.gq++; G.edge = true; }
+        else if (k === 'ov') { G.oq = (G.oq || 0) + 1; G.edge = true; }
         else if (k === 'menu') openSettings();
         else if (k === 'board') TT.board = !TT.board;
         else if (k === 'chat') send({ t: 'chat', k: (TT.chatK = ((TT.chatK || 0) + 1) % 4) });
@@ -1438,6 +1468,11 @@
     sp.style.setProperty('--p', spk);
     sp.classList.toggle('lit', spk >= 1);
     sp.classList.toggle('dim', !!foot);
+    const ov = $('tOv');
+    ov.classList.toggle('hidden', !me.ovOn);
+    ov.style.setProperty('--p', me.ovUsed ? 0 : me.ovk || 0);
+    ov.classList.toggle('lit', !me.ovUsed && me.ovk >= 1);
+    ov.classList.toggle('dim', !!me.ovUsed);
     const sk = $('tSkill');
     sk.classList.toggle('dim', !(me.skUses > 0) || me.skCd > 0);
     sk.dataset.n = me.skUses == null ? 3 : me.skUses;
@@ -1566,7 +1601,7 @@
   }
   function superRange(me) {
     const sp = S.WEAPONS[me.weapon].special;
-    return { beam: 900, barrage: 440, quake: 280, charge: 300 }[sp] || 300;
+    return { beam: 900, barrage: 440, quake: 280, charge: 300, bulldoze: 430, napalm: 430 }[sp] || 300;
   }
   function updateCamera(dt) {
     if (TOP()) return updateCameraTop(dt);
@@ -1731,7 +1766,7 @@
       if (G.sendAcc >= 1 / 30 || G.edge) {
         G.sendAcc = 0; G.edge = false;
         const r3 = (v) => Math.round(v * 1000) / 1000, r1 = (v) => Math.round(v * 10) / 10;
-        send({ t: 'in', mx: r3(inp.mx), my: r3(inp.my), a: r3(G.inp.a), pt: r3(G.inp.pt), f: inp.f, w: inp.w, qq: G.qq, gq: G.gq, aq: G.aq, ad: Math.round(G.inp.ad || 200),
+        send({ t: 'in', mx: r3(inp.mx), my: r3(inp.my), a: r3(G.inp.a), pt: r3(G.inp.pt), f: inp.f, w: inp.w, qq: G.qq, gq: G.gq, aq: G.aq, oq: G.oq || 0, ad: Math.round(G.inp.ad || 200),
           x: r1(me.px), y: r1(me.py), z: r1(me.pz), vx: Math.round(me.pvx), vy: Math.round(me.pvy), vz: Math.round(me.pvz), sync: G.sync });
       }
     }
@@ -1766,10 +1801,21 @@
     for (const pr of G.projs.values()) {
       const t = (now - pr.t0) / 1000, q = S.projPos(pr, t);
       const gh = S.topAt(G.M, q.x, q.y);
-      if (t > 3.2 || q.z < gh - 1) { killProj(pr, q.x, q.y, gh < 1e3 ? Math.max(gh, q.z) : q.z); continue; }
+      if (t > 3.2 || (pr.ghost ? t > pr.ts : q.z < gh - 1)) { killProj(pr, q.x, q.y, gh < 1e3 ? Math.max(gh, q.z) : q.z); continue; }
       pr.x = q.x; pr.y = q.y; pr.z = q.z;
     }
     for (const [id, b] of G.bombs) { S.stepBomb(b, dt, G.M); b.life += dt; if (b.life > 5) G.bombs.delete(id); }
+    if (G.fires) {
+      G.fires = G.fires.filter((f) => now < f.end);
+      for (const f of G.fires) {
+        f.acc += dt;
+        while (f.acc > 0.03) {
+          f.acc -= 0.03;
+          const a = Math.random() * 6.283, rr2 = Math.sqrt(Math.random()) * f.r;
+          R3.emit(f.x + Math.cos(a) * rr2, f.y + Math.sin(a) * rr2, f.z + 4, Math.random() < 0.5 ? '#ff7a2e' : G.colors[f.team], 1, 30, 1, { sys: 'pg', size: 16, life: 0.5, grav: -140, drag: 1.5, grow: -0.5 });
+        }
+      }
+    }
     G.fx = G.fx.filter((f) => now - f.t0 < f.dur);
     G.missiles = G.missiles.filter((m) => now - m.t0 < m.dur);
     G.shake = Math.max(0, G.shake - dt * 30);
@@ -2116,7 +2162,7 @@
       const lines = TOUCH
         ? ['左半屏：摇杆移动 · 「攻击」拖动瞄准、松手发射，点一下自动瞄准', '「大招」充满后同样拖动瞄准 · 「技能」每局 3 次', '机体被摧毁后驾驶员会弹出：活下来就能原地空投新机体']
         : TOP() ? ['WASD 移动 · 鼠标瞄准 · 左键攻击（消耗 1 格弹药）', 'E / 右键 大招（打中敌人充能）· Q 驾驶员技能 · 空格 跳跃', 'Shift 滚轮：己方涂料上加速、隐身、装填更快 · 躲进草丛敌人看不见你']
-        : ['WASD 移动 · 鼠标转视角 · 左键攻击 · 空格跳跃', 'Shift 变滚轮：己方涂料上加速、隐身、装填更快', 'E/右键 大招 · Q 驾驶员技能 · 1-4 快捷语音 · Tab 记分板 · Esc 暂停'];
+        : ['WASD 移动 · 鼠标转视角 · 左键攻击 · 空格跳跃', 'Shift 变滚轮：己方涂料上加速、隐身、装填更快', 'E/右键 大招 · Q 驾驶员技能 · R 超载 · 1-4 快捷语音 · Tab 记分板 · Esc 暂停'];
       lines.forEach((l, i) => txt(l, 12, (TOUCH ? 190 : 230) + i * 20, 13, '#dfe1ee', 'left', 3));
       ctx.globalAlpha = 1;
     }
@@ -2141,6 +2187,10 @@
         ring(bx - 104, by + 6, 32, spk, '#ffdf2e', foot ? '—' : '大招', 'E / 右键', spk >= 1 && !foot, !!foot);
         const sk = S.SKILLS[P.skill], uses = me.skUses == null ? 3 : me.skUses;
         ring(bx - 186, by + 12, 26, me.skCd > 0 ? 1 - me.skCd / S.SKILL_CD : 1, P.accent, sk.short, `Q · 剩 ${uses}`, false, uses <= 0);
+        if (me.ovOn) {
+          const used = me.ovUsed && !(me.ovT > 0);
+          ring(bx - 258, by + 16, 24, me.ovT > 0 ? me.ovT / (S.OV_TIME + 2) : used ? 0 : me.ovk, '#b78cff', me.ovT > 0 ? me.ovT.toFixed(0) + '秒' : '超载', used ? 'R · 已用' : 'R', !me.ovUsed && me.ovk >= 1, used);
+        }
         txt('空格 跳跃 · Shift 滚轮', bx - 70, by - 64, 11, '#9a9db5', 'center', 3);
       }
       if (foot && alive) {
@@ -2373,7 +2423,7 @@
     const cb = ecoWait.get(m.req);
     if (cb) { ecoWait.delete(m.req); cb(m); }
   }
-  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); sendLoadout(); }
+  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); renderTalents(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); sendLoadout(); }
   const fmtN = (n) => (n >= 100000 ? Math.floor(n / 1000) + 'k' : String(n));
   const cur = (k, n, cls) => `<span class="cur cur-${k} ${cls || ''}">${ic(k)}<b>${fmtN(n)}</b></span>`;
   function renderWallet() {
@@ -2430,6 +2480,47 @@
       };
       xl.appendChild(el);
     }
+  }
+  // ---------------- 天赋树 ----------------
+  function renderTalents() {
+    const tree = $('talTree');
+    if (!tree) return;
+    const free = E.tpFree(profile), total = E.tpTotal(profile);
+    $('talTop').innerHTML = `<span class="tp">${ic('star')}<b>${free}</b><small>/ ${total} 天赋点</small></span><button class="btn small ghost" id="talReset" ${profile.talents.length ? '' : 'disabled'}>重置（30 宝石）</button>`;
+    const badge = $('talBadge'); if (badge) { badge.textContent = free; badge.classList.toggle('hidden', !(free > 0 && S.TALENTS.some((t) => canUnlock(t)))); }
+    const st = $('sideTalTxt'); if (st) st.textContent = profile.tal.length ? profile.tal.map((id) => S.talent(id).name).join(' · ') : '天赋树';
+    $('talEquip').innerHTML = `<b>本局携带</b>` + [0, 1, 2].map((i) => { const T = S.talent(profile.tal[i]); return T ? `<span class="tal-slot on" style="--bc:${S.TALENT_BRANCHES.find((b) => b.id === T.br).color}">${T.name}</span>` : '<span class="tal-slot">空</span>'; }).join('') + '<small>点已点亮的天赋装上 / 卸下</small>';
+    tree.innerHTML = '';
+    for (const B of S.TALENT_BRANCHES) {
+      const col = document.createElement('div');
+      col.className = 'tal-col'; col.style.setProperty('--bc', B.color);
+      col.innerHTML = `<h4>${B.name}</h4>`;
+      for (const T of S.TALENTS.filter((t) => t.br === B.id)) {
+        const on = profile.talents.includes(T.id), eq = profile.tal.includes(T.id), can = canUnlock(T);
+        const el = document.createElement('button');
+        el.className = 'tal-node' + (on ? ' on' : can ? ' can' : ' off') + (eq ? ' eq' : '');
+        el.innerHTML = `<i>${T.tier}</i><b>${T.name}</b><small>${T.desc}</small><em>${eq ? '★ 已装上' : on ? '已点亮' : `${T.cost} 点`}</em>`;
+        el.onclick = async () => {
+          if (on) {
+            if (eq) profile.tal = profile.tal.filter((x) => x !== T.id);
+            else if (profile.tal.length >= S.TALENT_SLOTS) return toast(`最多带 ${S.TALENT_SLOTS} 个天赋，先卸下一个`);
+            else profile.tal = profile.tal.concat(T.id);
+            saveProfile(); sendLoadout(); renderTalents(); renderProfile(); sfx.click();
+            return;
+          }
+          const r = await eco('talent', { id: T.id });
+          if (!r.ok) return toast(r.err);
+          sfx.win(); toast(`点亮天赋「${T.name}」`);
+        };
+        col.appendChild(el);
+      }
+      tree.appendChild(col);
+    }
+    $('talReset').onclick = async () => { const r = await eco('resetTalents'); if (!r.ok) return toast(r.err); toast('天赋已重置，天赋点全部退回'); };
+  }
+  function canUnlock(T) {
+    if (profile.talents.includes(T.id) || E.tpFree(profile) < T.cost) return false;
+    return T.tier === 1 || profile.talents.some((id) => { const u = S.talent(id); return u.br === T.br && u.tier === T.tier - 1; });
   }
   // ---------------- 开箱动画 ----------------
   let coBusy = false;
@@ -2634,7 +2725,7 @@
       act = `<button class="btn small" id="doUp" ${okU ? '' : 'disabled'}>${ic('up')}升到 ${q.lv + 1} 级：${ic('coins')}${c} ${ic('parts')}${pt}</button>`;
     }
     return `<div class="upg"><div class="lvbig"><small>等级</small><b>${q.lv}</b><small>/ ${cap}</small></div>
-      <div class="upg-mid"><div class="bts">突破 ${stars}</div><small>生命 / 伤害 +${bonus}%${q.bt >= 1 ? ' · 超载技能已解锁（第 ② 阶段上线）' : ''}</small></div>
+      <div class="upg-mid"><div class="bts">突破 ${stars}</div><small>生命 / 伤害 +${bonus}%${q.bt >= 1 ? ' · 超载技能已解锁（R 键）' : ''}</small></div>
       <div class="upg-act">${act}</div></div>`;
   }
   function bindUpgrade(P) {
@@ -2695,7 +2786,7 @@
   }
   function afterAccountChange() {
     $('nameInput').value = profile.name;
-    renderProfile(); renderPilots(); renderHeads(); renderWallet(); renderChests();
+    renderProfile(); renderPilots(); renderHeads(); renderWallet(); renderChests(); renderTalents();
     if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists();
     sendLoadout();
   }

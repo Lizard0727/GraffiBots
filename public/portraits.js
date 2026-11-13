@@ -305,6 +305,25 @@
         s += `<path d="M150,250 Q200,312 250,250 Q246,286 200,296 Q154,286 150,250 Z" fill="${P.hair2}" opacity="0.35"/>`;
         for (let i = 0; i < 26; i++) { const a = Math.PI * (0.15 + 0.7 * (i / 25)); s += `<circle cx="${(200 + Math.cos(a) * 46).toFixed(1)}" cy="${(258 + Math.sin(a) * 30).toFixed(1)}" r="1.4" fill="${P.hair2}" opacity="0.7"/>`; }
         break;
+      case 'flag': // 红色贝雷帽 + 黄色五角星 + 脸上一道喷漆
+        s += path(shape([[116, 132], [118, 96], [160, 66], [222, 58], [276, 72], [300, 104], [290, 128], [200, 118]]), a, ol(3));
+        s += `<path d="M128,124 Q200,108 288,122" fill="none" stroke="${mix(a, '#000', 0.35)}" stroke-width="5"/>`;
+        s += `<path d="M252,86 l5,10 l11,1 l-8,7 l3,11 l-11,-6 l-10,6 l3,-11 l-8,-7 l11,-1 Z" fill="#ffe14d" ${ol(2)}/>`;
+        s += `<path d="M142,226 q22,-6 44,2" stroke="${a}" stroke-width="7" stroke-linecap="round" opacity="0.85" fill="none"/>`;
+        break;
+      case 'hammer': // 黄色安全帽 + 胡茬 + 创可贴
+        s += path(shape([[112, 142], [116, 96], [150, 64], [200, 52], [250, 64], [284, 96], [288, 142]]), '#ffc531', ol(3));
+        s += path(shape([[96, 146], [200, 132], [304, 146], [304, 160], [200, 148], [96, 160]]), '#ffb000', ol(3));
+        s += `<path d="M200,56 L200,136" stroke="#e09a00" stroke-width="8"/><rect x="186" y="88" width="28" height="18" rx="3" fill="#fff" ${ol(2)}/><path d="M192,97 h16" stroke="${LINE}" stroke-width="3"/>`;
+        s += `<path d="M150,250 Q200,306 250,250 Q246,282 200,292 Q154,282 150,250 Z" fill="${P.hair2}" opacity="0.3"/>`;
+        s += `<g transform="rotate(14 250 214)"><rect x="232" y="208" width="36" height="12" rx="5" fill="#ffe3b8" ${ol(2)}/></g>`;
+        break;
+      case 'echo': // 大耳机 + 麦克风 + 音符
+        s += `<path d="M110,190 Q104,70 200,64 Q296,70 290,190" fill="none" stroke="${LINE}" stroke-width="14"/><path d="M110,190 Q104,70 200,64 Q296,70 290,190" fill="none" stroke="#2a2d3a" stroke-width="9"/>`;
+        for (const x of [104, 296]) s += `<rect x="${x - 20}" y="170" width="40" height="58" rx="16" fill="#2a2d3a" ${ol(3)}/><rect x="${x - 12}" y="180" width="24" height="38" rx="10" fill="${a}"/>`;
+        s += `<path d="M104,226 Q120,280 172,286" fill="none" stroke="${LINE}" stroke-width="4"/><circle cx="176" cy="286" r="8" fill="#2a2d3a" ${ol(2)}/>`;
+        s += `<path d="M300,96 v-26 l14,-4 v22" fill="none" stroke="${a}" stroke-width="4"/><circle cx="296" cy="96" r="5" fill="${a}"/><circle cx="310" cy="88" r="5" fill="${a}"/>`;
+        break;
       case 'yuzu': // 鼻贴 + 星星发夹
         s += `<g transform="rotate(-8 200 240)"><rect x="184" y="234" width="32" height="11" rx="5" fill="#ffe3b8" ${ol(2)}/><rect x="196" y="234" width="8" height="11" fill="#f2c890"/></g>`;
         for (const [x, y] of [[112, 108], [288, 108]]) s += `<path d="M${x},${y - 12} l4,8 l9,1 l-7,6 l2,9 l-8,-5 l-8,5 l2,-9 l-7,-6 l9,-1 Z" fill="#7be0ff" ${ol(1.8)}/>`;
@@ -414,6 +433,32 @@
         for (const x of [70, 330]) s += `<rect x="${x - 34}" y="374" width="68" height="14" rx="5" fill="#d6b44a" ${ol(2.4)} transform="rotate(${x < 200 ? -24 : 24} ${x} 381)"/>`;
         for (let i = 0; i < 3; i++) s += `<rect x="${226 + i * 18}" y="420" width="14" height="8" fill="${['#c94a3a', '#3a6dc9', '#d6b44a'][i]}" ${ol(1.4)}/>`;
         s += `<circle cx="244" cy="452" r="10" fill="#d6b44a" ${ol(2)}/><path d="M238,452 l4,4 l8,-8" stroke="#6b5a1a" stroke-width="2.4" fill="none"/>`;
+        break;
+      }
+      case 'rebel': {   // 灰色军装外套 + 红色喷漆臂章
+        s += path(shape(SH), '#5b5e68', ol(3));
+        s += path(shape([[150, 350, 1], [164, 326, 1], [200, 372], [236, 326, 1], [250, 350, 1], [200, 396]]), '#6d707a', ol(3));
+        s += path('M164,326 L200,372 L236,326 L232,340 L200,384 L168,340 Z', '#2a2533');
+        s += `<path d="M200,396 L200,520" stroke="${LINE}" stroke-width="2.4"/>`;
+        s += `<path d="M60,438 L118,414 L126,446 L68,470 Z" fill="${a}" ${ol(2.4)}/><path d="M80,446 l26,-10" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`;
+        s += `<path d="M236,430 q30,-14 60,6 q-8,20 -30,22 q-26,-2 -30,-28 Z" fill="${a}" opacity="0.85"/><path d="M250,470 l4,24 M268,466 l2,30" stroke="${a}" stroke-width="5" stroke-linecap="round" opacity="0.85"/>`;
+        break;
+      }
+      case 'worker': {  // 灰色工作服 + 荧光橙反光背心
+        s += path(shape(SH), '#6a6e78', ol(3));
+        s += path(shape([[70, 400], [150, 352], [176, 420], [176, 520, 1], [62, 520, 1]]), '#ff8a1f', ol(3));
+        s += path(shape(mirrorPts([[70, 400], [150, 352], [176, 420], [176, 520, 1], [62, 520, 1]])), '#ff8a1f', ol(3));
+        for (const y of [452, 488]) s += `<path d="M66,${y} L176,${y} M224,${y} L334,${y}" stroke="#f4f4f4" stroke-width="9"/>`;
+        s += `<rect x="236" y="404" width="34" height="22" rx="4" fill="#2a2d3a" ${ol(2)}/><path d="M242,415 h22" stroke="#ffc531" stroke-width="3"/>`;
+        break;
+      }
+      case 'dj': {      // 黑色飞行夹克 + 声波图案 + 磁带吊坠
+        s += path(shape(SH), '#1d1b2a', ol(3));
+        s += path('M168,338 L200,404 L232,338 Z', '#2ef0c8', ol(2.4));
+        let wave = 'M70,450'; for (let i = 0; i < 12; i++) wave += ` l11,${i % 2 ? 26 : -26}`;
+        s += `<path d="${wave}" fill="none" stroke="${a}" stroke-width="5" stroke-linejoin="round"/>`;
+        s += `<path d="M206,420 L210,440" stroke="${LINE}" stroke-width="2"/><rect x="190" y="440" width="44" height="28" rx="4" fill="#ff3ea5" ${ol(2.4)}/><circle cx="203" cy="454" r="5" fill="#fff"/><circle cx="221" cy="454" r="5" fill="#fff"/>`;
+        s += `<path d="M300,400 l6,14 l15,2 l-11,10 l3,15 l-13,-8 l-13,8 l3,-15 l-11,-10 l15,-2 Z" fill="#ffe14d" ${ol(2)}/>`;
         break;
       }
       case 'kid': {

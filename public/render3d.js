@@ -1064,6 +1064,64 @@
         g.userData.spinner = sp;
         break;
       }
+      // ---- S1 灰城重涂：赛季机甲 ----
+      case 'dozer': {
+        // 推土铲：一块宽大的弧形铲斗挡在前面
+        add(outlined(rbox(10, 8, 8, 2.5), mt, 1, 1, 1, 1, 0, 0));
+        add(part(s.box, dk, 10, 2, 2, 8, -2, 4)); add(part(s.box, dk, 10, 2, 2, 8, -2, -4));
+        const blade = add(outlined(rbox(3.2, 16, 26, 1.4), cm, 1, 1, 1, 16, -1, 0)); blade.rotation.z = 0.22;
+        add(part(s.box, lt, 1.2, 12, 22, 17.8, 0, 0)).rotation.z = 0.22;
+        add(part(s.box, s.yellow, 2.4, 3, 26, 17.6, -7, 0));
+        for (let i = -2; i <= 2; i++) add(part(s.box, mt, 3, 2, 2, 19, -9.5, i * 5.5));    // 铲齿
+        add(part(s.box, dk, 1.2, 14, 1.2, 15.5, 2, 11)); add(part(s.box, dk, 1.2, 14, 1.2, 15.5, 2, -11));
+        break;
+      }
+      case 'flamer': {
+        // 背着燃料罐的喷火枪：粗枪身 + 喇叭口 + 小火苗
+        add(outlined(rbox(14, 6, 6, 2), mt, 1, 1, 1, 5, 0, 0));
+        { const tank = part(s.cyl, cm, 4.5, 14, 4.5, -2, 6, 0); tank.rotation.z = Math.PI / 2; add(tank); }
+        { const cap = part(s.sph, dk, 4.6, 4.6, 4.6, 5, 6, 0); add(cap); }
+        add(part(s.box, s.yellow, 1.2, 9.4, 9.4, -2, 6, 0));
+        const nz = add(new T.Mesh(new T.CylinderGeometry(3.6, 1.8, 6, 12, 1, true), toon(0x2a2d3a, { side: T.DoubleSide })));
+        nz.rotation.z = -Math.PI / 2; nz.position.set(15, 0.4, 0);
+        g.userData.tip = add(part(s.sph, basic(0xff9a2e, { transparent: true, opacity: 0.85 }), 2.2, 2.2, 2.2, 18.5, 0.4, 0));
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        break;
+      }
+      case 'carrier': {
+        // 肩上的无人机发射架：三个小机库 + 停着的无人机
+        add(outlined(rbox(14, 9, 12, 2.5), mt, 1, 1, 1, 2, 2, 0));
+        for (let i = -1; i <= 1; i++) {
+          add(outlined(rbox(5, 4, 3.4, 1), dk, 1, 1, 1, 8, 6.5, i * 4));
+          add(part(s.sph, cm, 1.6, 1, 1.6, 10.5, 9, i * 4));
+          const rot = part(s.cyl, lt, 2.6, 0.3, 2.6, 10.5, 9.8, i * 4); add(rot);
+        }
+        add(part(s.box, s.yellow, 14.4, 1.2, 1.2, 2, -2.4, 6.2));
+        { const ant = add(part(s.cyl, s.metal, 0.6, 9, 0.6, -3, 10, -4)); ant.rotation.z = 0.3; }
+        g.userData.tip = add(part(s.sph, basic(0x7af0ff, { transparent: true, opacity: 0.9 }), 1.4, 1.4, 1.4, -4.4, 14.4, -4));
+        break;
+      }
+      case 'wrecker': {
+        // 拆楼大锤：长柄 + 方锤头
+        add(outlined(rbox(8, 6, 6, 2), mt, 1, 1, 1, 1, 0, 0));
+        cylX(dk, 1.4, 24, 14, 0, 0);
+        add(outlined(rbox(9, 12, 12, 2.6), cm, 1, 1, 1, 27, 0, 0));
+        add(part(s.box, mt, 10, 2, 12.6, 27, 4.4, 0)); add(part(s.box, mt, 10, 2, 12.6, 27, -4.4, 0));
+        add(part(s.box, s.yellow, 2, 12.6, 2, 31.6, 0, 0));
+        break;
+      }
+      case 'megaphone': {
+        // 巨型喇叭：喇叭口朝前，侧面一个音箱
+        add(outlined(rbox(10, 8, 8, 2.5), mt, 1, 1, 1, 1, 0, 0));
+        const horn = add(new T.Mesh(new T.CylinderGeometry(9.5, 3, 16, 16, 1, true), toon(color, { side: T.DoubleSide })));
+        horn.rotation.z = -Math.PI / 2; horn.position.set(13, 1, 0); horn.castShadow = true;
+        const rim = add(new T.Mesh(new T.TorusGeometry(9.5, 1, 6, 18), dk)); rim.rotation.y = Math.PI / 2; rim.position.set(21, 1, 0);
+        add(part(s.sph, dk, 3, 3, 3, 6, 1, 0));
+        add(outlined(rbox(6, 7, 4, 1.4), dk, 1, 1, 1, 0, 0, -7));
+        add(part(s.cyl, lt, 2.2, 0.6, 2.2, 0, 0, -9.3)).rotation.x = Math.PI / 2;
+        add(part(s.box, s.yellow, 1.2, 8.4, 8.4, 4, 0, 0));
+        break;
+      }
     }
   }
   function buildHead(g, head, color) {
@@ -1347,6 +1405,10 @@
     }
     if (P.id === 'candy') for (const z of [-1, 1]) { const e = add(part(SH.cone, SH.white, 1.4, 2.6, 1.0, -0.4, 5.0, z * 2.5)); e.rotation.x = z * 0.35; }
     if (P.id === 'titan') { const band = add(new T.Mesh(new T.TorusGeometry(4.45, 0.55, 6, 20), acc)); band.rotation.x = Math.PI / 2; band.rotation.z = 0.15; band.position.y = 2.2; }
+    // S1 新驾驶员：岚的红色贝雷帽、石磊的黄色安全帽、叶声的大耳机
+    if (P.id === 'flag') { const b = add(part(sph, acc, 4.9, 1.8, 4.9, -0.3, 5.0, 0.6)); b.rotation.z = 0.25; add(part(sph, SH.yellow, 0.7, 0.7, 0.7, 1.6, 5.4, -1.8)); }
+    if (P.id === 'hammer') { add(part(sph, SH.yellow, 4.9, 3.6, 4.9, -0.2, 4.4, 0)); add(part(SH.cyl, SH.yellow, 6.2, 0.5, 6.2, 0.4, 3.2, 0)); add(part(SH.box, toon(0xffffff), 1.4, 1, 1.4, 3.4, 5.2, 0)); }
+    if (P.id === 'echo') for (const z of [-1, 1]) { add(part(SH.cyl, SH.dark, 1.9, 1.2, 1.9, 0, 1.4, z * 4.6)).rotation.x = Math.PI / 2; add(part(sph, acc, 1.2, 1.2, 0.6, 0, 1.4, z * 5.3)); if (z > 0) { const band = add(new T.Mesh(new T.TorusGeometry(4.6, 0.45, 6, 16, Math.PI), SH.dark)); band.rotation.y = Math.PI / 2; band.position.y = 1.6; } }
     // 等级解锁的头部涂装，缩小后戴在驾驶员头上
     const hc = new T.Group(); hc.position.set(-0.5, 4.2, 0); hc.scale.setScalar(0.42); g.add(hc);
     buildHead(hc, headCosmetic, teamColor);
@@ -1691,6 +1753,8 @@
         if (bf & 16) emit(p.x + Math.cos(p.a) * 18, p.y + Math.sin(p.a) * 18, z + 22, '#ff7a2e', 2, 40, 1, { sys: 'pg', size: 11, life: 0.35, grav: -160, drag: 2 });
         if (bf & 32) emit(p.x, p.y, z + 14, G.colors[p.team], 3, 30, 0.5, { sys: 'pg', size: 14, life: 0.4, grav: 0, drag: 3 });
         if (bf & 2) emit(p.x, p.y, z + 30, '#7af0ff', 1, 20, 0.5, { sys: 'pg', size: 8, life: 0.3, grav: 0 });
+        if (bf & 64) for (let k = 0; k < 2; k++) emit(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, z + 4 + Math.random() * 36, k ? '#b78cff' : '#ffffff', 1, 30, 1, { sys: 'pg', size: 12, life: 0.45, grav: -140, drag: 2 });   // 超载
+        if (bf & 128) emit(p.x, p.y, z + 44, '#ff5a36', 1, 20, 0.3, { sys: 'pg', size: 8, life: 0.3, grav: -40 });   // 集结
       }
       if (wheel) for (const m of b.fadeMats) m.opacity = fade;
       if (p.flash > 0) b.bodyMat.emissive.setRGB(0.8, 0.8, 0.8);
@@ -1871,6 +1935,10 @@
     // 驾驶员技能召唤物
     for (const h of G.helpers || []) {
       const [, kind, x, y, z, team] = h;
+      if (kind === 'fire') continue;   // 火海用粒子画（client 收到 fz 事件）
+      if (kind === 'charge') {         // 炸药：一闪一闪的涂料弹
+        const m = P['shell' + team].next(); m.position.set(x, z + 6, y); m.scale.setScalar(1.3 + 0.4 * Math.abs(Math.sin(now / 70))); continue;
+      }
       if (kind === 'bento') { const g = P.bento.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }
       const g = P[kind + team].next();
       g.position.set(x, z, y);

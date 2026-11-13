@@ -140,7 +140,7 @@ class AccountStore {
     const now = Date.now();
     if (now - (c.lastEco || 0) < 150) return reply({ ok: false, err: '操作太快了' });
     c.lastEco = now;
-    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, pilot: m.pilot }, cryptoRand);
+    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, pilot: m.pilot, id: m.id }, cryptoRand);
     if (r.ok) { this.syncConn(c, acc); this.save(); }
     reply(Object.assign({}, r, { profile: this.publicProfile(acc) }));
   }
