@@ -34,6 +34,11 @@
 
   function eye(cx, cy, flip, P, id) {
     const sh = P.eyeShape;
+    if (sh === 'happy') {
+      // 笑眯眯的弯眼 ^^
+      const tr0 = `translate(${cx},${cy}) scale(${flip ? -1.12 : 1.12},1.12)`;
+      return `<g transform="${tr0}"><path d="M-20,6 Q0,-16 20,6" fill="none" stroke="${LINE}" stroke-width="6" stroke-linecap="round"/><path d="M-22,4 l-7,4" stroke="${LINE}" stroke-width="4" stroke-linecap="round"/></g>`;
+    }
     const h = { round: 46, sharp: 36, cool: 31, sleepy: 40, bold: 36 }[sh] || 40;
     const lift = { sharp: -7, cool: -5, bold: -3 }[sh] || 0;      // 外眼角上挑
     const ec = P.eye;
@@ -132,6 +137,31 @@
       const front = [[124, 242, 1], [122, 156], [146, 108], [200, 92], [254, 108], [278, 156], [276, 236, 1], [264, 190], [258, 214, 1], [248, 160], [238, 186, 1], [226, 150], [212, 196, 1], [200, 144], [178, 214, 1], [176, 156], [156, 226, 1], [150, 168], [138, 240, 1], [134, 190]];
       return { back, front, hl: [[142, 132], [172, 116, 1], [184, 126], [210, 110, 1], [222, 122], [250, 118, 1], [258, 128], [250, 126, 1], [222, 132], [210, 120, 1], [184, 136], [172, 126, 1], [144, 144]] };
     },
+    braid() {
+      const back = [[124, 250, 1], [114, 168], [130, 100], [200, 72], [270, 100], [286, 168], [276, 250, 1], [250, 200], [150, 200]];
+      const front = [[120, 230, 1], [118, 150], [140, 98], [200, 78], [262, 98], [284, 150], [284, 236, 1], [270, 186], [262, 150, 1], [244, 168], [228, 128], [214, 160, 1], [196, 124], [176, 168, 1], [166, 132], [150, 182, 1], [140, 150], [132, 208, 1]];
+      return { back, front, hl: [[136, 126], [168, 108, 1], [180, 120], [204, 100, 1], [218, 114], [246, 104, 1], [262, 120], [262, 130], [246, 116, 1], [218, 126], [204, 112, 1], [180, 132], [168, 120, 1], [138, 138]] };
+    },
+    undercut() {
+      const back = [[134, 200, 1], [126, 140], [146, 92], [200, 70], [256, 90], [276, 140], [268, 200, 1], [240, 170], [160, 170]];
+      const front = [[132, 150, 1], [134, 112], [160, 82], [214, 70], [264, 88], [284, 128], [290, 196, 1], [270, 168], [262, 200, 1], [250, 156], [232, 182, 1], [226, 146], [204, 160, 1], [196, 132], [172, 140, 1], [160, 124], [144, 150]];
+      return { back, front, hl: [[150, 108], [180, 90, 1], [192, 100], [222, 84, 1], [234, 96], [262, 98, 1], [270, 110], [262, 108, 1], [234, 106], [222, 94, 1], [192, 110], [180, 100, 1], [152, 118]] };
+    },
+    chef() {
+      const back = [[130, 200, 1], [124, 150], [140, 104], [200, 86], [260, 104], [276, 150], [270, 200, 1], [240, 176], [160, 176]];
+      const front = [[126, 176, 1], [126, 138], [148, 112], [200, 104], [252, 112], [274, 138], [274, 176, 1], [262, 150], [250, 166, 1], [238, 140], [222, 158, 1], [210, 138], [196, 156, 1], [182, 138], [168, 160, 1], [156, 140], [142, 168, 1], [136, 150]];
+      return { back, front, hl: [[144, 128], [172, 118, 1], [184, 124], [210, 114, 1], [222, 122], [250, 120, 1], [256, 128], [250, 126, 1], [222, 130], [210, 122, 1], [184, 132], [172, 126, 1], [146, 136]] };
+    },
+    veteran() {
+      const back = [[134, 196, 1], [126, 146], [142, 102], [200, 82], [258, 102], [274, 146], [266, 196, 1], [240, 168], [160, 168]];
+      const front = [[130, 172, 1], [128, 136], [144, 108], [176, 96], [200, 100], [228, 94], [256, 106], [272, 136], [270, 172, 1], [262, 140], [250, 124], [228, 118, 1], [210, 124], [196, 118, 1], [176, 124], [156, 126], [140, 142]];
+      return { back, front, hl: [[146, 120], [172, 106, 1], [184, 112], [212, 104, 1], [224, 110], [252, 114, 1], [256, 122], [252, 120, 1], [224, 118], [212, 112, 1], [184, 120], [172, 114, 1], [148, 128]] };
+    },
+    buns() {
+      const back = [[122, 272, 1], [114, 180], [128, 108], [200, 78], [272, 108], [286, 180], [278, 272, 1], [256, 230], [144, 230]];
+      const front = [[118, 268, 1], [118, 152], [138, 104], [200, 84], [262, 104], [282, 152], [282, 268, 1], [266, 226], [264, 172, 1], [236, 176], [208, 170, 1], [192, 176], [164, 170, 1], [138, 176], [134, 226]];
+      return { back, front, hl: [[136, 126], [168, 108, 1], [180, 120], [204, 100, 1], [218, 114], [246, 104, 1], [262, 120], [262, 130], [246, 116, 1], [218, 126], [204, 112, 1], [180, 132], [168, 120, 1], [138, 138]] };
+    },
     ponytail() {
       const back = [[124, 250, 1], [114, 170], [130, 100], [200, 70], [270, 100], [286, 170], [276, 250, 1], [250, 200], [150, 200]];
       const front = [[120, 246, 1], [118, 150], [138, 100], [196, 76], [256, 96], [282, 148], [282, 250, 1], [268, 200], [264, 168, 1], [248, 136], [236, 170, 1], [222, 128], [216, 152, 1], [200, 120], [184, 160, 1], [172, 132], [160, 178, 1], [150, 140], [136, 196, 1], [132, 210]];
@@ -165,6 +195,9 @@
         s += `<path d="M${x},150 Q${x + sw},${200 + len / 2} ${x + sw * 2},${200 + len}" fill="none" stroke="${P.hair}" stroke-width="10" stroke-linecap="round"/>`;
       }
     }
+    if (st === 'buns') {
+      for (const x of [134, 266]) { s += `<circle cx="${x}" cy="96" r="30" fill="${hairFill}" ${ol(3)}/><path d="M${x - 16},88 q16,-14 32,0" fill="none" stroke="${P.hair2}" stroke-width="3" opacity="0.6"/>`; }
+    }
     if (st === 'swept') {
       s += path(shape([[262, 230], [300, 300], [296, 360, 1], [274, 300], [252, 250]]), hairFill, ol(3));
       s += path(shape([[138, 230], [104, 300], [110, 352, 1], [128, 300], [148, 250]]), hairFill, ol(3));
@@ -174,7 +207,24 @@
   function hairExtrasFront(P, g) {
     const st = P.style, hairFill = `url(#${g}h)`;
     let s = '';
-    if (st === 'twintail' || st === 'ponytail' || st === 'swept') {
+    if (st === 'braid') {
+      // 搭在右肩前面的长辫子
+      for (let i = 0; i < 7; i++) {
+        const y = 240 + i * 30, x = 262 + Math.sin(i * 0.9) * 6 + i * 3, r = 17 - i * 0.9;
+        s += `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r * 1.15}" fill="${hairFill}" ${ol(2.6)}/>`;
+        s += `<path d="M${x - r * 0.6},${y - 4} q${r * 0.6},${r * 0.7} ${r * 1.2},0" fill="none" stroke="${P.hair2}" stroke-width="2.2" opacity="0.6"/>`;
+      }
+      s += `<rect x="276" y="446" width="22" height="10" rx="4" fill="${P.accent}" ${ol(2)}/>`;
+      s += path(shape([[300, 456], [292, 492, 1], [286, 462], [282, 494, 1], [276, 456]]), hairFill, ol(2.4));
+    }
+    if (st === 'undercut') {
+      // 剃短的两侧
+      for (const f of [false, true]) s += path(shape((f ? mirrorPts : (x) => x)([[128, 150], [126, 196], [134, 222, 1], [142, 190], [140, 150]])), mix(P.skin, P.hair, 0.55), 'opacity="0.85"');
+    }
+    if (st === 'veteran') {
+      for (const f of [false, true]) s += path(shape((f ? mirrorPts : (x) => x)([[130, 150], [128, 200], [136, 228, 1], [142, 196], [142, 152]])), `url(#${g}h)`, ol(2));
+    }
+    if (st === 'twintail' || st === 'ponytail' || st === 'swept' || st === 'buns') {
       // 鬓角长发
       const L = [[126, 170], [118, 230], [124, 300], [132, 330, 1], [138, 286], [140, 220], [140, 176]];
       s += path(shape(L), hairFill, ol(2.6)) + path(shape(mirrorPts(L)), hairFill, ol(2.6));
@@ -230,6 +280,34 @@
         break;
       case 'raven': // 面颊涂料痕
         s += `<path d="M146,236 q10,-3 22,2" stroke="${a}" stroke-width="5" stroke-linecap="round" fill="none"/><path d="M150,246 q8,-2 15,1" stroke="#ffe14d" stroke-width="4" stroke-linecap="round" fill="none"/>`;
+        break;
+      case 'gale': // 棕色飞行护目镜 + 风线
+        s += path(shape([[120, 124], [200, 104], [280, 124], [282, 136], [200, 118], [118, 138]]), '#6b4a32', ol(2.4));
+        for (const x of [166, 234]) { s += `<ellipse cx="${x}" cy="116" rx="24" ry="17" fill="#8a6244" ${ol(3)}/><ellipse cx="${x}" cy="116" rx="17" ry="11" fill="url(#${g}lens)"/><path d="M${x - 10},110 q6,-5 13,-3" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>`; }
+        s += `<path d="M30,150 q60,-10 90,8 M40,180 q50,-6 76,6" stroke="#fff" stroke-width="3" fill="none" opacity="0.5" stroke-linecap="round"/>`;
+        break;
+      case 'hex': // 透明数据护目镜 + 耳机
+        s += `<rect x="128" y="186" width="144" height="40" rx="18" fill="${P.accent}" opacity="0.32" ${ol(3)}/>`;
+        s += `<path d="M140,198 h30 M150,206 h44 M210,198 h24 M226,214 h34" stroke="#fff" stroke-width="2.4" opacity="0.8" stroke-linecap="round"/>`;
+        s += `<rect x="112" y="190" width="18" height="32" rx="7" fill="#20182e" ${ol(2.4)}/><rect x="270" y="190" width="18" height="32" rx="7" fill="#20182e" ${ol(2.4)}/>`;
+        s += `<circle cx="279" cy="206" r="4" fill="${P.accent}"/>`;
+        break;
+      case 'chef': // 高高的厨师帽
+        s += path(shape([[140, 118], [128, 70], [150, 30], [186, 30], [200, 14], [222, 26], [256, 30], [274, 66], [262, 118]]), '#ffffff', ol(3));
+        s += `<path d="M168,40 q8,30 4,70 M224,36 q-6,30 -2,74" fill="none" stroke="#d8dce4" stroke-width="3"/>`;
+        s += path(shape([[134, 132], [200, 116], [266, 132], [266, 148], [200, 132], [134, 148]]), '#f2f2f2', ol(3));
+        s += `<circle cx="200" cy="218" r="0" fill="none"/>`;
+        break;
+      case 'vet': // 眼罩 + 疤 + 胡茬
+        s += `<path d="M118,160 L282,230" stroke="${LINE}" stroke-width="4"/>`;
+        s += `<ellipse cx="238" cy="210" rx="26" ry="22" fill="#1d1d24" ${ol(3)}/><path d="M226,202 q12,-6 22,0" stroke="#4a4a58" stroke-width="2" fill="none"/>`;
+        s += `<path d="M150,196 L170,232" stroke="${mix(P.skin, '#7a2a1a', 0.5)}" stroke-width="3" stroke-linecap="round"/>`;
+        s += `<path d="M150,250 Q200,312 250,250 Q246,286 200,296 Q154,286 150,250 Z" fill="${P.hair2}" opacity="0.35"/>`;
+        for (let i = 0; i < 26; i++) { const a = Math.PI * (0.15 + 0.7 * (i / 25)); s += `<circle cx="${(200 + Math.cos(a) * 46).toFixed(1)}" cy="${(258 + Math.sin(a) * 30).toFixed(1)}" r="1.4" fill="${P.hair2}" opacity="0.7"/>`; }
+        break;
+      case 'yuzu': // 鼻贴 + 星星发夹
+        s += `<g transform="rotate(-8 200 240)"><rect x="184" y="234" width="32" height="11" rx="5" fill="#ffe3b8" ${ol(2)}/><rect x="196" y="234" width="8" height="11" fill="#f2c890"/></g>`;
+        for (const [x, y] of [[112, 108], [288, 108]]) s += `<path d="M${x},${y - 12} l4,8 l9,1 l-7,6 l2,9 l-8,-5 l-8,5 l2,-9 l-7,-6 l9,-1 Z" fill="#7be0ff" ${ol(1.8)}/>`;
         break;
       case 'aurora': // 头顶护目镜 + 发夹
         s += path(shape([[124, 116], [200, 92], [276, 112], [276, 124], [200, 104], [124, 128]]), '#e9edf2', ol(2.4));
@@ -295,6 +373,55 @@
         s += `<path d="M166,330 q12,10 22,0 q10,12 24,0 q10,10 22,0" fill="none" stroke="${a}" stroke-width="4" stroke-linecap="round"/>`;
         s += `<path d="M178,390 L172,470 M222,390 L228,470" stroke="#e8e0ff" stroke-width="3"/><circle cx="172" cy="474" r="5" fill="#e8e0ff"/><circle cx="228" cy="474" r="5" fill="#e8e0ff"/>`;
         for (const [x, y, r, c] of [[96, 450, 12, a], [110, 476, 6, '#ffe14d'], [292, 430, 9, '#3dffb4'], [276, 470, 5, a]]) s += `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`;
+        break;
+      }
+      case 'aviator': {
+        s += path(shape(SH), '#7a4e30', ol(3));
+        s += path(shape([[96, 380], [170, 334], [200, 360], [230, 334], [304, 380], [270, 402], [200, 384], [130, 402]]), '#f4e6c8', ol(3));
+        // 围巾
+        s += path(shape([[160, 312], [200, 336], [240, 312], [250, 346], [200, 368], [150, 346]]), P.accent, ol(3));
+        s += path(shape([[214, 356], [250, 420], [236, 470, 1], [222, 424], [200, 368]]), P.accent, ol(3));
+        s += `<path d="M168,330 q32,20 64,0" fill="none" stroke="#fff" stroke-width="3" opacity="0.5"/>`;
+        s += `<path d="M200,384 L200,520" stroke="${LINE}" stroke-width="2.4"/>`;
+        s += `<circle cx="132" cy="456" r="15" fill="#e8c24a" ${ol(2.4)}/><path d="M124,456 h16 M132,448 v16" stroke="#7a4e30" stroke-width="3"/>`;
+        break;
+      }
+      case 'hacker': {
+        s += path(shape(SH), '#1c1628', ol(3));
+        s += path(shape([[120, 344], [200, 334], [280, 344], [262, 382], [200, 394], [138, 382]]), '#2a2140', ol(3));
+        s += `<path d="M60,470 L130,400 L180,400 M340,470 L270,400 L220,400" stroke="${P.accent}" stroke-width="4" fill="none"/>`;
+        for (const [x, y] of [[130, 400], [270, 400], [180, 400], [220, 400]]) s += `<circle cx="${x}" cy="${y}" r="5" fill="${P.accent}"/>`;
+        // 挂在脖子上的耳机
+        s += `<path d="M150,330 Q200,372 250,330" fill="none" stroke="#3a3050" stroke-width="8"/>`;
+        s += `<rect x="134" y="318" width="24" height="30" rx="10" fill="#3a3050" ${ol(2.4)}/><rect x="242" y="318" width="24" height="30" rx="10" fill="#3a3050" ${ol(2.4)}/>`;
+        s += `<text x="200" y="470" text-anchor="middle" font-family="monospace" font-size="26" font-weight="900" fill="${P.accent}">&lt;/&gt;</text>`;
+        break;
+      }
+      case 'chefcoat': {
+        s += path(shape([[34, 520, 1], [50, 414], [98, 362], [168, 336], [232, 336], [302, 362], [350, 414], [366, 520, 1]]), '#fbfbf8', ol(3));
+        s += path(shape([[160, 330], [200, 356], [240, 330], [246, 356], [200, 380], [154, 356]]), '#e0402e', ol(3));
+        s += path(shape([[194, 372], [182, 410, 1], [200, 396], [218, 410, 1], [206, 372]]), '#e0402e', ol(2.4));
+        for (const y of [410, 444, 478]) for (const x of [168, 232]) s += `<circle cx="${x}" cy="${y}" r="6" fill="#d8dce4" ${ol(1.8)}/>`;
+        s += `<path d="M90,420 q20,-10 40,0" stroke="#d8dce4" stroke-width="3" fill="none"/>`;
+        s += `<rect x="252" y="420" width="44" height="26" rx="5" fill="${P.accent}" ${ol(2)}/><text x="274" y="439" text-anchor="middle" font-size="15" font-weight="900" fill="#fff" font-family="sans-serif">夜宵</text>`;
+        break;
+      }
+      case 'military': {
+        s += path(shape(SH), '#4c5a34', ol(3));
+        s += path(shape([[150, 350, 1], [164, 326, 1], [200, 368], [236, 326, 1], [250, 350, 1], [200, 392]]), '#5d6c40', ol(3));
+        s += path('M164,326 L200,368 L236,326 L232,340 L200,380 L168,340 Z', '#e8e2d0');
+        s += `<path d="M200,392 L200,520" stroke="${LINE}" stroke-width="2.4"/>`;
+        for (const x of [70, 330]) s += `<rect x="${x - 34}" y="374" width="68" height="14" rx="5" fill="#d6b44a" ${ol(2.4)} transform="rotate(${x < 200 ? -24 : 24} ${x} 381)"/>`;
+        for (let i = 0; i < 3; i++) s += `<rect x="${226 + i * 18}" y="420" width="14" height="8" fill="${['#c94a3a', '#3a6dc9', '#d6b44a'][i]}" ${ol(1.4)}/>`;
+        s += `<circle cx="244" cy="452" r="10" fill="#d6b44a" ${ol(2)}/><path d="M238,452 l4,4 l8,-8" stroke="#6b5a1a" stroke-width="2.4" fill="none"/>`;
+        break;
+      }
+      case 'kid': {
+        s += path(shape([[26, 520, 1], [40, 408], [92, 358], [168, 334], [232, 334], [308, 358], [360, 408], [374, 520, 1]]), '#ffd23f', ol(3));
+        s += path(shape([[110, 352], [200, 336], [290, 352], [276, 392], [200, 404], [124, 392]]), '#f2b820', ol(3));
+        s += `<path d="M176,400 L170,470 M224,400 L230,470" stroke="#fff" stroke-width="3"/><circle cx="170" cy="474" r="5" fill="#fff"/><circle cx="230" cy="474" r="5" fill="#fff"/>`;
+        s += `<rect x="146" y="470" width="108" height="40" rx="12" fill="#f2b820" ${ol(2.4)}/>`;
+        s += `<circle cx="200" cy="452" r="18" fill="#fff6e8" ${ol(2.4)}/><path d="M188,440 l4,-10 l6,8 M212,440 l-4,-10 l-6,8" fill="#fff6e8" ${ol(2)}/><circle cx="194" cy="452" r="2.4" fill="${LINE}"/><circle cx="206" cy="452" r="2.4" fill="${LINE}"/>`;
         break;
       }
       case 'engineer': {

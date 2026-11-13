@@ -50,6 +50,9 @@
   const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
   if (TOUCH) document.body.classList.add('touch');
   let hqOn = store.get('hq', !TOUCH);
+  // 视角：top = 俯视（默认，双摇杆）；tps = 第三人称（旧版）
+  let camMode = store.get('cam', 'top');
+  const TOP = () => camMode === 'top';
   let sens = store.get('sens', 1);
   function toggleMute() { const m = AU.toggleMute(); toast(m ? '已静音' : '已开启声音', 1000); renderSettings(); }
 
@@ -239,6 +242,7 @@
       <div class="set-row"><span>鼠标灵敏度</span><input type="range" min="20" max="300" data-set="sens" value="${Math.round(sens * 100)}"><output>${Math.round(sens * 100)}</output></div>
       <label class="set-row toggle"><span>屏幕震动</span><input type="checkbox" data-set="shake" ${shakeOn ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>第三人称视角（关闭 = 俯视双摇杆，推荐）</span><input type="checkbox" data-set="tps" ${camMode === 'tps' ? 'checked' : ''}></label>
       <div><div class="set-note" style="margin-bottom:6px">原创曲目试听：</div><div class="jukebox">${Object.entries(AU.TRACK_NAMES).map(([k, n]) => `<button data-track="${k}" class="${cur === k ? 'sel' : ''}">♪ ${n}</button>`).join('')}</div></div>
       <div class="set-note">所有音乐和音效都由浏览器实时合成，均为原创。主界面播放「霓虹喷漆街」，对战中播放「涂装突击」，最后 30 秒切换为「倒数冲刺」。</div>`;
     for (const box of document.querySelectorAll('.settings-box')) {
@@ -255,6 +259,7 @@
         cb.onchange = () => {
           if (cb.dataset.set === 'muted') AU.setMuted(cb.checked);
           else if (cb.dataset.set === 'hq') { hqOn = cb.checked; store.set('hq', hqOn); R3.setQuality(hqOn); }
+          else if (cb.dataset.set === 'tps') { camMode = cb.checked ? 'tps' : 'top'; store.set('cam', camMode); document.body.classList.toggle('topcam', !!G && TOP()); if (G) { G.camF = null; G.camD = null; } }
           else { shakeOn = cb.checked; store.set('shake', shakeOn); }
           renderSettings();
         };
@@ -658,10 +663,16 @@
   let lastUnlock = 0, wasLocked = false;
   const locked = () => document.pointerLockElement === cv;
   function lockPointer() {
-    if (TOUCH || !G || locked() || !cv.requestPointerLock) return;
+    if (TOUCH || TOP() || !G || locked() || !cv.requestPointerLock) return;
     try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* ignore */ }
   }
 
+  const FACE_IMG = new Map();
+  function faceImg(pid) {
+    let im = FACE_IMG.get(pid);
+    if (!im) { im = new Image(); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(GP.portrait(S.pilot(pid), { face: true })); FACE_IMG.set(pid, im); }
+    return im;
+  }
   function startGame(m) {
     const M = S.buildMap(m.map);
     const colors = S.COLOR_SETS[m.colorSet].c;
@@ -669,7 +680,7 @@
       map: m.map, mode: m.mode, colors, M, grid: new Uint8Array(S.GW * S.GH), duration: m.duration,
       players: new Map(), snaps: [], projs: new Map(), fx: [], texts: [], feed: [], bombs: new Map(), missiles: [],
       announce: null, big: null, tl: m.duration, cd: 3.5, over: false, overT: 0, obj: null, objA: null, offset: null,
-      sendAcc: 0, sync: -1, sq: 0, qq: 0, edge: false, chats: new Map(), sb: new Map(), shake: 0,
+      sendAcc: 0, sync: -1, qq: 0, gq: 0, aq: 0, edge: false, rv: [0, 0, 0], helpers: [], shells: new Map(), dmgTexts: [], chats: new Map(), sb: new Map(), shake: 0,
       me: null, lastCount: 99, goT: 0, hitMark: 0, dmgFlash: 0, killer: null,
       cur: new Set(), turf: [0, 0], miniFrame: 0, startedAt: performance.now(), lastFrame: performance.now(), lw: false,
       prevTl: m.duration, wasAlive: null, spReady: null, cam: null, camZ: null, camD: null, camClose: false, aim: null,
@@ -694,6 +705,8 @@
     AU.music('battle');
     lockPointer();
     touchShow(true);
+    document.body.classList.toggle('topcam', TOP());
+    G.camF = null;
     showVs(m.players, colors);
   }
   // 开局对阵画面：两队驾驶员立绘滑入
@@ -738,13 +751,15 @@
       }
     }
     if (m.sb) for (const r of m.sb) G.sb.set(r[0], r);
-    G.snaps.push({ t: st, pm, o: m.o, d: m.d, e: m.e, done: false });
+    if (m.rv) G.rv = m.rv;
+    G.snaps.push({ t: st, pm, o: m.o, d: m.d, e: m.e, h: m.h || [], done: false });
     while (G.snaps.length > 120) { const s = G.snaps.shift(); if (!s.done) consume(s, true); }
   }
   function applyMe(a) {
     const me = G.me;
-    me.hp = a[4]; me.tank = a[5]; me.sp = a[6]; me.flags = a[7]; me.resp = a[8] / 10; me.carry = a[9];
+    me.hp = a[4]; me.ammo = a[5] / 100; me.tank = a[5] / 3; me.sp = a[6]; me.flags = a[7]; me.resp = a[8] / 10; me.carry = a[9];
     me.sm = a[10] / 100; me.charge = a[11] / 100; me.shield = a[12]; me.spk = a[16];
+    me.maxHp = a[20] || 100; me.skUses = a[21]; me.skCd = (a[22] || 0) / 10; me.buffs = a[23] || 0;
     const alive = a[7] & 1;
     if (a[13] !== G.sync || !alive) {
       G.sync = a[13];
@@ -775,8 +790,59 @@
         const t = G.players.get(e[1]);
         if (t) t.flash = 0.1;
         if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; sfx.hit(); }
+        // 伤害数字：只显示和自己有关的
+        if (t && e[4] > 0 && !silent && (e[2] === myId || e[1] === myId)) G.dmgTexts.push({ id: e[1], dx: (Math.random() - 0.5) * 24, text: String(e[4]), color: e[1] === myId ? '#ff5a6a' : '#fff', t: now });
         break;
       }
+      case 'wreck': {
+        const by = G.players.get(e[1]), v = G.players.get(e[2]);
+        if (!v) break;
+        const col = G.colors[by ? by.team : 3 - v.team];
+        R3.burst(e[3], e[4], (e[5] || 0) + 18, col, 40, 300);
+        R3.burst(e[3], e[4], (e[5] || 0) + 18, '#3a3e52', 24, 260);
+        G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r: 70, color: col, t0: now, dur: 500 });
+        G.feed.unshift({ by, v, t: now, wreck: true }); if (G.feed.length > 5) G.feed.pop();
+        if (silent) break;
+        if (e[1] === myId && e[2] !== myId) { bigText(`击毁 ${v.name} 的机体！`); sfx.kill(); }
+        if (e[2] === myId) { sfx.die(); bigText('机体被摧毁！驾驶员弹出', '#ff5a6a'); G.shake = Math.max(G.shake, 8); }
+        else if (nearMe(e[3], e[4], 500)) { sfx.boom(); G.shake = Math.max(G.shake, 4); }
+        break;
+      }
+      case 'mdrop': {
+        const p = G.players.get(e[1]);
+        if (!p) break;
+        G.fx.push({ k: 'ring', x: e[2], y: e[3], z: e[4] || 0, r: 75, color: G.colors[p.team], t0: now, dur: 500 });
+        G.fx.push({ k: 'line', x0: e[2], y0: e[3], z0: 900, x1: e[2], y1: e[3], z1: e[4] || 0, color: G.colors[p.team], w: 16, t0: now, dur: 420 });
+        R3.burst(e[2], e[3], (e[4] || 0) + 4, G.colors[p.team], 30, 260, 0.5);
+        if (!silent && e[1] === myId) { sfx.respawn(); bigText('新机体空投完成！', G.colors[p.team]); }
+        else if (!silent && nearMe(e[2], e[3], 400)) sfx.boom();
+        break;
+      }
+      case 'sk': {
+        const p = G.players.get(e[1]);
+        if (!p) break;
+        const P = S.pilot(p.pilot), sk = S.SKILLS[e[2]];
+        const r = { emp: 170, cheer: 170, smoke: 95 }[e[2]] || 40;
+        G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r, color: e[2] === 'emp' ? '#7af0ff' : e[2] === 'cheer' ? '#7dff9a' : P.accent, t0: now, dur: 520 });
+        if (e[2] === 'smoke') R3.burst(e[3], e[4], (e[5] || 0) + 10, '#2a1f3a', 40, 160);
+        if (silent) break;
+        if (e[1] === myId) { bigText(`${sk.name}！`, P.accent); sfx.special(); }
+        else if (G.me && p.team === G.me.team && e[2] === 'scan') announce('全队可以看见所有敌人了！', P.accent);
+        else if (nearMe(e[3], e[4], 400)) sfx.pick();
+        break;
+      }
+      case 'lb': G.shells.set(e[1], { x0: e[2], y0: e[3], z0: e[4], x1: e[5], y1: e[6], z1: e[7], T: e[8], team: e[9], t0: now, r: 54 }); if (!silent && nearMe(e[2], e[3], 500)) sfx.throw(); break;
+      case 'pu': {
+        const p = G.players.get(e[1]);
+        if (p) { G.fx.push({ k: 'ring', x: p.x + Math.cos(e[2]) * 34, y: p.y + Math.sin(e[2]) * 34, z: (p.z || 0) + 14, r: 34, color: G.colors[p.team], t0: now, dur: 220 }); if (!silent && nearMe(p.x, p.y, 400)) sfx.hit(); }
+        break;
+      }
+      case 'qk':
+        G.fx.push({ k: 'ring', x: e[1], y: e[2], z: e[3], r: 110, color: G.colors[e[4]], t0: now, dur: 520 });
+        R3.burst(e[1], e[2], e[3] + 4, G.colors[e[4]], 45, 320, 0.4);
+        if (!silent && nearMe(e[1], e[2], 600)) { sfx.boom(); G.shake = Math.max(G.shake, 8); }
+        break;
+      case 'heal': { const p = G.players.get(e[1]); if (p) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 50, text: `+${e[2]}`, color: '#7dff9a', t: now }); break; }
       case 'kill': {
         const by = G.players.get(e[1]), v = G.players.get(e[2]);
         if (!v) break;
@@ -848,8 +914,8 @@
     if (k === 'Tab' || k === 'Space' || k.startsWith('Arrow')) e.preventDefault();
     if (e.repeat) return;
     keys.add(k);
-    if (k === 'KeyE') { G.sq++; G.edge = true; }
-    if (k === 'KeyQ') { G.qq++; G.edge = true; }
+    if (k === 'KeyE') { G.qq++; G.edge = true; }   // 大招
+    if (k === 'KeyQ') { G.gq++; G.edge = true; }   // 驾驶员技能
     if (k >= 'Digit1' && k <= 'Digit4') send({ t: 'chat', k: +k.slice(5) - 1 });
     if (k === 'KeyM') toggleMute();
   });
@@ -864,9 +930,9 @@
   });
   cv.addEventListener('mousedown', (e) => {
     if (!G) return;
-    if (!locked()) { lockPointer(); return; }
-    if (e.button === 0) mouse.down = true;
-    if (e.button === 2) { G.sq++; G.edge = true; }
+    if (!TOP() && !locked()) { lockPointer(); return; }
+    if (e.button === 0) { mouse.down = true; G.aq++; G.edge = true; }
+    if (e.button === 2) { G.qq++; G.edge = true; }
   });
   addEventListener('mouseup', (e) => { if (e.button === 0) mouse.down = false; });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -878,11 +944,11 @@
   });
 
   // ================= 触屏操作 =================
-  const TT = { on: false, sx: 0, sy: 0, fire: false, jump: false, wheel: false, ptr: new Map(), board: false };
+  const TT = { on: false, sx: 0, sy: 0, hold: false, aiming: false, ax: 0, ay: -1, ak: 1, superAim: false, keepUntil: 0, jump: false, wheel: false, ptr: new Map(), board: false };
   function setupTouch() {
     if (!TOUCH) return;
     const ui = $('touchUI'), stick = $('tStick'), knob = stick.querySelector('i');
-    const R = 56;
+    const R = 56, AR = 64;
     const goFull = () => {
       const de = document.documentElement;
       if (!document.fullscreenElement && de.requestFullscreen) {
@@ -890,26 +956,35 @@
       }
     };
     const btnOf = (el) => el && el.closest && el.closest('[data-tb]');
+    const isCharger = () => G && G.me && S.WEAPONS[G.me.weapon].attack === 'charge' && !(G.me.flags & 512);
+    // 点一下：自动瞄准最近的敌人
+    const autoAim = (superMode) => {
+      const me = G.me; if (!me) return;
+      const range = superMode ? superRange(me) : (me.flags & 512 ? S.PISTOL.range : S.weaponRange(me.weapon));
+      const t = autoTarget(range + 60);
+      if (t) { G.aimLock = t.id; G.aimLockUntil = performance.now() + 300; G.aimPt = { x: t.x, y: t.y }; }
+      TT.keepUntil = performance.now() + 300;
+    };
     ui.addEventListener('pointerdown', (e) => {
       if (!G) return;
       e.preventDefault();
       AU.resume();
       if (store.get('fullscreen', true)) goFull();
       const b = btnOf(e.target);
-      const rec = { x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, kind: 'look' };
+      const rec = { x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, kind: TOP() ? 'none' : 'look', t0: performance.now() };
       if (b) {
         const k = b.dataset.tb;
-        rec.kind = k; b.classList.add('on');
-        rec.el = b;
-        if (k === 'fire') TT.fire = true;
-        else if (k === 'jump') TT.jump = true;
+        rec.kind = k; b.classList.add('on'); rec.el = b;
+        if (k === 'fire' || k === 'sp') {
+          const r = b.getBoundingClientRect();
+          rec.cx = r.left + r.width / 2; rec.cy = r.top + r.height / 2; rec.dragged = false;
+        } else if (k === 'jump') TT.jump = true;
         else if (k === 'wheel') { TT.wheel = !TT.wheel; b.classList.toggle('lit', TT.wheel); }
-        else if (k === 'bomb') { G.sq++; G.edge = true; }
-        else if (k === 'sp') { G.qq++; G.edge = true; }
+        else if (k === 'skill') { G.gq++; G.edge = true; }
         else if (k === 'menu') openSettings();
         else if (k === 'board') TT.board = !TT.board;
         else if (k === 'chat') send({ t: 'chat', k: (TT.chatK = ((TT.chatK || 0) + 1) % 4) });
-      } else if (e.clientX < innerWidth * 0.42) {
+      } else if (e.clientX < innerWidth * 0.45) {
         rec.kind = 'stick';
         stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px';
         stick.classList.add('show'); knob.style.transform = 'translate(-50%,-50%)';
@@ -924,13 +999,23 @@
       if (rec.kind === 'stick') {
         let dx = e.clientX - rec.x0, dy = e.clientY - rec.y0;
         const l = Math.hypot(dx, dy);
-        // 拖太远时摇杆底座跟着手指走
         if (l > R * 1.6) { rec.x0 += (dx / l) * (l - R * 1.6); rec.y0 += (dy / l) * (l - R * 1.6); stick.style.left = rec.x0 + 'px'; stick.style.top = rec.y0 + 'px'; dx = e.clientX - rec.x0; dy = e.clientY - rec.y0; }
         const k = Math.min(1, Math.hypot(dx, dy) / R), a = Math.atan2(dy, dx);
         TT.sx = Math.cos(a) * k; TT.sy = -Math.sin(a) * k;
         if (k < 0.12) { TT.sx = 0; TT.sy = 0; }
         knob.style.transform = `translate(calc(-50% + ${Math.cos(a) * k * R}px), calc(-50% + ${Math.sin(a) * k * R}px))`;
-      } else if (rec.kind === 'look' || rec.kind === 'fire') {
+      } else if (rec.kind === 'fire' || rec.kind === 'sp') {
+        // 攻击 / 大招摇杆：拖动瞄准，松手发射
+        const dx = e.clientX - rec.cx, dy = e.clientY - rec.cy, l = Math.hypot(dx, dy);
+        if (l > 16 || rec.dragged) {
+          rec.dragged = true;
+          TT.aiming = true; TT.superAim = rec.kind === 'sp';
+          if (l > 1) { TT.ax = dx / l; TT.ay = dy / l; }
+          TT.ak = Math.max(0.2, Math.min(1, l / AR));
+          if (rec.kind === 'fire' && isCharger()) TT.hold = true;    // 狙击：拖动时蓄力
+          rec.el.style.setProperty('--dx', `${Math.min(l, AR) * (dx / (l || 1))}px`); rec.el.style.setProperty('--dy', `${Math.min(l, AR) * (dy / (l || 1))}px`);
+        }
+      } else if (rec.kind === 'look') {
         const dx = e.clientX - rec.lx, dy = e.clientY - rec.ly;
         view.yaw += dx * 0.0062 * sens;
         view.pitch = clamp(view.pitch - dy * 0.0052 * sens, -1.25, 1.05);
@@ -941,10 +1026,17 @@
       const rec = TT.ptr.get(e.pointerId);
       if (!rec) return;
       TT.ptr.delete(e.pointerId);
-      if (rec.el) rec.el.classList.remove('on');
+      if (rec.el) { rec.el.classList.remove('on'); rec.el.style.removeProperty('--dx'); rec.el.style.removeProperty('--dy'); }
       if (rec.kind === 'stick') { TT.sx = 0; TT.sy = 0; stick.classList.remove('show'); }
-      else if (rec.kind === 'fire') TT.fire = false;
       else if (rec.kind === 'jump') TT.jump = false;
+      else if ((rec.kind === 'fire' || rec.kind === 'sp') && G) {
+        if (!rec.dragged) autoAim(rec.kind === 'sp');
+        else TT.keepUntil = performance.now() + 300;
+        if (rec.kind === 'fire') { if (!(isCharger() && rec.dragged)) G.aq++; }
+        else G.qq++;
+        G.edge = true;
+        TT.aiming = false; TT.hold = false; TT.superAim = false;
+      }
     };
     ui.addEventListener('pointerup', end); ui.addEventListener('pointercancel', end);
     ui.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -954,33 +1046,64 @@
     TT.on = on;
     $('touchUI').classList.toggle('hidden', !on);
     document.body.classList.toggle('ingame', on);
-    if (!on) { TT.fire = TT.jump = TT.wheel = false; TT.sx = TT.sy = 0; TT.ptr.clear(); $('tWheel').classList.remove('lit'); }
+    if (!on) { TT.hold = TT.aiming = TT.jump = TT.wheel = false; TT.sx = TT.sy = 0; TT.ptr.clear(); $('tWheel').classList.remove('lit'); }
   }
   // 触屏辅助瞄准：开火时准星会被附近的敌人轻轻吸过去
   function aimAssist(dt) {
     const me = G.me;
-    if (!TT.on || !TT.fire || !me || !G.cam) return;
-    let best = null, bd = 0.16;
-    for (const id of G.cur) {
-      const p = G.players.get(id);
-      if (!p || !(p.flags & 1) || p.team === me.team || p.flags & 4) continue;
-      const dx = p.x - me.px, dy = p.y - me.py, d = Math.hypot(dx, dy);
-      if (d > S.weaponRange(me.weapon) * 1.1 || d < 20) continue;
-      const da = Math.atan2(Math.sin(Math.atan2(dy, dx) - view.yaw), Math.cos(Math.atan2(dy, dx) - view.yaw));
-      if (Math.abs(da) < bd) { bd = Math.abs(da); best = da; }
+    if (TOP() || !TT.on || !TT.hold || !me || !G.cam) return;
+    const t = autoTarget(S.weaponRange(me.weapon) * 1.1);
+    if (!t) return;
+    const da = Math.atan2(Math.sin(Math.atan2(t.y - me.py, t.x - me.px) - view.yaw), Math.cos(Math.atan2(t.y - me.py, t.x - me.px) - view.yaw));
+    if (Math.abs(da) < 0.16) view.yaw += da * Math.min(1, dt * 3.2);
+  }
+  // 地面瞄准指示：攻击射程 / 扇形 / 落点圈，大招有自己的形状
+  function computeAimShow() {
+    const me = G.me;
+    G.aimShow = null;
+    if (!TOP() || !me || !(me.flags & 1) || G.cd > 0 || G.over || !G.aim) return;
+    const aiming = TT.on ? TT.aiming : true;
+    if (!aiming) return;
+    const foot = me.flags & 512, W = S.WEAPONS[me.weapon], a = G.aim.a, d = G.aim.d;
+    const base = { x: me.px, y: me.py, z: me.pz, a, color: G.colors[me.team], strong: TT.on || mouse.down };
+    if (TT.superAim && !foot) {
+      const sp = W.special;
+      if (sp === 'beam') Object.assign(base, { kind: 'line', len: 900, w: 26 });
+      else if (sp === 'barrage') Object.assign(base, { kind: 'line', len: 440, w: 70 });
+      else if (sp === 'quake') { const dd = clamp(d, 80, 280); Object.assign(base, { kind: 'line', len: dd, w: 10, tx: me.px + Math.cos(a) * dd, ty: me.py + Math.sin(a) * dd, tz: me.pz, tr: 95 }); }
+      else if (sp === 'charge') Object.assign(base, { kind: 'line', len: 300, w: 44 });
+      else Object.assign(base, { kind: 'circle', len: sp === 'storm' ? 260 : sp === 'bubble' ? 170 : 60 });
+      base.color = '#ffdf2e'; G.aimShow = base; return;
     }
-    if (best != null) view.yaw += best * Math.min(1, dt * 3.2);
+    if (foot) Object.assign(base, { kind: 'line', len: S.PISTOL.range, w: 8 });
+    else switch (W.attack) {
+      case 'burst': Object.assign(base, { kind: 'line', len: W.range, w: 16 }); break;
+      case 'fan': Object.assign(base, { kind: 'fan', len: W.range, arc: W.arc + 0.1 }); break;
+      case 'flick': Object.assign(base, { kind: 'fan', len: W.range, arc: W.arc + 0.1 }); break;
+      case 'charge': Object.assign(base, { kind: 'line', len: W.range * (0.35 + 0.65 * (me.charge || 0)), w: 8 + 6 * (me.charge || 0) }); break;
+      case 'punch': Object.assign(base, { kind: 'fan', len: W.range + 18, arc: W.arc }); break;
+      case 'lob': {
+        const dd = clamp(d, W.minRange, W.range), tx = me.px + Math.cos(a) * dd, ty = me.py + Math.sin(a) * dd;
+        Object.assign(base, { kind: 'line', len: dd, w: 4, tx, ty, tz: Math.min(150, S.topAt(G.M, tx, ty)), tr: W.blast });
+        break;
+      }
+    }
+    G.aimShow = base;
   }
   function updateTouchHud() {
     if (!TT.on || !G.me) return;
-    const me = G.me, W = S.WEAPONS[me.weapon];
-    const spk = Math.min(1, me.sp / W.spNeed);
+    const me = G.me, W = S.WEAPONS[me.weapon], foot = me.flags & 512;
+    const spk = foot ? 0 : Math.min(1, me.sp / W.spNeed);
     const sp = $('tSp');
     sp.style.setProperty('--p', spk);
     sp.classList.toggle('lit', spk >= 1);
-    $('tBomb').classList.toggle('dim', me.tank < S.SUB_COST);
-    if (TT.wheel && TT.fire) $('tWheel').classList.remove('lit');
-    if (TT.fire) TT.wheel = false;
+    sp.classList.toggle('dim', !!foot);
+    const sk = $('tSkill');
+    sk.classList.toggle('dim', !(me.skUses > 0) || me.skCd > 0);
+    sk.dataset.n = me.skUses == null ? 3 : me.skUses;
+    $('tFire').style.setProperty('--ammo', me.ammo == null ? 3 : me.ammo);
+    if (TT.wheel && TT.aiming) $('tWheel').classList.remove('lit');
+    if (TT.aiming) TT.wheel = false;
   }
 
   function readInput() {
@@ -998,11 +1121,11 @@
       mx = c * TT.sy - s * TT.sx; my = s * TT.sy + c * TT.sx;
     }
     const me = G.me;
-    let w = keys.has('ShiftLeft') || keys.has('ShiftRight') || (TT.on && TT.wheel && !TT.fire);
+    let w = keys.has('ShiftLeft') || keys.has('ShiftRight') || (TT.on && TT.wheel && !TT.aiming);
     if (me && me.spk === SP_BEAM && me.flags & 128) w = false;
     const aim = G.aim || { a: view.yaw, pt: view.pitch };
     const jump = keys.has('Space') || (TT.on && TT.jump);
-    return { mx, my, w, f: (mouse.down || (TT.on && TT.fire)) && !w, j: jump, jh: jump, a: aim.a, pt: aim.pt };
+    return { mx, my, w, f: (mouse.down || (TT.on && TT.hold)) && !w, j: jump, jh: jump, a: aim.a, pt: aim.pt, ad: aim.d || 200 };
   }
 
   // ---------------- 第三人称摄像机 + 准星瞄准 ----------------
@@ -1015,7 +1138,94 @@
     for (let t = 0; t < max; t += step) if (z + dz * t < camTop(x + dx * t, y + dy * t)) return t;
     return max;
   }
+  // ---------------- 俯视镜头（双摇杆）：镜头固定朝向敌方，自己的基地在屏幕下方 ----------------
+  function aimToPoint(ax, ay, az) {
+    const me = G.me;
+    const d = Math.hypot(ax - me.px, ay - me.py);
+    const z = az == null ? Math.max(S.topAt(G.M, ax, ay) < 1e3 ? S.topAt(G.M, ax, ay) : 0, 0) + 16 : az;
+    const foot = me.flags & 512;
+    return { a: Math.atan2(ay - me.py, ax - me.px), pt: clamp(Math.atan2(z - (me.pz + (foot ? 14 : S.MUZZLE)), Math.max(30, d)), -0.7, 0.9), d };
+  }
+  // 自动瞄准：最近的看得见的敌人
+  function autoTarget(range) {
+    const me = G.me;
+    let best = null, bd = range;
+    for (const id of G.cur) {
+      const p = G.players.get(id);
+      if (!p || !(p.flags & 1) || p.team === me.team || !visibleEnemy(p)) continue;
+      const d = Math.hypot(p.x - me.px, p.y - me.py);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+  function visibleEnemy(p) {
+    if (!(p.flags & 4)) return true;
+    const me = G.me;
+    if (!me || G.rv[me.team]) return true;
+    return Math.hypot(p.x - me.px, p.y - me.py) < (me.pilot === 'hex' ? 170 : S.BUSH_DETECT);
+  }
+  function updateCameraTop(dt) {
+    const me = G.me;
+    let fx, fy, fz;
+    if (me) { fx = me.px; fy = me.py; fz = me.pz; }
+    else { const p = G.players.get([...G.cur][0]); if (!p) return; fx = p.x; fy = p.y; fz = p.z || 0; }
+    const yaw = me && me.team === 2 ? Math.PI : 0;
+    view.yaw = yaw; view.pitch = -0.1;
+    const fwx = Math.cos(yaw), fwy = Math.sin(yaw);
+    // 镜头稍微看向瞄准方向
+    let lx = 0, ly = 0;
+    if (G.aimPt && me) { lx = clamp((G.aimPt.x - fx) * 0.18, -90, 90); ly = clamp((G.aimPt.y - fy) * 0.18, -70, 70); }
+    const tx = fx + lx + fwx * 60, ty = fy + ly + fwy * 60;
+    if (!G.camF) G.camF = { x: tx, y: ty, z: fz };
+    const k = Math.min(1, dt * 7);
+    G.camF.x += (tx - G.camF.x) * k; G.camF.y += (ty - G.camF.y) * k; G.camF.z += (fz - G.camF.z) * Math.min(1, dt * 5);
+    G.camDipV += (-180 * G.camDip - 16 * G.camDipV) * Math.min(dt, 0.05);
+    G.camDip = Math.max(-18, Math.min(8, G.camDip + G.camDipV * Math.min(dt, 0.05)));
+    const aspect = VW / Math.max(1, VH);
+    const far = aspect < 1.4 ? 1.18 : 1;                 // 屏幕越窄镜头越高
+    const back = 330 * far, height = 600 * far;
+    const cx = G.camF.x - fwx * back, cy = G.camF.y - fwy * back, cz = G.camF.z + height + G.camDip;
+    const sk = shakeOn ? G.shake : 0;
+    const dx = G.camF.x - cx, dy = G.camF.y - cy, dz = G.camF.z - cz, L = Math.hypot(dx, dy, dz);
+    G.cam = { x: cx, y: cy, z: cz, d: { x: dx / L, y: dy / L, z: dz / L } };
+    G.camClose = false;
+    R3.setCamera(cx + (Math.random() - 0.5) * sk, cy + (Math.random() - 0.5) * sk, cz + (Math.random() - 0.5) * sk, G.camF.x, G.camF.y, G.camF.z, 46);
+    if (!me) return;
+    // 瞄准：电脑用鼠标在地面上的位置；手机用攻击摇杆
+    const alive = me.flags & 1;
+    const range = me.flags & 512 ? S.PISTOL.range : S.weaponRange(me.weapon);
+    if (TT.on) {
+      if (TT.aiming) {
+        // 屏幕上推 = 朝敌方前进方向，右推 = 屏幕右侧
+        const wa = yaw + Math.atan2(TT.ax, -TT.ay);
+        const d = Math.max(40, TT.ak * (TT.superAim ? superRange(me) : range));
+        G.aimPt = { x: me.px + Math.cos(wa) * d, y: me.py + Math.sin(wa) * d };
+      } else if (performance.now() < TT.keepUntil) {
+        // 刚松开摇杆：保持这一发的瞄准方向
+      } else if (!G.aimPt || Math.hypot(me.pvx, me.pvy) > 30) {
+        const ma = Math.hypot(me.pvx, me.pvy) > 30 ? Math.atan2(me.pvy, me.pvx) : yaw;
+        G.aimPt = { x: me.px + Math.cos(ma) * 150, y: me.py + Math.sin(ma) * 150 };
+      }
+    } else {
+      const r = R3.screenRay(mouse.x, mouse.y);
+      if (r && r.dz < -0.05) {
+        const pz = me.pz + 12, t = (pz - r.z) / r.dz;
+        G.aimPt = { x: r.x + r.dx * t, y: r.y + r.dy * t };
+      }
+    }
+    if (G.aimPt && alive) {
+      if (G.aimLock && performance.now() > G.aimLockUntil) G.aimLock = null;
+      const tgt = G.aimLock && G.players.get(G.aimLock);
+      G.aim = tgt ? aimToPoint(tgt.x, tgt.y, (tgt.z || 0) + 16) : aimToPoint(G.aimPt.x, G.aimPt.y);
+      G.aimPoint = { x: G.aimPt.x, y: G.aimPt.y, z: S.topAt(G.M, G.aimPt.x, G.aimPt.y), L: G.aim.d };
+    }
+  }
+  function superRange(me) {
+    const sp = S.WEAPONS[me.weapon].special;
+    return { beam: 900, barrage: 440, quake: 280, charge: 300 }[sp] || 300;
+  }
   function updateCamera(dt) {
+    if (TOP()) return updateCameraTop(dt);
     const me = G.me;
     let fx, fy, fz;
     if (me) { fx = me.px; fy = me.py; fz = me.pz; }
@@ -1142,7 +1352,7 @@
       // 本地预测：完整物理状态（击退、土狼时间、跳跃缓冲）跨帧保留
       if (!G.ps) G.ps = { x: me.px, y: me.py, z: me.pz, vx: 0, vy: 0, vz: 0, onGround: true };
       const st = G.ps;
-      st.team = me.team; st.sm = me.sm;
+      st.team = me.team; st.sm = me.sm; st.foot = !!(me.flags & 512);
       const spk = me.flags & 128 ? S.SPECIAL_IDS[me.spk] : null;
       const wasGround = st.onGround;
       // 固定子步长，帧率高低手感一致
@@ -1169,13 +1379,14 @@
     updateCamera(dt);
     aimAssist(dt);
     updateTouchHud();
+    computeAimShow();
     G.inp = readInput();
     if (me && !G.over) {
       G.sendAcc += dt;
       if (G.sendAcc >= 1 / 30 || G.edge) {
         G.sendAcc = 0; G.edge = false;
         const r3 = (v) => Math.round(v * 1000) / 1000, r1 = (v) => Math.round(v * 10) / 10;
-        send({ t: 'in', mx: r3(inp.mx), my: r3(inp.my), a: r3(G.inp.a), pt: r3(G.inp.pt), f: inp.f, w: inp.w, sq: G.sq, qq: G.qq,
+        send({ t: 'in', mx: r3(inp.mx), my: r3(inp.my), a: r3(G.inp.a), pt: r3(G.inp.pt), f: inp.f, w: inp.w, qq: G.qq, gq: G.gq, aq: G.aq, ad: Math.round(G.inp.ad || 200),
           x: r1(me.px), y: r1(me.py), z: r1(me.pz), vx: Math.round(me.pvx), vy: Math.round(me.pvy), vz: Math.round(me.pvz), sync: G.sync });
       }
     }
@@ -1188,7 +1399,7 @@
       const ready = me.sp >= S.WEAPONS[me.weapon].spNeed;
       if (ready && G.spReady === false && alive) { sfx.ready(); bigText('大招就绪！按 Q 发动', '#fff36b'); }
       G.spReady = ready;
-      if (alive && inp.f && me.tank < 8 && G.cd <= 0) sfx.lowInk();
+      if (alive && inp.f && me.ammo < 0.3 && G.cd <= 0 && !(me.flags & 512)) sfx.lowInk();
     }
     // 时间提示与音乐
     if (G.cd <= 0 && !G.over) {
@@ -1245,10 +1456,11 @@
       if (Math.hypot(pa[1] - pb[1], pa[2] - pb[2]) > 160 || (pa[7] & 1) !== (pb[7] & 1)) pa = pb;
       p.x = lerp(pa[1], pb[1], k); p.y = lerp(pa[2], pb[2], k); p.z = lerp(pa[17] || 0, pb[17] || 0, k);
       p.a = lerpAngle(pa[3], pb[3], k); p.pt = lerp(pa[18] || 0, pb[18] || 0, k);
-      p.hp = pb[4]; p.tank = pb[5]; p.sp = pb[6]; p.flags = pb[7]; p.resp = pb[8] / 10; p.carry = pb[9];
+      p.hp = pb[4]; p.ammo = pb[5] / 100; p.tank = pb[5] / 3; p.sp = pb[6]; p.flags = pb[7]; p.resp = pb[8] / 10; p.carry = pb[9];
+      p.maxHp = pb[20] || 100; p.buffs = pb[23] || 0;
       p.charge = pb[11] / 100; p.shield = pb[12]; p.vx = pb[14]; p.vy = pb[15]; p.spk = pb[16]; p.vz = pb[19] || 0;
     }
-    G.obj = b.o; G.objA = a.o; G.objK = k;
+    G.obj = b.o; G.objA = a.o; G.objK = k; G.helpers = b.h || [];
     return true;
   }
 
@@ -1288,31 +1500,68 @@
   }
   function drawWorldLabels(now) {
     const me = G.me, c = G.cam;
+    // 头顶：名字 + 血条（自己再加弹药格），弹出的驾驶员显示重建倒计时
     for (const id of G.cur) {
-      if (id === myId) continue;
       const p = G.players.get(id);
       if (!p || !(p.flags & 1)) continue;
+      const self = id === myId;
       const enemy = me && p.team !== me.team;
-      if (enemy && p.flags & 4) continue;
-      const d = c ? Math.hypot(p.x - c.x, p.y - c.y) : 0;
-      const seen = c && S.los3(G.M, c.x, c.y, c.z, p.x, p.y, (p.z || 0) + 30);
-      if (enemy && (!seen || d > 900)) continue;
-      const s = R3.project(p.x, p.y, (p.z || 0) + 54);
+      if (enemy && !visibleEnemy(p)) continue;
+      const px = self ? me.px : p.x, py = self ? me.py : p.y, pz = self ? me.pz : (p.z || 0);
+      if (!TOP() && enemy) {
+        const seen = c && S.los3(G.M, c.x, c.y, c.z, px, py, pz + 30);
+        if (!seen || Math.hypot(px - c.x, py - c.y) > 900) continue;
+      }
+      if (!TOP() && self) continue;
+      const foot = p.flags & 512;
+      const s = R3.project(px, py, pz + (foot ? 34 : 52));
       if (!s) continue;
       const col = G.colors[p.team];
-      if (!enemy) txt(p.name, s.x, s.y, 12, col, 'center', 3);
-      else {
-        txt(p.name, s.x, s.y - 8, 12, col, 'center', 3);
-        ctx.fillStyle = '#000a'; ctx.fillRect(s.x - 18, s.y + 2, 36, 5);
-        ctx.fillStyle = col; ctx.fillRect(s.x - 18, s.y + 2, 36 * Math.max(0, p.hp) / 100, 5);
+      const hpMax = (self ? me.maxHp : p.maxHp) || 100, hp = Math.max(0, self ? me.hp : p.hp);
+      const w = self ? 58 : 46, h = self ? 8 : 6, x0 = s.x - w / 2, y0 = s.y;
+      txt(self ? (foot ? '驾驶员' : '你') : p.name, s.x, y0 - 10, self ? 13 : 12, self ? '#fff' : col, 'center', 3);
+      ctx.fillStyle = '#000c'; rr(ctx, x0 - 2, y0 - 2, w + 4, h + 4, 4); ctx.fill();
+      ctx.fillStyle = self ? (hp / hpMax > 0.35 ? '#6dff8a' : '#ff5a6a') : enemy ? (hp / hpMax > 0.35 ? '#ff5a6a' : '#ff9a3a') : '#4fc3ff';
+      rr(ctx, x0, y0, w * Math.min(1, hp / hpMax), h, 3); ctx.fill();
+      if ((self ? me.shield : p.shield) > 0) { ctx.fillStyle = '#bef6ffcc'; ctx.fillRect(x0, y0, Math.min(w, (w * (self ? me.shield : p.shield)) / hpMax), 3); }
+      if (self) {
+        txt(String(Math.ceil(hp)), x0 - 6, y0 + h / 2, 11, '#fff', 'right', 3);
+        // 弹药格
+        const am = me.ammo == null ? 3 : me.ammo, sw = (w - 4) / 3;
+        for (let i = 0; i < 3; i++) {
+          const f = Math.max(0, Math.min(1, am - i));
+          ctx.fillStyle = '#000c'; ctx.fillRect(x0 + i * (sw + 2), y0 + h + 4, sw, 5);
+          ctx.fillStyle = f >= 1 ? '#ffae2e' : '#c77a22'; ctx.fillRect(x0 + i * (sw + 2), y0 + h + 4, sw * f, 5);
+        }
       }
-      if (!enemy && !seen) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.x, s.y + 14, 4, 0, 7); ctx.stroke(); }
+      if (p.flags & 256 && !foot) { ctx.strokeStyle = '#ffdf2e'; ctx.lineWidth = 2; rr(ctx, x0 - 4, y0 - 4, w + 8, h + 8, 5); ctx.stroke(); }
+      if (foot) {
+        const t = self ? me.resp : p.resp;
+        txt(`🔧 ${Math.max(0, t).toFixed(1)}s`, s.x, y0 + h + (self ? 18 : 10), 11, '#ffdf2e', 'center', 3);
+      }
+      const bf = self ? me.buffs : p.buffs;
+      if (bf) {
+        const icons = []; if (bf & 1) icons.push('⚡'); if (bf & 2) icons.push('🐢'); if (bf & 4) icons.push('🚫'); if (bf & 16) icons.push('🔥');
+        if (icons.length) txt(icons.join(''), s.x + w / 2 + 12, y0 + 2, 12, '#fff', 'left', 0);
+      }
       const ch = G.chats.get(id);
-      if (ch) {
+      if (ch && !self) {
         const age = now - ch.t;
         if (age > 2500) G.chats.delete(id);
-        else txt(S.QUICK_CHAT[ch.k], s.x, s.y - 26, 15, '#fff', 'center', 4);
+        else txt(S.QUICK_CHAT[ch.k], s.x, y0 - 28, 15, '#fff', 'center', 4);
       }
+    }
+    // 伤害数字
+    G.dmgTexts = G.dmgTexts.filter((t) => now - t.t < 800);
+    for (const t of G.dmgTexts) {
+      const p = G.players.get(t.id); if (!p) continue;
+      const self = t.id === myId;
+      const k = (now - t.t) / 800;
+      const sc = R3.project(self ? me.px : p.x, self ? me.py : p.y, (self ? me.pz : p.z || 0) + 60 + k * 30);
+      if (!sc) continue;
+      ctx.globalAlpha = 1 - k * k;
+      txt(t.text, sc.x + t.dx, sc.y, 18 + (1 - k) * 6, t.color, 'center', 4);
+      ctx.globalAlpha = 1;
     }
     const mc = G.chats.get(myId);
     if (mc) { if (now - mc.t > 2500) G.chats.delete(myId); else txt(`你：${S.QUICK_CHAT[mc.k]}`, VW / 2, VH * 0.62, 16, '#fff', 'center', 4); }
@@ -1387,12 +1636,17 @@
       list.forEach((p, i) => {
         const x = side < 0 ? cx - 92 - i * 40 : cx + 92 + i * 40, y = 33;
         const aliveP = p.flags & 1, col = G.colors[t];
-        ctx.fillStyle = aliveP ? col : '#333645';
-        ctx.strokeStyle = p.id === myId ? '#fff' : '#000'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(x, y, 16, 0, 7); ctx.fill(); ctx.stroke();
-        if (aliveP && p.flags & 256) { ctx.strokeStyle = '#fff36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 20 + Math.sin(now / 150) * 1.5, 0, 7); ctx.stroke(); }
-        if (aliveP) txt(S.WEAPONS[p.weapon].name[0], x, y + 1, 14, '#111', 'center', 0);
-        else txt(String(Math.ceil(p.resp)), x, y + 1, 15, '#fff', 'center', 3);
+        // 驾驶员头像（弹出时变小并显示扳手，倒下时变灰）
+        const img = faceImg(p.pilot), foot = p.flags & 512;
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.fill();
+        ctx.save(); ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.clip();
+        if (!aliveP) ctx.filter = 'grayscale(1) brightness(.5)';
+        if (img.complete && img.naturalWidth) ctx.drawImage(img, x - 15, y - 15, 30, 30); else { ctx.fillStyle = '#333645'; ctx.fillRect(x - 15, y - 15, 30, 30); }
+        ctx.restore(); ctx.filter = 'none';
+        ctx.strokeStyle = p.id === myId ? '#fff' : '#000'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.stroke();
+        if (aliveP && p.flags & 256) { ctx.strokeStyle = '#fff36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 21 + Math.sin(now / 150) * 1.5, 0, 7); ctx.stroke(); }
+        if (!aliveP) txt(String(Math.ceil(p.resp)), x, y + 1, 15, '#fff', 'center', 3);
+        else if (foot) txt('🔧', x + 11, y + 11, 11, '#fff', 'center', 0);
       });
     };
     chips(myTeam, -1); chips(otherTeam, 1);
@@ -1479,46 +1733,39 @@
       ctx.globalAlpha = 1;
     }
 
-    // ---- 左下：状态 ----
+    // ---- 技能面板（电脑：右下；手机由按钮显示）+ 驾驶员弹出提示 ----
     if (me) {
-      // 触屏：状态栏放在左上角，给摇杆让出左下
-      const bx = 18, by = TOUCH ? 158 : VH - 22;
-      const W = S.WEAPONS[me.weapon];
-      // 涂料罐
-      const th = 110, tw = 30, tx0 = bx, ty0 = by - th;
-      ctx.fillStyle = '#000b'; rr(ctx, tx0 - 4, ty0 - 4, tw + 8, th + 8, 12); ctx.fill();
-      const tk = me.tank / 100;
-      ctx.fillStyle = G.colors[me.team]; rr(ctx, tx0, ty0 + th * (1 - tk), tw, th * tk, 8); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
-      const subY = ty0 + th * (1 - S.SUB_COST / 100);
-      ctx.beginPath(); ctx.moveTo(tx0 - 2, subY); ctx.lineTo(tx0 + tw + 2, subY); ctx.stroke();
-      txt('涂料', tx0 + tw / 2, ty0 - 14, 12, '#ccc', 'center', 3);
-      // 血量
-      const hx = bx + tw + 18, hw = small ? 120 : 170;
-      ctx.fillStyle = '#000b'; rr(ctx, hx - 4, by - 26, hw + 8, 30, 10); ctx.fill();
-      ctx.fillStyle = me.hp > 40 ? '#7dff9a' : '#ff5a6a'; rr(ctx, hx, by - 22, (hw * Math.max(0, me.hp)) / 100, 22, 7); ctx.fill();
-      if (me.shield > 0) { ctx.fillStyle = 'rgba(190,246,255,.7)'; rr(ctx, hx, by - 22, Math.min(hw, (hw * me.shield) / 100), 8, 4); ctx.fill(); }
-      txt(`${Math.max(0, Math.ceil(me.hp))}`, hx + 8, by - 11, 15, '#111', 'left', 0);
-      // 大招（触屏版由按钮显示）
-      const spx = hx + 30, spy = by - 66, spr = 26;
+      const W = S.WEAPONS[me.weapon], foot = me.flags & 512;
+      const P = S.pilot(me.pilot);
       if (!TOUCH) {
-      const spk = Math.min(1, me.sp / W.spNeed), ready = spk >= 1;
-      ctx.fillStyle = '#000b'; ctx.beginPath(); ctx.arc(spx, spy, spr + 5, 0, 7); ctx.fill();
-      ctx.strokeStyle = ready ? '#fff36b' : G.colors[me.team]; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.arc(spx, spy, spr, -Math.PI / 2, -Math.PI / 2 + spk * Math.PI * 2); ctx.stroke();
-      txt(ready ? 'Q' : `${Math.floor(spk * 100)}`, spx, spy + 1, ready ? 24 : 15, ready ? '#fff36b' : '#fff', 'center', 3);
-      txt(S.SPECIALS[W.special].name, spx + spr + 12, spy - 8, 13, ready ? '#fff36b' : '#ccc', 'left', 3);
-      txt(ready ? '大招就绪！' : '涂地充能', spx + spr + 12, spy + 10, 11, '#9a9db5', 'left', 3);
-      // 炸弹
-      const canBomb = me.tank >= S.SUB_COST;
-      txt(`💣 E / 右键${canBomb ? '' : '（涂料不足）'}`, hx, by - 108 + 6, 12, canBomb ? '#fff' : '#777', 'left', 3);
+        const bx = VW - 70, by = VH - 70;
+        const ring = (x, y, r, k, color, label, key, ready, dim) => {
+          ctx.fillStyle = dim ? '#0008' : '#000b'; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.fill();
+          ctx.strokeStyle = '#ffffff22'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
+          ctx.strokeStyle = color; ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.max(0, Math.min(1, k)) * Math.PI * 2); ctx.stroke();
+          if (ready) { ctx.strokeStyle = '#fff36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r + 7 + Math.sin(now / 150) * 1.5, 0, 7); ctx.stroke(); }
+          txt(label, x, y - 2, r > 30 ? 16 : 13, dim ? '#777' : '#fff', 'center', 3);
+          txt(key, x, y + r + 16, 11, '#9a9db5', 'center', 3);
+        };
+        const am = me.ammo == null ? 3 : me.ammo;
+        ring(bx, by, 40, am / 3, '#ffae2e', foot ? '手枪' : W.short, '左键 · ' + Math.floor(am) + '/3');
+        const spk = foot ? 0 : Math.min(1, me.sp / W.spNeed);
+        ring(bx - 104, by + 6, 32, spk, '#ffdf2e', foot ? '—' : '大招', 'E / 右键', spk >= 1 && !foot, !!foot);
+        const sk = S.SKILLS[P.skill], uses = me.skUses == null ? 3 : me.skUses;
+        ring(bx - 186, by + 12, 26, me.skCd > 0 ? 1 - me.skCd / S.SKILL_CD : 1, P.accent, sk.name.slice(0, 2), `Q · 剩 ${uses}`, false, uses <= 0);
+        txt('空格 跳跃 · Shift 滚轮', bx - 70, by - 64, 11, '#9a9db5', 'center', 3);
       }
-      if (alive && me.tank < 12 && !(G.inp && G.inp.w)) txt(TOUCH ? '涂料不足！切换「滚轮」在己方涂料上补充' : '涂料不足！按住 Shift 在己方涂料上补充', VW / 2, TOUCH ? 110 : VH - 120, 18, '#ffdf2e', 'center', 4);
-      if (me.carry) txt(`携带电池 ×${me.carry}（送回充电站）`, hx, by - 128 + 6, 13, '#b8ff3a', 'left', 3);
+      if (foot && alive) {
+        const t = Math.max(0, me.resp);
+        ctx.fillStyle = '#000b'; rr(ctx, VW / 2 - 170, VH - 96, 340, 44, 12); ctx.fill();
+        ctx.fillStyle = '#ffdf2e'; rr(ctx, VW / 2 - 160, VH - 62, 320 * (1 - t / S.REBUILD), 4, 2); ctx.fill();
+        txt(`驾驶员弹出！活下去 —— 新机体 ${t.toFixed(1)} 秒后就地空投`, VW / 2, VH - 80, 15, '#fff', 'center', 0);
+      }
+      if (me.carry) txt(`携带电池 ×${me.carry}（送回充电站）`, VW / 2, VH - 120, 14, '#b8ff3a', 'center', 3);
     }
 
     // ---- 小地图 ----
-    const mw = TOUCH ? 132 : small ? 150 : 228, mh = (mw * S.GH) / S.GW, mx = VW - mw - 14, my = TOUCH ? 14 : VH - mh - 14;
+    const mw = TOUCH ? 132 : small ? 150 : 190, mh = (mw * S.GH) / S.GW, mx = VW - mw - 14, my = 14;
     ctx.fillStyle = '#000c'; rr(ctx, mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.fill();
     ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
     const ms = mw / S.W;
@@ -1589,9 +1836,10 @@
     // ---- 记分板 ----
     if (keys.has('Tab') || TT.board) drawScoreboard();
 
-    // ---- 准星（屏幕中心） ----
-    const chx = VW / 2, chy = VH / 2;
-    if (!TOUCH && !locked() && !G.over && $('settingsDlg').classList.contains('hidden')) {
+    // ---- 准星：俯视模式跟着鼠标，触屏不显示 ----
+    if (TOP() && TOUCH) return;
+    const chx = TOP() ? mouse.x : VW / 2, chy = TOP() ? mouse.y : VH / 2;
+    if (!TOP() && !TOUCH && !locked() && !G.over && $('settingsDlg').classList.contains('hidden')) {
       ctx.fillStyle = '#000b'; rr(ctx, chx - 150, chy + 120, 300, 40, 12); ctx.fill();
       txt('🖱 点击画面锁定鼠标，开始操控', chx, chy + 140, 16, '#ffdf2e', 'center', 0);
     }

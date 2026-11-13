@@ -125,6 +125,7 @@
     buildBounds();
     buildCity(G.map);
     buildProps(G.map);
+    buildBushes();
     buildModeDecor(G);
     buildDynamic(G);
     buildParticles();
@@ -643,6 +644,30 @@
     scene.add(g);
     bakeStatic(g);
   }
+  // ---------------- 草丛：每块草丛一个网格，自己站在里面时变半透明 ----------------
+  function buildBushes() {
+    const SK = W.SK, C = S.CELL;
+    W.bushes = [];
+    const base = SK.night ? 0x2f8f7a : 0x4fae3c, tip = SK.night ? 0x6fe0c0 : 0x9fe05a;
+    for (const [bx, by, bw, bh] of W.M.bushes || []) {
+      const R = rng(bx * 31 + by * 7);
+      const mat = toon(base, { transparent: true });
+      const matT = toon(tip, { transparent: true });
+      const g = new T.Group();
+      for (let j = 0; j < bh; j++)
+        for (let i = 0; i < bw; i++) {
+          const cx = bx + i, cy = by + j;
+          if (!W.M.bush[cy * S.GW + cx]) continue;
+          const x = (cx + 0.5) * C, y = (cy + 0.5) * C;
+          const r = 10 + R() * 5;
+          g.add(part(SH.sphL, mat, r, r * (0.9 + R() * 0.5), r, x + (R() - 0.5) * 6, 8 + R() * 4, y + (R() - 0.5) * 6));
+          if (R() < 0.6) { const b = part(SH.cone, matT, 3, 10 + R() * 8, 3, x + (R() - 0.5) * 10, 20 + R() * 4, y + (R() - 0.5) * 10); b.rotation.z = (R() - 0.5) * 0.6; g.add(b); }
+        }
+      scene.add(g);
+      bake(g, true);
+      W.bushes.push({ g, mats: [mat, matT], rect: [bx, by, bw, bh], fade: 1 });
+    }
+  }
   // 场景静态物体合并（复用机兵的 bake）
   function bakeStatic(g) { bake(g, true); for (const m of g.children) { m.receiveShadow = true; } }
 
@@ -732,6 +757,46 @@
       P['missile' + t] = pool(() => { const m = new T.Mesh(SH.cone, cm); m.scale.set(9, 34, 9); m.rotation.x = Math.PI; return m; });
     }
     P.ring = pool(() => new T.Mesh(SH.ring, basic(0xffffff, { transparent: true, side: T.DoubleSide, depthWrite: false })));
+    // 迫击炮弹 + 落点预警圈
+    for (const t of [1, 2]) {
+      const sm = toon(cs[t], { emissive: new T.Color(cs[t]).multiplyScalar(0.3) });
+      P['shell' + t] = pool(() => { const m = new T.Mesh(SH.sph, sm); m.scale.setScalar(7); m.castShadow = true; return m; });
+      const wm = basic(cs[t], { transparent: true, opacity: 0.5, side: T.DoubleSide, depthWrite: false });
+      P['warn' + t] = pool(() => new T.Mesh(SH.ring, wm));
+      // 炮台 / 无人机 / 便当
+      P['turret' + t] = pool(() => {
+        const g = new T.Group();
+        g.add(part(SH.cyl, toon(0x3a3e52), 9, 6, 9, 0, 3, 0));
+        g.add(part(SH.cyl, toon(0x3a3e52), 2, 14, 2, 0, 12, 0));
+        const head = new T.Group(); head.position.y = 19; g.add(head);
+        head.add(part(SH.sphL, toon(cs[t]), 6, 5, 6, 0, 0, 0));
+        head.add(part(SH.cyl, toon(0x23252f), 1.6, 12, 1.6, 7, 0, 0)).rotation.z = -Math.PI / 2;
+        g.userData.head = head; return g;
+      });
+      P['drone' + t] = pool(() => {
+        const g = new T.Group();
+        g.add(part(SH.sphL, toon(0xfff3e0), 6, 5, 6, 0, 0, 0));
+        for (const z of [-3, 3]) g.add(part(SH.cone, toon(cs[t]), 2, 4, 1.6, 0, 5, z));
+        for (const z of [-2, 2]) g.add(part(SH.sphL, basic(0x222222), 0.9, 1.2, 0.9, 5.3, 1, z));
+        const rotor = part(SH.box, toon(0x3a3e52), 18, 0.6, 2, 0, 7, 0); g.add(rotor); g.userData.rotor = rotor;
+        return g;
+      });
+    }
+    P.bento = pool(() => {
+      const g = new T.Group();
+      g.add(part(SH.box, toon(0xd8492e), 16, 7, 12, 0, 3.5, 0));
+      g.add(part(SH.box, toon(0xffe0a0), 16.5, 2, 12.5, 0, 7.5, 0));
+      g.add(part(SH.box, basic(0xffffff), 3, 2.2, 13, 0, 7.6, 0));
+      return g;
+    });
+    // 瞄准指示（地面上的半透明条 / 扇形 / 圆）
+    const am = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false, side: T.DoubleSide });
+    W.aimMat = am;
+    W.aimLine = new T.Mesh(new T.PlaneGeometry(1, 1).translate(0.5, 0, 0), am); W.aimLine.rotation.x = -Math.PI / 2;
+    W.aimFan = new T.Mesh(new T.CircleGeometry(1, 24, -0.5, 1), am); W.aimFan.rotation.x = -Math.PI / 2;
+    W.aimCircle = new T.Mesh(new T.CircleGeometry(1, 40), am); W.aimCircle.rotation.x = -Math.PI / 2;
+    W.aimRing = new T.Mesh(SH.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false, side: T.DoubleSide })); W.aimRing.rotation.x = -Math.PI / 2;
+    for (const m of [W.aimLine, W.aimFan, W.aimCircle, W.aimRing]) { m.visible = false; m.renderOrder = 5; scene.add(m); }
     P.line = pool(() => new T.Mesh(SH.tube, basic(0xffffff, { transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
     P.beam = pool(() => new T.Mesh(SH.tube, basic(0xffffff, { transparent: true, opacity: 0.75, depthWrite: false, blending: T.AdditiveBlending })));
     P.beamCore = pool(() => new T.Mesh(SH.tube, basic(0xffffff)));
@@ -843,6 +908,24 @@
         add(part(s.cyl, dk, 5.2, 1.4, 5.2, 3, 0, 0)).rotation.z = -Math.PI / 2;
         add(outlined(rbox(7, 7, 7, 2), mt, 1, 1, 1, 0, 0, 0));
         { const h = add(new T.Mesh(new T.TorusGeometry(6, 0.7, 5, 12, Math.PI), mt)); h.position.set(12, 0, 0); h.rotation.x = Math.PI / 2; }
+        break;
+      }
+      case 'mortar': {
+        // 肩扛迫击炮：粗炮管斜向上
+        add(outlined(rbox(12, 8, 10, 2.5), mt, 1, 1, 1, 0, 0, 0));
+        const tube = new T.Group(); tube.position.set(3, 3, 0); tube.rotation.z = 0.75; g.add(tube);
+        tube.add(part(s.cyl, cm, 5, 22, 5, 0, 10, 0));
+        tube.add(part(s.cyl, dk, 6, 3, 6, 0, 21, 0));
+        tube.add(part(s.cyl, lt, 5.3, 2, 5.3, 0, 4, 0));
+        add(part(s.box, s.yellow, 6, 1.2, 10.4, 0, -3.5, 0));
+        break;
+      }
+      case 'fist': {
+        // 重拳手套
+        add(outlined(rbox(9, 6, 6, 2), mt, 1, 1, 1, 2, 0, 0));
+        add(outlined(rbox(10, 10, 10, 3.5), cm, 1, 1, 1, 11, 0, 0));
+        for (let i = 0; i < 4; i++) add(part(s.box, lt, 1.6, 2, 2, 16.2, 3.6 - i * 2.4, 0));
+        add(part(s.box, dk, 6, 2, 10.6, 9, -4.6, 0));
         break;
       }
       case 'gatling': {
@@ -1064,7 +1147,9 @@
     // 头
     add(part(SH.sph, skin, 4.2, 4.5, 4.2, 0, 0.4, 0));
     // 眼睛（大大的动漫眼：白底 + 彩色虹膜 + 高光）
+    const happy = P.eyeShape === 'happy';
     for (const z of [-1.5, 1.5]) {
+      if (happy) { add(part(sph, SH.dark, 0.4, 0.28, 0.9, 4.05, 0.3, z)); continue; }
       add(part(sph, SH.white, 0.5, 1.25, 0.95, 3.75, 0.2, z));
       add(part(sph, toon(P.eye), 0.45, 1.0, 0.72, 3.98, 0.05, z));
       add(part(sph, SH.glowW, 0.2, 0.32, 0.3, 4.3, 0.55, z - 0.2));
@@ -1106,6 +1191,25 @@
         const rim = add(new T.Mesh(new T.TorusGeometry(4.6, 0.45, 6, 18), acc)); rim.rotation.y = Math.PI / 2; rim.position.set(1.8, 0.9, 0);
         break;
       }
+      case 'braid':
+        for (let i = 0; i < 5; i++) add(part(sph, hair, 1.3 - i * 0.08, 1.4, 1.3 - i * 0.08, 0.6 - i * 0.3, -1.5 - i * 2.2, 4.4));
+        add(part(sph, acc, 0.9, 0.7, 0.9, -0.6, -12.3, 4.4));
+        break;
+      case 'undercut': {
+        const sw = add(part(sph, hair, 3.4, 2.2, 4.6, 0.8, 3.6, 0.8)); sw.rotation.x = -0.25;
+        break;
+      }
+      case 'chef':
+        add(part(SH.cyl, SH.white, 4.4, 4, 4.4, -0.4, 6, 0));
+        add(part(sph, SH.white, 5, 3.4, 5, -0.4, 9, 0));
+        break;
+      case 'veteran':
+        add(part(sph, hair2, 3.6, 2.6, 3.8, 0.8, -1.9, 0));                    // 胡子
+        add(part(sph, SH.dark, 0.5, 1.4, 1.2, 4.1, 0.3, 1.5));                  // 眼罩
+        break;
+      case 'buns':
+        for (const z of [-3.2, 3.2]) add(part(sph, hair, 2.2, 2.2, 2.2, -0.8, 5.2, z));
+        break;
       case 'ponytail': {
         const t2 = add(part(sph, hair, 1.8, 6, 1.8, -4.6, 0.6, 0)); t2.rotation.z = -1.0;
         add(part(sph, acc, 1, 1, 1, -3.6, 3, 0));
@@ -1113,7 +1217,9 @@
       }
     }
     // 驾驶员的标志配件
-    if (P.id === 'blaze' || P.id === 'aurora') {
+    if (P.id === 'hex') { add(part(SH.box, toon(P.accent, { emissive: new T.Color(P.accent).multiplyScalar(0.5), transparent: true, opacity: 0.8 }), 0.6, 1.3, 4.6, 4.2, 0.3, 0)); }
+    if (P.id === 'gale') { const sc = add(new T.Mesh(new T.TorusGeometry(2.6, 0.9, 6, 14), acc)); sc.rotation.x = Math.PI / 2; sc.position.y = -3.4; }
+    if (P.id === 'blaze' || P.id === 'aurora' || P.id === 'gale') {
       for (const z of [-1.7, 1.7]) { const gg = add(new T.Mesh(new T.TorusGeometry(1.15, 0.45, 6, 12), SH.dark)); gg.rotation.y = Math.PI / 2 - 0.2; gg.position.set(2.6, 3.6, z); add(part(sph, toon(P.accent, { emissive: new T.Color(P.accent).multiplyScalar(0.4) }), 0.5, 1, 1, 2.7, 3.6, z)); }
     }
     if (P.id === 'candy') for (const z of [-1, 1]) { const e = add(part(SH.cone, SH.white, 1.4, 2.6, 1.0, -0.4, 5.0, z * 2.5)); e.rotation.x = z * 0.35; }
@@ -1216,6 +1322,21 @@
     const arm = dyn(new T.Group()); arm.position.set(1, 10, -15.5); lean.add(arm);
     arm.add(outlined(rbox(9, 4, 4, 1.6), frame, 1, 1, 1, 2.6, -1, 0));
     arm.add(outlined(rbox(3.6, 4.6, 4.6, 1.6), bodyMat, 1, 1, 1, 7, -1, 0));
+    if (weapon === 'fist') { arm.add(outlined(rbox(10, 10, 10, 3.5), bodyMat, 1, 1, 1, 11, -1, 0)); for (let i = 0; i < 4; i++) arm.add(part(s.box, light, 1.6, 2, 2, 16.2, 2.6 - i * 2.4, 0)); }
+    // ---- 弹出后的驾驶员（步行） ----
+    const foot = dyn(new T.Group()); root.add(foot); foot.visible = false;
+    const fp = buildPilot(pilotId, head, color); fp.scale.setScalar(1.25); fp.position.y = 17; foot.add(fp);
+    const flegs = [];
+    for (const side of [-1, 1]) {
+      const lg = dyn(new T.Group()); lg.position.set(0, 9, side * 2.6); foot.add(lg);
+      lg.add(part(s.box, joint, 2.6, 9, 2.6, 0, -4.5, 0));
+      lg.add(part(s.box, light, 4, 2, 3, 0.8, -8.6, 0));
+      flegs.push(lg);
+    }
+    const gun = dyn(new T.Group()); gun.position.set(3, 12, 5); foot.add(gun);
+    gun.add(part(s.box, toon(0x2a2d3a), 7, 2.4, 2, 3, 0, 0)); gun.add(part(s.box, toon(color), 2.4, 3.4, 2.2, 0.5, -1.6, 0));
+    for (const g2 of flegs) bake(g2, true);
+    bake(gun, true);
     // ---- 滚轮形态 ----
     const wheel = dyn(new T.Group()); wheel.position.y = 14; root.add(wheel);
     const wheelTilt = dyn(new T.Group()); wheel.add(wheelTilt);
@@ -1237,10 +1358,10 @@
     for (const g of [lower, lean, wpnMount, wpn, arm, spinG]) bake(g);
     for (const L of legs) { bake(L.hip); bake(L.knee); bake(L.ankle); }
     return {
-      root, body, hips, lower, upper, lean, legs, flames, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
+      root, body, hips, lower, upper, lean, legs, flames, foot, flegs, fpilot: fp, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
       fadeMats: [wheelMat, hubMat, spokeMat, tireMat, treadMat], shield, ud: wpn.userData,
       // 动画状态
-      spin: 0, moveA: 0, phase: 0, legYaw: 0, face: null, zs: null, lvx: 0, lvy: 0, avx: 0, avy: 0,
+      punch: 0, punchV: 0, spin: 0, moveA: 0, phase: 0, legYaw: 0, face: null, zs: null, lvx: 0, lvy: 0, avx: 0, avy: 0,
       pitch: 0, pitchV: 0, roll: 0, rollV: 0, susp: 0, suspV: 0, recoil: 0, recoilV: 0, wroll: 0,
       lastVz: 0, lastFlash: 0, lastCharge: 0, lastFire: false, fireT: 0, airT: 0, walkAmt: 0,
     };
@@ -1289,6 +1410,18 @@
     spring(b, 'susp', 0, 260, 15, dt);
     b.susp = clampN(b.susp, -6, 3);
 
+    const onFoot = !!(st.flags & 512);
+    b.foot.visible = onFoot;
+    if (onFoot) {
+      b.body.visible = false; b.wheel.visible = false;
+      b.face = b.face == null ? st.a : b.face + wrapA(st.a - b.face) * Math.min(1, dt * 16);
+      b.root.rotation.y = -b.face;
+      b.phase += (Math.PI * 2 * sp * dt) / 22;
+      const sw = Math.min(1, sp / 150);
+      b.flegs[0].rotation.z = Math.sin(b.phase) * 0.8 * sw; b.flegs[1].rotation.z = -Math.sin(b.phase) * 0.8 * sw;
+      b.fpilot.position.y = 17 + Math.abs(Math.sin(b.phase)) * 1.2 * sw;
+      return;
+    }
     if (wheel) {
       b.root.rotation.y = -b.moveA;
       b.spin -= (sp * dt) / 12;
@@ -1368,12 +1501,15 @@
       if (b.fireT >= rate) { b.fireT = 0; b.recoilV += st.weapon === 'gatling' ? 3 : 5; }
     } else b.fireT = 0.2;
     b.lastCharge = ch; b.lastFire = fire;
+    if (st.weapon === 'fist' && fire && !b.lastFireP) b.punchV += 60;
+    b.lastFireP = fire;
+    spring(b, 'punch', 0, 240, 16, dt);
     spring(b, 'recoil', 0, 300, 18, dt);
     b.recoil = clampN(b.recoil, -0.4, 1.5);
     // 武器俯仰 + 后坐
     const pt = clampN(st.pt || 0, -0.9, 0.9);
     b.wpnMount.rotation.z = pt * 0.95 - b.pitch;
-    b.wpn.position.x = -b.recoil * 3.2;
+    b.wpn.position.x = -b.recoil * 3.2 + Math.max(0, b.punch) * 1.2;
     b.arm.rotation.z = pt * 0.4 + Math.sin(b.phase) * 0.15 * b.walkAmt;
     // 驾驶员：轻微抬头 / 跟着身体晃
     b.pilot.rotation.z = pt * 0.35 - b.pitch * 0.6;
@@ -1548,6 +1684,47 @@
         ms.position.set(m.x, m.z + 17 + h, m.y);
       }
     }
+    // 迫击炮弹：抛物线 + 落点预警圈
+    for (const [id, sh] of G.shells) {
+      const k = (now - sh.t0) / 1000 / sh.T;
+      if (k >= 1) { G.shells.delete(id); continue; }
+      const dist = Math.hypot(sh.x1 - sh.x0, sh.y1 - sh.y0), h = 60 + dist * 0.35;
+      const m = P['shell' + sh.team].next();
+      m.position.set(sh.x0 + (sh.x1 - sh.x0) * k, sh.z0 + (sh.z1 - sh.z0) * k + 4 * h * k * (1 - k), sh.y0 + (sh.y1 - sh.y0) * k);
+      const w = P['warn' + sh.team].next();
+      flat(w, sh.x1, sh.y1, sh.z1 + 1.2);
+      w.scale.setScalar(sh.r * (0.6 + 0.4 * k));
+    }
+    // 驾驶员技能召唤物
+    for (const h of G.helpers || []) {
+      const [, kind, x, y, z, team] = h;
+      if (kind === 'bento') { const g = P.bento.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }
+      const g = P[kind + team].next();
+      g.position.set(x, z, y);
+      if (kind === 'turret') g.userData.head.rotation.y = now / 300;
+      else { g.userData.rotor.rotation.y = now / 30; g.position.y = z + Math.sin(now / 200) * 2; }
+    }
+    // 草丛：自己站在里面时那一块变半透明
+    if (W.bushes) {
+      const me = G.me, C = S.CELL;
+      for (const b of W.bushes) {
+        const [bx, by, bw, bh] = b.rect;
+        const inside = me && me.px > bx * C - 10 && me.px < (bx + bw) * C + 10 && me.py > by * C - 10 && me.py < (by + bh) * C + 10;
+        b.fade += ((inside ? 0.42 : 1) - b.fade) * Math.min(1, dt * 8);
+        for (const m of b.mats) { m.opacity = b.fade; m.depthWrite = b.fade > 0.95; }
+      }
+    }
+    // 瞄准指示
+    const A = G.aimShow;
+    for (const m of [W.aimLine, W.aimFan, W.aimCircle, W.aimRing]) m.visible = false;
+    if (A) {
+      W.aimMat.color.set(A.color || '#ffffff'); W.aimMat.opacity = A.strong ? 0.38 : 0.16;
+      const y = A.z + 1.6;
+      if (A.kind === 'line') { const m = W.aimLine; m.visible = true; m.position.set(A.x, y, A.y); m.rotation.z = -A.a; m.scale.set(A.len, A.w, 1); }
+      else if (A.kind === 'fan') { const m = W.aimFan; m.visible = true; m.position.set(A.x, y, A.y); m.rotation.z = -A.a; m.scale.set(A.len, A.len, 1); if (W.fanArc !== A.arc) { W.fanArc = A.arc; m.geometry.dispose(); m.geometry = new T.CircleGeometry(1, 24, -A.arc / 2, A.arc); } }
+      else if (A.kind === 'circle') { const m = W.aimCircle; m.visible = true; m.position.set(A.x, y, A.y); m.scale.set(A.len, A.len, 1); }
+      if (A.tx != null) { const r = W.aimRing; r.visible = true; r.position.set(A.tx, A.tz + 1.8, A.ty); r.scale.setScalar(A.tr || 20); r.material.color.set(A.color || '#ffffff'); }
+    }
     // 特效
     for (const f of G.fx) {
       const k = (now - f.t0) / f.dur;
@@ -1635,6 +1812,15 @@
     if (_p.z > 1 || _p.z < -1) return null;
     return { x: ((_p.x + 1) / 2) * innerWidth, y: ((1 - _p.y) / 2) * innerHeight };
   }
+  // 屏幕坐标 → 游戏世界里的射线（用于鼠标在地面上瞄准）
+  const _r0 = new T.Vector3(), _r1 = new T.Vector3();
+  function screenRay(sx, sy) {
+    if (!camera) return null;
+    camera.updateMatrixWorld();
+    _r0.set((sx / innerWidth) * 2 - 1, -(sy / innerHeight) * 2 + 1, 0.5).unproject(camera);
+    _r1.copy(_r0).sub(camera.position).normalize();
+    return { x: camera.position.x, y: camera.position.z, z: camera.position.y, dx: _r1.x, dy: _r1.z, dz: _r1.y };
+  }
   function render(G, now, dt, myId) {
     if (!W || W.G !== G) return;
     if (W.dirty) { W.surfTex.needsUpdate = true; W.dirty = false; }
@@ -1648,7 +1834,7 @@
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
-    build, paintCell, burst, setCamera, project, render, clear, show, preview, previewFrame, previewMode, setQuality,
+    build, paintCell, burst, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();
