@@ -41,6 +41,18 @@
 
 重新生成单文件版：`node tools/build-single.js`（`--cdn` 生成体积更小、需要联网的网页版）。
 
+## 安卓 App（APK）
+
+`android/` 文件夹是一个完整的安卓项目：一个全屏横屏的 App，把游戏文件打包在里面，离线可玩，联机走 P2P 房间码，返回键打开暂停菜单（连按两次退出）。有三种方式得到安装包：
+
+1. **用 GitHub 自动打包（推荐，不用装任何东西）**：把整个文件夹上传到一个 GitHub 仓库，打开仓库的 **Actions → 打包安卓 App → Run workflow**，几分钟后在这次运行页面底部的 **Artifacts** 里下载 `涂鸦机兵-安卓App`，解压得到 `涂鸦机兵-GraffiBots.apk`。
+2. **用 Android Studio**：用 Android Studio 打开 `android` 文件夹，菜单 **Build → Build APK(s)**。
+3. **命令行**：装好 Android SDK 后，在 `android` 文件夹运行 `gradle assembleRelease`，APK 在 `android/app/build/outputs/apk/release/`。
+
+安装到手机：把 APK 发到手机上点开，按提示允许「安装未知来源应用」即可。默认用调试签名打包；如果想以后更新时直接覆盖安装，在仓库 Settings → Secrets 里设置 `GB_KEYSTORE_B64`（签名文件的 base64）和 `GB_KEYSTORE_PASS`，之后每次都用同一个签名。
+
+iPhone：苹果不允许直接安装 App 文件（需要苹果开发者账号和 Mac 上架或签名），请用 Safari 打开网页版后点「分享 → 添加到主屏幕」，效果接近 App（全屏、有图标）。
+
 ## 运行（两种方式任选）
 
 ### 方式一：直接双击打开（推荐，不用装任何东西）
@@ -117,6 +129,8 @@ public/portraits.js  驾驶员立绘（程序化 SVG）
 public/sw.js         离线缓存（通过网址打开时生效）
 public/manifest.webmanifest  添加到主屏幕用的 App 信息和图标
 tools/build-single.js        打包成单个 HTML 文件
+android/                     安卓 App 项目（WebView 外壳，游戏文件直接用 public 文件夹）
+.github/workflows/android.yml  在 GitHub 上自动打包 APK
 public/render3d.js   Three.js 3D 场景、双足机兵与驾驶员模型、程序化动画、涂料贴图、特效
 public/client.js     界面、联网（服务器 / 内置服务器 / P2P）、输入、第三人称摄像机、HUD
 public/audio.js      程序化音乐与音效
