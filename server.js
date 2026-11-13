@@ -8,6 +8,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { Game, Room, Hub, findPath, buildNav } = require('./public/core.js');
 const hub = new Hub();
+hub.accounts = null;   // 启动服务器时挂上账号系统（见文件末尾）
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -16,6 +17,123 @@ const MIME = {
   '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8',
 };
 
+
+// =====================================================================
+// 账号：保存在 data/accounts.json（密码用 scrypt 加盐哈希，登录令牌只存哈希）
+// 奖杯 / 经验 / 战绩由服务器在比赛结束时结算，客户端只能改出战配置
+// =====================================================================
+const S = require('./public/shared.js');
+class AccountStore {
+  constructor(file) {
+    this.file = file;
+    this.data = { accounts: {}, tokens: {} };
+    try { this.data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* 第一次运行：还没有账号文件 */ }
+    this.data.accounts = this.data.accounts || {}; this.data.tokens = this.data.tokens || {};
+    this.fails = new Map();
+    this.saveT = null;
+  }
+  save(now) {
+    clearTimeout(this.saveT);
+    const write = () => {
+      try {
+        fs.mkdirSync(path.dirname(this.file), { recursive: true });
+        const tmp = this.file + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(this.data));
+        fs.renameSync(tmp, this.file);   // 先写临时文件再改名，写到一半断电也不会损坏
+      } catch (e) { console.error('保存账号失败:', e.message); }
+    };
+    if (now) write(); else this.saveT = setTimeout(write, 500);
+  }
+  static hashPass(pass, salt) { return crypto.scryptSync(pass, salt, 32).toString('hex'); }
+  static sha(t) { return crypto.createHash('sha256').update(t).digest('hex'); }
+  find(name) { return this.data.accounts[String(name).toLowerCase()] || null; }
+  issueToken(acc) {
+    const token = crypto.randomBytes(32).toString('hex');
+    this.data.tokens[AccountStore.sha(token)] = { a: acc.key, exp: Date.now() + 30 * 86400000 };
+    // 每个账号最多保留 5 个登录设备
+    const mine = Object.entries(this.data.tokens).filter(([, v]) => v.a === acc.key).sort((x, y) => x[1].exp - y[1].exp);
+    while (mine.length > 5) delete this.data.tokens[mine.shift()[0]];
+    return token;
+  }
+  publicProfile(acc) { return Object.assign({}, acc.profile, { name: acc.name }); }
+  // 登录失败太多次：这个账号名锁 30 秒
+  locked(name) { const f = this.fails.get(String(name).toLowerCase()); return f && f.n >= 5 && Date.now() - f.t < 30000; }
+  fail(name) { const k = String(name).toLowerCase(), f = this.fails.get(k) || { n: 0, t: 0 }; f.n = Date.now() - f.t > 30000 ? 1 : f.n + 1; f.t = Date.now(); this.fails.set(k, f); }
+  bind(c, acc, token) {
+    c.acct = acc.key;
+    c.name = acc.name;
+    const p = acc.profile;
+    c.weapon = p.weapon; c.head = p.head; c.pilot = p.pilot; c.level = S.levelFromXp(p.xp);
+    c.conn.send({ t: 'auth', ok: true, token, account: { name: acc.name, created: acc.created }, profile: this.publicProfile(acc) });
+    if (c.room) c.room.broadcastLobby();
+  }
+  handle(c, m) {
+    const err = (msg) => c.conn.send({ t: 'auth', ok: false, op: m.op, err: msg });
+    const now = Date.now();
+    if (now - (c.lastAuth || 0) < 400) return err('操作太快了，请稍等');
+    c.lastAuth = now;
+    switch (m.op) {
+      case 'register': {
+        const name = String(m.name || '').trim(), pass = String(m.pass || '');
+        if (!S.ACCOUNT.nameOk(name)) return err(S.ACCOUNT.nameHint);
+        if (!S.ACCOUNT.passOk(pass)) return err(S.ACCOUNT.passHint);
+        if (this.find(name)) return err('这个账号名已经被注册了');
+        const salt = crypto.randomBytes(16).toString('hex');
+        // 游客的进度可以带进新账号：只接受出战配置，奖杯和经验从 0 开始（避免伪造）
+        const acc = { key: name.toLowerCase(), name, salt, hash: AccountStore.hashPass(pass, salt), created: now, profile: S.cleanProfile(m.profile) };
+        this.data.accounts[acc.key] = acc;
+        const token = this.issueToken(acc);
+        this.save(true);
+        return this.bind(c, acc, token);
+      }
+      case 'login': {
+        const name = String(m.name || '').trim(), pass = String(m.pass || '');
+        if (this.locked(name)) return err('密码错误次数太多，请 30 秒后再试');
+        const acc = this.find(name);
+        const ok = acc && crypto.timingSafeEqual(Buffer.from(acc.hash, 'hex'), Buffer.from(AccountStore.hashPass(pass, acc.salt), 'hex'));
+        if (!ok) { this.fail(name); return err('账号或密码不对'); }
+        this.fails.delete(name.toLowerCase());
+        const token = this.issueToken(acc);
+        this.save();
+        return this.bind(c, acc, token);
+      }
+      case 'token': {
+        const t = this.data.tokens[AccountStore.sha(String(m.token || ''))];
+        const acc = t && t.exp > now && this.data.accounts[t.a];
+        if (!acc) return err('登录已过期，请重新登录');
+        return this.bind(c, acc, null);
+      }
+      case 'logout': {
+        if (m.token) delete this.data.tokens[AccountStore.sha(String(m.token))];
+        c.acct = null;
+        this.save();
+        return c.conn.send({ t: 'auth', ok: true, op: 'logout' });
+      }
+    }
+  }
+  // 客户端只能保存出战配置
+  saveProfile(c, m) {
+    const acc = c.acct && this.data.accounts[c.acct];
+    if (!acc || !m.profile) return;
+    const p = {}; for (const k of S.PROFILE_FIELDS) if (m.profile[k] !== undefined) p[k] = m.profile[k];
+    acc.profile = S.cleanProfile(Object.assign({}, acc.profile, p), acc.profile);
+    this.save();
+  }
+  // 比赛结束：服务器按同一套规则发奖励
+  applyResult(c, result) {
+    const acc = c.acct && this.data.accounts[c.acct];
+    if (!acc) return;
+    const r = S.matchReward(result, c.id);
+    if (!r) return;
+    const p = acc.profile;
+    p.xp += r.xp; p.matches++; if (r.won) p.wins++;
+    p.kills += r.kills; p.paint += r.paint;
+    p.trophies = Math.max(0, (p.trophies || 0) + r.trophies);
+    c.level = S.levelFromXp(p.xp);
+    this.save();
+    c.conn.send({ t: 'profile', profile: this.publicProfile(acc), reward: r });
+  }
+}
 
 function lanAddresses() {
   const out = [];
@@ -125,6 +243,7 @@ function createServer() {
 }
 
 if (require.main === module) {
+  hub.accounts = new AccountStore(process.env.GB_ACCOUNTS || path.join(__dirname, 'data', 'accounts.json'));
   const server = createServer();
   server.listen(PORT, () => {
     console.log('\n  🎨 涂鸦机兵 GraffiBots 服务器已启动');
@@ -134,4 +253,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { Game, Room, Hub, createServer, findPath, buildNav };
+module.exports = { Game, Room, Hub, createServer, findPath, buildNav, AccountStore, hub };

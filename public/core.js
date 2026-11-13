@@ -1355,6 +1355,8 @@ class Room {
   onGameEnd(result) {
     this.state = 'lobby'; this.game = null;
     this.broadcast({ t: 'end', result });
+    const acc = this.hub && this.hub.accounts;
+    if (acc) for (const c of this.members.values()) acc.applyResult(c, result);
     this.colorSet = (this.colorSet + 1 + randInt(S.COLOR_SETS.length - 1)) % S.COLOR_SETS.length;
     this.broadcastLobby();
   }
@@ -1376,7 +1378,9 @@ function handle(hub, c, m) {
   if (!m || typeof m.t !== 'string') return;
   const r = c.room;
   switch (m.t) {
-    case 'hello': setProfile(c, m); break;
+    case 'hello': if (!c.acct) setProfile(c, m); c.conn.send({ t: 'caps', accounts: !!hub.accounts }); break;
+    case 'auth': if (hub.accounts) hub.accounts.handle(c, m); else c.conn.send({ t: 'auth', ok: false, op: m.op, err: '这里没有账号服务器' }); break;
+    case 'saveProfile': if (hub.accounts) hub.accounts.saveProfile(c, m); break;
     case 'create': {
       if (r) r.remove(c);
       const room = new Room(genCode(hub.rooms), c, { hub });
@@ -1402,7 +1406,7 @@ function handle(hub, c, m) {
       c.team = t; r.broadcastLobby();
       break;
     }
-    case 'loadout': setProfile(c, m); if (r) r.broadcastLobby(); break;
+    case 'loadout': { const nm = c.name; setProfile(c, m); if (c.acct) c.name = nm; if (r) r.broadcastLobby(); break; }   // 登录后名字就是账号名
     case 'settings': if (r && r.hostId === c.id && r.state === 'lobby') r.applySettings(m); break;
     case 'start': if (r && r.hostId === c.id && r.state === 'lobby') r.start(); break;
     case 'in': if (r && r.game) r.game.input(c.id, m); break;

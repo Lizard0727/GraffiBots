@@ -18,17 +18,45 @@
     get(k, d) { try { const v = localStorage.getItem('gb_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('gb_' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
-  const profile = Object.assign({ name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', trophies: 0, mode: 'turf', map: -1, size: 3, dur: 180, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 }, store.get('profile', {}));
-  if (!S.WEAPONS[profile.weapon]) profile.weapon = 'blaster';
-  if (!S.HEADS.some((h) => h.id === profile.head)) profile.head = 'antenna';
-  if (!S.PILOTS.some((p) => p.id === profile.pilot)) profile.pilot = 'blaze';
-  if (!S.MODES[profile.mode]) profile.mode = 'turf';
-  if (!(profile.map >= -1 && profile.map < S.MAPS.length)) profile.map = -1;
-  if (!(profile.size >= 1 && profile.size <= 4)) profile.size = 3;
-  if (![120, 180, 240].includes(profile.dur)) profile.dur = 180;
-  if (S.HEADS.some((h) => h.id === profile.head && h.tr > (profile.trophies || 0))) profile.head = 'antenna';
+  // ---------------- 资料 + 账号 ----------------
+  // 三种身份：guest 游客（进度存在 gb_profile）、local 本机账号（存在这台设备）、online 在线账号（Node 服务器结算，换设备也在）
+  const PROFILE_DEFAULT = { name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', trophies: 0, mode: 'turf', map: -1, size: 3, dur: 180, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 };
+  const profile = {};
+  function loadProfile(p) {
+    for (const k of Object.keys(profile)) delete profile[k];
+    Object.assign(profile, PROFILE_DEFAULT, p || {});
+    if (typeof profile.name !== 'string') profile.name = '';
+    for (const k of ['trophies', 'xp', 'matches', 'wins', 'kills', 'paint']) profile[k] = Math.max(0, Math.floor(+profile[k] || 0));
+    if (!S.WEAPONS[profile.weapon]) profile.weapon = 'blaster';
+    if (!S.HEADS.some((h) => h.id === profile.head)) profile.head = 'antenna';
+    if (!S.PILOTS.some((p) => p.id === profile.pilot)) profile.pilot = 'blaze';
+    if (!S.MODES[profile.mode]) profile.mode = 'turf';
+    if (!(profile.map >= -1 && profile.map < S.MAPS.length)) profile.map = -1;
+    if (!(profile.size >= 1 && profile.size <= 4)) profile.size = 3;
+    if (![120, 180, 240].includes(profile.dur)) profile.dur = 180;
+    if (S.HEADS.some((h) => h.id === profile.head && h.tr > (profile.trophies || 0))) profile.head = 'antenna';
+  }
+  const LACC = GAcc.LocalAccounts(store, S);
+  const onlineKey = (n) => 'online_' + String(n).toLowerCase();
+  let session = store.get('session', null);          // { kind: 'guest' | 'local' | 'online', name, token }
+  if (session && session.kind === 'local' && !LACC.profile(session.name)) session = null;
+  if (session && !['guest', 'local', 'online'].includes(session.kind)) session = null;
+  let serverAccounts = null;     // 服务器有没有账号系统（null = 还不知道）
+  let onlineReady = false;       // 在线账号：这条连接已经通过服务器验证
+  let pendingAuth = null, pendingReward = null, needLogin = !session;
+  loadProfile(!session || session.kind === 'guest' ? store.get('profile', {}) : session.kind === 'local' ? LACC.profile(session.name) : store.get(onlineKey(session.name), { name: session.name }));
   const level = () => S.levelFromXp(profile.xp);
-  const saveProfile = () => store.set('profile', profile);
+  let saveTimer = 0;
+  const pickFields = (o, ks) => { const r = {}; for (const k of ks) r[k] = o[k]; return r; };
+  function saveProfile() {
+    if (!session || session.kind === 'guest') store.set('profile', profile);
+    else if (session.kind === 'local') LACC.save(session.name, profile);
+    else {
+      store.set(onlineKey(session.name), profile);      // 本地缓存一份，离线时也能看到
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { if (onlineReady) send({ t: 'saveProfile', profile: pickFields(profile, S.PROFILE_FIELDS) }); }, 400);
+    }
+  }
 
   function toast(msg, ms = 2400) {
     const t = $('toast');
@@ -243,6 +271,7 @@
     $('xpBar').style.width = ((profile.xp - cur) / (next - cur)) * 100 + '%';
     $('statsText').innerHTML = `<span>对战 ${profile.matches}</span><span>胜利 ${profile.wins}</span><span>击毁 ${profile.kills}</span><span>涂地 ${profile.paint}</span><span>🏆 ${profile.trophies || 0}</span>`;
     $('chipName').textContent = profile.name || '未命名机兵';
+    renderAcct();
     // 奖杯
     const tr = profile.trophies || 0, nh = nextHead();
     const prevTr = [...S.HEADS].reverse().find((h) => h.tr <= tr);
@@ -482,6 +511,7 @@
   }
 
   function ensureName() {
+    if (session && session.kind !== 'guest') return;
     if (!profile.name.trim()) {
       profile.name = '机兵' + Math.floor(100 + Math.random() * 900);
       $('nameInput').value = profile.name; saveProfile(); sendHello();
@@ -698,6 +728,7 @@
     ws.onmessage = (e) => deliver(e.data);
     ws.onclose = () => {
       if (!wsEverOpen) { FILE_MODE = true; ws = null; startLocal(); return; }   // 没有 Node 服务器（静态网页托管）
+      onlineReady = false;
       setConn('与服务器断开，正在重连…', 'bad');
       if (room) { toast('与服务器断开连接，正在重连…'); wantRoom = room.code; }
       resetToTitle();
@@ -809,6 +840,9 @@
   function onMsg(m) {
     switch (m.t) {
       case 'welcome': myId = m.id; break;
+      case 'caps': onCaps(m); break;
+      case 'auth': onAuth(m); break;
+      case 'profile': onServerProfile(m); break;
       case 'joined':
         if (!FILE_MODE) { try { history.replaceState(null, '', '?room=' + m.code); } catch (e) { /* ignore */ } }
         if (net && net.kind === 'local') hostP2P(m.code);
@@ -2248,8 +2282,7 @@
     $('resScore').textContent = score;
     // MVP
     const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
-    let mvp = null;
-    for (const p of r.players) if (p.team === r.winner && (!mvp || val(p) > val(mvp))) mvp = p;
+    const mvp = S.mvpOf(r);
     const objLabel = { escort: '得分', battery: '电池', soccer: '—', zone: '—', turf: '—' }[r.mode];
     $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
     let html = `<tr><th style="text-align:left">驾驶员</th><th>机体</th><th>击毁</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
@@ -2266,32 +2299,215 @@
       mv.innerHTML = `<div class="mvp-art">${GP.portrait(P)}</div><div><b>★ MVP</b><h3 style="color:${cs[mvp.team]}">${esc(mvp.name)}</h3><p>“${P.line}”</p><small style="color:var(--muted)">击倒 ${mvp.kills} · 涂地 ${mvp.paint}</small></div>`;
       mv.classList.remove('show'); void mv.offsetWidth; mv.classList.add('show');
     } else mv.classList.remove('show');
-    // 经验
+    // 经验 / 奖杯：在线账号由服务器结算（防止改本地数据刷分），其余在本机结算
+    pendingReward = null;
     if (meRow) {
-      const before = level();
-      const gain = 60 + (won ? 60 : draw ? 30 : 0) + meRow.kills * 10 + Math.floor(meRow.paint / 25) + meRow.obj * 12 + (mvp && mvp.id === myId ? 40 : 0);
-      profile.xp += gain; profile.matches++; if (won) profile.wins++;
-      profile.kills += meRow.kills; profile.paint += meRow.paint;
-      // 奖杯：赢 +8，平 +2，输 −3
-      const trBefore = profile.trophies || 0;
-      const dTr = won ? S.TROPHY_WIN : draw ? S.TROPHY_DRAW : -S.TROPHY_LOSS;
-      profile.trophies = Math.max(0, trBefore + dTr);
-      saveProfile();
-      const after = level();
-      let msg = `${dTr >= 0 ? '+' : ''}${dTr} 🏆（共 ${profile.trophies}）　+${gain} XP`;
-      if (after > before) msg += `　🎉 升级到 Lv.${after}！`;
-      const un = S.HEADS.filter((h) => h.tr > trBefore && h.tr <= profile.trophies).map((h) => h.name);
-      if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
-      $('resXp').textContent = msg;
-      renderProfile(); renderHeads(); sendLoadout();
+      const rw = S.matchReward(r, myId);
+      if (session && session.kind === 'online') {
+        if (onlineReady) { pendingReward = { trBefore: profile.trophies || 0, lvBefore: level(), t: performance.now() }; $('resXp').textContent = '服务器结算中…'; }
+        else $('resXp').textContent = '没有连上账号服务器，这局不计入战绩';
+      } else {
+        const trBefore = profile.trophies || 0, lvBefore = level();
+        profile.xp += rw.xp; profile.matches++; if (rw.won) profile.wins++;
+        profile.kills += rw.kills; profile.paint += rw.paint;
+        profile.trophies = Math.max(0, trBefore + rw.trophies);
+        saveProfile();
+        showReward(rw, trBefore, lvBefore);
+      }
     } else $('resXp').textContent = '';
   }
+  function showReward(rw, trBefore, lvBefore) {
+    const after = level();
+    let msg = `${rw.trophies >= 0 ? '+' : ''}${rw.trophies} 🏆（共 ${profile.trophies}）　+${rw.xp} XP`;
+    if (after > lvBefore) msg += `　🎉 升级到 Lv.${after}！`;
+    const un = S.HEADS.filter((h) => h.tr > trBefore && h.tr <= profile.trophies).map((h) => h.name);
+    if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
+    $('resXp').textContent = msg;
+    renderProfile(); renderHeads(); sendLoadout();
+  }
+
+  // ================= 账号：登录 / 注册 / 退出 =================
+  const KIND_TAG = { guest: '游客', local: '本机账号', online: '在线账号' };
+  let lgTab = 'login';
+  const lgKind = () => (serverAccounts ? 'online' : 'local');
+  const isGuest = () => !session || session.kind === 'guest';
+  function onCaps(m) {
+    serverAccounts = !!m.accounts;
+    if (session && session.kind === 'online') {
+      if (serverAccounts) send({ t: 'auth', op: 'token', token: session.token });
+      else toast('没有连上账号服务器：先用离线缓存的资料，这期间的对战不计入账号', 4200);
+    }
+    if (!$('login').classList.contains('hidden')) renderLogin();
+    renderAcct();
+  }
+  function onAuth(m) {
+    if (m.op === 'logout') return;
+    const mine = pendingAuth; pendingAuth = null;
+    if (mine) clearTimeout(mine.timer);
+    if (m.ok) {
+      const first = !session || session.kind !== 'online' || session.name !== m.account.name;
+      session = { kind: 'online', name: m.account.name, token: m.token, created: m.account.created };
+      store.set('session', session);
+      onlineReady = true; needLogin = false;
+      applyServerProfile(m.profile);
+      if (mine) { hideLogin(); toast(mine.op === 'register' ? `注册成功，欢迎加入，${session.name}！` : `欢迎回来，${session.name}！`); }
+      else if (first) toast(`已登录在线账号 ${session.name}`);
+      return;
+    }
+    if (mine) { lgError(m.err || '登录失败'); return; }
+    if (m.op === 'token' && session && session.kind === 'online') {   // 令牌过期 / 被退出
+      session = null; store.set('session', null); onlineReady = false;
+      loadProfile(store.get('profile', {})); afterAccountChange();
+      toast('登录已过期，请重新登录');
+      needLogin = true;
+      if (!$('boot')) showLogin('login');
+    }
+  }
+  function applyServerProfile(p) {
+    const keepUi = pickFields(profile, ['mode', 'map', 'size', 'dur']);
+    loadProfile(Object.assign({}, keepUi, p, { name: session.name }));
+    store.set(onlineKey(session.name), profile);
+    afterAccountChange();
+  }
+  function onServerProfile(m) {
+    if (!session || session.kind !== 'online') return;
+    applyServerProfile(m.profile);
+    if (m.reward && pendingReward) { showReward(m.reward, pendingReward.trBefore, pendingReward.lvBefore); pendingReward = null; }
+  }
+  function afterAccountChange() {
+    $('nameInput').value = profile.name;
+    renderProfile(); renderPilots(); renderHeads();
+    if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists();
+    sendLoadout();
+  }
+  // 开场动画结束后：已登录就直接进大厅，否则先登录
+  function startAccount() {
+    if (needLogin || !session) showLogin(LACC.list().length || (store.get('profile', {}).matches || 0) === 0 ? 'login' : 'register');
+    else if (session.kind === 'guest') ensureName();
+  }
+  function showLogin(tab) {
+    lgTab = tab || lgTab;
+    const el = $('login');
+    el.classList.remove('hidden', 'out');
+    $('lgPass').value = ''; $('lgPass2').value = ''; lgError('');
+    renderLogin();
+    if (!TOUCH) setTimeout(() => ($('lgName').value ? $('lgPass') : $('lgName')).focus(), 60);
+  }
+  function hideLogin() {
+    const el = $('login');
+    if (el.classList.contains('hidden')) return;
+    el.classList.add('out');
+    setTimeout(() => el.classList.add('hidden'), 300);
+    $('lgPass').value = ''; $('lgPass2').value = '';
+  }
+  function lgError(msg) {
+    const e = $('lgErr');
+    e.textContent = msg;
+    e.classList.remove('shake'); if (msg) { void e.offsetWidth; e.classList.add('shake'); }
+  }
+  function renderLogin() {
+    const reg = lgTab === 'register', online = lgKind() === 'online';
+    $('loginForm').classList.toggle('reg', reg);
+    for (const b of document.querySelectorAll('.lg-tab')) b.classList.toggle('sel', b.dataset.tab === lgTab);
+    const mode = $('lgMode');
+    mode.textContent = online ? '在线账号 · 存在服务器' : '本机账号 · 存在这台设备';
+    mode.classList.toggle('online', online);
+    $('lgGo').textContent = reg ? '注 册' : '登 录';
+    $('lgGo').disabled = !!pendingAuth;
+    $('lgPass').autocomplete = reg ? 'new-password' : 'current-password';
+    const g = store.get('profile', {}), hasGuest = (g.matches || 0) > 0;
+    let note = online ? '在线账号的奖杯和经验由服务器结算，换手机或电脑登录进度都在。'
+      : serverAccounts === null && !FILE_MODE ? '正在连接服务器…' : '现在没有连上游戏服务器，账号保存在这台设备的浏览器里（换设备不会同步）。电脑上运行 node server.js 开服后，就能注册在线账号。';
+    if (reg && hasGuest) note += online ? ' 游客的出战配置会带进新账号（奖杯和经验从 0 开始）。' : ` 游客进度（${g.trophies || 0} 🏆、${g.matches} 场）会带进新账号。`;
+    $('lgNote').textContent = note;
+    const known = $('lgKnown');
+    known.innerHTML = '';
+    if (!online && !reg) {
+      for (const a of LACC.list().slice(0, 6)) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.innerHTML = `${esc(a.name)}<small>🏆${a.trophies}</small>`;
+        b.onclick = () => { $('lgName').value = a.name; $('lgPass').focus(); sfx.click(); };
+        known.appendChild(b);
+      }
+    }
+  }
+  function guestProgress() { const g = store.get('profile', {}); return g && typeof g === 'object' ? g : {}; }
+  function submitLogin(e) {
+    if (e) e.preventDefault();
+    if (pendingAuth) return;
+    AU.resume();
+    const reg = lgTab === 'register', name = $('lgName').value.trim(), pass = $('lgPass').value;
+    if (!S.ACCOUNT.nameOk(name)) return lgError(S.ACCOUNT.nameHint);
+    if (!S.ACCOUNT.passOk(pass)) return lgError(S.ACCOUNT.passHint);
+    if (reg && pass !== $('lgPass2').value) return lgError('两次输入的密码不一样');
+    lgError('');
+    if (lgKind() === 'online') {
+      const op = reg ? 'register' : 'login';
+      pendingAuth = { op, timer: setTimeout(() => { pendingAuth = null; renderLogin(); lgError('服务器没有回应，请稍后再试'); }, 8000) };
+      $('lgGo').disabled = true;
+      send({ t: 'auth', op, name, pass, profile: reg ? pickFields(Object.assign({}, PROFILE_DEFAULT, guestProgress()), S.PROFILE_FIELDS) : undefined });
+      return;
+    }
+    if (reg) {
+      const g = guestProgress();
+      const res = LACC.register(name, pass, Object.assign({}, PROFILE_DEFAULT, g));
+      if (!res.ok) return lgError(res.err);
+      if ((g.matches || 0) > 0) store.set('profile', Object.assign({}, PROFILE_DEFAULT, pickFields(g, S.PROFILE_FIELDS), { name: g.name || '', head: 'antenna' }));   // 进度已搬进账号
+      enterAs({ kind: 'local', name: res.name }, res.profile, `注册成功，欢迎加入，${res.name}！`);
+    } else {
+      const res = LACC.login(name, pass);
+      if (!res.ok) return lgError(res.err);
+      enterAs({ kind: 'local', name: res.name }, res.profile, `欢迎回来，${res.name}！`);
+    }
+  }
+  function enterAs(sess, prof, msg) {
+    session = sess; store.set('session', sess); needLogin = false; onlineReady = false;
+    loadProfile(prof);
+    afterAccountChange();
+    hideLogin();
+    if (sess.kind === 'guest') ensureName();
+    sfx.click();
+    if (msg) toast(msg);
+  }
+  function logout() {
+    if (session && session.kind === 'online') send({ t: 'auth', op: 'logout', token: session.token });
+    if (room) send({ t: 'leave' });
+    session = null; store.set('session', null); onlineReady = false;
+    loadProfile(store.get('profile', {}));
+    afterAccountChange();
+    closeOv();
+    showLogin('login');
+  }
+  function renderAcct() {
+    const kind = session ? session.kind : 'guest';
+    const tag = $('chipAcct');
+    if (tag) { tag.textContent = KIND_TAG[kind]; tag.className = 'acct-tag ' + kind; }
+    $('nameField').classList.toggle('hidden', !isGuest());
+    const box = $('acctBox');
+    if (!box) return;
+    if (kind === 'guest') {
+      box.innerHTML = `<div class="who"><b>游客</b><small>进度只存在这台设备上；注册账号后进度会带进账号</small></div>
+        <button class="btn small" id="acReg">注册账号</button><button class="btn small ghost" id="acLogin">登录</button>`;
+      $('acReg').onclick = () => { closeOv(); showLogin('register'); };
+      $('acLogin').onclick = () => { closeOv(); showLogin('login'); };
+    } else {
+      const online = kind === 'online';
+      const st = online ? (onlineReady ? '已连接服务器 ✓ 进度由服务器保存' : '暂时没连上服务器，用的是离线缓存') : '保存在这台设备上';
+      box.innerHTML = `<div class="who">${KIND_TAG[kind]}<br><b>${esc(session.name)}</b><small>${st}</small></div>
+        <button class="btn small ghost" id="acOut">${online ? '退出登录' : '切换账号'}</button>`;
+      $('acOut').onclick = logout;
+    }
+  }
+  $('loginForm').addEventListener('submit', submitLogin);
+  for (const b of document.querySelectorAll('.lg-tab')) b.onclick = () => { lgTab = b.dataset.tab; lgError(''); renderLogin(); sfx.click(); };
+  $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 
   // ================= 启动 =================
   window.__gbDebug = () => ({ G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
-  boot();
+  boot().then(startAccount);
   // 通过网址打开时注册离线缓存（双击本地文件打开时浏览器不支持，自动跳过）
   const IN_APP = new URLSearchParams(location.search).has('app');   // 安卓 App 里运行
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.GB_SINGLE && !IN_APP) navigator.serviceWorker.register('sw.js').catch(() => {});

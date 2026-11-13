@@ -610,6 +610,45 @@
     return { vx: d.x * 430, vy: d.y * 430, vz: d.z * 430 };
   };
 
+  // ---------------- 比赛奖励（客户端显示和服务器结算用同一套算法） ----------------
+  S.mvpOf = function (result) {
+    const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
+    let mvp = null;
+    for (const p of result.players) if (p.team === result.winner && (!mvp || val(p) > val(mvp))) mvp = p;
+    return mvp;
+  };
+  S.matchReward = function (result, pid) {
+    const me = result.players.find((p) => p.id === pid);
+    if (!me) return null;
+    const won = result.winner === me.team, draw = !result.winner, mvp = S.mvpOf(result);
+    const isMvp = !!(mvp && mvp.id === pid);
+    const xp = 60 + (won ? 60 : draw ? 30 : 0) + me.kills * 10 + Math.floor(me.paint / 25) + me.obj * 12 + (isMvp ? 40 : 0);
+    const trophies = won ? S.TROPHY_WIN : draw ? S.TROPHY_DRAW : -S.TROPHY_LOSS;
+    return { xp, trophies, won, draw, mvp: isMvp, kills: me.kills, paint: me.paint };
+  };
+  // ---------------- 账号规则 ----------------
+  S.ACCOUNT = {
+    nameOk: (n) => typeof n === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,12}$/.test(n),
+    passOk: (p) => typeof p === 'string' && p.length >= 6 && p.length <= 64,
+    nameHint: '账号名 2–12 个字：中文、字母、数字或下划线',
+    passHint: '密码至少 6 位',
+  };
+  // 可以由客户端保存的资料（奖杯、经验、战绩只能由服务器在比赛结束时结算）
+  S.PROFILE_FIELDS = ['pilot', 'weapon', 'head', 'mode', 'map', 'size', 'dur'];
+  S.cleanProfile = function (p, base) {
+    const o = Object.assign({ name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', trophies: 0, mode: 'turf', map: -1, size: 3, dur: 180, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 }, base || {});
+    p = p || {};
+    if (S.WEAPONS[p.weapon]) o.weapon = p.weapon;
+    if (S.PILOTS.some((x) => x.id === p.pilot)) o.pilot = p.pilot;
+    if (S.MODES[p.mode]) o.mode = p.mode;
+    if (Number.isInteger(p.map) && p.map >= -1 && p.map < S.MAPS.length) o.map = p.map;
+    if (Number.isInteger(p.size) && p.size >= 1 && p.size <= 4) o.size = p.size;
+    if ([120, 180, 240].includes(p.dur)) o.dur = p.dur;
+    const head = S.HEADS.find((h) => h.id === p.head);
+    if (head && head.tr <= (o.trophies || 0)) o.head = p.head;
+    return o;
+  };
+
   S.QUICK_CHAT = ['这边！', '冲啊！', '好样的！', '需要支援！'];
   return S;
 });

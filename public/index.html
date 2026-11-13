@@ -44,6 +44,25 @@
     </section>
     <div class="boot-skip">点击跳过</div>
   </div>
+  <!-- ============ 账号：登录 / 注册 ============ -->
+  <section id="login" class="hidden">
+    <div class="lg-logo"><b><span>涂鸦</span>机兵</b><i>GRAFFI·BOTS</i></div>
+    <form class="lg-card" id="loginForm" autocomplete="on" novalidate>
+      <div class="lg-mode" id="lgMode">本机账号</div>
+      <div class="lg-tabs">
+        <button type="button" class="lg-tab sel" data-tab="login">登录</button>
+        <button type="button" class="lg-tab" data-tab="register">注册</button>
+      </div>
+      <div class="lg-known" id="lgKnown"></div>
+      <label class="field">账号名<input id="lgName" name="username" maxlength="12" autocomplete="username" placeholder="2–12 个字"></label>
+      <label class="field">密码<input id="lgPass" name="password" type="password" maxlength="64" autocomplete="current-password" placeholder="至少 6 位"></label>
+      <label class="field lg-reg">再输一次密码<input id="lgPass2" type="password" maxlength="64" autocomplete="new-password" placeholder="确认密码"></label>
+      <p class="lg-err" id="lgErr"></p>
+      <button type="submit" class="btn big" id="lgGo">登 录</button>
+      <p class="lg-note" id="lgNote"></p>
+      <button type="button" class="lg-guest" id="lgGuest">先不登录，<b>游客试玩 →</b></button>
+    </form>
+  </section>
   <canvas id="gl"></canvas>
   <canvas id="game"></canvas>
 
@@ -53,7 +72,7 @@
     <header class="home-top">
       <button class="me-chip" data-ov="profile" title="名片 / 头部涂装">
         <div id="chipBot" class="avatar"></div>
-        <div class="chip-txt"><b id="chipName">机兵</b><div class="lvrow"><span id="lvText">Lv.1</span><small id="xpText"></small></div><div class="bar"><i id="xpBar"></i></div></div>
+        <div class="chip-txt"><b id="chipName">机兵</b><em id="chipAcct" class="acct-tag">游客</em><div class="lvrow"><span id="lvText">Lv.1</span><small id="xpText"></small></div><div class="bar"><i id="xpBar"></i></div></div>
       </button>
       <button class="trophy-chip" data-ov="road" title="奖杯之路">
         <span class="tro-ico" data-icon="trophy"></span><div><b id="trophyText">0</b><div class="bar gold"><i id="trophyBar"></i></div><small id="trophyNext"></small></div>
@@ -138,7 +157,8 @@
     <section id="ov-profile" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>机兵名片</h2></header>
       <div class="ov-body narrow">
-        <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
+        <div class="acct-box" id="acctBox"></div>
+        <label class="field" id="nameField">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
         <div class="stats" id="statsText"></div>
         <h3>头部涂装 <small>沿奖杯之路解锁，戴在驾驶员头上</small></h3>
         <div id="headList" class="head-list"></div>
@@ -260,6 +280,7 @@
   <script src="wall.js"></script>
   <script src="portraits.js"></script>
   <script src="audio.js"></script>
+  <script src="account.js"></script>
   <script src="vendor/peerjs.min.js"></script>
   <script src="core.js"></script>
   <script src="render3d.js"></script>
