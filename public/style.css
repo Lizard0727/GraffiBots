@@ -805,3 +805,53 @@ kbd { background: var(--ink); color: var(--ny); border: 0; font-family: var(--nu
 
 .play-btn span { display: block; line-height: 1; margin-bottom: 6px; }
 .aitag { font-family: var(--num); font-size: 11px; background: var(--ink); color: #fff; padding: 0 5px; border-radius: 3px; margin-left: 5px; letter-spacing: 1px; }
+
+/* =====================================================================
+   开场：XA 游戏工作室 → 加载画面
+   ===================================================================== */
+#boot { position: fixed; inset: 0; z-index: 100; background: #0c0a10; overflow: hidden; cursor: pointer; }
+#boot.done { animation: bootOut .45s ease-in forwards; pointer-events: none; }
+@keyframes bootOut { to { opacity: 0; transform: scale(1.06); } }
+.boot-skip { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: 14px; font-family: var(--head); color: #fff7; font-size: 13px; }
+.boot-studio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: radial-gradient(circle at 50% 45%, #241a33, #0c0a10 65%); }
+.boot-studio.out { animation: fadeOut .4s ease-in forwards; }
+.xa-logo { position: relative; width: min(420px, 78vw); aspect-ratio: 400 / 260; }
+.xa-splat { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.xa-splat .spl { transform-origin: 200px 130px; animation: splatIn .5s cubic-bezier(.2,1.6,.4,1) .15s both; }
+.xa-splat .drips rect { transform-origin: top; transform-box: fill-box; animation: drip .9s ease-in .55s both; }
+.xa-splat .dots circle { transform-box: fill-box; transform-origin: center; animation: dotPop .3s cubic-bezier(.2,1.8,.4,1) both; }
+.xa-splat .dots circle:nth-child(1) { animation-delay: .35s; } .xa-splat .dots circle:nth-child(2) { animation-delay: .42s; } .xa-splat .dots circle:nth-child(3) { animation-delay: .5s; }
+.xa-splat .dots circle:nth-child(4) { animation-delay: .55s; } .xa-splat .dots circle:nth-child(5) { animation-delay: .6s; } .xa-splat .dots circle:nth-child(6) { animation-delay: .66s; }
+@keyframes splatIn { from { transform: scale(0) rotate(-20deg); } }
+@keyframes drip { from { transform: scaleY(0); } }
+@keyframes dotPop { from { transform: scale(0); } }
+.xa-text { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--tag); font-size: min(150px, 28vw); color: var(--ink); letter-spacing: 6px;
+  transform: rotate(-6deg); text-shadow: 5px 5px 0 #fff, 9px 9px 0 var(--np); animation: xaIn .45s cubic-bezier(.2,1.6,.4,1) .6s both; }
+@keyframes xaIn { from { opacity: 0; transform: rotate(-6deg) scale(2.4); } }
+.xa-name { text-align: center; animation: nameIn .5s ease-out 1s both; }
+.xa-name span { display: block; font-family: var(--head); font-size: 30px; color: #fff; letter-spacing: 8px; text-shadow: var(--spray); }
+.xa-name i { display: block; font-family: var(--num); font-style: normal; font-size: 16px; letter-spacing: 9px; color: var(--nc); margin-top: 4px; }
+@keyframes nameIn { from { opacity: 0; transform: translateY(16px); } }
+
+.boot-load { position: absolute; inset: 0; background: linear-gradient(#0005, #000a), var(--wall, #2a2433) center / cover; animation: ovIn .35s ease-out; }
+.bl-art { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); display: flex; gap: 0; }
+.bl-art .pol { width: min(170px, 20vw); background: #fff; padding: 7px 7px 26px; box-shadow: 6px 8px 0 #000a; margin: 0 -14px; animation: polIn .5s cubic-bezier(.2,1.5,.4,1) both; position: relative; }
+.bl-art .pol svg { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; border: 2px solid var(--ink); }
+.bl-art .pol b { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font-family: var(--head); font-weight: 400; color: var(--ink); font-size: 15px; }
+.bl-art .pol:nth-child(1) { transform: rotate(-9deg) translateY(16px); animation-delay: .05s; } .bl-art .pol:nth-child(2) { transform: rotate(2deg); z-index: 2; animation-delay: .15s; }
+.bl-art .pol:nth-child(3) { transform: rotate(8deg) translateY(12px); animation-delay: .25s; }
+@keyframes polIn { from { opacity: 0; translate: 0 60px; } }
+.bl-logo { position: absolute; left: 50%; top: 9%; transform: translateX(-50%) rotate(-4deg); text-align: center; line-height: 1; }
+.bl-logo b { display: block; font-family: var(--head); font-size: min(86px, 14vw); color: #fff; text-shadow: var(--spray), 9px 10px 0 var(--np); white-space: nowrap; animation: xaIn .45s cubic-bezier(.2,1.6,.4,1) both; }
+.bl-logo b span { color: var(--ny); }
+.bl-logo i { display: inline-block; font-family: var(--tag); font-style: normal; font-size: 24px; color: var(--nc); text-shadow: 2px 2px 0 var(--ink); transform: rotate(4deg); margin-top: 6px; }
+.bl-bottom { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(620px, 88vw); text-align: center; }
+.bl-tip { font-family: var(--head); color: #fff; font-size: 17px; text-shadow: 1px 1px 0 var(--ink), -1px -1px 0 var(--ink); margin-bottom: 12px; min-height: 24px; }
+.bl-tip b { color: var(--ny); font-weight: 400; }
+.bl-bar { position: relative; height: 26px; background: #0007; border: 3px solid #fff; border-radius: 99px; overflow: visible; }
+.bl-bar i { position: absolute; left: 3px; top: 3px; bottom: 3px; width: 0; border-radius: 99px; background: repeating-linear-gradient(-45deg, var(--ny) 0 12px, #ffd000 12px 24px); transition: width .25s ease-out; }
+.bl-bar i::after { content: ''; position: absolute; right: 2px; top: 60%; width: 8px; height: 22px; border-radius: 4px; background: var(--ny); }
+.bl-bar em { position: absolute; right: -6px; top: -36px; font-family: var(--num); font-style: normal; font-size: 30px; color: var(--ny); text-shadow: var(--spray); transform: rotate(-6deg); }
+.bl-step { margin-top: 8px; font-family: var(--head); color: #fffb; font-size: 13px; }
+@media (max-height: 520px) { .bl-art .pol { width: min(120px, 16vw); } .bl-logo b { font-size: 50px; } .bl-logo { top: 5%; } .bl-tip { font-size: 14px; } }

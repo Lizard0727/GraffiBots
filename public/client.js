@@ -424,6 +424,63 @@
     if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
     setTimeout(() => { $('playBtn').classList.remove('busy'); if (quick) { quick = null; toast('没有连上服务器，请稍后再试'); } }, 4000);
   }
+  // ================= 开场：XA 游戏工作室 → 加载画面 → 大厅 =================
+  const TIPS = [
+    '机体被打爆后驾驶员会<b>弹出</b>，活过 6 秒，新机体就空投在你脚下！',
+    '躲进<b>草丛</b>，敌人就看不见你——除非靠得很近，或者你开火。',
+    '在己方涂料上变成<b>滚轮</b>：跑得飞快、隐身，还能快速装填弹药。',
+    '<b>弹跳板</b>能把你弹过高墙，飞上对面的高台。',
+    '打中敌人会给<b>大招</b>充能，涂地也会充一点。',
+    '每位驾驶员的<b>技能</b>每局只能用 3 次，留到关键时刻！',
+    '踩在敌方涂料上会减速、掉血，先把脚下涂成自己的颜色。',
+    '<b>迫击机兵</b>的炮弹能越过墙壁，专打躲在掩体后的人。',
+    '脱离战斗 3 秒后会快速回血，打不过就先撤！',
+  ];
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function boot() {
+    const el = $('boot');
+    if (!el) return;
+    let skip = false, phase = 1;
+    el.addEventListener('pointerdown', () => { skip = true; AU.resume(); });
+    // 第 1 段：工作室标志
+    for (let t = 0; t < 2300 && !skip; t += 50) await wait(50);
+    $('bootStudio').classList.add('out');
+    await wait(skip ? 50 : 350);
+    $('bootStudio').classList.add('hidden');
+    $('bootLoad').classList.remove('hidden');
+    skip = false; phase = 2;
+    // 第 2 段：加载画面（真实的预加载：字体、涂鸦墙、驾驶员立绘、机体缩略图、3D 展示台）
+    const picks = S.PILOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+    $('bootArt').innerHTML = picks.map((P) => `<div class="pol">${GP.portrait(P)}<b>${P.name}</b></div>`).join('');
+    let tip = Math.floor(Math.random() * TIPS.length);
+    const showTip = () => { $('bootTip').innerHTML = '小技巧：' + TIPS[tip++ % TIPS.length]; };
+    showTip();
+    const tipTimer = setInterval(showTip, 2600);
+    const set = (k, label) => { $('bootBar').style.width = `calc(${Math.round(k * 100)}% - 6px)`; $('bootPct').textContent = Math.round(k * 100) + '%'; if (label) $('bootStep').textContent = label; };
+    const steps = [
+      ['正在摇匀喷漆罐…', async () => { if (document.fonts && document.fonts.load) await Promise.race([Promise.all(['40px GBHead', '40px GBNum', '40px GBTag'].map((f) => document.fonts.load(f))), wait(1500)]).catch(() => {}); }],
+      ['正在给墙面打底…', async () => { GWall.apply(); }],
+      ['驾驶员正在换装…', async () => { for (const P of S.PILOTS) { faceImg(P.id); GP.portrait(P); await nextFrame(); } }],
+      ['正在组装机兵…', async () => { const P = S.pilot(profile.pilot); for (const w of S.WEAPON_ORDER) { if (R3.mechThumb) R3.mechThumb({ color: P.accent, head: profile.head, weapon: w, pilot: P.id }); await nextFrame(); } }],
+      ['点亮霓虹灯…', async () => { renderProfile(); renderPilots(); await nextFrame(); }],
+    ];
+    const t0 = performance.now();
+    for (let i = 0; i < steps.length; i++) {
+      set(i / steps.length, steps[i][0]);
+      await steps[i][1]();
+      // 每一步至少停一会儿，进度条看起来是在「喷」出来的
+      const want = ((i + 1) / steps.length) * (skip ? 0 : 1800);
+      while (performance.now() - t0 < want && !skip) await wait(30);
+    }
+    set(1, '准备开涂！');
+    await wait(skip ? 0 : 350);
+    clearInterval(tipTimer);
+    el.classList.add('done');
+    setTimeout(() => el.remove(), 500);
+    void phase;
+  }
+
   function ensureName() {
     if (!profile.name.trim()) {
       profile.name = '机兵' + Math.floor(100 + Math.random() * 900);
@@ -2102,6 +2159,7 @@
   window.__gbDebug = () => ({ G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
+  boot();
   // 通过网址打开时注册离线缓存（双击本地文件打开时浏览器不支持，自动跳过）
   const IN_APP = new URLSearchParams(location.search).has('app');   // 安卓 App 里运行
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.GB_SINGLE && !IN_APP) navigator.serviceWorker.register('sw.js').catch(() => {});

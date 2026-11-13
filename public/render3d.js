@@ -1764,7 +1764,7 @@
     if (mode === 'jump') {
       // 每 1.6 秒跳一次：z = v·t − g·t²/2
       const ph = (t % 1.6), T0 = 380 / 980 * 2;
-      if (ph < T0) { st.z = (380 * ph - 490 * ph * ph) * 0.45; st.vz = 380 - 980 * ph; }
+      if (ph < T0) { st.z = (380 * ph - 490 * ph * ph) * 0.3; st.vz = 380 - 980 * ph; }
     }
     PV.bot.body.visible = !(st.flags & 2); PV.bot.wheel.visible = !!(st.flags & 2);
     animateBot(PV.bot, st, now, dt);
