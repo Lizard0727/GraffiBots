@@ -110,7 +110,7 @@
       zen: 0x2a1010, mid: 0xa03c1a, hor: 0xffa050, sunC: 0xffc488, sunI: 0.95, hemiS: 0xffe0c8, hemiG: 0x4a2a20, hemiI: 0.78, fill: 0xff6a3a, fog: 0x8a4a30,
       sun: [0.6, 0.45, 0.5], floor: ['#6c605a', '#645852'], tops: ['#8a6a50', '#7a6a64', '#4a3e3a', '#8a7060'], win: 0.9,
       sides: [['#a85a2a', '#2a1a14'], ['#5a5050', '#ff7a2a'], ['#3a3030', '#ff9a3a'], ['#6a5a50', '#ffb03a']], trim: ['#2a1a14', '#ff7a2a', '#ffb03a', '#ffb03a'], night: false, glow: true, fx: 'embers',
-    },,
+    },
     { // 灰城广场：阴沉的灰城黄昏，彩色涂料格外显眼
       zen: 0x3a3d48, mid: 0x7a7d88, hor: 0xd8c8b8, sunC: 0xffe6c8, sunI: 0.85, hemiS: 0xf0f0f4, hemiG: 0x4a4c56, hemiI: 0.8, fill: 0xff8a5a, fog: 0x8a8c96,
       sun: [-0.4, 0.6, -0.6], floor: ['#8a8d96', '#82858e'], seam: '#6d707a', tops: ['#9a9da6', '#b0b3bc', '#6d707a', '#a4a7b0'], win: 0.5,
@@ -892,6 +892,17 @@
         return g;
       });
     }
+    // 盾墙（每队一个颜色）
+    for (const t of TEAMS) {
+      const wm = basic(cs[t], { transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
+      P['wall' + t] = pool(() => {
+        const g = new T.Group();
+        g.add(part(SH.box, wm, 140, 80, 4, 0, 40, 0));
+        g.add(part(SH.box, toon(0x2a2d3a), 144, 6, 8, 0, 3, 0));
+        g.add(part(SH.box, basic(cs[t]), 144, 3, 5, 0, 80, 0));
+        return g;
+      });
+    }
     // 逃亡圈：空投箱（金色补给箱 + 降落伞）
     P.crate = pool(() => {
       const g = new T.Group();
@@ -1083,6 +1094,17 @@
         }
         for (const x of [9, 20]) { const ring = part(s.cyl, cm, 5.4, 2, 5.4, x, 0, 0); ring.rotation.z = -Math.PI / 2; sp.add(ring); }
         g.userData.spinner = sp;
+        break;
+      }
+      // ---- 1.1：防暴盾卫（警棍 + 大盾牌） ----
+      case 'riot': {
+        add(outlined(rbox(9, 6, 6, 2), mt, 1, 1, 1, 2, 0, 0));
+        cylX(dk, 1.3, 14, 12, 0, 0);
+        g.userData.tip = add(part(s.sph, basic(0x7af0ff, { transparent: true, opacity: 0.9 }), 1.8, 1.8, 1.8, 19.5, 0, 0));
+        const sh = add(outlined(rbox(3, 26, 20, 2), toon(0x2a2d3a), 1, 1, 1, 9, -2, 13));
+        sh.rotation.y = -0.25;
+        const win = add(part(s.box, toon(color, { emissive: new T.Color(color).multiplyScalar(0.25) }), 3.4, 6, 14, 9.2, 5, 13)); win.rotation.y = -0.25;
+        const st2 = add(part(s.box, s.yellow, 3.4, 2.2, 20.4, 9.2, -9, 13)); st2.rotation.y = -0.25;
         break;
       }
       // ---- S1 灰城重涂：赛季机甲 ----
@@ -1429,6 +1451,7 @@
     // S1 新驾驶员：岚的红色贝雷帽、石磊的黄色安全帽、叶声的大耳机
     if (P.id === 'flag') { const b = add(part(sph, acc, 4.9, 1.8, 4.9, -0.3, 5.0, 0.6)); b.rotation.z = 0.25; add(part(sph, SH.yellow, 0.7, 0.7, 0.7, 1.6, 5.4, -1.8)); }
     if (P.id === 'hammer') { add(part(sph, SH.yellow, 4.9, 3.6, 4.9, -0.2, 4.4, 0)); add(part(SH.cyl, SH.yellow, 6.2, 0.5, 6.2, 0.4, 3.2, 0)); add(part(SH.box, toon(0xffffff), 1.4, 1, 1.4, 3.4, 5.2, 0)); }
+    if (P.id === 'han') { add(part(SH.box, toon(0x7af0ff, { emissive: new T.Color(0x3a8aa8), transparent: true, opacity: 0.75 }), 0.6, 1.1, 4.4, 4.2, 0.6, 0)); add(part(sph, SH.dark, 0.7, 0.9, 0.7, 0, 0.6, 4.4)); }
     if (P.id === 'echo') for (const z of [-1, 1]) { add(part(SH.cyl, SH.dark, 1.9, 1.2, 1.9, 0, 1.4, z * 4.6)).rotation.x = Math.PI / 2; add(part(sph, acc, 1.2, 1.2, 0.6, 0, 1.4, z * 5.3)); if (z > 0) { const band = add(new T.Mesh(new T.TorusGeometry(4.6, 0.45, 6, 16, Math.PI), SH.dark)); band.rotation.y = Math.PI / 2; band.position.y = 1.6; } }
     // 等级解锁的头部涂装，缩小后戴在驾驶员头上
     const hc = new T.Group(); hc.position.set(-0.5, 4.2, 0); hc.scale.setScalar(0.42); g.add(hc);
@@ -1981,6 +2004,9 @@
     for (const h of G.helpers || []) {
       const [, kind, x, y, z, team] = h;
       if (kind === 'fire') continue;   // 火海用粒子画（client 收到 fz 事件）
+      if (kind === 'wall') {   // 防暴盾卫的盾墙：半透明能量墙
+        const g = P['wall' + team].next(); g.position.set(x, z, y); g.rotation.y = -(h[6] || 0); g.children[0].material.opacity = 0.32 + 0.12 * Math.sin(now / 120); continue;
+      }
       if (kind === 'crate') { const g = P.crate.next(); g.position.set(x, z + Math.abs(Math.sin(now / 400 + x)) * 4, y); g.rotation.y = now / 900; continue; }
       if (kind === 'charge') {         // 炸药：一闪一闪的涂料弹
         const m = P['shell' + team].next(); m.position.set(x, z + 6, y); m.scale.setScalar(1.3 + 0.4 * Math.abs(Math.sin(now / 70))); continue;

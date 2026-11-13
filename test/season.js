@@ -267,5 +267,96 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   ok(r.rank === 4 && r.trophies === -3, '四队第 4 名：奖杯 −3');
 }
 
+// ==================== 1.1 维护更新 ====================
+{
+  // 防暴盾卫：正面减伤，背面不减
+  const d = duel({}, { weapon: 'riot' });
+  d.B.input.a = Math.PI; d.B.hp = 150; d.g.hurt(d.B, 20, d.A);
+  const front = 150 - d.B.hp;
+  d.B.input.a = 0; d.B.hp = 150; d.g.hurt(d.B, 20, d.A);
+  const back = 150 - d.B.hp;
+  ok(Math.abs(front - 12) < 0.01 && Math.abs(back - 20) < 0.01, `防暴盾卫：正面 20 伤害只扣 ${front}，背后扣 ${back}`);
+}
+{
+  // 盾墙挡住子弹
+  const d = duel({ weapon: 'blaster' }, { weapon: 'riot' }, { dist: 200 });
+  d.B.sp = S.WEAPONS.riot.spNeed; d.B.input.a = Math.PI; d.B.input.qq++; d.run(0.1);
+  ok(d.g.helpers.some((h) => h.kind === 'wall'), '防暴盾卫大招：立起盾墙');
+  d.B.ovT = 0; const hp0 = d.B.hp; for (let i = 0; i < 3; i++) { d.A.input.aq++; d.run(0.6); }
+  ok(d.B.hp === hp0 && d.events.some((e) => e[0] === 'blk' && e[1] === 0), '盾墙挡住了对面的全部子弹');
+}
+{
+  const d = duel({ pilot: 'han' }, {}, { dist: 120 });
+  d.A.input.gq++; d.run(0.1);
+  ok(d.B.slowT > 1 && d.B.revealT > 3 && d.B.hp < 100, '韩冰「闪光弹」：前方敌人受伤、减速、暴露');
+  const d2 = duel({}, { pilot: 'han', power: { lv: 5, bt: 1, tal: [] } });
+  d2.B.ovT = 5; d2.A.hp = 100; d2.g.hurt(d2.B, 40, d2.A);
+  ok(d2.A.hp < 100, `韩冰超载「反戈一击」：反弹 ${Math.round(100 - d2.A.hp)} 点伤害给攻击者`);
+}
+{
+  // 新天赋
+  const d = duel({ power: { lv: 1, bt: 0, tal: ['a5'] } }, {});
+  let hits = []; for (let i = 0; i < 5; i++) { d.B.hp = 100; d.g.hurt(d.B, 10, d.A); hits.push(100 - d.B.hp); }
+  ok(Math.abs(hits[4] - 16) < 0.01 && Math.abs(hits[0] - 10) < 0.01, `「连击喷涂」：第 5 次命中 ${hits[4]}`);
+  const d2 = duel({}, { power: { lv: 1, bt: 0, tal: ['d5'] } });
+  d2.g.hurt(d2.B, 999, d2.A);
+  ok(!d2.B.foot && d2.B.hp >= 1 && d2.B.invulnT > 1, '「不屈装甲」：致命伤害保留 1 血');
+  d2.B.invulnT = 0; d2.g.hurt(d2.B, 999, d2.A);
+  ok(d2.B.foot, '「不屈装甲」每台机体只生效一次');
+  const d3 = duel({}, { power: { lv: 1, bt: 0, tal: ['d6'] } }); d3.B.hp = 100; d3.g.hurt(d3.B, 50, d3.A);
+  ok(Math.abs(100 - d3.B.hp - 40) < 0.01, '「堡垒」：50 点的一击只扣 40');
+  const d4 = duel({ power: { lv: 5, bt: 1, tal: ['s6'] } }, {}); d4.A.ov = S.OV_NEED; d4.A.input.oq++; d4.run(0.05);
+  ok(d4.A.ovT > 7, '「超载共鸣」：超载持续 8 秒');
+  const o = E.newProfile('t6'); o.xp = S.xpForLevel(12);
+  for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) E.apply(o, 'talent', { id });
+  ok(o.talents.includes('a5') && S.TALENTS.length === 24, '天赋树每支 6 级，共 24 个天赋');
+}
+{
+  // 叛将档案
+  const o = E.newProfile('story');
+  ok(E.apply(o, 'claimStory', { n: 3 }).ok === false, '叛将档案：没完成任务不能领');
+  const rw = { xp: 0, trophies: 8, won: true, draw: false, mvp: false, kills: 8, paint: 2000, mode: 'elim' };
+  for (let i = 0; i < 3; i++) E.applyMatch(o, rw, Date.UTC(2026, 11, 20, 4));
+  ok(E.apply(o, 'claimStory', { n: 3 }).ok && o.mechs.includes('riot'), '完成 3 个任务：获得防暴盾卫');
+  ok(E.apply(o, 'claimStory', { n: 5 }).ok && o.pilots.han, '全部完成：韩冰加入');
+}
+{
+  // 活动 / 信箱 / 限时购买
+  const o = E.newProfile('ev'), now = Date.UTC(2026, 10, 21, 4);
+  const box = E.mailbox(o, now);
+  ok(box.length === 4 && E.apply(o, 'claimMail', { id: 'v11', now }).ok && o.gems === E.START.gems + 100, '信箱：领取 1.1 补偿（100 宝石 + 军用箱）');
+  ok(E.apply(o, 'claimMail', { id: 'v11', now }).ok === false, '同一封邮件不能领两次');
+  ok(E.mailbox(o, Date.UTC(2027, 1, 1)).length === 0, '邮件 30 天后过期');
+  const c0 = o.coins; E.applyMatch(o, { xp: 0, trophies: 8, won: false, draw: false, mvp: false, kills: 0, paint: 0, mode: 'turf' }, now);
+  ok(o.coins - c0 === Math.round(E.matchCoins({ won: false, draw: false, kills: 0, mvp: false }) * 1.5), '「灰城反击周」期间金币 ×1.5');
+  for (let i = 0; i < 5; i++) E.applyMatch(o, { xp: 0, trophies: 0, won: false, draw: false, mvp: false, kills: 0, paint: 0, mode: 'turf' }, now);
+  ok(E.apply(o, 'claimEvent', { id: 'fightback', i: 0, now }).ok && o.chests.military >= 1, '活动任务「完成 5 局对战」：领军用箱');
+  ok(E.apply(o, 'claimEvent', { id: 'fightback', i: 0, now: Date.UTC(2026, 11, 30) }).ok === false, '活动结束后不能再领');
+  const of1 = E.offers(o, now), of2 = E.offers(o, now + 3 * 3600e3);
+  ok(of1.pilots.length === 2 && of1.mech && JSON.stringify(of1) !== JSON.stringify(of2), `限时购买：${of1.pilots.map((id) => S.pilot(id).name).join('、')} + ${S.WEAPONS[of1.mech].name}，3 小时后刷新`);
+  ok([...of1.pilots, ...of2.pilots].every((id) => !E.SEASON_PILOTS.includes(id) && !E.QUEST_ONLY.includes(id)) && !E.SEASON_MECHS.includes(of1.mech), '限时购买只出常驻角色');
+  o.gems = 1000;
+  ok(E.apply(o, 'buyOffer', { id: of1.pilots[0], now }).ok && o.pilots[of1.pilots[0]] && o.gems === 1000 - E.OFFER.pilotPrice, '用宝石买下限时驾驶员');
+  ok(E.apply(o, 'buyOffer', { id: of1.mech, now: now + 3 * 3600e3 + 1 }).ok === false || of2.mech === of1.mech, '刷新后旧商品买不到');
+}
+{
+  // 逃亡圈提前退出：按当前名次结算
+  const { Hub } = require('../server.js');
+  const hub = new Hub(); const box = []; const c = hub.connect({ send: (m) => box.push(m), sendRaw: (str) => box.push(JSON.parse(str)) });
+  hub.message(c, { t: 'hello', name: 'X', pilot: 'blaze', weapon: 'blaster' });
+  hub.message(c, { t: 'create' });
+  const room = c.room; room.settings = Object.assign({}, room.settings, { mode: 'escape8', bots: true }); room.manual = true;
+  room.game = new Game(room, { manual: true }); room.state = 'playing'; const g = room.game; g.countdown = 0;
+  const me = g.players.get(c.id);
+  for (const p of g.players.values()) if (p !== me && p.team % 2) { p.alive = false; p.out = true; }
+  g.step();
+  me.alive = false; me.out = true; g.step();
+  hub.message(c, { t: 'leave' });
+  const end = box.find((m) => m.t === 'end' && m.early);
+  const rank = end && end.result.place.indexOf(me.team) + 1;
+  ok(end && rank >= 4 && rank <= 8, `逃亡圈：淘汰后退出，立刻结算（第 ${rank} 名）`);
+  g.stop();
+}
+
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');
 process.exit(failed ? 1 : 0);

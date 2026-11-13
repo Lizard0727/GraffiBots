@@ -263,6 +263,7 @@ class Game {
   // ------------------------------------------------------------------
   maxHpOf(p) { return p.foot ? S.PILOT_HP : p.maxHp; }
   updatePlayer(p, dt) {
+    const wheel0 = (q) => !!q.input.w && !q.foot;
     if (!p.alive) {
       p.respawnT -= dt;
       if (p.respawnT <= 0) this.respawn(p);
@@ -289,10 +290,11 @@ class Game {
     if (spAct && p.spKind === 'charge') sm *= 1.45;
     if (p.rushT > 0) sm *= 1.35;
     if (p.slowT > 0) sm *= 0.55;
-    if (p.pilot === 'raven' && (inBush || own)) sm *= 1.1;
+    if (p.pilot === 'raven' && (inBush || own)) sm *= 1.15;
     if (OV && OV.spd) sm *= OV.spd;
     if (p.rallyT > 0) sm *= 1.15;
     if (own && p.tal.has('p2')) sm *= 1.06;
+    if (own && wheel0(p) && p.tal.has('p6')) sm *= 1.1;
     p.sm = sm;
     const wheel = !!inp.w && !p.foot && !(spAct && p.spKind === 'beam');
     p.wheel = wheel;
@@ -302,7 +304,7 @@ class Game {
     const maxHp = this.maxHpOf(p);
     if (enemy && p.invulnT <= 0 && !(spAct && p.spKind === 'charge') && p.hp > maxHp * 0.3) p.hp = Math.max(maxHp * 0.3, p.hp - maxHp * 0.1 * dt);
     if (!enemy && this.time - p.lastHurt > 3 && this.time - p.lastAtk > 2) {
-      const k = (wheel && own ? 0.32 : 0.16) * (p.pilot === 'chef' ? 1.5 : 1);
+      const k = (wheel && own ? 0.32 : 0.16) * (p.pilot === 'chef' ? 1.8 : 1);
       p.hp = Math.min(maxHp, p.hp + maxHp * k * dt);
     }
     if (own && p.tal.has('p4')) p.hp = Math.min(maxHp, p.hp + 3 * dt);   // 天赋：墨水回复
@@ -512,7 +514,7 @@ class Game {
       case 'rush': p.rushT = 3; break;
       case 'scan': this.reveal[p.team] = this.time + 5; break;
       case 'cheer':
-        for (const a of this.players.values()) if (a.alive && a.team === p.team && dist(a, p) < 170) a.hp = Math.min(this.maxHpOf(a), a.hp + 40);
+        for (const a of this.players.values()) if (a.alive && a.team === p.team && dist(a, p) < 200) a.hp = Math.min(this.maxHpOf(a), a.hp + 50);
         break;
       case 'guard': p.shield = Math.max(p.shield, 60); p.shieldT = 4; break;
       case 'smoke': this.paint(p.x, p.y, p.z, 95, p.team, p); p.smokeT = 3; break;
@@ -524,7 +526,7 @@ class Game {
         break;
       }
       case 'emp':
-        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 170) { e.slowT = 2.5; e.silenceT = 1.2; e.charge = 0; e.burst = null; }
+        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 190) { e.slowT = 2.5; e.silenceT = 1.3; e.charge = 0; e.burst = null; }
         break;
       case 'bento': this.helpers.push({ id: this.nextId++, kind: 'bento', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 15, armed: 0.6 }); break;
       case 'overdrive': p.ammo = S.AMMO; p.odN = 3; break;
@@ -532,7 +534,16 @@ class Game {
       case 'rally':
         for (const a of this.players.values()) if (a.alive && a.team === p.team && dist(a, p) < 180) a.rallyT = Math.max(a.rallyT, 5);
         break;
-      case 'blast': this.helpers.push({ id: this.nextId++, kind: 'charge', x: p.x, y: p.y, z: this.top(p.x, p.y), team: p.team, owner: p.id, t: 1.2, cd: 99 }); break;
+      case 'blast': this.helpers.push({ id: this.nextId++, kind: 'charge', x: p.x, y: p.y, z: this.top(p.x, p.y), team: p.team, owner: p.id, t: 0.9, cd: 99 }); break;
+      case 'flash':
+        for (const e of this.players.values()) {
+          if (!e.alive || e.team === p.team || dist(e, p) > 230) continue;
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - p.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+          if (Math.abs(da) > 1.25) continue;
+          e.slowT = Math.max(e.slowT, 1.5); e.silenceT = Math.max(e.silenceT, 0.8); e.revealT = 4; e.charge = 0; e.burst = null;
+          this.hurt(e, 15, p);
+        }
+        break;
       case 'jam':
         for (const e of this.players.values()) {
           if (!e.alive || e.team === p.team || dist(e, p) > 220) continue;
@@ -545,7 +556,7 @@ class Game {
   // ---------------- 超载技能 ----------------
   activateOverload(p) {
     const O = S.OVERLOADS[p.pilot];
-    p.ovUsed = true; p.ov = 0; p.ovT = S.OV_TIME + (p.bt >= 2 ? 2 : 0); p.ovPulse = 0;
+    p.ovUsed = true; p.ov = 0; p.ovT = S.OV_TIME + (p.bt >= 2 ? 2 : 0) + (p.tal.has('s6') ? 2 : 0); p.ovPulse = 0;
     this.ev(['ov', p.id, p.pilot, r1(p.x), r1(p.y), r1(p.z)]);
     const near = (r) => [...this.players.values()].filter((a) => a.alive && a.team === p.team && dist(a, p) < r);
     if (O.skillReset) { p.skillCd = 0; p.skillUses++; }
@@ -585,15 +596,16 @@ class Game {
         if (h.armed > 0) return true;
         for (const a of this.players.values()) {
           if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < 26 && Math.abs(a.z - h.z) < 30) {
-            a.hp = Math.min(this.maxHpOf(a), a.hp + 60); this.ev(['heal', a.id, 60]); return false;
+            a.hp = Math.min(this.maxHpOf(a), a.hp + 75); this.ev(['heal', a.id, 75]); return false;
           }
         }
         return true;
       }
       if (h.kind === 'charge') {   // 石磊的炸药：时间到就爆
-        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 8, 110, 70, 30, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 110, 0]); return false; }
+        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 8, 110, 80, 34, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 110, 0]); return false; }
         return true;
       }
+      if (h.kind === 'wall') return true;   // 盾墙：挡子弹的判定在 updateProjs
       if (h.kind === 'fire') {     // 燃料罐的火海：每 0.4 秒伤害并涂色
         h.cd -= dt;
         if (h.cd <= 0) {
@@ -707,7 +719,22 @@ class Game {
       if (bOV && bOV.kb) kmul = (kmul || 1) * bOV.kb;
       if (bOV && bOV.frostHit) t.slowT = Math.max(t.slowT, 1);
     }
+    if (by && by !== t && by.tal) {
+      if (by.tal.has('a5') && by.team !== t.team) { by.hitN = (by.hitN || 0) + 1; if (by.hitN % 5 === 0) dmg *= 1.6; }
+      if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
+      if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
+      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.15;   // 韩冰被动：倒戈
+    }
+    // 防暴盾卫：正面（瞄准方向 ±60°）受到的伤害 -40%
+    if (!t.foot && S.WEAPONS[t.weapon].front && (by || kdx != null)) {
+      const sx = by && by !== t ? by.x - t.x : -(kdx || 0), sy = by && by !== t ? by.y - t.y : -(kdy || 0);
+      let da = Math.atan2(sy, sx) - t.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+      if (Math.abs(da) < 1.05) { dmg *= S.WEAPONS[t.weapon].front; this.ev(['blk', t.id]); }
+    }
+    if (t.tal && t.tal.has('d6') && dmg > 30) dmg *= 0.8;
     if (tOV && tOV.def) dmg *= tOV.def;
+    if (tOV && tOV.reflect && by && by !== t && by.team !== t.team && by.alive && !this._reflecting) { this._reflecting = true; this.hurt(by, dmg * tOV.reflect, t); this._reflecting = false; }
+    if (!t.foot && S.WEAPONS[t.weapon].armor) dmg *= S.WEAPONS[t.weapon].armor;   // 重装机体减伤
     if (t.tal && t.tal.has('d4') && t.hp < this.maxHpOf(t) * 0.3) dmg *= 0.85;
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -5%
       let n = 0;
@@ -726,11 +753,12 @@ class Game {
     if (by && by.cubes && by !== t) dmg *= 1 + by.cubes * S.ESCAPE.crateDmg;   // 逃亡圈：空投箱
     if (this.tutorial && !t.bot) dmg = Math.min(dmg, Math.max(0, t.hp - 1));   // 教程里玩家不会倒下
     if (tOV && tOV.undying) dmg = Math.min(dmg, Math.max(0, t.hp - 1));         // 秦岳超载：老兵不死
+    if (t.tal && t.tal.has('d5') && !t.foot && !t.d5used && dmg >= t.hp) { dmg = Math.max(0, t.hp - 1); t.d5used = true; t.invulnT = 1.5; this.ev(['blk', t.id]); }   // 天赋：不屈装甲
     t.hp -= dmg; t.lastHurt = this.time;
     // 打中敌人给大招充能
     if (by && by.team !== t.team && this.players.has(by.id) && !by.foot && !(by.spT > 0)) {
       const bo = by.ovT > 0 ? S.OVERLOADS[by.pilot] : null;
-      by.sp = Math.min(S.WEAPONS[by.weapon].spNeed, by.sp + dmg * (by.pilot === 'candy' ? 1.2 : 1) * (by.tal.has('a3') ? 1.15 : 1) * (bo && bo.spGain ? bo.spGain : 1));
+      by.sp = Math.min(S.WEAPONS[by.weapon].spNeed, by.sp + dmg * (by.pilot === 'candy' ? 1.3 : 1) * (by.tal.has('a3') ? 1.15 : 1) * (bo && bo.spGain ? bo.spGain : 1));
     }
     // 超载充能：突破 I 以后，每局一次
     if (by && by !== t && by.team !== t.team && by.bt >= 1 && !by.ovUsed && by.ovT <= 0 && this.players.has(by.id)) by.ov = Math.min(S.OV_NEED, by.ov + dmg * (by.tal.has('s3') ? 1.2 : 1));
@@ -740,7 +768,7 @@ class Game {
   onTakedown(by) {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
-    if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.3);
+    if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.35);
     if (by.tal && by.tal.has('s4') && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + 15);
   }
   // 机体被摧毁：驾驶员弹出，6 秒后在驾驶员所在位置空投新机体
@@ -755,11 +783,11 @@ class Game {
     if (sh) { t.shield = sh; t.shieldT = 6; }
     t.invulnT = 0.7; t.ammo = S.AMMO; t.wheel = false;
     this.ev(['wreck', by ? by.id : 0, t.id, r1(x), r1(y), r1(z)]);
-    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 60, 30, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
+    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 45, 22, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
     this.knock(t, Math.random() - 0.5, Math.random() - 0.5, 150, 300);
   }
   redeploy(p) {
-    p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.invulnT = 1.0; p.rebuildT = 0;
+    p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.invulnT = 1.0; p.rebuildT = 0; p.d5used = false;
     this.ev(['mdrop', p.id, r1(p.x), r1(p.y), r1(p.z)]);
     for (const t of this.players.values()) {
       if (!t.alive || t.team === p.team || Math.hypot(t.x - p.x, t.y - p.y) > 75) continue;
@@ -783,7 +811,7 @@ class Game {
   respawn(p) {
     const sp = this.spawns ? { x: this.spawns[p.team].x + (p.slot ? 34 : 0), y: this.spawns[p.team].y + (p.slot ? 20 : 0) } : S.spawnPoint(p.team, p.slot);
     p.x = sp.x; p.y = sp.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.kx = p.ky = 0; p.onGround = true;
-    p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.alive = true; p.invulnT = 2.5;
+    p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.alive = true; p.invulnT = 2.5; p.d5used = false;
     p.sync++; p.lastPosT = this.time;
     p.input.f = false;
     p.input.a = p.team === 1 ? 0 : Math.PI;
@@ -862,6 +890,7 @@ class Game {
   activateSpecial(p) {
     const W = S.WEAPONS[p.weapon];
     p.sp = 0; p.spKind = W.special;
+    if (p.tal.has('s5')) for (const a of this.players.values()) if (a !== p && a.alive && a.team === p.team && dist(a, p) < 200) { a.shield = Math.max(a.shield, 30); a.shieldT = 4; }
     this.ev(['sp', p.id, p.spKind]);
     const a = p.input.a;
     switch (p.spKind) {
@@ -887,6 +916,12 @@ class Game {
         for (let i = 0; i < 3; i++) this.helpers.push({ id: this.nextId++, kind: 'drone', x: p.x, y: p.y, z: p.z + 40, team: p.team, owner: p.id, t: 8, cd: 0.25 + i * 0.15, ang: (i * Math.PI * 2) / 3 });
         break;
       case 'whirl': p.spT = 2.2; break;
+      case 'aegis': {
+        p.spT = 0.3;
+        const wx = p.x + Math.cos(a) * 46, wy = p.y + Math.sin(a) * 46;
+        this.helpers.push({ id: this.nextId++, kind: 'wall', x: wx, y: wy, z: this.top(wx, wy), team: p.team, owner: p.id, t: 6, cd: 99, ang: a + Math.PI / 2, half: 70 });
+        break;
+      }
       case 'sonic':
         p.spT = 0.3;
         this.explode(p.x, p.y, p.z + 10, 230, 48, 26, p.team, p, true);
@@ -1023,6 +1058,14 @@ class Game {
           pr.acc = 0;
           if (pr.z - gh < 55 && pr.z >= gh) this.paint(pr.x, pr.y, gh, pr.trail, pr.team, owner);
         }
+        // 敌方盾墙挡住子弹
+        let blocked = false;
+        for (const h of this.helpers) {
+          if (h.kind !== 'wall' || h.team === pr.team || pr.z > h.z + 80) continue;
+          const ux = Math.cos(h.ang), uy = Math.sin(h.ang), dx = pr.x - h.x, dy = pr.y - h.y, along = dx * ux + dy * uy, across = -dx * uy + dy * ux;
+          if (Math.abs(along) <= h.half && Math.abs(across) < 9 + pr.size) { blocked = true; break; }
+        }
+        if (blocked) { dead = true; this.ev(['blk', 0, r1(pr.x), r1(pr.y), r1(pr.z)]); break; }
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
@@ -1152,6 +1195,7 @@ class Game {
           for (const p of this.players.values()) {
             if (!p.alive || p.out || Math.hypot(p.x - k.x, p.y - k.y) > 28 || Math.abs(p.z - k.z) > 40) continue;
             p.cubes = Math.min(S.ESCAPE.maxCubes, (p.cubes || 0) + 1);
+            p.stats.cubes = (p.stats.cubes || 0) + 1;
             if (!p.foot) { const add = Math.round(p.maxHp * S.ESCAPE.crateHp); p.maxHp += add; }
             p.hp = Math.min(this.maxHpOf(p), p.hp + S.ESCAPE.crateHeal);
             this.ev(['crt', p.id, r1(k.x), r1(k.y), r1(k.z), p.cubes]);
@@ -1345,7 +1389,7 @@ class Game {
     }
     const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState(),
       rv: [0, this.reveal[1] > this.time ? 1 : 0, this.reveal[2] > this.time ? 1 : 0],
-      h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team]).concat(this.obj.crates ? this.obj.crates.map((k) => [k.id, 'crate', r1(k.x), r1(k.y), r1(k.z), 0]) : []) };
+      h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team, h.ang != null ? r2(h.ang) : 0]).concat(this.obj.crates ? this.obj.crates.map((k) => [k.id, 'crate', r1(k.x), r1(k.y), r1(k.z), 0]) : []) };
     if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj]);
     this.room.broadcast(msg, true);
     this.diff = []; this.events = [];
@@ -1387,6 +1431,19 @@ class Game {
   }
 
   stop() { this.over = true; if (this.interval) clearInterval(this.interval); }
+  // 比赛还没结束时的临时结算（逃亡圈提前退出用）：还活着的队伍排前面，已淘汰的按淘汰顺序倒排
+  partialResult() {
+    const o = this.obj, alive = [];
+    for (let t = 1; t <= this.teams; t++) if (this.aliveOf(t)) alive.push(t);
+    alive.sort((a, b) => this.aliveOf(b) - this.aliveOf(a));
+    const place = [...alive, ...o.elim.slice().reverse()];
+    const turf = S.countTurf(this.grid, this.M);
+    return {
+      mode: this.mode, map: this.mapIdx, winner: place[0], reason: 'early', turf: [turf.a / turf.tot, turf.b / turf.tot], score: o.score.slice(), count: null,
+      colorSet: this.colorSet, teams: this.teams, rounds: null, place,
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, ...p.stats })),
+    };
+  }
 }
 
 // =====================================================================
@@ -1451,19 +1508,22 @@ function botThink(g, p, dt) {
   let aim = { a: mx || my ? Math.atan2(my, mx) : inp.a, pt: -0.05 };
   inp.ad = 220;
 
-  if (enemy && ed < range * 1.05 && ai.seenT > ai.react) {
+  // 近战机体从更远处就开始冲上去（不然只会等敌人走到脸上）
+  const melee = !p.foot && (W.attack === 'punch' || p.weapon === 'roller' || p.weapon === 'bucket' || p.weapon === 'dozer' || p.weapon === 'flamer');
+  const engage = melee ? Math.max(range * 1.05, 300) : range * 1.05;
+  if (enemy && ed < engage && ai.seenT > ai.react) {
     const lead = ed / 650;
     aim = aimAt(p, enemy.x + enemy.vx * lead * 0.6, enemy.y + enemy.vy * lead * 0.6, enemy.z + 16);
     aim.a += (Math.random() - 0.5) * 0.18; aim.pt += (Math.random() - 0.5) * 0.06;
     inp.ad = ed;
-    wantAtk = true;
+    wantAtk = ed < range * 1.1;
     ai.strafeT -= dt;
     if (ai.strafeT <= 0) { ai.strafeT = rand(0.4, 1.1); ai.strafe = Math.random() < 0.5 ? -1 : 1; }
     const ea = Math.atan2(enemy.y - p.y, enemy.x - p.x);
     if (p.foot) {
       // 驾驶员：边退边打
       mx = -Math.cos(ea) * 0.7 + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.6; my = -Math.sin(ea) * 0.7 + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.6;
-    } else if (p.weapon === 'roller' || p.weapon === 'bucket' || p.weapon === 'fist') { mx = Math.cos(ea); my = Math.sin(ea); }
+    } else if (melee) { mx = Math.cos(ea) + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.35; my = Math.sin(ea) + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.35; }
     else if (p.weapon === 'charger') { mx = Math.cos(ea + Math.PI / 2) * ai.strafe * 0.5; my = Math.sin(ea + Math.PI / 2) * ai.strafe * 0.5; }
     else {
       const want = p.weapon === 'mortar' ? 0.75 : 0.55;
@@ -1508,7 +1568,7 @@ function botThink(g, p, dt) {
   // 大招
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
-    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220 }[sp];
+    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320 }[sp];
     if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < 0.002) {
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
@@ -1523,7 +1583,7 @@ function botThink(g, p, dt) {
     const use = {
       rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
       turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, overdrive: fight && p.ammo < 1, drone: fight,
-      rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210,
+      rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
     }[sk];
     if (use) {
       if (sk === 'dash' && enemy && !p.foot) { inp.mx = Math.cos(aim.a); inp.my = Math.sin(aim.a); }
@@ -1642,6 +1702,13 @@ class Room {
   remove(c) {
     this.members.delete(c.id);
     c.room = null;
+    // 逃亡圈：已淘汰的玩家提前退出 → 按当前名次结算（名次已经确定了）
+    const g0 = this.game, p0 = g0 && g0.players.get(c.id);
+    if (g0 && S.isEscape(g0.mode) && p0 && p0.out && !g0.over) {
+      const result = g0.partialResult();
+      c.conn.send({ t: 'end', result, early: true });
+      if (this.hub && this.hub.accounts) this.hub.accounts.applyResult(c, result);
+    }
     if (this.game) {
       this.game.removePlayer(c.id);
       if (this.game.humanCount() === 0) { this.game.stop(); this.game = null; this.state = 'lobby'; }

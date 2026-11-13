@@ -52,7 +52,7 @@ ok(p.weapon === 'charger', '可以换成已有的机体');
     const r = E.apply(q, 'buy', { chest: 'airdrop' }, rnd);
     for (const it of r.items) if (it.k === 'pilot' && before.has(it.id)) dupBad = true;
   }
-  ok(!dupBad && Object.keys(q.pilots).length === S.PILOTS.length && q.mechs.length === S.WEAPON_ORDER.length, '不会抽到重复角色，开够了能集齐全部驾驶员和机体');
+  ok(!dupBad && Object.keys(q.pilots).length === S.PILOTS.length - 1 && q.mechs.length === S.WEAPON_ORDER.length - 1 && !q.pilots.han && !q.mechs.includes('riot'), '不会抽到重复角色，开够了能集齐宝箱里的全部驾驶员和机体（任务角色韩冰 / 防暴盾卫不在宝箱里）');
   const r = E.apply(q, 'buy', { chest: 'airdrop' }, () => 0);
   ok(r.items.some((i) => i.dup) && !r.items.some((i) => i.k === 'pilot'), '全部拥有后，角色 / 机体奖励换成金币');
 }
@@ -91,13 +91,13 @@ ok(E.apply(Object.assign(E.newProfile('x'), { gems: 999 }), 'buy', { chest: 'sta
 {
   const q = E.newProfile('打'); const d0 = q.gems, c0 = q.coins;
   const rw = { xp: 200, trophies: 8, won: true, draw: false, mvp: true, kills: 4, paint: 300 };
-  const r = E.applyMatch(q, rw, Date.UTC(2026, 10, 13, 4));
+  const r = E.applyMatch(q, rw, Date.UTC(2026, 11, 13, 4));
   ok(q.coins - c0 === E.matchCoins(rw) + E.LEVELUP.coins * r.lvUps, `赢一局得金币 +${E.matchCoins(rw)}`);
   ok(q.gems - d0 === E.FIRST_WIN_GEMS + E.LEVELUP.gems * r.lvUps, '每日首胜 +20 宝石');
   const g1 = q.gems;
-  E.applyMatch(q, Object.assign({}, rw, { xp: 0 }), Date.UTC(2026, 10, 13, 9));
+  E.applyMatch(q, Object.assign({}, rw, { xp: 0 }), Date.UTC(2026, 11, 13, 9));
   ok(q.gems === g1, '同一天第二次赢不再给首胜宝石');
-  E.applyMatch(q, Object.assign({}, rw, { xp: 0 }), Date.UTC(2026, 10, 14, 9));
+  E.applyMatch(q, Object.assign({}, rw, { xp: 0 }), Date.UTC(2026, 11, 14, 9));
   ok(q.gems === g1 + E.FIRST_WIN_GEMS, '第二天又有首胜宝石');
 }
 

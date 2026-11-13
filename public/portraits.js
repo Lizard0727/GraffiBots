@@ -324,6 +324,12 @@
         s += `<path d="M104,226 Q120,280 172,286" fill="none" stroke="${LINE}" stroke-width="4"/><circle cx="176" cy="286" r="8" fill="#2a2d3a" ${ol(2)}/>`;
         s += `<path d="M300,96 v-26 l14,-4 v22" fill="none" stroke="${a}" stroke-width="4"/><circle cx="296" cy="96" r="5" fill="${a}"/><circle cx="310" cy="88" r="5" fill="${a}"/>`;
         break;
+      case 'han': // 战术护目镜 + 耳麦 + 眉骨疤
+        s += path(shape([[118, 176], [200, 166], [282, 176], [278, 200], [200, 192], [122, 200]]), 'rgba(122,240,255,0.55)', ol(3));
+        s += `<path d="M130,182 L270,182" stroke="#ffffff" stroke-width="3" opacity="0.7"/>`;
+        s += `<rect x="96" y="196" width="18" height="34" rx="7" fill="#2a2d3a" ${ol(2.4)}/><path d="M104,230 Q116,268 160,276" fill="none" stroke="${LINE}" stroke-width="3"/><circle cx="162" cy="276" r="5" fill="#2a2d3a" ${ol(2)}/>`;
+        s += `<path d="M232,150 L248,168" stroke="${mix(P.skin, '#7a2a1a', 0.55)}" stroke-width="3.4" stroke-linecap="round"/>`;
+        break;
       case 'yuzu': // 鼻贴 + 星星发夹
         s += `<g transform="rotate(-8 200 240)"><rect x="184" y="234" width="32" height="11" rx="5" fill="#ffe3b8" ${ol(2)}/><rect x="196" y="234" width="8" height="11" fill="#f2c890"/></g>`;
         for (const [x, y] of [[112, 108], [288, 108]]) s += `<path d="M${x},${y - 12} l4,8 l9,1 l-7,6 l2,9 l-8,-5 l-8,5 l2,-9 l-7,-6 l9,-1 Z" fill="#7be0ff" ${ol(1.8)}/>`;
@@ -433,6 +439,16 @@
         for (const x of [70, 330]) s += `<rect x="${x - 34}" y="374" width="68" height="14" rx="5" fill="#d6b44a" ${ol(2.4)} transform="rotate(${x < 200 ? -24 : 24} ${x} 381)"/>`;
         for (let i = 0; i < 3; i++) s += `<rect x="${226 + i * 18}" y="420" width="14" height="8" fill="${['#c94a3a', '#3a6dc9', '#d6b44a'][i]}" ${ol(1.4)}/>`;
         s += `<circle cx="244" cy="452" r="10" fill="#d6b44a" ${ol(2)}/><path d="M238,452 l4,4 l8,-8" stroke="#6b5a1a" stroke-width="2.4" fill="none"/>`;
+        break;
+      }
+      case 'security': {   // 深蓝防弹背心，胸前灰石集团标志被喷漆划掉
+        s += path(shape(SH), '#2a3346', ol(3));
+        s += path(shape([[90, 380], [160, 346], [176, 520, 1], [84, 520, 1]]), '#1d2433', ol(3));
+        s += path(shape(mirrorPts([[90, 380], [160, 346], [176, 520, 1], [84, 520, 1]])), '#1d2433', ol(3));
+        s += `<rect x="236" y="410" width="54" height="30" rx="4" fill="#9aa0a8" ${ol(2.4)}/><text x="263" y="431" text-anchor="middle" font-size="14" font-family="Impact, sans-serif" fill="#2a2d3a">GRAYCO</text>`;
+        s += `<path d="M228,442 L298,404" stroke="#ff5a36" stroke-width="7" stroke-linecap="round"/>`;
+        for (const y of [452, 476]) s += `<rect x="110" y="${y}" width="44" height="16" rx="3" fill="#3a4458" ${ol(2)}/>`;
+        s += `<path d="M168,338 L200,396 L232,338" fill="none" stroke="${P.accent}" stroke-width="5"/>`;
         break;
       }
       case 'rebel': {   // 灰色军装外套 + 红色喷漆臂章

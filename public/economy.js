@@ -44,6 +44,47 @@
   E.questName = (q) => E.QUESTS[q[0]].name.replace('{n}', q[1]);
   E.SEASON_PILOTS = ['flag', 'hammer', 'echo'];      // 本赛季新角色：只能从街头宝箱开出
   E.SEASON_MECHS = ['dozer', 'flamer', 'carrier', 'wrecker', 'megaphone'];
+  E.QUEST_ONLY = ['han', 'riot'];   // 只能通过任务获得，不会从宝箱开出
+  // ---------------- 限时活动 ----------------
+  const RW = (k, n) => ({ k, n }), RC = (id) => ({ k: 'chest', id, n: 1 }), RS = (id) => ({ k: 'skin', id });
+  E.EVENTS = [
+    { id: 'fightback', name: '灰城反击周', start: Date.UTC(2026, 10, 12, 16), end: Date.UTC(2026, 10, 26, 16), color: '#ff5a36',
+      desc: '反抗军发起总攻！活动期间每局对战的金币 ×1.5，完成下面的任务领取限定奖励。', coinMul: 1.5,
+      quests: [['play', 5, RC('military')], ['win', 5, RW('gems', 60)], ['kills', 30, RW('coins', 500)], ['paint', 8000, RS('av_can')], ['elim', 3, RC('airdrop')]] },
+    { id: 'escapefest', name: '逃亡圈狂欢', start: Date.UTC(2026, 10, 19, 16), end: Date.UTC(2026, 11, 3, 16), color: '#9cff2e',
+      desc: '毒圈又缩小了！活动期间逃亡圈对局的通行证经验 ×2，冲进前三名吧。', escPassMul: 2,
+      quests: [['escape', 5, RW('crystals', 1)], ['top3', 3, RW('gems', 80)], ['crates', 10, RC('military')]] },
+  ];
+  E.EVENT_STAT = { play: '完成 {n} 局对战', win: '赢 {n} 局', kills: '击毁 / 击倒 {n} 次', paint: '涂地 {n} 格', elim: '玩 {n} 局生死之战', escape: '玩 {n} 局逃亡圈', top3: '逃亡圈进入前三名 {n} 次', crates: '逃亡圈捡 {n} 个空投箱' };
+  E.statName = (k, n) => E.EVENT_STAT[k].replace('{n}', n);
+  E.activeEvents = (now) => E.EVENTS.filter((ev) => (now || Date.now()) >= ev.start && (now || Date.now()) < ev.end);
+  // ---------------- 任务线：叛将档案（永久） ----------------
+  E.STORY = { id: 'defector', name: '叛将档案', desc: '灰石集团的安保主管想要投诚……完成她的考验，把她和她的防暴盾卫带回反抗军。',
+    steps: [['play', 3], ['win', 3], ['kills', 20], ['elim', 2], ['paint', 5000]],
+    rewards: [[3, { k: 'mech', id: 'riot' }], [5, { k: 'pilot', id: 'han' }]] };
+  // ---------------- 信箱（系统邮件：版本补偿 / 活动礼包） ----------------
+  E.MAILS = [
+    { id: 'v11', t: Date.UTC(2026, 10, 12, 16), from: '灰城反抗军指挥部', title: '1.1 维护更新补偿', body: '感谢等待！1.1 版本带来了新驾驶员「韩冰」、防暴盾卫、限时活动、新天赋和观战模式。这是本次维护的补偿，请收下。', items: [RW('gems', 100), RC('military')] },
+    { id: 'fightback_gift', t: Date.UTC(2026, 10, 12, 16), from: '活动组', title: '「灰城反击周」开幕礼包', body: '总攻开始！先送上一份物资，活动期间对战金币 ×1.5。', items: [RW('coins', 500), RC('supply'), RC('supply')] },
+    { id: 'han_gift', t: Date.UTC(2026, 10, 12, 16), from: '韩冰', title: '叛将的见面礼', body: '我知道你们不信任我。这些零件是从灰石集团仓库里带出来的，就当是投名状吧。完成「叛将档案」，我就正式加入你们。', items: [RW('parts', 200), RW('crystals', 1)] },
+    { id: 'escapefest_gift', t: Date.UTC(2026, 10, 19, 16), from: '活动组', title: '「逃亡圈狂欢」礼包', body: '毒圈来了！逃亡圈通行证经验 ×2，这个空投箱祝你吃鸡。', items: [RC('airdrop')] },
+  ];
+  // ---------------- 限时购买：每 3 小时刷新，2 位驾驶员 + 1 台机体（只出常驻角色） ----------------
+  E.OFFER = { hours: 3, pilotPrice: 320, mechPrice: 260 };
+  E.offerSlot = (now) => Math.floor((now || Date.now()) / (E.OFFER.hours * 3600e3));
+  E.offers = function (o, now) {
+    const slot = E.offerSlot(now);
+    let h = (slot * 2654435761 + 97) >>> 0;
+    const rnd = () => { h = (h * 1103515245 + 12345) >>> 0; return h / 4294967296; };
+    const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const pp = shuffle(S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.QUEST_ONLY.includes(id)));
+    const mm = shuffle(S.WEAPON_ORDER.filter((id) => !E.SEASON_MECHS.includes(id) && !E.QUEST_ONLY.includes(id)));
+    // 优先给还没有的；都有了就照常显示（标成已拥有）
+    const pick = (list, has, n) => [...list.filter((id) => !has(id)), ...list.filter((id) => has(id))].slice(0, n);
+    return { slot, ends: (slot + 1) * E.OFFER.hours * 3600e3, pilots: pick(pp, (id) => !!o.pilots[id], 2), mech: pick(mm, (id) => o.mechs.includes(id), 1)[0] };
+  };
+  E.MAIL_DAYS = 30;   // 邮件 30 天后过期
+  E.mailbox = (o, now) => { now = now || Date.now(); return E.MAILS.filter((m) => now >= m.t && now < m.t + E.MAIL_DAYS * 86400e3).map((m) => Object.assign({}, m, { got: (o.mailGot || []).includes(m.id) })); };
   E.START = { coins: 200, gems: 40, parts: 30, crystals: 0 };
 
   // ---------------- 升级与突破 ----------------
@@ -92,8 +133,8 @@
   // ---------------- 资料 ----------------
   const POOL = {
     starter: () => E.STARTER_PILOTS,
-    standard: () => S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id)),
-    all: () => S.PILOTS.map((p) => p.id),
+    standard: () => S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.QUEST_ONLY.includes(id)),
+    all: () => S.PILOTS.map((p) => p.id).filter((id) => !E.QUEST_ONLY.includes(id)),
   };
   const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(+v || 0)));
   E.newProfile = function (name) {
@@ -104,7 +145,7 @@
       trophies: 0, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0, day: 0, dayWin: 0,
       talents: [], tal: [], tpBonus: 0,
       pass: { s: 1, xp: 0, prem: false, cf: [], cp: [] }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
-      skins: [], wear: {},
+      skins: [], wear: {}, mailGot: [], ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
     }, E.START);
   };
   // 读取任意来源的资料：旧版本直接重置成新手号；字段做类型和范围检查
@@ -139,6 +180,10 @@
       o.q = { d: int(p.q.d, 0, 1e7), dp: arr(p.q.dp, 3, 1e6), w: int(p.q.w, 0, 1e7), wp: arr(p.q.wp, 4, 1e7) };
     }
     o.skins = Array.isArray(p.skins) ? [...new Set(p.skins.filter((id) => S.skin(id)))] : [];
+    o.mailGot = Array.isArray(p.mailGot) ? [...new Set(p.mailGot.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
+    o.ev = {};
+    if (p.ev && typeof p.ev === 'object') for (const ev of E.EVENTS) { const q = p.ev[ev.id]; if (q) o.ev[ev.id] = { p: ev.quests.map((_, i) => int(Array.isArray(q.p) ? q.p[i] : 0, 0, 1e7)), c: ev.quests.map((_, i) => !!(Array.isArray(q.c) && q.c[i])) }; }
+    if (p.story && typeof p.story === 'object') o.story = { p: E.STORY.steps.map((_, i) => int(Array.isArray(p.story.p) ? p.story.p[i] : 0, 0, 1e7)), c: (Array.isArray(p.story.c) ? p.story.c : []).filter((n) => E.STORY.rewards.some((r) => r[0] === n)) };
     o.chests = {};
     if (p.chests && typeof p.chests === 'object') for (const c in E.CHESTS) { const n = int(p.chests[c], 0, 999); if (n) o.chests[c] = n; }
     E.setLoadout(o, p);
@@ -198,7 +243,7 @@
     for (const d of C.drops) {
       if (rand() >= d.p) continue;
       if (d.k === 'pilot' || d.k === 'mech') {
-        const pool = d.k === 'pilot' ? POOL[d.pool]().filter((id) => !o.pilots[id]) : S.WEAPON_ORDER.filter((id) => !o.mechs.includes(id));
+        const pool = d.k === 'pilot' ? POOL[d.pool]().filter((id) => !o.pilots[id]) : S.WEAPON_ORDER.filter((id) => !o.mechs.includes(id) && !E.QUEST_ONLY.includes(id));
         if (!pool.length) { items.push({ k: 'coins', n: C.dup, dup: d.k }); continue; }
         const id = pool[Math.floor(rand() * pool.length) % pool.length];
         items.push({ k: d.k, id });
@@ -328,6 +373,47 @@
         grant(o, items);
         return { ok: true, items: E.merge(items) };
       }
+      case 'claimMail': {
+        const box = E.mailbox(o, a.now), ids = a.id === '*' ? box.filter((m) => !m.got).map((m) => m.id) : [a.id];
+        const items = [];
+        for (const id of ids) { const m = box.find((x) => x.id === id); if (!m || m.got) continue; o.mailGot.push(id); items.push(...m.items.map((it) => Object.assign({}, it))); }
+        if (!items.length) return no('没有可以领取的邮件');
+        grant(o, items);
+        return { ok: true, items: E.merge(items) };
+      }
+      case 'claimEvent': {
+        const ev = E.activeEvents(a.now).find((x) => x.id === a.id), i = a.i | 0;
+        if (!ev) return no('活动已经结束了');
+        const q = ev.quests[i], st = o.ev[ev.id];
+        if (!q || !st || st.p[i] < q[1]) return no('任务还没完成');
+        if (st.c[i]) return no('已经领过了');
+        st.c[i] = true;
+        const it = Object.assign({}, q[2]);
+        grant(o, [it]);
+        return { ok: true, items: [it] };
+      }
+      case 'claimStory': {
+        const R = E.STORY.rewards.find((r) => r[0] === (a.n | 0));
+        if (!R) return no('没有这个奖励');
+        const done = E.STORY.steps.filter((st, i) => o.story.p[i] >= st[1]).length;
+        if (done < R[0]) return no(`要先完成 ${R[0]} 个任务`);
+        if (o.story.c.includes(R[0])) return no('已经领过了');
+        o.story.c.push(R[0]);
+        const it = Object.assign({}, R[1]);
+        grant(o, [it]);
+        return { ok: true, items: [it] };
+      }
+      case 'buyOffer': {
+        const of = E.offers(o, a.now), isP = of.pilots.includes(a.id), isM = of.mech === a.id;
+        if (!isP && !isM) return no('这个限时商品已经刷新掉了');
+        if (isP ? o.pilots[a.id] : o.mechs.includes(a.id)) return no('已经拥有了');
+        const price = isP ? E.OFFER.pilotPrice : E.OFFER.mechPrice;
+        if (o.gems < price) return no(`宝石不够（需要 ${price}）`);
+        o.gems -= price;
+        const it = { k: isP ? 'pilot' : 'mech', id: a.id };
+        grant(o, [it]);
+        return { ok: true, items: [it], spent: { gems: price } };
+      }
       case 'buySkin': {
         const K = S.skin(a.id);
         if (!K) return no('没有这个皮肤');
@@ -353,13 +439,23 @@
     o.xp += rw.xp; o.matches++; if (rw.won) o.wins++;
     o.kills += rw.kills; o.paint += rw.paint;
     o.trophies = Math.max(0, trBefore + rw.trophies);
-    const items = [{ k: 'coins', n: E.matchCoins(rw) }];
+    const evs = E.activeEvents(now), esc = rw.mode === 'escape4' || rw.mode === 'escape8';
+    const coinMul = evs.reduce((m, ev) => m * (ev.coinMul || 1), 1);
+    const items = [{ k: 'coins', n: Math.round(E.matchCoins(rw) * coinMul), why: coinMul > 1 ? '活动加成' : undefined }];
+    if (!items[0].why) delete items[0].why;
+    const gainS = { play: 1, win: rw.won ? 1 : 0, kills: rw.kills, paint: rw.paint, elim: rw.mode === 'elim' ? 1 : 0, escape: esc ? 1 : 0, top3: esc && rw.rank && rw.rank <= 3 ? 1 : 0, crates: rw.cubes || 0 };
+    for (const ev of evs) {
+      const st = o.ev[ev.id] || (o.ev[ev.id] = { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) });
+      ev.quests.forEach((q, i) => { st.p[i] = Math.min(q[1], st.p[i] + (gainS[q[0]] || 0)); });
+    }
+    E.STORY.steps.forEach((q, i) => { o.story.p[i] = Math.min(q[1], o.story.p[i] + (gainS[q[0]] || 0)); });
     const d = E.dayIndex(now);
     if (o.day !== d) { o.day = d; o.dayWin = 0; }
     if (rw.won && !o.dayWin) { o.dayWin = 1; items.push({ k: 'gems', n: E.FIRST_WIN_GEMS, why: '每日首胜' }); }
     // 通行证经验 + 每日 / 每周任务
-    const pxp = E.matchPassXp(rw);
-    items.push({ k: 'passxp', n: pxp, why: '对战' });
+    const pmul = esc ? evs.reduce((m, ev) => m * (ev.escPassMul || 1), 1) : 1;
+    const pxp = E.matchPassXp(rw) * pmul;
+    items.push({ k: 'passxp', n: pxp, why: pmul > 1 ? '对战（活动 ×2）' : '对战' });
     const wk = E.weekIndex(now);
     if (o.q.d !== d) { o.q.d = d; o.q.dp = [0, 0, 0]; }
     if (o.q.w !== wk) { o.q.w = wk; o.q.wp = [0, 0, 0, 0]; }

@@ -81,6 +81,9 @@
       <button class="wallet" id="wallet" data-ov="chests" title="宝箱 · 商店 · 兑换"></button>
       <div class="top-gap"></div>
       <div id="connStatus" class="conn">正在连接服务器…</div>
+      <button class="icon-btn has-badge" data-ov="events" title="活动" data-icon="event"><em class="badge hidden" id="evBadge">!</em></button>
+      <button class="icon-btn has-badge" data-ov="mail" title="信箱" data-icon="mail"><em class="badge hidden" id="mailBadge">0</em></button>
+      <button class="icon-btn" id="newsBtn" title="更新公告" data-icon="news"></button>
       <button class="icon-btn" data-ov="guide" title="玩法说明" data-icon="help"></button>
       <button class="icon-btn" id="homeSettings" title="设置" data-icon="gear"></button>
     </header>
@@ -157,6 +160,7 @@
     <section id="ov-chests" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>宝箱 · 商店</h2><small>全部靠玩获得：宝石来自每日首胜、账号升级和宝箱</small><div class="wallet in-ov" id="wallet2"></div></header>
       <div class="ov-body">
+        <h3>限时购买 <small id="offerEnds">每 3 小时刷新</small></h3><div id="offerRow" class="chest-row"></div>
         <h3>我的宝箱</h3><div id="myChests" class="chest-row"></div>
         <h3>宝石商店 <small>点「概率」查看每种奖励的开出概率</small></h3><div id="shopChests" class="chest-row"></div>
         <h3>宝石兑换</h3><div id="exchangeList" class="xchg-row"></div>
@@ -177,6 +181,14 @@
         <div class="rare-legend" id="rareLegend"></div>
         <div class="skin-grid" id="skinGrid"></div>
       </div>
+    </section>
+    <section id="ov-events" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>活动</h2><small>限时活动和任务线，完成任务领奖励</small></header>
+      <div class="ov-body"><div class="ev-list" id="evList"></div></div>
+    </section>
+    <section id="ov-mail" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>信箱</h2><small>版本补偿和活动礼包会发到这里，30 天内有效</small><button class="btn" id="mailAll">全部领取</button></header>
+      <div class="ov-body narrow"><div id="mailList"></div></div>
     </section>
     <section id="ov-talents" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>天赋树</h2><small>账号每升 1 级得 1 点天赋点。点亮后可以装上，每局最多带 3 个</small><div class="tal-top" id="talTop"></div></header>
@@ -307,6 +319,15 @@
     <button class="tb t-mini t-chat" data-tb="chat"><span>💬</span></button>
   </div>
   <div id="rotateHint"><div><b>⟳</b><p>请把手机横过来玩</p></div></div>
+  <!-- 更新公告 -->
+  <div id="newsDlg" class="dlg hidden"><div class="dlg-card news-card"><div class="news-tag">更新公告</div><h2 id="newsTitle"></h2><small id="newsDate"></small><div id="newsBody" class="news-body"></div><button class="btn" id="newsOk">知道了，开打！</button></div></div>
+  <!-- 观战栏 -->
+  <div id="specBar" class="hidden">
+    <button class="spec-arrow" id="specPrev">◀</button>
+    <div class="spec-mid"><div id="specWho"></div><small id="specMsg"></small></div>
+    <button class="spec-arrow" id="specNext">▶</button>
+    <button class="btn small" id="specLeave">退出并结算</button>
+  </div>
   <!-- 新手教程提示卡 -->
   <div id="tutBox" class="hidden">
     <div class="tut-face" id="tutFace"></div>

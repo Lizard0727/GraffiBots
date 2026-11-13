@@ -45,6 +45,9 @@
     escape: (c = '#9aa0a8') => `<path d="M24,3 C36,3 45,12 45,24 C45,36 36,45 24,45 C12,45 3,36 3,24 C3,12 12,3 24,3 Z" fill="${c}" ${st()}/>
       <path d="M24,11 C31,11 37,17 37,24 C37,31 31,37 24,37 C17,37 11,31 11,24 C11,17 17,11 24,11 Z" fill="#9cff2e" ${st(2.6)} stroke-dasharray="5 3"/>
       <path d="M21,16 L28,16 L28,24 L33,24 L24,33 L15,24 L21,24 Z" fill="#ffe600" ${st(2.4)}/>`,
+    mail: (c = '#fff6e3') => `<path d="M5,12 L43,12 L43,38 L5,38 Z" fill="${c}" ${st()}/><path d="M5,12 L24,27 L43,12" fill="none" ${st()}/><circle cx="38" cy="12" r="6" fill="#ff3ea5" ${st(2.2)}/>`,
+    event: (c = '#ff5a36') => `<path d="M8,16 L40,16 L40,42 L8,42 Z" fill="${c}" ${st()}/><path d="M6,10 L42,10 L42,17 L6,17 Z" fill="#ffe600" ${st()}/><path d="M24,10 L24,42" stroke="#ffe600" stroke-width="5"/><path d="M24,10 C18,2 10,6 16,10 M24,10 C30,2 38,6 32,10" fill="none" ${st(2.6)}/>`,
+    news: (c = '#1fd6ee') => `<path d="M8,6 L34,6 L40,12 L40,42 L8,42 Z" fill="#fff6e3" ${st()}/><path d="M14,16 L34,16 M14,23 L34,23 M14,30 L28,30" ${st(2.6)}/><path d="M30,32 L42,20 L46,24 L34,36 L29,37 Z" fill="${c}" ${st(2.2)}/>`,
     // 能力
     super: (c = '#ffdf2e') => `<path d="M24,3 L29,17 L44,14 L33,25 L42,38 L27,33 L22,46 L19,32 L5,36 L14,24 L4,13 L19,16 Z" fill="${c}" ${st()}/><circle cx="24" cy="24" r="5" fill="#ff3ea5" ${st(2.2)}/>`,
     skill: (c = '#7af0ff') => `<path d="M22,4 C24,16 28,20 41,22 C28,25 24,29 22,44 C20,29 16,25 4,23 C16,20 20,16 22,4 Z" fill="${c}" ${st()}/><path d="M39,6 L40,13 M36,10 L43,9" ${st(2.6)}/>`,
