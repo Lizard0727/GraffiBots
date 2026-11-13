@@ -14,13 +14,13 @@ const bot = (x = 900, y = 640) => ({ x, y, z: 0, vx: 0, vy: 0, vz: 0, onGround: 
 const run = (p, inp, sec, M = flat, g = grid) => { let maxZ = p.z; for (let t = 0; t < sec; t += DT) { S.stepMove(p, typeof inp === 'function' ? inp(t) : inp, DT, g, M, 1); maxZ = Math.max(maxZ, p.z); } return maxZ; };
 
 // 1. 起步加速有过程，不是瞬间满速
-{ const p = bot(); run(p, { mx: 1, my: 0 }, 0.05); const v1 = p.vx; run(p, { mx: 1, my: 0 }, 0.5); ok(v1 < 120 && Math.abs(p.vx - 165) < 2, `行走起步：0.05s 时 ${v1.toFixed(0)}，0.55s 后 ${p.vx.toFixed(0)}（满速 165）`); }
+{ const W = S.SPEED.walk; const p = bot(); run(p, { mx: 1, my: 0 }, 0.03); const v1 = p.vx; run(p, { mx: 1, my: 0 }, 0.5); ok(v1 > W * 0.3 && v1 < W * 0.7 && Math.abs(p.vx - W) < 2, `行走起步：0.03s 时 ${v1.toFixed(0)}，之后满速 ${p.vx.toFixed(0)}（${W}）`); }
 // 2. 松手后有短暂滑行
-{ const p = bot(); run(p, { mx: 1, my: 0 }, 0.6); const x0 = p.x; run(p, {}, 0.5); ok(p.x - x0 > 4 && p.x - x0 < 20 && p.vx === 0, `行走急停滑行 ${(p.x - x0).toFixed(1)} 单位`); }
+{ const p = bot(); run(p, { mx: 1, my: 0 }, 0.6); const x0 = p.x; run(p, {}, 0.5); ok(p.x - x0 > 2 && p.x - x0 < 20 && p.vx === 0, `行走急停滑行 ${(p.x - x0).toFixed(1)} 单位`); }
 // 3. 己方涂料上滚轮惯性大、滑得远
-{ const g = new Uint8Array(S.GW * S.GH).fill(1); const p = bot(); run(p, { mx: 1, my: 0, w: true }, 1, flat, g); const v = p.vx, x0 = p.x; run(p, { w: true }, 0.6, flat, g); ok(Math.abs(v - 320) < 2 && p.x - x0 > 80, `滚轮满速 ${v.toFixed(0)}，松手滑行 ${(p.x - x0).toFixed(0)} 单位`); }
+{ const g = new Uint8Array(S.GW * S.GH).fill(1); const p = bot(); run(p, { mx: 1, my: 0, w: true }, 1, flat, g); const v = p.vx, x0 = p.x; run(p, { w: true }, 0.6, flat, g); ok(Math.abs(v - S.SPEED.wheelOwn) < 2 && p.x - x0 > 80, `滚轮满速 ${v.toFixed(0)}，松手滑行 ${(p.x - x0).toFixed(0)} 单位`); }
 // 4. 敌方涂料又黏又慢
-{ const g = new Uint8Array(S.GW * S.GH).fill(2); const p = bot(); run(p, { mx: 1, my: 0 }, 1, flat, g); ok(p.vx <= 80.5, `敌方涂料上行走速度 ${p.vx.toFixed(0)}`); }
+{ const g = new Uint8Array(S.GW * S.GH).fill(2); const p = bot(); run(p, { mx: 1, my: 0 }, 1, flat, g); ok(p.vx <= S.SPEED.enemy + 0.5, `敌方涂料上行走速度 ${p.vx.toFixed(0)}`); }
 // 5. 跳跃高度：长按全跳能上矮台(40)，短按小跳更低；滚轮跳能上高台(80)
 { const p = bot(); const h = run(p, (t) => ({ j: t < 0.6, jh: t < 0.6 }), 1.2); const q = bot(); const hs = run(q, (t) => ({ j: t < 0.06, jh: t < 0.06 }), 1.2);
   const w = bot(); const hw = run(w, (t) => ({ j: t < 0.6, jh: t < 0.6, w: true }), 1.2);

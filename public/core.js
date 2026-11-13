@@ -217,7 +217,7 @@ class Game {
       const dtAllow = Math.min(0.6, this.time - p.lastPosT) + 0.05;
       if (S.padAt(this.M, p.x, p.y) || S.padAt(this.M, m.x, m.y)) p.kbT = this.time;   // 踩到弹跳板也会被弹飞
       const kb = this.time - (p.kbT || -9) < 1.2 ? 540 : 0;     // 刚被击退：放宽速度上限
-      const maxStep = (330 * p.sm + 40 + kb) * dtAllow + 12;
+      const maxStep = (380 * p.sm + 40 + kb) * dtAllow + 12;
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       const gh = this.top(m.x, m.y);
       const test = { x: m.x, y: m.y, z: m.z };
@@ -225,7 +225,7 @@ class Game {
       const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? (S.PAD.v * S.PAD.v) / (2 * S.GRAV) : 0);
       if (d <= maxStep && !bad) {
         p.x = m.x; p.y = m.y; p.z = Math.max(gh, m.z); p.lastPosT = this.time;
-        const vmax = 420 * p.sm + kb;
+        const vmax = 460 * p.sm + kb;
         p.vx = clamp(+m.vx || 0, -vmax, vmax); p.vy = clamp(+m.vy || 0, -vmax, vmax); p.vz = clamp(+m.vz || 0, -2000, 600);
         p.onGround = p.z <= gh + 1;
       } else {

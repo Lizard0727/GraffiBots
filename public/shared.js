@@ -400,6 +400,8 @@
     return { blaster: 0.9, roller: 1, charger: 0.5, bucket: 0.85, gatling: 0.6, mortar: 0.9, fist: 1 }[weapon] || 1;
   };
   // ground: 脚下涂料（-1 表示在空中）
+  // 速度表：比旧版快一档，起步和急停更干脆（手感参考快节奏的俯视乱斗游戏）
+  S.SPEED = { walk: 190, enemy: 88, wheelOwn: 345, wheelDry: 130, wheelEnemy: 75, airWalk: 190, airWheel: 270 };
   S.speedFor = function (team, sm, ground, wheel, mul, foot) {
     let s;
     if (foot) {
@@ -407,18 +409,19 @@
       const enemy = ground > 0 && ground !== team;
       return (enemy ? 125 : S.PILOT_SPEED) * (sm || 1);
     }
-    if (ground < 0) s = wheel ? 250 : 165 * mul;
+    const V = S.SPEED;
+    if (ground < 0) s = wheel ? V.airWheel : V.airWalk * mul;
     else {
       const own = ground === team, enemy = ground !== 0 && ground !== team;
-      s = wheel ? (own ? 320 : enemy ? 70 : 115) : (enemy ? 80 : 165) * mul;
+      s = wheel ? (own ? V.wheelOwn : enemy ? V.wheelEnemy : V.wheelDry) : (enemy ? V.enemy : V.walk) * mul;
     }
     return s * (sm || 1);
   };
   // ---------------- 物理手感参数 ----------------
   // 加速度单位：单位/秒²。机兵有质量感：起步要加速、松手会滑行、急转会刹车。
   S.PHYS = {
-    walk: { acc: 1500, brake: 2300, coast: 1700 },        // 双足行走：抓地好
-    wheelOwn: { acc: 1150, brake: 900, coast: 240 },      // 己方涂料上的滚轮：滑溜、惯性大
+    walk: { acc: 2800, brake: 3800, coast: 3300 },        // 双足行走：抓地好，几乎即按即走、即松即停
+    wheelOwn: { acc: 1500, brake: 1000, coast: 260 },     // 己方涂料上的滚轮：滑溜、惯性大
     wheelDry: { acc: 700, brake: 1100, coast: 900 },      // 无涂料地面上的滚轮
     sticky: { acc: 520, brake: 2600, coast: 2600 },       // 敌方涂料：又黏又慢
     air: { acc: 520, brake: 620, coast: 90 },             // 空中：保留动量，少量空中控制

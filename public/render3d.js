@@ -928,43 +928,67 @@
     }
   }
 
-  function buildParticles() {
+  // ---------------- 粒子：每颗有自己的大小、透明度、寿命；分普通（涂料、烟）和发光叠加两套 ----------------
+  const PVS = `attribute float size; attribute float alpha; varying vec3 vC; varying float vA;
+    void main(){ vC = color; vA = alpha; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (520.0 / -mv.z); gl_Position = projectionMatrix * mv; }`;
+  const PFS = `varying vec3 vC; varying float vA; uniform float soft;
+    void main(){ vec2 d = gl_PointCoord - 0.5; float r = length(d); if (r > 0.5) discard;
+      float a = soft > 0.5 ? smoothstep(0.5, 0.0, r) : smoothstep(0.5, 0.38, r); gl_FragColor = vec4(vC, a * vA); }`;
+  function makePS(n, additive, soft) {
     const g = new T.BufferGeometry();
-    W.pPos = new Float32Array(PN * 3); W.pCol = new Float32Array(PN * 3);
-    for (let i = 0; i < PN; i++) W.pPos[i * 3 + 1] = -9999;
-    g.setAttribute('position', new T.BufferAttribute(W.pPos, 3));
-    g.setAttribute('color', new T.BufferAttribute(W.pCol, 3));
-    const m = new T.PointsMaterial({ size: 7, vertexColors: true, sizeAttenuation: true, transparent: true, depthWrite: false });
-    W.points = new T.Points(g, m);
-    W.points.frustumCulled = false;
-    scene.add(W.points);
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), size = new Float32Array(n), alpha = new Float32Array(n);
+    for (let i = 0; i < n; i++) pos[i * 3 + 1] = -9999;
+    g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
+    g.setAttribute('size', new T.BufferAttribute(size, 1)); g.setAttribute('alpha', new T.BufferAttribute(alpha, 1));
+    const m = new T.ShaderMaterial({ vertexShader: PVS, fragmentShader: PFS, vertexColors: true, transparent: true, depthWrite: false,
+      blending: additive ? T.AdditiveBlending : T.NormalBlending, uniforms: { soft: { value: soft ? 1 : 0 } } });
+    const pts = new T.Points(g, m); pts.frustumCulled = false; scene.add(pts);
+    return { pts, pos, col, size, alpha, d: new Array(n).fill(null), i: 0, n };
   }
-  function burst(x, y, z, color, n, spd = 220, up = 1) {
+  function buildParticles() {
+    W.ps = makePS(PN, false, false);        // 涂料飞溅、碎片
+    W.pg = makePS(900, true, true);         // 发光：枪口火光、火花、能量
+    W.pk = makePS(500, false, true);        // 烟雾：柔和的大颗粒
+  }
+  const _c = new T.Color();
+  // opt: { size, life, grav, drag, grow, sys: 'ps'|'pg'|'pk', spread, dir: {x,y,z} }
+  function emit(x, y, z, color, n, spd = 220, up = 1, opt = {}) {
     if (!W) return;
-    const c = new T.Color(color);
+    const S2 = W[opt.sys || 'ps'];
+    _c.set(color);
     for (let k = 0; k < n; k++) {
-      const i = W.pi; W.pi = (W.pi + 1) % PN;
+      const i = S2.i; S2.i = (S2.i + 1) % S2.n;
       const a = Math.random() * 6.283, e = 0.15 + Math.random() * 1.1 * up, v = spd * (0.3 + Math.random());
-      W.pd[i] = { x, y, z, vx: Math.cos(a) * Math.cos(e) * v, vy: Math.sin(a) * Math.cos(e) * v, vz: Math.sin(e) * v, life: 0.35 + Math.random() * 0.5 };
-      W.pCol[i * 3] = c.r; W.pCol[i * 3 + 1] = c.g; W.pCol[i * 3 + 2] = c.b;
+      let vx = Math.cos(a) * Math.cos(e) * v, vy = Math.sin(a) * Math.cos(e) * v, vz = Math.sin(e) * v;
+      if (opt.dir) { const sp = opt.spread == null ? 0.35 : opt.spread; vx = (opt.dir.x + (Math.random() - 0.5) * sp) * v; vy = (opt.dir.y + (Math.random() - 0.5) * sp) * v; vz = (opt.dir.z + (Math.random() - 0.3) * sp) * v; }
+      const life = (opt.life || 0.5) * (0.6 + Math.random() * 0.8);
+      S2.d[i] = { x, y, z, vx, vy, vz, life, max: life, s0: (opt.size || 7) * (0.7 + Math.random() * 0.6), grow: opt.grow || 0, grav: opt.grav == null ? 760 : opt.grav, drag: opt.drag || 0 };
+      S2.col[i * 3] = _c.r; S2.col[i * 3 + 1] = _c.g; S2.col[i * 3 + 2] = _c.b;
     }
-    W.points.geometry.attributes.color.needsUpdate = true;
+    S2.pts.geometry.attributes.color.needsUpdate = true;
   }
-  function stepParticles(dt) {
-    const P = W.pPos;
-    for (let i = 0; i < PN; i++) {
-      const p = W.pd[i];
+  function burst(x, y, z, color, n, spd = 220, up = 1) { emit(x, y, z, color, n, spd, up, { size: 7, life: 0.6 }); }
+  function stepPS(S2, dt) {
+    const P = S2.pos;
+    for (let i = 0; i < S2.n; i++) {
+      const p = S2.d[i];
       if (!p) continue;
       p.life -= dt;
-      if (p.life <= 0) { W.pd[i] = null; P[i * 3 + 1] = -9999; continue; }
-      p.vz -= 760 * dt;
+      if (p.life <= 0) { S2.d[i] = null; P[i * 3 + 1] = -9999; S2.alpha[i] = 0; continue; }
+      p.vz -= p.grav * dt;
+      if (p.drag) { const f = Math.exp(-p.drag * dt); p.vx *= f; p.vy *= f; p.vz *= f; }
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
       const gh = S.topAt(W.M, p.x, p.y);
-      if (p.z < gh && gh < 1e3) { p.z = gh + 0.5; p.vx *= 0.4; p.vy *= 0.4; p.vz = 0; }
+      if (p.grav > 0 && p.z < gh && gh < 1e3) { p.z = gh + 0.5; p.vx *= 0.4; p.vy *= 0.4; p.vz = 0; }
+      const k = p.life / p.max;
       P[i * 3] = p.x; P[i * 3 + 1] = p.z; P[i * 3 + 2] = p.y;
+      S2.size[i] = p.s0 * (1 + p.grow * (1 - k));
+      S2.alpha[i] = Math.min(1, k * 2.2);
     }
-    W.points.geometry.attributes.position.needsUpdate = true;
+    const g = S2.pts.geometry.attributes;
+    g.position.needsUpdate = true; g.size.needsUpdate = true; g.alpha.needsUpdate = true;
   }
+  function stepParticles(dt) { stepPS(W.ps, dt); stepPS(W.pg, dt); stepPS(W.pk, dt); }
 
   // =====================================================================
   // 机兵模型
@@ -1457,7 +1481,7 @@
     for (const g of [lower, lean, wpnMount, wpn, arm, spinG]) bake(g);
     for (const L of legs) { bake(L.hip); bake(L.knee); bake(L.ankle); }
     return {
-      root, body, hips, lower, upper, lean, legs, flames, foot, flegs, fpilot: fp, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
+      root, body, hips, lower, upper, lean, legs, flames, foot, flegs, fpilot: fp, color, fxAcc: 0, stepPh: 0, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
       fadeMats: [wheelMat, hubMat, spokeMat, tireMat, treadMat], shield, ud: wpn.userData,
       // 动画状态
       punch: 0, punchV: 0, spin: 0, moveA: 0, phase: 0, legYaw: 0, face: null, zs: null, lvx: 0, lvy: 0, avx: 0, avy: 0,
@@ -1499,7 +1523,11 @@
     const vz = st.vz || 0;
     const air = Math.abs(vz) > 30;
     if (air) b.airT += dt; else {
-      if (b.airT > 0.12 && b.lastVz < -120) b.suspV -= Math.min(140, -b.lastVz * 0.16);
+      if (b.airT > 0.12 && b.lastVz < -120) {
+        b.suspV -= Math.min(140, -b.lastVz * 0.16);
+        // 落地扬尘：一圈往外推的烟
+        if (W && b.root.visible !== false) { const n = Math.min(14, 4 + (-b.lastVz) / 60); for (let k = 0; k < n; k++) { const a = (k / n) * 6.283; emit(st.x + Math.cos(a) * 10, st.y + Math.sin(a) * 10, z + 2, '#d8d4e4', 1, 90, 0.1, { sys: 'pk', size: 16, life: 0.55, grav: -20, drag: 4, grow: 1.4, dir: { x: Math.cos(a), y: Math.sin(a), z: 0.1 }, spread: 0.2 }); } }
+      }
       b.airT = 0;
     }
     b.lastVz = vz;
@@ -1531,6 +1559,8 @@
       b.wheelTilt.rotation.x = b.wroll;
       b.wheel.position.y = 14 + b.susp * 0.6;
       b.wheel.scale.set(1 - b.susp * 0.02, 1 + b.susp * 0.03, 1 - b.susp * 0.02);
+      // 滚轮高速：身后拖出队伍色光迹
+      if (sp > 240 && W && !air) { b.fxAcc += dt; if (b.fxAcc > 0.025) { b.fxAcc = 0; emit(st.x - Math.cos(b.moveA) * 12, st.y - Math.sin(b.moveA) * 12, z + 6, b.color, 1, 20, 0.2, { sys: 'pg', size: 12, life: 0.35, grav: 0, drag: 2 }); } }
       return;
     }
     // ---- 双足 ----
@@ -1553,7 +1583,13 @@
     // 步态
     const s01 = clampN(sp / 165, 0, 1.6);
     b.walkAmt += ((air ? 0 : Math.min(1, s01 * 1.5)) - b.walkAmt) * Math.min(1, dt * 10);
-    b.phase += (dir * Math.PI * 2 * sp * dt) / 30;
+    b.phase += (dir * Math.PI * 2 * sp * dt) / 26;
+    // 脚步扬尘：每一步落地时在脚下冒一小团烟
+    if (!air && sp > 110 && W && Math.floor(b.phase / Math.PI) !== b.stepPh) {
+      b.stepPh = Math.floor(b.phase / Math.PI);
+      const side = b.stepPh % 2 ? 1 : -1, fx = st.x - Math.sin(b.face) * 6 * side, fy = st.y + Math.cos(b.face) * 6 * side;
+      emit(fx, fy, z + 1, '#cfcbdc', 2, 30, 0.3, { sys: 'pk', size: 10, life: 0.45, grav: -15, drag: 3, grow: 1.2 });
+    }
     const A = 0.55 * Math.min(1.25, s01) * b.walkAmt, KS = 1.1 * Math.min(1.25, s01) * b.walkAmt, K0 = 0.18;
     let maxDrop = 0;
     const pose = [];
@@ -1645,9 +1681,20 @@
       animateBot(b, { x: p.x, y: p.y, z: p.z, vx: p.vx, vy: p.vy, vz: p.vz, a: p.a, pt: p.pt, flags: p.flags, charge: p.charge, tank: p.tank, flash: p.flash, weapon: p.weapon }, now, dt);
       if (!vis) continue;
       b.root.visible = true;
+      // 持续光环：冲锋火焰 / 加速 / 火力全开 / 跳跃砸地的尾迹 / 大招发动中发光
+      b.auraAcc = (b.auraAcc || 0) + dt;
+      if (b.auraAcc > 0.03) {
+        b.auraAcc = 0;
+        const z = p.z || 0, bf = p.buffs || 0;
+        if (p.flags & 128 && p.spk === SP_CHARGE) for (let k = 0; k < 3; k++) emit(p.x + (Math.random() - 0.5) * 26, p.y + (Math.random() - 0.5) * 26, z + 6 + Math.random() * 20, k ? '#ffb02e' : G.colors[p.team], 1, 40, 1, { sys: 'pg', size: 16, life: 0.4, grav: -120, drag: 2, grow: -0.4 });
+        if (bf & 1 && Math.hypot(p.vx || 0, p.vy || 0) > 60) emit(p.x, p.y, z + 18, '#fff36b', 2, 30, 0.3, { sys: 'pg', size: 9, life: 0.35, grav: 0, drag: 3 });
+        if (bf & 16) emit(p.x + Math.cos(p.a) * 18, p.y + Math.sin(p.a) * 18, z + 22, '#ff7a2e', 2, 40, 1, { sys: 'pg', size: 11, life: 0.35, grav: -160, drag: 2 });
+        if (bf & 32) emit(p.x, p.y, z + 14, G.colors[p.team], 3, 30, 0.5, { sys: 'pg', size: 14, life: 0.4, grav: 0, drag: 3 });
+        if (bf & 2) emit(p.x, p.y, z + 30, '#7af0ff', 1, 20, 0.5, { sys: 'pg', size: 8, life: 0.3, grav: 0 });
+      }
       if (wheel) for (const m of b.fadeMats) m.opacity = fade;
       if (p.flash > 0) b.bodyMat.emissive.setRGB(0.8, 0.8, 0.8);
-      else if (p.spk === SP_CHARGE && p.flags & 128) b.bodyMat.emissive.set(G.colors[p.team]).multiplyScalar(0.4 + 0.3 * Math.sin(now / 60));
+      else if (p.flags & 128) b.bodyMat.emissive.set(G.colors[p.team]).multiplyScalar(0.35 + 0.3 * Math.sin(now / 50));
       else b.bodyMat.emissive.setRGB(0, 0, 0);
       b.shield.visible = p.shield > 0;
       if (p.shield > 0) b.shield.material.opacity = 0.16 + 0.08 * Math.sin(now / 120);
@@ -1962,7 +2009,7 @@
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
-    build, paintCell, burst, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, setQuality,
+    build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();

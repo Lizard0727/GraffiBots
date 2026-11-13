@@ -986,8 +986,12 @@
       case 'px': { const pr = G.projs.get(e[1]); if (pr) { killProj(pr, e[2], e[3], e[4]); if (!silent && nearMe(e[2], e[3], 320)) sfx.splat(); } break; }
       case 'hit': {
         const t = G.players.get(e[1]);
-        if (t) t.flash = 0.1;
-        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; sfx.hit(); }
+        if (t) {
+          t.flash = 0.1;
+          const tx = e[1] === myId && G.me ? G.me.px : t.x, ty = e[1] === myId && G.me ? G.me.py : t.y, tz = (e[1] === myId && G.me ? G.me.pz : t.z) || 0;
+          R3.emit(tx, ty, tz + 18, e[3] ? '#bef6ff' : '#ffffff', e[4] > 30 ? 8 : 4, 200, 0.8, { sys: 'pg', size: 8, life: 0.2, grav: 0, drag: 5 });
+        }
+        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; sfx.hit(); if (e[4] > 40) G.shake = Math.max(G.shake, 3); }
         // 伤害数字：只显示和自己有关的
         if (t && e[4] > 0 && !silent && (e[2] === myId || e[1] === myId)) G.dmgTexts.push({ id: e[1], dx: (Math.random() - 0.5) * 24, text: String(e[4]), color: e[1] === myId ? '#ff5a6a' : '#fff', t: now });
         break;
@@ -996,8 +1000,8 @@
         const by = G.players.get(e[1]), v = G.players.get(e[2]);
         if (!v) break;
         const col = G.colors[by ? by.team : 3 - v.team];
-        R3.burst(e[3], e[4], (e[5] || 0) + 18, col, 40, 300);
-        R3.burst(e[3], e[4], (e[5] || 0) + 18, '#3a3e52', 24, 260);
+        boomFx(e[3], e[4], e[5] || 0, col, true);
+        R3.emit(e[3], e[4], (e[5] || 0) + 18, '#3a3e52', 24, 300, 1.2, { size: 9, life: 1 });
         G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r: 70, color: col, t0: now, dur: 500 });
         G.feed.unshift({ by, v, t: now, wreck: true }); if (G.feed.length > 5) G.feed.pop();
         if (silent) break;
@@ -1023,8 +1027,9 @@
         const r = { emp: 170, cheer: 170, smoke: 95 }[e[2]] || 40;
         G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r, color: e[2] === 'emp' ? '#7af0ff' : e[2] === 'cheer' ? '#7dff9a' : P.accent, t0: now, dur: 520 });
         if (e[2] === 'smoke') R3.burst(e[3], e[4], (e[5] || 0) + 10, '#2a1f3a', 40, 160);
+        skillFx(p, e[2], e[3], e[4], e[5] || 0);
         if (silent) break;
-        if (e[1] === myId) { bigText(`${sk.name}！`, P.accent); sfx.special(); }
+        if (e[1] === myId) { cutinSide(p, sk.name, '技能'); sfx.special(); G.camPunch = Math.max(G.camPunch || 0, 0.4); }
         else if (G.me && p.team === G.me.team && e[2] === 'scan') announce('全队可以看见所有敌人了！', P.accent);
         else if (nearMe(e[3], e[4], 400)) sfx.pick();
         break;
@@ -1037,7 +1042,10 @@
       }
       case 'qk':
         G.fx.push({ k: 'ring', x: e[1], y: e[2], z: e[3], r: 110, color: G.colors[e[4]], t0: now, dur: 520 });
+        ringFx(e[1], e[2], e[3], 150, '#ffffff', 420, 60);
         R3.burst(e[1], e[2], e[3] + 4, G.colors[e[4]], 45, 320, 0.4);
+        R3.emit(e[1], e[2], e[3] + 2, '#cfcbdc', 26, 220, 0.15, { sys: 'pk', size: 30, life: 1, grav: -10, drag: 3, grow: 1.5 });
+        R3.emit(e[1], e[2], e[3] + 4, '#5a5266', 20, 320, 1.2, { size: 8, life: 0.9 });
         if (!silent && nearMe(e[1], e[2], 600)) { sfx.boom(); G.shake = Math.max(G.shake, 8); }
         break;
       case 'heal': { const p = G.players.get(e[1]); if (p) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 50, text: `+${e[2]}`, color: '#7dff9a', t: now }); break; }
@@ -1063,7 +1071,7 @@
       case 'bm': addBomb(e); break;
       case 'bx':
         if (e[6]) G.bombs.delete(e[6]);
-        R3.burst(e[1], e[2], e[3] + 8, G.colors[e[4]], 50, 360);
+        boomFx(e[1], e[2], e[3], G.colors[e[4]], e[5] > 70);
         G.fx.push({ k: 'ring', x: e[1], y: e[2], z: e[3], r: e[5], color: G.colors[e[4]], t0: now, dur: 380 });
         if (!silent && nearMe(e[1], e[2], 700)) { sfx.boom(); G.shake = Math.max(G.shake, nearMe(e[1], e[2], 200) ? 9 : 5); }
         break;
@@ -1072,10 +1080,13 @@
         const p = G.players.get(e[1]);
         if (!p || silent) break;
         const sp = S.SPECIALS[e[2]];
-        if (e[1] === myId) bigText(sp.name + '！', G.colors[p.team]);
-        else if (G.me && p.team !== G.me.team) announce(`敌方 ${p.name} 发动了「${sp.name}」`, G.colors[p.team]);
+        superFx(p, e[2]);
+        if (e[1] === myId) {
+          // 自己的大招：大横幅 + 镜头冲击 + 白闪 + 速度线
+          cutinBig(p, sp.name, 'SUPER!', `${S.pilot(p.pilot).name} · ${S.WEAPONS[p.weapon].name}`);
+          G.camPunch = 1; G.flashT = now; G.speedLines = now; G.shake = Math.max(G.shake, 5);
+        } else cutinSide(p, sp.name, (G.me && p.team !== G.me.team ? '敌方 ' : '队友 ') + p.name + ' · 大招');
         sfx.special();
-        if (e[2] === 'storm' || e[2] === 'bubble') G.fx.push({ k: 'ring', x: p.x, y: p.y, z: p.z, r: e[2] === 'bubble' ? 170 : 260, color: G.colors[p.team], t0: now, dur: 600 });
         break;
       }
       case 'zn': if (!silent) { announce(e[1] ? `${teamName(e[1])} 占领了据点！` : '据点恢复中立', e[1] ? G.colors[e[1]] : '#fff', true); sfx.capture(); } break;
@@ -1094,10 +1105,83 @@
   }
   function addProj(e, mine) {
     G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4] });
+    // 枪口火光：白色核心 + 队伍色火花，沿射击方向喷出
+    const L = Math.hypot(e[5], e[6], e[7]) || 1, dir = { x: e[5] / L, y: e[6] / L, z: e[7] / L };
+    R3.emit(e[2], e[3], e[4], '#ffffff', 1, 0, 0, { sys: 'pg', size: 16, life: 0.07, grav: 0 });
+    R3.emit(e[2], e[3], e[4], G.colors[e[9]], 3, 160, 0, { sys: 'pg', size: 7, life: 0.14, grav: 0, drag: 6, dir, spread: 0.7 });
   }
   function killProj(pr, x, y, z) {
     G.projs.delete(pr.id);
-    R3.burst(x == null ? pr.x : x, y == null ? pr.y : y, z == null ? pr.z : z, G.colors[pr.team], 5, 100);
+    const px = x == null ? pr.x : x, py = y == null ? pr.y : y, pz = z == null ? pr.z : z;
+    R3.emit(px, py, pz + 2, G.colors[pr.team], 6, 120, 0.8, { size: 6, life: 0.4 });
+    R3.emit(px, py, pz + 3, G.colors[pr.team], 1, 0, 0, { sys: 'pg', size: 18, life: 0.12, grav: 0 });
+  }
+  // ---------------- 演出：大招横幅 / 侧边横幅 ----------------
+  function cutinBig(p, title, small, sub) {
+    const el = $('cutin');
+    const P = S.pilot(p.pilot);
+    el.style.setProperty('--tc', G.colors[p.team]);
+    el.innerHTML = `<div class="band"></div><div class="art">${GP.portrait(P, { bust: true })}</div><div class="ttl"><small>${small}</small><b>${title}</b><i>${sub}</i></div>`;
+    el.classList.remove('hidden');
+    clearTimeout(cutinBig.h);
+    cutinBig.h = setTimeout(() => el.classList.add('hidden'), 1050);
+  }
+  function cutinSide(p, title, small) {
+    const box = $('cutinSide');
+    const P = S.pilot(p.pilot);
+    const d = document.createElement('div');
+    d.className = 'cs'; d.style.setProperty('--tc', G.colors[p.team]);
+    d.innerHTML = `<div class="face">${GP.portrait(P, { face: true })}</div><div><small>${small}</small><b>${title}</b></div>`;
+    box.appendChild(d);
+    while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(() => d.remove(), 2100);
+  }
+  // 圆环 + 粒子的组合特效
+  function ringFx(x, y, z, r, color, dur = 450, delay = 0) { G.fx.push({ k: 'ring', x, y, z, r, color, t0: performance.now() + delay, dur }); }
+  function boomFx(x, y, z, color, big) {
+    const k = big ? 1.6 : 1;
+    R3.emit(x, y, z + 10, '#fff4c8', Math.round(6 * k), 120 * k, 0.8, { sys: 'pg', size: 26 * k, life: 0.25, grav: 0, drag: 5, grow: 0.8 });
+    R3.emit(x, y, z + 10, '#ff9a2e', Math.round(14 * k), 260 * k, 0.9, { sys: 'pg', size: 16 * k, life: 0.45, grav: -60, drag: 3, grow: 0.6 });
+    R3.emit(x, y, z + 8, color, Math.round(30 * k), 320 * k, 1, { size: 7, life: 0.7 });
+    R3.emit(x, y, z + 12, '#3a3448', Math.round(10 * k), 90 * k, 0.6, { sys: 'pk', size: 34 * k, life: 1.4, grav: -40, drag: 2.5, grow: 1.6 });
+  }
+  function superFx(p, kind) {
+    const x = p.id === myId && G.me ? G.me.px : p.x, y = p.id === myId && G.me ? G.me.py : p.y, z = (p.id === myId && G.me ? G.me.pz : p.z) || 0;
+    const col = G.colors[p.team];
+    ringFx(x, y, z, 90, '#ffffff', 300);
+    R3.emit(x, y, z + 20, col, 30, 260, 1, { sys: 'pg', size: 12, life: 0.5, grav: 0, drag: 3 });
+    switch (kind) {
+      case 'storm': for (let i = 0; i < 3; i++) ringFx(x, y, z, 120 + i * 70, col, 520, i * 330); break;
+      case 'charge': ringFx(x, y, z, 120, '#ffb02e', 500); R3.emit(x, y, z + 10, '#ffb02e', 30, 200, 1, { sys: 'pg', size: 16, life: 0.6, grav: -100, drag: 2 }); break;
+      case 'missiles': for (let i = 0; i < 12; i++) R3.emit(x, y, z + 30, '#ffffff', 1, 700, 0, { sys: 'pg', size: 10, life: 0.6, grav: 0, dir: { x: 0, y: 0, z: 1 }, spread: 0.3 }); break;
+      case 'bubble': ringFx(x, y, z, 170, '#bef6ff', 600); R3.emit(x, y, z + 10, '#bef6ff', 24, 120, 1, { sys: 'pk', size: 18, life: 1.2, grav: -60, drag: 1.5 }); break;
+      case 'beam': ringFx(x, y, z, 80, col, 300); G.shake = Math.max(G.shake, p.id === myId ? 6 : 0); break;
+      case 'barrage': ringFx(x, y, z, 110, col, 420); break;
+      case 'quake': ringFx(x, y, z, 70, col, 300); R3.emit(x, y, z + 2, '#cfcbdc', 16, 140, 0.2, { sys: 'pk', size: 20, life: 0.7, grav: -10, drag: 3, grow: 1.2 }); break;
+    }
+  }
+  function skillFx(p, kind, x, y, z) {
+    const P = S.pilot(p.pilot);
+    switch (kind) {
+      case 'rush': ringFx(x, y, z, 70, '#fff36b', 380); R3.emit(x, y, z + 16, '#fff36b', 20, 220, 0.6, { sys: 'pg', size: 10, life: 0.4, grav: 0, drag: 3 }); break;
+      case 'scan': ringFx(x, y, z, 700, '#7af0ff', 1000); ringFx(x, y, z, 360, '#7af0ff', 700, 150); if (G.me && p.team === G.me.team) G.scanUntil = performance.now() + 5000; break;
+      case 'cheer':
+        ringFx(x, y, z, 170, '#7dff9a', 600); R3.emit(x, y, z + 20, '#7dff9a', 24, 140, 1, { sys: 'pg', size: 10, life: 0.8, grav: -80, drag: 2 });
+        for (let i = 0; i < 5; i++) G.texts.push({ x: x + (Math.random() - 0.5) * 80, y: y + (Math.random() - 0.5) * 80, z: z + 30, text: i % 2 ? '♪' : '♫', color: '#7dff9a', t: performance.now() + i * 90 });
+        break;
+      case 'guard': ringFx(x, y, z, 60, '#bef6ff', 400); R3.emit(x, y, z + 20, '#bef6ff', 18, 120, 1, { sys: 'pg', size: 12, life: 0.5, grav: 0, drag: 3 }); break;
+      case 'smoke': for (let i = 0; i < 3; i++) R3.emit(x, y, z + 10, i ? '#2a1f3a' : '#4a3a6a', 22, 160, 0.5, { sys: 'pk', size: 44, life: 2.6, grav: -12, drag: 2.6, grow: 1.6 }); break;
+      case 'turret': G.fx.push({ k: 'line', x0: x, y0: y, z0: 700, x1: x, y1: y, z1: z, color: P.accent, w: 10, t0: performance.now(), dur: 300 }); R3.emit(x, y, z + 6, P.accent, 20, 200, 0.6, { sys: 'pg', size: 9, life: 0.4, grav: 0, drag: 3 }); break;
+      case 'dash': { ringFx(x, y, z, 50, P.accent, 300); const a = p.a || 0; R3.emit(x, y, z + 16, P.accent, 18, 260, 0, { sys: 'pg', size: 12, life: 0.35, grav: 0, drag: 4, dir: { x: -Math.cos(a), y: -Math.sin(a), z: 0.1 }, spread: 0.6 }); break; }
+      case 'emp':
+        ringFx(x, y, z, 170, '#7af0ff', 500); ringFx(x, y, z, 120, '#ffffff', 300, 80);
+        for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.283 + Math.random() * 0.4, r = 60 + Math.random() * 100; G.fx.push({ k: 'line', x0: x, y0: y, z0: z + 20, x1: x + Math.cos(a) * r, y1: y + Math.sin(a) * r, z1: z + 6, color: '#bff8ff', w: 2.5, t0: performance.now() + i * 25, dur: 220 }); }
+        R3.emit(x, y, z + 20, '#bff8ff', 30, 300, 0.6, { sys: 'pg', size: 8, life: 0.4, grav: 0, drag: 3 });
+        break;
+      case 'bento': R3.emit(x, y, z + 10, '#ffffff', 10, 40, 1, { sys: 'pk', size: 18, life: 1.2, grav: -60, drag: 1.5, grow: 1 }); ringFx(x, y, z, 40, '#ffb43d', 300); break;
+      case 'overdrive': ringFx(x, y, z, 80, '#ff7a2e', 400); R3.emit(x, y, z + 20, '#ff7a2e', 30, 200, 1, { sys: 'pg', size: 13, life: 0.5, grav: -100, drag: 2 }); break;
+      case 'drone': R3.emit(x, y, z + 40, '#ffc531', 24, 160, 1, { sys: 'pg', size: 9, life: 0.5, grav: 0, drag: 3 }); ringFx(x, y, z, 50, '#ffc531', 300); break;
+    }
   }
   function addBomb(e) {
     if (G.bombs.has(e[1])) return;
@@ -1381,14 +1465,17 @@
     G.camDipV += (-180 * G.camDip - 16 * G.camDipV) * Math.min(dt, 0.05);
     G.camDip = Math.max(-18, Math.min(8, G.camDip + G.camDipV * Math.min(dt, 0.05)));
     const aspect = VW / Math.max(1, VH);
-    const far = aspect < 1.4 ? 1.18 : 1;                 // 屏幕越窄镜头越高
-    const back = 250 * far, height = 450 * far;
+    const far = (aspect < 1.4 ? 1.18 : 1) * (TOUCH ? 0.84 : 1);   // 屏幕越窄镜头越高；手机屏幕小，镜头拉近一点
+    // 大招 / 技能时镜头往前一冲再弹回去
+    G.camPunch = Math.max(0, (G.camPunch || 0) - dt * 2.4);
+    const punch = Math.sin(Math.min(1, G.camPunch) * Math.PI * 0.5);
+    const back = 250 * far * (1 - 0.22 * punch), height = 450 * far * (1 - 0.22 * punch);
     const cx = G.camF.x - fwx * back, cy = G.camF.y - fwy * back, cz = G.camF.z + height + G.camDip;
     const sk = shakeOn ? G.shake : 0;
     const dx = G.camF.x - cx, dy = G.camF.y - cy, dz = G.camF.z - cz, L = Math.hypot(dx, dy, dz);
     G.cam = { x: cx, y: cy, z: cz, d: { x: dx / L, y: dy / L, z: dz / L } };
     G.camClose = false;
-    R3.setCamera(cx + (Math.random() - 0.5) * sk, cy + (Math.random() - 0.5) * sk, cz + (Math.random() - 0.5) * sk, G.camF.x, G.camF.y, G.camF.z, 46);
+    R3.setCamera(cx + (Math.random() - 0.5) * sk, cy + (Math.random() - 0.5) * sk, cz + (Math.random() - 0.5) * sk, G.camF.x, G.camF.y, G.camF.z, 46 - 6 * punch);
     if (!me) return;
     // 瞄准：电脑用鼠标在地面上的位置；手机用攻击摇杆
     const alive = me.flags & 1;
@@ -1596,7 +1683,7 @@
       if (alive && G.wasAlive === false) { sfx.respawn(); view.yaw = me.team === 2 ? Math.PI : 0; view.pitch = -0.12; }
       G.wasAlive = !!alive;
       const ready = me.sp >= S.WEAPONS[me.weapon].spNeed;
-      if (ready && G.spReady === false && alive) { sfx.ready(); bigText('大招就绪！按 Q 发动', '#fff36b'); }
+      if (ready && G.spReady === false && alive) { sfx.ready(); bigText(TOUCH ? '大招就绪！' : '大招就绪！按 E 发动', '#fff36b'); }
       G.spReady = ready;
       if (alive && inp.f && me.ammo < 0.3 && G.cd <= 0 && !(me.flags & 512)) sfx.lowInk();
     }
@@ -1782,6 +1869,19 @@
     else if (G.mode === 'battery' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '充电站', G.colors[myTeam], '⚡'); }
   }
   // ================= HUD =================
+  // 喷漆色块（边缘不规则的圆）
+  function splat(x, y, rx, ry, color, seed) {
+    ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = '#141018'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const a = (i / 24) * Math.PI * 2, w = 1 + 0.08 * Math.sin(a * 5 + seed) + 0.05 * Math.sin(a * 9 + seed * 2);
+      const px = x + Math.cos(a) * rx * w, py = y + Math.sin(a) * ry * w;
+      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillRect(x - rx * 0.5, y + ry * 0.7, 4, 10); ctx.fillRect(x + rx * 0.35, y + ry * 0.75, 3, 7);
+    ctx.restore();
+  }
   function txt(s, x, y, size, color, align = 'center', stroke = 4) {
     ctx.font = `${size}px GBHead, "Microsoft YaHei", sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle';
     if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
@@ -1824,11 +1924,40 @@
     }
 
     drawWorldLabels(now);
+    // 大招白闪 + 速度线
+    if (G.flashT && now - G.flashT < 260) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - (now - G.flashT) / 260)})`; ctx.fillRect(0, 0, VW, VH); }
+    const wheelFast = TOP() && me && G.inp && G.inp.w && Math.hypot(me.pvx || 0, me.pvy || 0) > 280;
+    if ((G.speedLines && now - G.speedLines < 700) || wheelFast) {
+      const k = wheelFast && !(G.speedLines && now - G.speedLines < 700) ? 0.25 : 1 - (now - G.speedLines) / 700;
+      ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.5 * k})`; ctx.lineCap = 'round';
+      const R0 = Math.min(VW, VH) * 0.42, R1 = Math.hypot(VW, VH) * 0.6;
+      for (let i = 0; i < 46; i++) {
+        const a = (i / 46) * Math.PI * 2 + ((now / 40) | 0) * 0.37, r0 = R0 + ((i * 53) % 90);
+        ctx.lineWidth = 2 + (i % 3) * 2;
+        ctx.beginPath(); ctx.moveTo(VW / 2 + Math.cos(a) * r0, VH / 2 + Math.sin(a) * r0); ctx.lineTo(VW / 2 + Math.cos(a) * R1, VH / 2 + Math.sin(a) * R1); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // 义眼扫描：敌人头顶显示标记（隔着墙和草丛也能看到）
+    if (G.scanUntil && now < G.scanUntil && me) {
+      for (const id of G.cur) {
+        const p = G.players.get(id);
+        if (!p || !(p.flags & 1) || p.team === me.team) continue;
+        const sc = R3.project(p.x, p.y, (p.z || 0) + 70);
+        if (!sc) continue;
+        ctx.strokeStyle = '#7af0ff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(sc.x, sc.y, 13, 8, 0, 0, 7); ctx.stroke();
+        ctx.fillStyle = '#7af0ff'; ctx.beginPath(); ctx.arc(sc.x, sc.y, 4, 0, 7); ctx.fill();
+      }
+    }
 
     // ---- 顶部：计时与队伍 ----
     const cx = VW / 2;
-    ctx.fillStyle = '#000b'; rr(ctx, cx - 62, 10, 124, 46, 14); ctx.fill();
-    txt(fmtTime(G.tl), cx, 34, 30, G.tl <= 30 && G.tl > 0 ? (Math.floor(now / 400) % 2 ? '#ff5a6a' : '#fff') : '#fff', 'center', 0);
+    // 计时器：一团喷漆色块
+    splat(cx, 33, 64, 26, G.tl <= 30 && G.tl > 0 ? '#ff3b52' : '#141018', 7);
+    ctx.font = '32px GBNum, GBHead, Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 5; ctx.strokeStyle = '#141018'; ctx.strokeText(fmtTime(G.tl), cx, 35);
+    ctx.fillStyle = G.tl <= 30 && G.tl > 0 && Math.floor(now / 400) % 2 ? '#ffe600' : '#fff'; ctx.fillText(fmtTime(G.tl), cx, 35);
     const roster = (t) => [...G.players.values()].filter((p) => p.team === t && G.cur.has(p.id));
     const chips = (t, side) => {
       const list = roster(t);
@@ -2001,7 +2130,10 @@
       else {
         const s = 1 + Math.max(0, 0.3 - age / 400);
         ctx.globalAlpha = Math.min(1, (1300 - age) / 400);
-        txt(G.big.text, cx, VH * 0.3, 34 * s, G.big.color, 'center', 6);
+        ctx.save(); ctx.translate(cx, VH * 0.3); ctx.rotate(-0.05);
+        txt(G.big.text, 5, 6, 36 * s, '#141018', 'center', 8);
+        txt(G.big.text, 0, 0, 36 * s, G.big.color, 'center', 7);
+        ctx.restore();
         ctx.globalAlpha = 1;
       }
     }
