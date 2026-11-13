@@ -330,8 +330,19 @@
     escort: { name: '护送宝物', short: '宝物', desc: '抢下中央的宝物核心，带到敌方一侧的终点台得分（持有者受到的伤害降低 25%），先得 3 分获胜。' },
     soccer: { name: '漆弹足球', short: '足球', desc: '用涂料子弹、炸弹和身体把大球推进对方球门，先进 5 球获胜。', original: true },
     battery: { name: '电池掠夺', short: '电池', desc: '收集地图上的能量电池送回己方基地，被击倒会掉落全部电池，先存满 40 个获胜。', original: true },
+    elim: { name: '生死之战', short: '生死', desc: '只有一条命：机体被打爆不会重建，驾驶员也倒下就出局。先把对面全队消灭赢一局，三局两胜。', original: true, oneLife: true, isNew: true },
+    escape4: { name: '逃亡圈 · 四队', short: '逃亡', desc: '4 队 × 2 人分散空降。灰色毒圈不断缩小，捡空投箱变强，只有一条命，最后活下来的队伍获胜。', original: true, oneLife: true, teams: 4, size: 2, isNew: true },
+    escape8: { name: '逃亡圈 · 单人', short: '单人逃亡', desc: '8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。', original: true, oneLife: true, teams: 8, size: 1, isNew: true },
   };
-  S.MODE_ORDER = ['turf', 'zone', 'escort', 'soccer', 'battery'];
+  S.MODE_ORDER = ['turf', 'zone', 'escort', 'soccer', 'battery', 'elim', 'escape4', 'escape8'];
+  S.teamsOf = (mode) => (S.MODES[mode] && S.MODES[mode].teams) || 2;
+  S.isEscape = (mode) => mode === 'escape4' || mode === 'escape8';
+  // 多队模式的涂料颜色（第 1–8 队）
+  S.TEAM8 = [null, '#ff3ea5', '#1fd6ee', '#ffdf2e', '#9cff2e', '#ff8a1f', '#8c5cff', '#ff3b52', '#3a6dff'];
+  S.TEAM8_NAMES = [null, '粉队', '青队', '黄队', '绿队', '橙队', '紫队', '红队', '蓝队'];
+  // 逃亡圈：毒圈阶段（等待秒数、收缩秒数、收缩到初始半径的比例、圈外每秒伤害）
+  S.ESCAPE = { stages: [[32, 18, 0.62, 6], [24, 16, 0.4, 9], [18, 14, 0.24, 13], [14, 12, 0.12, 18], [10, 10, 0.05, 26]], crateHeal: 40, crateDmg: 0.1, crateHp: 0.1, maxCubes: 8 };
+  S.ELIM = { wins: 2, roundTime: 90, pause: 3 };
   S.ZONE = { x0: 52, y0: 32, x1: 68, y1: 48 };             // 据点（格子坐标，右/下不含）
   S.SOCCER_GOAL = { depth: 56, half: 140 };                // 球门：距边缘深度、半高
   S.ESCORT_TARGET = 3; S.SOCCER_TARGET = 5; S.BATTERY_TARGET = 40;
@@ -410,6 +421,24 @@
       stairs: [[22, 14, 4, 3, 'N', 1], [26, 10, 4, 4, 'N', 2, 1], [22, 63, 4, 3, 'S', 1], [43, 26, 7, 5, 'E', 2]],
       pads: [[42, 22, 30], [28, 40, 0]],
       bush: [[10, 14, 6, 5], [12, 62, 6, 5], [42, 46, 5, 6], [24, 44, 5, 5], [54, 6, 5, 5]],
+    },
+    // ---- S1 灰城重涂：新地图 ----
+    {
+      name: '灰城广场', desc: '灰石集团的市政广场：刷白的广告牌墙隔出两条侧路，楼梯通往牌顶，花坛和草丛围着中央。', goalX: 28, sky: 7, isNew: true, season: 1,
+      rects: [[14, 8, 3, 16, 3], [14, 56, 3, 16, 3], [24, 18, 8, 3, 2], [24, 59, 8, 3, 2], [44, 8, 8, 4, 2], [44, 68, 8, 4, 2],
+        [36, 30, 2, 6, 1], [50, 30, 3, 3, 1], [50, 47, 3, 3, 1], [32, 46, 6, 2, 1], [6, 4, 6, 2, 1], [40, 40, 2, 2, 3]],
+      stairs: [[26, 21, 4, 7, 'N', 2], [26, 52, 4, 7, 'S', 2], [46, 12, 4, 7, 'N', 2]],
+      pads: [[34, 40, 0], [20, 40, 40]],
+      bush: [[8, 10, 5, 6], [19, 28, 4, 6], [36, 58, 6, 5], [46, 22, 5, 5], [30, 70, 6, 4]],
+    },
+    {
+      name: '废墟逃亡区', desc: '被拆了一半的旧城区：到处是碎墙和瓦砾堆，草丛和高处很多，最适合「逃亡圈」的混战。', goalX: 30, sky: 8, isNew: true, season: 1,
+      rects: [[10, 10, 6, 3, 2], [10, 13, 2, 5, 2], [22, 3, 4, 4, 3], [30, 14, 8, 2, 1], [38, 6, 3, 6, 2], [48, 4, 6, 4, 1], [18, 22, 5, 5, 2],
+        [28, 24, 2, 7, 3], [40, 22, 6, 3, 1], [50, 16, 4, 4, 3], [16, 34, 3, 3, 2], [36, 33, 4, 4, 2], [46, 30, 3, 6, 1], [8, 58, 6, 3, 2],
+        [18, 52, 4, 6, 1], [26, 62, 6, 4, 3], [36, 52, 8, 2, 1], [44, 62, 4, 6, 2], [52, 54, 5, 3, 1], [12, 70, 4, 4, 1], [34, 70, 6, 3, 2], [48, 72, 6, 3, 1]],
+      stairs: [[12, 13, 4, 7, 'N', 2], [18, 27, 5, 7, 'N', 2], [36, 37, 4, 7, 'N', 2], [8, 51, 6, 7, 'S', 2]],
+      pads: [[31, 41, 0], [22, 66, 30]],
+      bush: [[3, 3, 6, 5], [32, 17, 5, 5], [22, 30, 5, 3], [41, 42, 5, 6], [30, 55, 5, 5], [50, 64, 5, 5], [42, 12, 4, 4], [56, 26, 4, 5]],
     },
   ];
   const DIR_FLIP = { E: 'W', W: 'E', N: 'S', S: 'N' };
@@ -767,6 +796,13 @@
     if (!me) return null;
     const won = result.winner === me.team, draw = !result.winner, mvp = S.mvpOf(result);
     const isMvp = !!(mvp && mvp.id === pid);
+    // 逃亡圈按名次：四队 +10/+5/0/−3，单人 +10/+7/+4/+2/0/−2/−3/−4
+    if (result.place) {
+      const rank = result.place.indexOf(me.team) + 1, n = result.place.length;
+      const table = n <= 4 ? [10, 5, 0, -3] : [10, 7, 4, 2, 0, -2, -3, -4];
+      const xp = 60 + Math.max(0, n - rank) * 15 + me.kills * 10 + Math.floor(me.paint / 25) + (isMvp ? 40 : 0);
+      return { xp, trophies: table[rank - 1] || 0, won: rank === 1, draw: false, mvp: isMvp, kills: me.kills, paint: me.paint, rank, of: n };
+    }
     const xp = 60 + (won ? 60 : draw ? 30 : 0) + me.kills * 10 + Math.floor(me.paint / 25) + me.obj * 12 + (isMvp ? 40 : 0);
     const trophies = won ? S.TROPHY_WIN : draw ? S.TROPHY_DRAW : -S.TROPHY_LOSS;
     return { xp, trophies, won, draw, mvp: isMvp, kills: me.kills, paint: me.paint };

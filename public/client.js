@@ -251,8 +251,9 @@
   function closeSettings() { $('settingsDlg').classList.add('hidden'); if (G && !G.over) lockPointer(); }
   function menuMusic() { if (!G) AU.music('menu'); setTimeout(updateNowPlaying, 100); }
   // ================= 大厅 =================
-  const MODE_ICON = { turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery' };
-  const MODE_COL = { turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'] };
+  const MODE_ICON = { turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery', elim: 'elim', escape4: 'escape', escape8: 'escape' };
+  const MODE_COL = { turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'],
+    elim: ['#2a1a1e', '#ff3b52'], escape4: ['#4a4d56', '#9cff2e'], escape8: ['#3a3d46', '#ff5a36'] };
   const ic = (n, c, size) => GI.svg(n, c, size);
   const mapName = (i) => (i < 0 ? '随机地图' : S.MAPS[i].name);
   function nextHead() { return S.HEADS.find((h) => h.tr > (profile.trophies || 0)); }
@@ -938,9 +939,10 @@
   }
   function startGame(m) {
     const M = S.buildMap(m.map);
-    const colors = S.COLOR_SETS[m.colorSet].c;
+    const teams = m.teams || 2;
+    const colors = teams > 2 ? S.TEAM8.slice() : S.COLOR_SETS[m.colorSet].c;
     G = {
-      map: m.map, mode: m.mode, colors, M, grid: new Uint8Array(S.GW * S.GH), duration: m.duration,
+      map: m.map, mode: m.mode, colors, M, teams, grid: new Uint8Array(S.GW * S.GH), duration: m.duration,
       players: new Map(), snaps: [], projs: new Map(), fx: [], texts: [], feed: [], bombs: new Map(), missiles: [],
       announce: null, big: null, tl: m.duration, cd: 3.5, over: false, overT: 0, obj: null, objA: null, offset: null,
       sendAcc: 0, sync: -1, qq: 0, gq: 0, aq: 0, edge: false, rv: [0, 0, 0], helpers: [], shells: new Map(), dmgTexts: [], chats: new Map(), sb: new Map(), shake: 0,
@@ -954,8 +956,8 @@
     G.me = G.players.get(myId) || null;
     if (G.me) Object.assign(G.me, { px: 0, py: 0, pz: 0, pvx: 0, pvy: 0, pvz: 0, onGround: true, sm: 1 });
     G.ps = null; G.camDip = 0; G.camDipV = 0;
-    view.yaw = G.me && G.me.team === 2 ? Math.PI : 0; view.pitch = -0.12;
-    G.shades = [null, 1, 2].map((t) => (t ? [0, 0.12, -0.12].map((k) => shade(colors[t], k)) : null));
+    view.yaw = G.me && G.me.team === 2 && teams === 2 ? Math.PI : 0; view.pitch = -0.12;
+    G.shades = colors.map((c, t) => (t ? [0, 0.12, -0.12].map((k) => shade(c, k)) : null));
     G.mini = document.createElement('canvas'); G.mini.width = S.GW; G.mini.height = S.GH;
     G.miniCtx = G.mini.getContext('2d'); G.miniImg = G.miniCtx.createImageData(S.GW, S.GH);
     G.paintable = 0; for (let i = 0; i < M.solid.length; i++) if (!M.solid[i]) G.paintable++;
@@ -977,6 +979,11 @@
     const el = $('vsSplash');
     const myTeam = G.me ? G.me.team : 1;
     let html = '';
+    if (G.teams > 2) {   // 逃亡圈：不显示两队对阵，只显示模式标题
+      el.innerHTML = `<div class="vs esc">${S.MODES[G.mode].name}</div>`;
+      el.classList.remove('hidden'); clearTimeout(showVs.h); showVs.h = setTimeout(() => el.classList.add('hidden'), 1600);
+      return;
+    }
     for (const [cls, t] of [['a', myTeam], ['b', 3 - myTeam]]) {
       html += `<div class="side ${cls}" style="--tc:${rgba(colors[t], 0.85)}"><div class="tname" style="color:${colors[t]}">${teamName(t)}</div>`;
       players.filter((p) => p.team === t).forEach((p, i) => {
@@ -1034,7 +1041,7 @@
   }
   const OWNER_IDX = { pj: 11, ln: 9, bm: 9 };
   function consume(s, silent) {
-    for (const v of s.d) { const idx = v >> 2, team = v & 3; G.grid[idx] = team; paintCell(idx, team); }
+    for (const v of s.d) { const idx = v >> 4, team = v & 15; G.grid[idx] = team; paintCell(idx, team); }
     for (const e of s.e) {
       const oi = OWNER_IDX[e[0]];
       if (oi && e[oi] === myId) continue;
@@ -1042,7 +1049,8 @@
       handleEvent(e, silent);
     }
   }
-  const teamName = (t) => S.TEAM_NAMES[t];
+  const teamName = (t) => (G && G.teams > 2 ? S.TEAM8_NAMES[t] : S.TEAM_NAMES[t]);
+  const teamOrder = (myTeam) => (G && G.teams > 2 ? [myTeam, ...Array.from({ length: G.teams }, (_, i) => i + 1).filter((t) => t !== myTeam)] : [myTeam, 3 - myTeam]);
   function announce(text, color, big) { G.announce = { text, color: color || '#fff', t: performance.now(), big: !!big }; }
   function bigText(text, color) { G.big = { text, color: color || '#ffdf2e', t: performance.now() }; }
   function nearMe(x, y, r) { const me = G.me; return me && Math.hypot(me.px - x, me.py - y) < r; }
@@ -1148,6 +1156,17 @@
         if (silent) break;
         if (e[1] === myId) { cutinBig(p, O.name, 'OVERLOAD!', `${P.name} · 超载技能`); G.camPunch = 1; G.flashT = now; G.speedLines = now; G.shake = Math.max(G.shake, 7); sfx.special(); }
         else cutinSide(p, O.name, '超载');
+        break;
+      }
+      case 'rd': if (!silent) { const w = e[1], mine = G.me && G.me.team === w; announce(`${mine ? '我方' : '对方'}拿下第 ${e[4]} 局！（${e[2]} : ${e[3]}）`, G.colors[w], true); (mine ? sfx.win : sfx.lose)(); } break;
+      case 'rs': if (!silent) { bigText(`第 ${e[1]} 局 · 开始！`, '#ffdf2e'); sfx.go(); } break;
+      case 'tout': if (!silent) announce(`${G.mode === 'escape8' ? (([...G.players.values()].find((q) => q.team === e[1]) || {}).name || '') : S.TEAM8_NAMES[e[1]]} 被淘汰（第 ${e[2]} 名）`, G.colors[e[1]]); break;
+      case 'cz': if (!silent) { announce('⚠ 毒圈开始收缩！', '#ff5a36', true); sfx.count(); } break;
+      case 'cr': if (!silent) announce('空投箱落地了！', '#ffe600'); break;
+      case 'crt': {
+        R3.emit(e[2], e[3], (e[4] || 0) + 10, '#ffe600', 24, 220, 1, { sys: 'pg', size: 11, life: 0.6, grav: -100, drag: 2 });
+        ringFx(e[2], e[3], e[4] || 0, 50, '#ffe600', 400);
+        if (e[1] === myId && !silent) { bigText(`能量 +1（共 ${e[5]} 层）`, '#ffe600'); sfx.pick(); }
         break;
       }
       case 'fz': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0 }); break;
@@ -2022,13 +2041,14 @@
   }
   function updateMini() {
     const d = G.miniImg.data, grid = G.grid, solid = G.M.solid, top = G.M.top;
-    const c1 = hexRgb(G.colors[1]), c2 = hexRgb(G.colors[2]);
+    const c1 = hexRgb(G.colors[1]), c2 = hexRgb(G.colors[2]), cx8 = G.colors.map((c) => (c ? hexRgb(c) : null));
     let a = 0, b = 0;
     for (let i = 0; i < grid.length; i++) {
       let r, g, bl;
       if (solid[i]) { r = 90; g = 96; bl = 125; }
       else if (grid[i] === 1) { [r, g, bl] = c1; a++; }
       else if (grid[i] === 2) { [r, g, bl] = c2; b++; }
+      else if (grid[i] > 2 && cx8[grid[i]]) [r, g, bl] = cx8[grid[i]];
       else if (top[i] > 0) { r = top[i] > 50 ? 70 : 56; g = top[i] > 50 ? 76 : 61; bl = top[i] > 50 ? 104 : 84; }
       else { r = 36; g = 39; bl = 52; }
       d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = bl; d[i * 4 + 3] = 255;
@@ -2106,15 +2126,35 @@
         ctx.restore(); ctx.filter = 'none';
         ctx.strokeStyle = p.id === myId ? '#fff' : '#000'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.stroke();
         if (aliveP && p.flags & 256) { ctx.strokeStyle = '#fff36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 21 + Math.sin(now / 150) * 1.5, 0, 7); ctx.stroke(); }
-        if (!aliveP) txt(String(Math.ceil(p.resp)), x, y + 1, 15, '#fff', 'center', 3);
+        if (!aliveP) txt(p.resp > 500 ? '✖' : String(Math.ceil(p.resp)), x, y + 1, 15, p.resp > 500 ? '#ff3b52' : '#fff', 'center', 3);
         else if (foot) txt('🔧', x + 11, y + 11, 11, '#fff', 'center', 0);
       });
     };
-    chips(myTeam, -1); chips(otherTeam, 1);
+    if (G.teams > 2) {
+      const ob = G.obj || [];
+      splat(cx - 150, 33, 76, 20, '#141018', 3); splat(cx + 150, 33, 76, 20, '#141018', 5);
+      txt(`存活 ${ob[8] || 0} 队 · ${ob[9] || 0} 人`, cx - 150, 34, 16, '#fff', 'center', 3);
+      txt(ob[6] === 1 ? '毒圈收缩中！' : ob[6] === 2 ? '最终圈' : `${ob[7] || 0} 秒后缩圈`, cx + 150, 34, 16, ob[6] === 1 ? '#ff5a36' : '#fff', 'center', 3);
+      if (me) { ctx.fillStyle = G.colors[me.team]; ctx.beginPath(); ctx.arc(cx - 232, 34, 9, 0, 7); ctx.fill(); txt(G.mode === 'escape8' ? '你' : S.TEAM8_NAMES[me.team], cx - 232, 56, 12, G.colors[me.team], 'center', 3); }
+    } else { chips(myTeam, -1); chips(otherTeam, 1); }
 
     // ---- 模式面板 ----
     const o = G.obj;
     const py = 74;
+    if (G.mode === 'elim' && o) {
+      const mine = myTeam === 2 ? o[1] : o[0], theirs = myTeam === 2 ? o[0] : o[1];
+      for (let i = 0; i < S.ELIM.wins; i++) {
+        ctx.fillStyle = i < mine ? G.colors[myTeam] : '#0008'; ctx.beginPath(); ctx.arc(cx - 30 - i * 22, py, 8, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = i < theirs ? G.colors[otherTeam] : '#0008'; ctx.beginPath(); ctx.arc(cx + 30 + i * 22, py, 8, 0, 7); ctx.fill(); ctx.stroke();
+      }
+      txt(`第 ${o[2]} 局`, cx, py, 14, '#fff', 'center', 3);
+      if (o[3] > 0) txt('下一局马上开始…', cx, VH * 0.3, 26, '#ffdf2e', 'center', 5);
+    }
+    if (G.teams > 2 && o) {
+      const ph = o[6], stg = ph === 2 ? '最终圈' : ph === 1 ? '毒圈正在收缩' : `安全区（${o[7]} 秒后收缩）`;
+      txt(stg, cx, py, 14, ph === 1 ? '#ff8a5a' : '#fff', 'center', 3);
+      if (me && G.me && Math.hypot(G.me.px - o[0], G.me.py - o[1]) > o[2] && (me.flags & 1)) txt('⚠ 你在毒圈外！快回安全区', cx, VH * 0.26, 24, '#ff5a36', 'center', 5);
+    }
     if (G.mode === 'turf') {
       if (G.miniFrame % 6 === 0) updateMini();
       if (G.tl <= 30 && G.tl > 0 && !G.over) {
@@ -2238,6 +2278,13 @@
     if (o && G.mode === 'escort' && !o[5]) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && G.mode === 'soccer') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && G.mode === 'battery') { ctx.fillStyle = '#b8ff3a'; const f = o[2]; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
+    if (o && G.teams > 2) {
+      ctx.save(); ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + o[3] * ms, my + o[4] * ms, o[5] * ms, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#ff5a36'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, o[2] * ms, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#ffe600'; const f = o[10] || []; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 2, my + f[i + 2] * ms - 2, 4, 4);
+      ctx.restore();
+    }
     if (G.mode === 'zone') { const Z = S.ZONE, C = S.CELL; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(mx + Z.x0 * C * ms, my + Z.y0 * C * ms, (Z.x1 - Z.x0) * C * ms, (Z.y1 - Z.y0) * C * ms); }
     for (const id of G.cur) {
       const p = G.players.get(id);
@@ -2291,7 +2338,8 @@
     // ---- 死亡 ----
     if (me && !alive && G.cd <= 0 && !G.over) {
       ctx.fillStyle = 'rgba(10,10,20,.45)'; ctx.fillRect(0, 0, VW, VH);
-      txt(`重新部署 ${Math.max(0, me.resp).toFixed(1)}s`, cx, VH * 0.42, 40, '#fff', 'center', 6);
+      if (me.resp > 500) txt(G.mode === 'elim' ? '出局！等待下一局' : '你被淘汰了 · 观战中', cx, VH * 0.42, 40, '#fff', 'center', 6);
+      else txt(`重新部署 ${Math.max(0, me.resp).toFixed(1)}s`, cx, VH * 0.42, 40, '#fff', 'center', 6);
       if (G.killer) txt(`被 ${G.killer.name}（${S.WEAPONS[G.killer.weapon].name}）击倒`, cx, VH * 0.42 + 48, 18, G.colors[G.killer.team], 'center', 4);
     }
 
@@ -2342,7 +2390,7 @@
     const cols = [x + 20, x + w * 0.42, x + w * 0.6, x + w * 0.72, x + w * 0.85];
     ['机兵', '武器', '击倒', '倒下', '涂地'].forEach((s, i) => txt(s, cols[i], y + 56, 12, '#9a9db5', 'left', 0));
     let ry = y + 84;
-    for (const t of [myTeam, 3 - myTeam]) {
+    for (const t of teamOrder(myTeam)) {
       for (const p of rows.filter((q) => q.team === t)) {
         const sb = G.sb.get(p.id) || [0, 0, 0, 0];
         txt((p.bot ? 'AI · ' : '') + p.name + (p.id === myId ? '（你）' : ''), cols[0], ry, 14, G.colors[t], 'left', 0);
@@ -2360,7 +2408,9 @@
   function showResults(r) {
     const meRow = r.players.find((p) => p.id === myId);
     const myTeam = meRow ? meRow.team : 1;
-    const cs = S.COLOR_SETS[r.colorSet].c;
+    const multi = (r.teams || 2) > 2;
+    const cs = multi ? S.TEAM8 : S.COLOR_SETS[r.colorSet].c;
+    const tName = (t) => (multi ? S.TEAM8_NAMES[t] : S.TEAM_NAMES[t]);
     G = null;
     touchShow(false);
     if (document.exitPointerLock && locked()) document.exitPointerLock();
@@ -2369,27 +2419,31 @@
     showScreen('game');
     const won = r.winner === myTeam, draw = !r.winner;
     const title = $('resTitle');
-    title.textContent = !meRow ? `${teamName(r.winner) || '平局'} 胜利` : draw ? '平 局' : won ? '胜 利 ！' : '惜 败 …';
+    const rank = r.place && meRow ? r.place.indexOf(myTeam) + 1 : 0;
+    title.textContent = rank ? (rank === 1 ? '大 吉 大 利 ！' : `第 ${rank} 名`) : !meRow ? `${tName(r.winner) || '平局'} 胜利` : draw ? '平 局' : won ? '胜 利 ！' : '惜 败 …';
     title.style.color = draw ? '#fff' : cs[r.winner];
     const reason = { ko: '提前决胜', time: '时间到', turf: '比分相同，按涂地面积判定' }[r.reason] || '';
     $('resSub').textContent = `${S.MODES[r.mode].name} · ${S.MAPS[r.map].name} · ${reason}`;
     const A = $('resA'), B = $('resB');
+    A.parentElement.classList.toggle('hidden', multi);
     A.style.background = cs[myTeam]; B.style.background = cs[3 - myTeam];
     A.style.width = '0'; B.style.width = '0';
     const pa = r.turf[myTeam - 1], pb = r.turf[3 - myTeam - 1];
     A.textContent = `${(pa * 100).toFixed(1)}%`; B.textContent = `${(pb * 100).toFixed(1)}%`;
     setTimeout(() => { A.style.width = pa * 100 + '%'; B.style.width = pb * 100 + '%'; }, 60);
     let score = '';
-    if (r.mode === 'zone') score = `剩余倒计时　${r.count[myTeam]} : ${r.count[3 - myTeam]}`;
+    if (r.place) score = `名次　${r.place.map((t, i) => `${i + 1}. ${multi && r.mode === 'escape8' ? (r.players.find((p) => p.team === t) || {}).name : tName(t)}`).join('　')}`;
+    else if (r.rounds) score = `回合　${r.rounds[myTeam]} : ${r.rounds[3 - myTeam]}`;
+    else if (r.mode === 'zone') score = `剩余倒计时　${r.count[myTeam]} : ${r.count[3 - myTeam]}`;
     else if (r.mode !== 'turf') score = `比分　${r.score[myTeam]} : ${r.score[3 - myTeam]}`;
     $('resScore').textContent = score;
     // MVP
     const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
     const mvp = S.mvpOf(r);
-    const objLabel = { escort: '得分', battery: '电池', soccer: '—', zone: '—', turf: '—' }[r.mode];
+    const objLabel = { escort: '得分', battery: '电池' }[r.mode] || '—';
     $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
     let html = `<tr><th style="text-align:left">驾驶员</th><th>机体</th><th>击毁</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
-    for (const t of [myTeam, 3 - myTeam]) {
+    for (const t of r.place || [myTeam, 3 - myTeam]) {
       for (const p of r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a))) {
         html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}">${esc(p.name)}${p.bot ? '<small class="aitag">AI</small>' : ''}${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
       }

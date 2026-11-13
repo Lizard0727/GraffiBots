@@ -27,7 +27,7 @@ class Bot {
     if (m.t === 'start') { this.game = m; this.grid = new Uint8Array(S.GW * S.GH); this.M = S.buildMap(m.map); this.sync = -1; this.gq = 0; }
     if (m.t === 's') {
       this.snaps++;
-      for (const v of m.d) this.grid[v >> 2] = v & 3;
+      for (const v of m.d) this.grid[v >> 4] = v & 15;
       this.last = m;
       const me = m.p.find((a) => a[0] === this.id);
       if (me && (me[13] !== this.sync || !(me[7] & 1))) { this.sync = me[13]; this.pos = { x: me[1], y: me[2], z: me[17], vx: 0, vy: 0, vz: 0, onGround: true }; this.resyncs = (this.resyncs || 0) + 1; }

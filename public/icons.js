@@ -40,6 +40,11 @@
     battery: (c = '#9cff2e') => `<path d="M12,11 L34,10 C36,10 37,11 37,13 L38,40 C38,42 37,43 35,43 L13,44 C11,44 10,43 10,41 L10,13 C10,11 11,11 12,11 Z" fill="#2a2d3a" ${st()}/>
       <path d="M19,5 L28,5 L28,10 L19,10 Z" fill="#c9d3dc" ${st(2.4)}/><path d="M14,30 L33,29 L34,39 L14,40 Z" fill="${c}"/><path d="M14,21 L33,20 L33,27 L14,28 Z" fill="${c}"/>
       <path d="M26,13 L18,26 L24,26 L21,37" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>`,
+    elim: (c = '#ff3b52') => `<path d="M24,5 C35,5 42,12 42,22 C42,29 38,33 34,35 L34,42 L14,42 L14,35 C10,33 6,29 6,22 C6,12 13,5 24,5 Z" fill="#f4f0ea" ${st()}/>
+      <path d="M13,20 L21,24 L14,29 Z M35,20 L27,24 L34,29 Z" fill="${c}" ${st(2.4)}/><path d="M20,35 L20,42 M24,35 L24,42 M28,35 L28,42" ${st(2.2)}/><path d="M4,6 L12,12 M44,6 L36,12" stroke="${c}" stroke-width="4" stroke-linecap="round"/>`,
+    escape: (c = '#9aa0a8') => `<path d="M24,3 C36,3 45,12 45,24 C45,36 36,45 24,45 C12,45 3,36 3,24 C3,12 12,3 24,3 Z" fill="${c}" ${st()}/>
+      <path d="M24,11 C31,11 37,17 37,24 C37,31 31,37 24,37 C17,37 11,31 11,24 C11,17 17,11 24,11 Z" fill="#9cff2e" ${st(2.6)} stroke-dasharray="5 3"/>
+      <path d="M21,16 L28,16 L28,24 L33,24 L24,33 L15,24 L21,24 Z" fill="#ffe600" ${st(2.4)}/>`,
     // 能力
     super: (c = '#ffdf2e') => `<path d="M24,3 L29,17 L44,14 L33,25 L42,38 L27,33 L22,46 L19,32 L5,36 L14,24 L4,13 L19,16 Z" fill="${c}" ${st()}/><circle cx="24" cy="24" r="5" fill="#ff3ea5" ${st(2.2)}/>`,
     skill: (c = '#7af0ff') => `<path d="M22,4 C24,16 28,20 41,22 C28,25 24,29 22,44 C20,29 16,25 4,23 C16,20 20,16 22,4 Z" fill="${c}" ${st()}/><path d="M39,6 L40,13 M36,10 L43,9" ${st(2.6)}/>`,

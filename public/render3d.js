@@ -110,7 +110,17 @@
       zen: 0x2a1010, mid: 0xa03c1a, hor: 0xffa050, sunC: 0xffc488, sunI: 0.95, hemiS: 0xffe0c8, hemiG: 0x4a2a20, hemiI: 0.78, fill: 0xff6a3a, fog: 0x8a4a30,
       sun: [0.6, 0.45, 0.5], floor: ['#6c605a', '#645852'], tops: ['#8a6a50', '#7a6a64', '#4a3e3a', '#8a7060'], win: 0.9,
       sides: [['#a85a2a', '#2a1a14'], ['#5a5050', '#ff7a2a'], ['#3a3030', '#ff9a3a'], ['#6a5a50', '#ffb03a']], trim: ['#2a1a14', '#ff7a2a', '#ffb03a', '#ffb03a'], night: false, glow: true, fx: 'embers',
+    },,
+    { // 灰城广场：阴沉的灰城黄昏，彩色涂料格外显眼
+      zen: 0x3a3d48, mid: 0x7a7d88, hor: 0xd8c8b8, sunC: 0xffe6c8, sunI: 0.85, hemiS: 0xf0f0f4, hemiG: 0x4a4c56, hemiI: 0.8, fill: 0xff8a5a, fog: 0x8a8c96,
+      sun: [-0.4, 0.6, -0.6], floor: ['#8a8d96', '#82858e'], seam: '#6d707a', tops: ['#9a9da6', '#b0b3bc', '#6d707a', '#a4a7b0'], win: 0.5,
+      sides: [['#c9ccd4', '#5b5e68'], ['#ff5a36', '#3a3d46'], ['#e6e7ea', '#9aa0a8'], ['#8a8d96', '#ffe600']], trim: ['#3a3d46', '#ffffff', '#ff5a36', '#ffe600'], night: false,
     },
+    { // 废墟逃亡区：尘土飞扬的废墟傍晚
+      zen: 0x2a2228, mid: 0x8a5a48, hor: 0xffb070, sunC: 0xffc890, sunI: 0.9, hemiS: 0xffe0c8, hemiG: 0x4a3a34, hemiI: 0.76, fill: 0x6f8dff, fog: 0x9a7060,
+      sun: [0.6, 0.4, -0.6], floor: ['#8a7f76', '#82776e'], seam: '#6a5f56', tops: ['#9a8f86', '#a89a88', '#6a6058', '#b0a494'], win: 0.25,
+      sides: [['#b8aa98', '#5a4e44'], ['#ff8a1f', '#4a3a30'], ['#d8ccbc', '#8a7e70'], ['#9a8e80', '#9cff2e']], trim: ['#3a302a', '#f4ece0', '#ff8a1f', '#9cff2e'], night: false,
+    }
   ];
 
   function build(G) {
@@ -295,8 +305,8 @@
     x.setLineDash([]); x.lineWidth = 8;
     x.beginPath(); x.arc(S.W / 2, S.H / 2, 150, 0, 7); x.stroke();
     x.lineWidth = 4; x.beginPath(); x.arc(S.W / 2, S.H / 2, 130, 0, 7); x.stroke();
-    // 两侧基地：队伍色箭头
-    for (const t of [1, 2]) {
+    // 两侧基地：队伍色箭头（多队模式没有基地）
+    for (const t of (G.teams || 2) > 2 ? [] : [1, 2]) {
       const b = S.basePos(t), col = G.colors[t];
       x.globalAlpha = 0.35; x.fillStyle = col;
       for (let k = 0; k < 3; k++) {
@@ -774,7 +784,7 @@
 
   function buildModeDecor(G) {
     const cs = G.colors;
-    for (const t of [1, 2]) {
+    for (const t of (G.teams || 2) > 2 ? [] : [1, 2]) {
       const b = S.basePos(t);
       scene.add(flat(part(SH.disc, basic(cs[t], { transparent: true, opacity: 0.3, depthWrite: false }), 66, 66, 1), b.x, b.y, 0.7));
       scene.add(flat(part(SH.ring, basic(cs[t]), 66, 66, 1), b.x, b.y, 0.9));
@@ -840,7 +850,8 @@
   }
   function buildDynamic(G) {
     const cs = G.colors, P = W.pools;
-    for (const t of [1, 2]) {
+    const TEAMS = Array.from({ length: cs.length - 1 }, (_, i) => i + 1);
+    for (const t of TEAMS) {
       const pm = basic(cs[t]);
       P['proj' + t] = pool(() => { const m = new T.Mesh(SH.sph, pm); return m; });
       const bm = lambert(cs[t], { emissive: new T.Color(cs[t]).multiplyScalar(0.25) });
@@ -857,7 +868,7 @@
     }
     P.ring = pool(() => new T.Mesh(SH.ring, basic(0xffffff, { transparent: true, side: T.DoubleSide, depthWrite: false })));
     // 迫击炮弹 + 落点预警圈
-    for (const t of [1, 2]) {
+    for (const t of TEAMS) {
       const sm = toon(cs[t], { emissive: new T.Color(cs[t]).multiplyScalar(0.3) });
       P['shell' + t] = pool(() => { const m = new T.Mesh(SH.sph, sm); m.scale.setScalar(7); m.castShadow = true; return m; });
       const wm = basic(cs[t], { transparent: true, opacity: 0.5, side: T.DoubleSide, depthWrite: false });
@@ -881,6 +892,16 @@
         return g;
       });
     }
+    // 逃亡圈：空投箱（金色补给箱 + 降落伞）
+    P.crate = pool(() => {
+      const g = new T.Group();
+      g.add(outlined(rbox(18, 14, 18, 2.5), toon(0xffb42e), 1, 1, 1, 0, 7, 0));
+      g.add(part(SH.box, toon(0x141018), 18.6, 2.2, 18.6, 0, 9, 0));
+      g.add(part(SH.box, toon(0xfff6e3), 4, 14.4, 18.8, 0, 7, 0));
+      const glow = part(SH.sphL, basic(0xffe600, { transparent: true, opacity: 0.25, depthWrite: false, blending: T.AdditiveBlending }), 20, 20, 20, 0, 10, 0);
+      g.add(glow);
+      return g;
+    });
     P.bento = pool(() => {
       const g = new T.Group();
       g.add(part(SH.box, toon(0xd8492e), 16, 7, 12, 0, 3.5, 0));
@@ -1960,6 +1981,7 @@
     for (const h of G.helpers || []) {
       const [, kind, x, y, z, team] = h;
       if (kind === 'fire') continue;   // 火海用粒子画（client 收到 fz 事件）
+      if (kind === 'crate') { const g = P.crate.next(); g.position.set(x, z + Math.abs(Math.sin(now / 400 + x)) * 4, y); g.rotation.y = now / 900; continue; }
       if (kind === 'charge') {         // 炸药：一闪一闪的涂料弹
         const m = P['shell' + team].next(); m.position.set(x, z + 6, y); m.scale.setScalar(1.3 + 0.4 * Math.abs(Math.sin(now / 70))); continue;
       }
@@ -1968,6 +1990,20 @@
       g.position.set(x, z, y);
       if (kind === 'turret') g.userData.head.rotation.y = now / 300;
       else { g.userData.rotor.rotation.y = now / 30; g.position.y = z + Math.sin(now / 200) * 2; }
+    }
+    // 逃亡圈：毒圈是一圈半透明的灰色涂料墙，下一个安全区画在地上
+    if ((G.teams || 2) > 2 && G.obj) {
+      const o = G.obj;
+      if (!W.circle) {
+        W.circle = part(SH.tube, basic(0xff5a36, { transparent: true, opacity: 0.22, side: T.DoubleSide, depthWrite: false }), 1, 220, 1, 0, 110, 0);
+        W.circleIn = part(SH.tube, basic(0x5b5e68, { transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false }), 1, 60, 1, 0, 30, 0);
+        W.safe = flat(part(SH.ring, basic(0xffffff, { transparent: true, opacity: 0.6, side: T.DoubleSide, depthWrite: false }), 1, 1, 1), 0, 0, 2);
+        scene.add(W.circle); scene.add(W.circleIn); scene.add(W.safe);
+      }
+      W.circle.position.set(o[0], 110, o[1]); W.circle.scale.set(o[2] * 2, 220, o[2] * 2);
+      W.circleIn.position.set(o[0], 30, o[1]); W.circleIn.scale.set(o[2] * 2 + 6, 60, o[2] * 2 + 6);
+      W.circle.material.opacity = 0.18 + 0.08 * Math.sin(now / 300);
+      W.safe.position.set(o[3], 2, o[4]); W.safe.scale.set(o[5] * 2, o[5] * 2, 1); W.safe.visible = o[6] !== 2;
     }
     // 草丛：自己站在里面时那一块变半透明
     if (W.bushes) {

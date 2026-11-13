@@ -228,5 +228,44 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   ok([1, 2, 3, 4].every((r) => S.SKINS.some((k) => k.rare === r)), '皮肤分普通 / 稀有 / 史诗 / 传说四个等级');
 }
 
+// ---- 新模式 ----
+{
+  const room = new Room('EL', null, { manual: true });
+  room.settings = { mode: 'elim', map: 0, duration: 120, teamSize: 3, bots: true };
+  const g = new Game(room, { manual: true }); g.countdown = 0;
+  const t1 = [...g.players.values()].filter((p) => p.team === 1), t2 = [...g.players.values()].filter((p) => p.team === 2);
+  g.hurt(t2[0], 999, t1[0]);
+  for (let i = 0; i < 8 * S.TICK; i++) g.step();
+  ok(t2[0].foot && t2[0].alive, '生死之战：机体被打爆后驾驶员弹出，8 秒后也不会重建');
+  t2[0].invulnT = 0; g.hurt(t2[0], 999, t1[0]);
+  ok(!t2[0].alive && t2[0].out, '驾驶员倒下就出局');
+  for (const p of t2) { p.invulnT = 0; p.alive = false; p.out = true; }
+  g.step();
+  ok(g.obj.wins[1] === 1 && g.obj.pause > 0, '对面全队出局：我方赢下第 1 局');
+  for (let i = 0; i < 4 * S.TICK; i++) g.step();
+  ok(g.obj.round === 2 && t2.every((p) => p.alive && !p.out), '3 秒后开始第 2 局，所有人复活');
+  for (const p of t2) { p.invulnT = 0; p.alive = false; p.out = true; }
+  g.step();
+  ok(g.over && g.result.winner === 1 && g.result.rounds[1] === 2, '先赢 2 局的一方获胜');
+}
+{
+  const room = new Room('ES', null, { manual: true });
+  room.settings = { mode: 'escape4', map: -1, duration: 120, teamSize: 3, bots: true };
+  const g = new Game(room, { manual: true }); g.countdown = 0;
+  const teams = new Set([...g.players.values()].map((p) => p.team));
+  ok(teams.size === 4 && g.players.size === 8 && S.MAPS[g.mapIdx].name === '废墟逃亡区', '四队逃亡圈：8 人分成 4 队，默认在「废墟逃亡区」');
+  const p = [...g.players.values()][0];
+  const k = g.obj.crates[0]; p.x = k.x; p.y = k.y; p.z = k.z; const mh = p.maxHp;
+  g.step();
+  ok(p.cubes === 1 && p.maxHp > mh, `捡到空投箱：能量 +1，生命上限 ${mh} → ${p.maxHp}`);
+  g.obj.circle.r = 50; g.obj.circle.x = 100; g.obj.circle.y = 100; p.x = S.W - 200; p.y = S.H - 200; p.invulnT = 0; const h0 = p.hp;
+  g.obj.dmgT = 0; g.step();
+  ok(p.hp < h0, '在毒圈外会持续掉血');
+  const g8 = new Game(Object.assign(new Room('E8', null, { manual: true }), { settings: { mode: 'escape8', map: -1, duration: 120, teamSize: 3, bots: true } }), { manual: true });
+  ok(new Set([...g8.players.values()].map((q) => q.team)).size === 8, '单人逃亡圈：8 人各自一队');
+  const r = S.matchReward({ winner: 3, place: [3, 1, 4, 2], players: [{ id: 9, team: 2, kills: 1, paint: 100, obj: 0 }] }, 9);
+  ok(r.rank === 4 && r.trophies === -3, '四队第 4 名：奖杯 −3');
+}
+
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');
 process.exit(failed ? 1 : 0);

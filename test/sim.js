@@ -20,15 +20,17 @@ for (const mode of S.MODE_ORDER) {
     const g = new Game(room, { manual: true });
     let ticks = 0;
     const t0 = Date.now();
-    while (!g.over && ticks < 200 * S.TICK) { g.step(); ticks++; }
+    const cap = S.MODES[mode].oneLife ? 420 : 200;
+    while (!g.over && ticks < cap * S.TICK) { g.step(); ticks++; }
+    if (!g.over) { console.log(`✗ ${S.MODES[mode].name} @ ${S.MAPS[map].name}：${cap} 秒内没打完`); failed++; continue; }
     const r = g.result;
     const ms = Date.now() - t0;
     const kills = r.players.reduce((a, p) => a + p.kills, 0);
     const paintless = r.players.filter((p) => p.paint < 50).map((p) => p.name);
-    const extra = mode === 'zone' ? ` 倒计时 ${r.count[1]}/${r.count[2]}` : mode === 'turf' ? '' : ` 比分 ${r.score[1]}:${r.score[2]}`;
+    const extra = r.place ? ` 名次 ${r.place.join('>')}` : r.rounds ? ` 回合 ${r.rounds[1]}:${r.rounds[2]}` : mode === 'zone' ? ` 倒计时 ${r.count[1]}/${r.count[2]}` : mode === 'turf' ? '' : ` 比分 ${r.score[1]}:${r.score[2]}`;
     let high = 0;
     for (let i = 0; i < g.grid.length; i++) if (g.grid[i] && g.M.top[i] > 0) high++;
-    const ok = g.over && kills > 0 && paintless.length === 0;
+    const ok = g.over && kills > 0 && (S.MODES[mode].oneLife || paintless.length === 0) && (!r.place || r.place.length === r.teams);
     if (!ok) failed++;
     console.log(`${ok ? '✓' : '✗'} ${S.MODES[mode].name.padEnd(5, '　')} @ ${S.MAPS[map].name}  用时 ${(ticks / S.TICK).toFixed(0)}s  胜方 ${r.winner} (${r.reason})  涂地 ${(r.turf[0] * 100).toFixed(1)}%/${(r.turf[1] * 100).toFixed(1)}%${extra}  击倒 ${kills}  高台涂色 ${high}格  模拟耗时 ${ms}ms${paintless.length ? '  ⚠ 几乎没涂地: ' + paintless.join(',') : ''}`);
   }

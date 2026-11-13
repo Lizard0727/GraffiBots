@@ -103,27 +103,37 @@ class Game {
     this.room = room;
     const st = room.settings;
     this.mode = st.mode;
-    this.mapIdx = st.map < 0 ? randInt(S.MAPS.length) : st.map;
+    // 逃亡圈默认用「废墟逃亡区」
+    const ruins = S.MAPS.findIndex((m) => m.name === '废墟逃亡区');
+    this.mapIdx = st.map < 0 ? (S.isEscape(this.mode) && ruins >= 0 ? ruins : randInt(S.MAPS.length)) : st.map;
+    this.teams = S.teamsOf(this.mode);
+    this.oneLife = !!(S.MODES[this.mode] && S.MODES[this.mode].oneLife);
     this.M = S.buildMap(this.mapIdx);
     this.nav = buildNav(this.M);
     this.grid = new Uint8Array(S.GW * S.GH);
     this.duration = st.duration; this.timeLeft = st.duration;
     this.countdown = 3.5; this.time = 0; this.tick = 0; this.over = false;
     this.players = new Map(); this.projs = []; this.bombs = []; this.missiles = []; this.shells = []; this.helpers = [];
-    this.reveal = [0, 0, 0];   // 全队扫描（义眼扫描）结束时间
+    this.reveal = new Array(this.teams + 1).fill(0);   // 全队扫描（义眼扫描）结束时间
     this.nextId = 1; this.diff = []; this.events = [];
     this.colorSet = room.colorSet;
-    const slots = { 1: 0, 2: 0 };
+    const slots = {};
+    for (let t = 1; t <= this.teams; t++) slots[t] = 0;
+    const teamCap = this.teams > 2 ? S.MODES[this.mode].size : S.MAX_PER_TEAM;
+    // 多队模式：真人按加入顺序分队（四队：每 2 人一队；单人：每人一队）
+    if (this.teams > 2) { let i = 0; for (const c of room.members.values()) c.gTeam = 1 + (Math.floor(i++ / teamCap) % this.teams); }
+    if (S.isEscape(this.mode)) this.spawns = this.escapeSpawns();
     // 角色等级：公平模式下所有人按同一等级；AI 的等级跟着真人玩家的平均等级
     this.fair = !!st.fair;
     this.tutorial = !!st.tutorial;   // 新手教程：敌人是不动的训练靶，时间不走，玩家不会倒下
     const FAIR = { lv: E.FAIR_LV, bt: E.FAIR_BT };
     const humans = [];
     for (const c of room.members.values()) {
-      if (slots[c.team] >= S.MAX_PER_TEAM) continue;
+      const team = this.teams > 2 ? c.gTeam : c.team;
+      if (slots[team] >= teamCap) continue;
       const pw = this.fair ? FAIR : c.power || { lv: 1, bt: 0 };
       humans.push(pw);
-      const pl = this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++, c.pilot, pw);
+      const pl = this.addPlayer(c.id, c.name, team, c.weapon, c.head, false, slots[team]++, c.pilot, pw);
       pl.looks = c.looks || null;
     }
     const avgLv = humans.length ? Math.round(humans.reduce((a, b) => a + b.lv, 0) / humans.length) : 1;
@@ -134,8 +144,9 @@ class Game {
       // AI 机兵由驾驶员们驾驶：优先使用还没人选的驾驶员（名字就是驾驶员的名字）
       const taken = new Set([...this.players.values()].map((p) => p.pilot));
       const free = S.PILOTS.filter((pp) => !taken.has(pp.id)).sort(() => Math.random() - 0.5);
-      for (const team of [1, 2])
-        while (slots[team] < st.teamSize && !(this.tutorial && team === 1)) {
+      const perTeam = this.teams > 2 ? teamCap : st.teamSize;
+      for (let team = 1; team <= this.teams; team++)
+        while (slots[team] < perTeam && !(this.tutorial && team === 1)) {
           bi++;
           const pp = free.shift();
           const pil = pp || S.PILOTS[randInt(S.PILOTS.length)];
@@ -153,7 +164,7 @@ class Game {
     room.broadcast({
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
       players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null })),
-      fair: this.fair,
+      fair: this.fair, teams: this.teams,
     });
     if (!opts.manual) this.interval = setInterval(() => this.step(), 1000 / S.TICK);
   }
@@ -661,7 +672,7 @@ class Game {
 
   paint(x, y, z, r, team, owner) {
     if (owner && owner.tal && owner.tal.has('p1')) r *= 1.12;   // 天赋：大号喷嘴
-    const n = S.paintCircle(this.grid, this.M, x, y, z, r, team, (i) => this.diff.push(i * 4 + team));
+    const n = S.paintCircle(this.grid, this.M, x, y, z, r, team, (i) => this.diff.push(i * 16 + team));
     if (owner && n) this.credit(owner, n);
     return n;
   }
@@ -712,6 +723,7 @@ class Game {
     }
     if (this.obj.tr && this.obj.tr.carrier === t.id) dmg *= 0.75;
     if (by && by.pmul && by !== t) dmg *= by.pmul;   // 等级加成
+    if (by && by.cubes && by !== t) dmg *= 1 + by.cubes * S.ESCAPE.crateDmg;   // 逃亡圈：空投箱
     if (this.tutorial && !t.bot) dmg = Math.min(dmg, Math.max(0, t.hp - 1));   // 教程里玩家不会倒下
     if (tOV && tOV.undying) dmg = Math.min(dmg, Math.max(0, t.hp - 1));         // 秦岳超载：老兵不死
     t.hp -= dmg; t.lastHurt = this.time;
@@ -735,9 +747,9 @@ class Game {
   wreck(t, by) {
     const x = t.x, y = t.y, z = t.z;
     if (by && by !== t) this.onTakedown(by);
-    this.paint(x, y, this.top(x, y), 55, by ? by.team : 3 - t.team, by && this.players.has(by.id) ? by : null);
+    this.paint(x, y, this.top(x, y), 55, by ? by.team : this.teams > 2 ? 0 : 3 - t.team, by && this.players.has(by.id) ? by : null);
     this.dropItems(t);
-    t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = S.REBUILD - (t.pilot === 'aurora' ? 2 : 0) - (t.tal && t.tal.has('d3') ? 1 : 0);
+    t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = this.oneLife ? 1e9 : S.REBUILD - (t.pilot === 'aurora' ? 2 : 0) - (t.tal && t.tal.has('d3') ? 1 : 0);   // 一条命的模式：机体不会重建
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.quakeT = 0;
     const sh = (t.pilot === 'hammer' ? 40 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
     if (sh) { t.shield = sh; t.shieldT = 6; }
@@ -757,9 +769,10 @@ class Game {
   }
   // 驾驶员被击倒：回基地复活
   kill(t, by) {
-    t.alive = false; t.hp = 0; t.respawnT = S.KO_RESPAWN; t.stats.deaths++;
+    t.alive = false; t.hp = 0; t.respawnT = this.oneLife ? 1e9 : S.KO_RESPAWN; t.stats.deaths++;
+    if (this.oneLife) t.out = true;   // 出局：生死之战等下一局，逃亡圈直接淘汰
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.foot = false;
-    const team = by ? by.team : 3 - t.team;
+    const team = by ? by.team : this.teams > 2 ? 0 : 3 - t.team;
     this.paint(t.x, t.y, this.top(t.x, t.y), 40, team, by && this.players.has(by.id) ? by : null);
     if (by && by !== t) this.onTakedown(by);
     t.sp = Math.floor(t.sp * 0.5);
@@ -768,7 +781,7 @@ class Game {
   }
 
   respawn(p) {
-    const sp = S.spawnPoint(p.team, p.slot);
+    const sp = this.spawns ? { x: this.spawns[p.team].x + (p.slot ? 34 : 0), y: this.spawns[p.team].y + (p.slot ? 20 : 0) } : S.spawnPoint(p.team, p.slot);
     p.x = sp.x; p.y = sp.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.kx = p.ky = 0; p.onGround = true;
     p.foot = false; p.hp = p.maxHp; p.ammo = S.AMMO; p.alive = true; p.invulnT = 2.5;
     p.sync++; p.lastPosT = this.time;
@@ -1032,9 +1045,56 @@ class Game {
   }
 
   // ------------------------------------------------------------------
+  // 逃亡圈：各队分散在地图四周的空地上
+  escapeSpawns() {
+    const out = [null], n = this.teams, cx = S.W / 2, cy = S.H / 2;
+    const open = (x, y) => { for (const [dx, dy] of [[0, 0], [34, 20], [-20, 20], [20, -20]]) { const tx = x + dx, ty = y + dy; if (tx < 30 || ty < 30 || tx > S.W - 30 || ty > S.H - 30 || this.top(tx, ty) !== 0) return false; } return true; };
+    const a0 = Math.random() * Math.PI * 2;
+    for (let t = 1; t <= n; t++) {
+      const a = a0 + ((t - 1) / n) * Math.PI * 2;
+      let best = null;
+      for (let k = 0; k < 400 && !best; k++) {
+        const rr = 0.38 + (k % 20) * 0.006, aa = a + (Math.floor(k / 20) % 2 ? 1 : -1) * Math.floor(k / 40) * 0.05;
+        const x = cx + Math.cos(aa) * S.W * rr, y = cy + Math.sin(aa) * S.H * rr;
+        if (open(x, y)) best = { x, y };
+      }
+      out.push(best || S.spawnPoint(t % 2 ? 1 : 2, 0));
+    }
+    return out;
+  }
+  aliveOf(team) { let n = 0; for (const p of this.players.values()) if (p.team === team && p.alive && !p.out) n++; return n; }
+  spawnCrate() {
+    const c = this.obj.circle;
+    for (let k = 0; k < 60; k++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * Math.max(60, c.r * 0.85);
+      const x = clamp(c.x + Math.cos(a) * rr, 40, S.W - 40), y = clamp(c.y + Math.sin(a) * rr, 40, S.H - 40);
+      const z = this.top(x, y);
+      if (z < 200 && !this.M.solid[Math.floor(y / S.CELL) * S.GW + Math.floor(x / S.CELL)]) { this.obj.crates.push({ id: this.nextId++, x, y, z }); return; }
+    }
+  }
+  // 生死之战：新一局（所有人复活、清场，保留大招一半充能）
+  resetRound() {
+    const o = this.obj;
+    o.roundT = S.ELIM.roundTime; o.round++;
+    this.projs = []; this.shells = []; this.helpers = []; this.bombs = []; this.missiles = [];
+    for (const p of this.players.values()) {
+      p.out = false; p.alive = true; p.foot = false; p.spT = 0; p.spKind = null; p.ovT = 0; p.shield = 0; p.shieldT = 0;
+      p.sp = Math.floor(p.sp * 0.5); p.skillUses = S.SKILL_USES + (p.tal.has('s2') ? 1 : 0); p.skillCd = 0; p.rebuildT = 0;
+      this.respawn(p); p.invulnT = 2;
+    }
+    this.ev(['rs', o.round]);
+  }
   initMode() {
     const o = (this.obj = { score: [0, 0, 0], resetT: 0 });
     switch (this.mode) {
+      case 'elim': o.wins = [0, 0, 0]; o.round = 1; o.pause = 0; o.roundT = S.ELIM.roundTime; this.timeLeft = o.roundT; break;
+      case 'escape4': case 'escape8': {
+        const R0 = Math.hypot(S.W, S.H) / 2 + 40;
+        o.circle = { x: S.W / 2, y: S.H / 2, r: R0, R0, from: null, to: { x: S.W / 2, y: S.H / 2, r: R0 }, stage: 0, phase: 0, t: S.ESCAPE.stages[0][0] };
+        o.crates = []; o.crateT = 15; o.elim = []; o.dmgT = 0;
+        for (let i = 0; i < 10; i++) this.spawnCrate();
+        this.timeLeft = 360; break;
+      }
       case 'zone': o.owner = 0; o.count = [0, 100, 100]; o.share = [0, 0, 0]; break;
       case 'escort': o.tr = { x: S.W / 2, y: S.H / 2, z: this.top(S.W / 2, S.H / 2), carrier: 0, resetT: 0 }; break;
       case 'soccer': o.ball = { x: S.W / 2, y: S.H / 2, vx: 0, vy: 0, r: 26, last: 0, acc: 0 }; break;
@@ -1045,6 +1105,70 @@ class Game {
   updateMode(dt) {
     const o = this.obj;
     switch (this.mode) {
+      case 'elim': {
+        if (o.pause > 0) {
+          o.pause -= dt; this.timeLeft = S.ELIM.roundTime;
+          if (o.pause <= 0) this.resetRound();
+          break;
+        }
+        o.roundT -= dt; this.timeLeft = Math.max(0.05, o.roundT);
+        const a = this.aliveOf(1), b = this.aliveOf(2);
+        if (a && b && o.roundT > 0) break;
+        // 一局结束：剩下的人多的一方赢；时间到且人数相同，比剩余生命
+        let w = a > b ? 1 : b > a ? 2 : 0;
+        if (!w) { let ha = 0, hb = 0; for (const p of this.players.values()) if (p.alive && !p.out) { if (p.team === 1) ha += p.hp / this.maxHpOf(p); else hb += p.hp / this.maxHpOf(p); } w = ha >= hb ? 1 : 2; }
+        o.wins[w]++;
+        this.ev(['rd', w, o.wins[1], o.wins[2], o.round]);
+        if (o.wins[w] >= S.ELIM.wins) { this.finish(w); break; }
+        o.pause = S.ELIM.pause;
+        for (const p of this.players.values()) p.invulnT = S.ELIM.pause + 2;
+        break;
+      }
+      case 'escape4': case 'escape8': {
+        const c = o.circle, ST = S.ESCAPE.stages;
+        c.t -= dt;
+        if (c.phase === 0 && c.t <= 0 && c.stage < ST.length) {
+          const [, shrink, ratio] = ST[c.stage], nr = Math.max(50, c.R0 * ratio), room = Math.max(0, c.r - nr) * 0.8, a = Math.random() * Math.PI * 2, d = Math.random() * room;
+          c.from = { x: c.x, y: c.y, r: c.r };
+          c.to = { x: clamp(c.x + Math.cos(a) * d, nr * 0.5 + 60, S.W - nr * 0.5 - 60), y: clamp(c.y + Math.sin(a) * d, nr * 0.5 + 60, S.H - nr * 0.5 - 60), r: nr };
+          c.phase = 1; c.t = shrink; c.T = shrink;
+          this.ev(['cz', c.stage]);
+        } else if (c.phase === 1) {
+          const k = clamp(1 - c.t / c.T, 0, 1);
+          c.x = c.from.x + (c.to.x - c.from.x) * k; c.y = c.from.y + (c.to.y - c.from.y) * k; c.r = c.from.r + (c.to.r - c.from.r) * k;
+          if (c.t <= 0) { c.stage++; c.phase = c.stage < ST.length ? 0 : 2; c.t = c.stage < ST.length ? ST[c.stage][0] : 0; }
+        }
+        // 圈外伤害（每 0.5 秒结算一次）
+        o.dmgT -= dt;
+        if (o.dmgT <= 0) {
+          o.dmgT = 0.5;
+          const dps = ST[Math.min(ST.length - 1, c.stage)][3];
+          for (const p of this.players.values()) if (p.alive && !p.out && Math.hypot(p.x - c.x, p.y - c.y) > c.r) { p.invulnT = 0; this.hurt(p, dps * 0.5, null); }
+        }
+        // 空投箱
+        o.crateT -= dt;
+        if (o.crateT <= 0) { o.crateT = 16; this.spawnCrate(); this.spawnCrate(); this.ev(['cr']); }
+        o.crates = o.crates.filter((k) => {
+          for (const p of this.players.values()) {
+            if (!p.alive || p.out || Math.hypot(p.x - k.x, p.y - k.y) > 28 || Math.abs(p.z - k.z) > 40) continue;
+            p.cubes = Math.min(S.ESCAPE.maxCubes, (p.cubes || 0) + 1);
+            if (!p.foot) { const add = Math.round(p.maxHp * S.ESCAPE.crateHp); p.maxHp += add; }
+            p.hp = Math.min(this.maxHpOf(p), p.hp + S.ESCAPE.crateHeal);
+            this.ev(['crt', p.id, r1(k.x), r1(k.y), r1(k.z), p.cubes]);
+            return false;
+          }
+          return true;
+        });
+        // 淘汰与名次
+        let alive = [];
+        for (let t = 1; t <= this.teams; t++) {
+          const n = this.aliveOf(t);
+          if (n) alive.push(t);
+          else if (!o.elim.includes(t) && [...this.players.values()].some((p) => p.team === t)) { o.elim.push(t); this.ev(['tout', t, this.teams - o.elim.length + 1]); }
+        }
+        if (alive.length <= 1) this.finish(alive[0] || o.elim[o.elim.length - 1]);
+        break;
+      }
       case 'zone': {
         let a = 0, b = 0;
         for (const i of this.zoneCells) { if (this.grid[i] === 1) a++; else if (this.grid[i] === 2) b++; }
@@ -1184,6 +1308,14 @@ class Game {
         for (const b of o.bats) flat.push(b.id, r1(b.x), r1(b.y), r1(b.z));
         return [o.score[1], o.score[2], flat];
       }
+      case 'elim': return [o.wins[1], o.wins[2], o.round, Math.ceil(o.pause * 10), this.aliveOf(1), this.aliveOf(2)];
+      case 'escape4': case 'escape8': {
+        const c = o.circle, flat = [];
+        for (const k of o.crates) flat.push(k.id, r1(k.x), r1(k.y), r1(k.z));
+        let teamsAlive = 0, people = 0;
+        for (let t = 1; t <= this.teams; t++) { const n = this.aliveOf(t); if (n) teamsAlive++; people += n; }
+        return [r1(c.x), r1(c.y), r1(c.r), r1(c.to.x), r1(c.to.y), r1(c.to.r), c.phase, Math.ceil(c.t), teamsAlive, people, flat];
+      }
     }
     return null;
   }
@@ -1213,7 +1345,7 @@ class Game {
     }
     const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState(),
       rv: [0, this.reveal[1] > this.time ? 1 : 0, this.reveal[2] > this.time ? 1 : 0],
-      h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team]) };
+      h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team]).concat(this.obj.crates ? this.obj.crates.map((k) => [k.id, 'crate', r1(k.x), r1(k.y), r1(k.z), 0]) : []) };
     if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj]);
     this.room.broadcast(msg, true);
     this.diff = []; this.events = [];
@@ -1228,6 +1360,11 @@ class Game {
     const byTurf = turf.a > turf.b ? 1 : turf.b > turf.a ? 2 : 0;
     const o = this.obj;
     let reason = 'ko';
+    if (winner == null && S.isEscape(this.mode)) {   // 逃亡圈超时：活着的人最多的队伍赢
+      let best = 0, bn = -1;
+      for (let t = 1; t <= this.teams; t++) { const n = this.aliveOf(t); if (n > bn) { bn = n; best = t; } }
+      winner = best; reason = 'time';
+    }
     if (winner == null) {
       reason = 'time';
       if (this.mode === 'turf') winner = byTurf;
@@ -1237,7 +1374,9 @@ class Game {
     }
     const result = {
       mode: this.mode, map: this.mapIdx, winner, reason, turf: [pa, pb], score: o.score.slice(),
-      count: o.count ? o.count.map((c) => Math.ceil(c)) : null, colorSet: this.colorSet,
+      count: o.count ? o.count.map((c) => Math.ceil(c)) : null, colorSet: this.colorSet, teams: this.teams,
+      rounds: o.wins ? o.wins.slice() : null,
+      place: o.elim ? [winner, ...o.elim.slice().reverse().filter((t) => t !== winner)] : null,
       players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, ...p.stats })),
     };
     this.result = result;
@@ -1418,6 +1557,15 @@ function randomGoal(g, p) {
 function chooseGoal(g, p) {
   const o = g.obj;
   switch (g.mode) {
+    case 'escape4': case 'escape8': {
+      const c = o.circle, safe = c.to || c;
+      if (Math.hypot(p.x - safe.x, p.y - safe.y) > safe.r * 0.75) return { x: clamp(safe.x + rand(-40, 40), 40, S.W - 40), y: clamp(safe.y + rand(-40, 40), 40, S.H - 40) };
+      let best = null, bd = 520;
+      for (const k of o.crates) { const d = Math.hypot(k.x - p.x, k.y - p.y); if (d < bd && Math.hypot(k.x - safe.x, k.y - safe.y) < safe.r) { bd = d; best = { x: k.x, y: k.y }; } }
+      if (best) return best;
+      const a = rand(0, Math.PI * 2), rr = rand(0, safe.r * 0.6);
+      return { x: clamp(safe.x + Math.cos(a) * rr, 40, S.W - 40), y: clamp(safe.y + Math.sin(a) * rr, 40, S.H - 40) };
+    }
     case 'zone':
       if (Math.random() < 0.75) return { x: rand(S.ZONE.x0 + 1, S.ZONE.x1 - 1) * S.CELL, y: rand(S.ZONE.y0 + 1, S.ZONE.y1 - 1) * S.CELL };
       break;
