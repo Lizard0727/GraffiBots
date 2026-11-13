@@ -402,7 +402,8 @@
     for (let i = -1; i < S.MAPS.length; i++) {
       const el = document.createElement('button');
       el.className = 'mapcard' + (profile.map === i ? ' sel' : '');
-      el.innerHTML = i < 0 ? '<div class="rnd">?</div><b>随机地图</b>' : `<canvas width="120" height="80"></canvas><b>${S.MAPS[i].name}</b>`;
+      el.innerHTML = i < 0 ? '<div class="rnd">?</div><b>随机地图</b>' : `${S.MAPS[i].isNew ? '<span class="new-badge">NEW</span>' : ''}<canvas width="120" height="80"></canvas><b>${S.MAPS[i].name}</b>`;
+      if (i >= 0) el.title = S.MAPS[i].desc;
       if (i >= 0) drawMapPreview(el.querySelector('canvas'), i);
       el.onclick = () => { profile.map = i; saveProfile(); renderModes(); renderModeCard(); sfx.click(); };
       mb.appendChild(el);
@@ -442,10 +443,19 @@
       c.fillText('?', canvas.width / 2, canvas.height / 2 + 4);
       return;
     }
-    let rects = mapPreviewCache.get(idx);
-    if (!rects) { rects = S.buildMap(idx).rects.slice().sort((a, b) => a[4] - b[4]); mapPreviewCache.set(idx, rects); }
-    const lvCol = [null, '#4d5578', '#6a74a3', '#9aa0c0'];
-    for (const [x, y, w, h, lv] of rects) { c.fillStyle = lvCol[lv]; c.fillRect(x * 2, y * 2, w * 2, h * 2); }
+    // 按每格高度上色：墙 / 高台 / 矮台 / 楼梯 / 草丛 / 弹跳板
+    let M = mapPreviewCache.get(idx);
+    if (!M) { M = S.buildMap(idx); mapPreviewCache.set(idx, M); }
+    const lvCol = [null, '#7a6a48', '#5a68a8', '#a0a6c4', '#6a6070'];
+    for (let y = 0; y < S.GH; y++)
+      for (let x = 0; x < S.GW; x++) {
+        const i = y * S.GW + x;
+        let col = M.lv[i] ? lvCol[M.lv[i]] : null;
+        if (M.lv[i] === 4) { const g = Math.round(70 + M.top[i] * 1.2); col = `rgb(${g},${g - 10},${g + 20})`; }
+        if (M.bush[i]) col = '#3d8f45';
+        if (M.pad[i]) col = '#ff5fd2';
+        if (col) { c.fillStyle = col; c.fillRect(x * 2, y * 2, 2, 2); }
+      }
     const cs = room ? S.COLOR_SETS[room.colorSet].c : S.COLOR_SETS[0].c;
     for (const t of [1, 2]) { const b = S.basePos(t); c.fillStyle = cs[t]; c.beginPath(); c.arc((b.x / S.CELL) * 2, (b.y / S.CELL) * 2, 10, 0, 7); c.fill(); }
   }

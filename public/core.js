@@ -16,14 +16,21 @@ const r2 = (v) => Math.round(v * 100) / 100;
 // 机器人寻路（粗网格 BFS，只走地面）
 // =====================================================================
 const NAV = 2, NW = S.GW / NAV, NH = S.GH / NAV;
+// 导航格：每 2×2 格一个节点，记录高度；墙、弹跳板、内部高差太大的格子不能走
 function buildNav(M) {
-  const nav = new Uint8Array(NW * NH);
+  const nav = new Uint8Array(NW * NH), navH = new Float32Array(NW * NH);
   for (let y = 0; y < NH; y++)
     for (let x = 0; x < NW; x++) {
-      let b = 0;
-      for (let j = 0; j < NAV; j++) for (let i = 0; i < NAV; i++) if (M.top[(y * NAV + j) * S.GW + x * NAV + i] > 0) b = 1;
-      nav[y * NW + x] = b;
+      let lo = 1e9, hi = -1, bad = 0;
+      for (let j = 0; j < NAV; j++) for (let i = 0; i < NAV; i++) {
+        const k = (y * NAV + j) * S.GW + x * NAV + i;
+        if (M.solid[k] || M.pad[k]) bad = 1;
+        lo = Math.min(lo, M.top[k]); hi = Math.max(hi, M.top[k]);
+      }
+      nav[y * NW + x] = bad || hi - lo > S.STEP ? 1 : 0;
+      navH[y * NW + x] = hi;
     }
+  nav.h = navH;
   return nav;
 }
 const NC = S.CELL * NAV;
@@ -59,7 +66,8 @@ function findPath(nav, sx, sy, tx, ty) {
       if (x < 0 || y < 0 || x >= NW || y >= NH) continue;
       const n = y * NW + x;
       if (nav[n] || prev[n] >= 0) continue;
-      if (dx && dy && (nav[cy * NW + x] || nav[y * NW + cx])) continue;
+      if (nav.h[n] > nav.h[c] + S.STEP) continue;   // 只能走上一级台阶，可以往下跳
+      if (dx && dy && (nav[cy * NW + x] || nav[y * NW + cx] || nav.h[n] !== nav.h[c])) continue;
       prev[n] = c; q.push(n);
     }
   }
@@ -69,9 +77,20 @@ function findPath(nav, sx, sy, tx, ty) {
   pathOut.reverse();
   return pathOut;
 }
-function floorLos(M, x0, y0, x1, y1) {
+// 能不能沿直线直接走过去（中间不能有比一级台阶更高的坎，也不能有墙或弹跳板）
+function floorLos(M, x0, y0, x1, y1, z0) {
   const a = Math.atan2(y1 - y0, x1 - x0), ox = -Math.sin(a) * 12, oy = Math.cos(a) * 12;
-  return S.los3(M, x0, y0, 5, x1, y1, 5) && S.los3(M, x0 + ox, y0 + oy, 5, x1 + ox, y1 + oy, 5) && S.los3(M, x0 - ox, y0 - oy, 5, x1 - ox, y1 - oy, 5);
+  const L = Math.hypot(x1 - x0, y1 - y0), n = Math.ceil(L / 8);
+  for (const k of [0, 1, -1]) {
+    let h = z0 == null ? S.topAt(M, x0, y0) : z0;
+    for (let i = 1; i <= n; i++) {
+      const x = x0 + ((x1 - x0) * i) / n + ox * k, y = y0 + ((y1 - y0) * i) / n + oy * k;
+      const t = S.topAt(M, x, y);
+      if (t > h + S.STEP || S.padAt(M, x, y)) return false;
+      h = t;
+    }
+  }
+  return true;
 }
 
 const BOT_NAMES = ['螺丝钉', '齿轮君', '电池仔', '喷漆王', '铁皮罐', '涂涂', '罐头侠', '霓虹', '闪电', '扳手', '像素', '火花', '弹簧', '芯片'];
@@ -196,13 +215,14 @@ class Game {
     // 客户端预测移动，服务器校验（限速 + 不穿墙 + 高度合理）
     if (p.alive && this.countdown <= 0 && !this.over && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z) && m.sync === p.sync) {
       const dtAllow = Math.min(0.6, this.time - p.lastPosT) + 0.05;
+      if (S.padAt(this.M, p.x, p.y) || S.padAt(this.M, m.x, m.y)) p.kbT = this.time;   // 踩到弹跳板也会被弹飞
       const kb = this.time - (p.kbT || -9) < 1.2 ? 540 : 0;     // 刚被击退：放宽速度上限
       const maxStep = (330 * p.sm + 40 + kb) * dtAllow + 12;
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       const gh = this.top(m.x, m.y);
       const test = { x: m.x, y: m.y, z: m.z };
       S.collide(test, (p.foot ? S.PILOT_R : S.R) - 2, this.M);
-      const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? 40 : 0);
+      const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? (S.PAD.v * S.PAD.v) / (2 * S.GRAV) : 0);
       if (d <= maxStep && !bad) {
         p.x = m.x; p.y = m.y; p.z = Math.max(gh, m.z); p.lastPosT = this.time;
         const vmax = 420 * p.sm + kb;
@@ -1102,7 +1122,7 @@ function botThink(g, p, dt) {
   let tx = ai.goal.x, ty = ai.goal.y;
   if (ai.path.length) {
     while (ai.pi < ai.path.length && dist(p, ai.path[ai.pi]) < 20) ai.pi++;
-    if (ai.pi + 1 < ai.path.length && floorLos(g.M, p.x, p.y, ai.path[ai.pi + 1].x, ai.path[ai.pi + 1].y)) ai.pi++;
+    if (ai.pi + 1 < ai.path.length && floorLos(g.M, p.x, p.y, ai.path[ai.pi + 1].x, ai.path[ai.pi + 1].y, p.z)) ai.pi++;
     if (ai.pi < ai.path.length) { tx = ai.path[ai.pi].x; ty = ai.path[ai.pi].y; }
   }
   let mx = tx - p.x, my = ty - p.y;
@@ -1253,7 +1273,7 @@ function chooseGoal(g, p) {
   let best = null, bs = -Infinity;
   for (let k = 0; k < 24; k++) {
     const cx = randInt(S.GW), cy = randInt(S.GH), i = cy * S.GW + cx;
-    if (g.M.top[i] > 0) continue;
+    if (g.M.solid[i] || g.M.pad[i]) continue;
     const x = (cx + 0.5) * S.CELL, y = (cy + 0.5) * S.CELL;
     const v = g.grid[i];
     const score = (v === p.team ? -400 : v === 0 ? 0 : 140) - Math.hypot(x - p.x, y - p.y) * 0.5 + rand(0, 120);

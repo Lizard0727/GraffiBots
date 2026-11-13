@@ -201,57 +201,135 @@
   S.JUMP_W = 410;                  // 滚轮形态跳跃：约 86 高，可直接跳上高台
   S.PROJ_G = 1500;                 // 子弹飞完直线距离后的下坠加速度
 
-  // ---------------- 地图（只写左半边，自动中心对称）；[x, y, w, h, 高度等级] ----------------
+  // ---------------- 地图（只写左半边，自动中心对称） ----------------
+  // rects: [x, y, w, h, 等级 1 矮台 / 2 高台 / 3 高墙]
+  // stairs: [x, y, w, h, 上坡方向 'E'|'W'|'N'|'S', 通往的等级, 起始等级=0]，每级台阶高 10，直接走上去
+  // pads: [x, y, 角度°]，2×2 格的弹跳板，把机兵朝这个方向弹飞
+  // bush: [x, y, w, h] 草丛；sky: 天空 / 配色预设
   S.MAPS = [
     {
-      name: '霓虹工厂', desc: '经典对称布局，中路开阔，矮掩体可跳上去，两侧有高台。', goalX: 24,
-      bush: [[22, 14, 6, 6], [30, 57, 8, 5], [46, 35, 5, 10], [9, 22, 5, 5]],
+      name: '霓虹工厂', desc: '经典对称布局，中路开阔；两侧高台可以走楼梯上去，中路弹跳板直飞据点。', goalX: 24, sky: 0,
       rects: [[16, 10, 4, 18, 3], [16, 52, 4, 18, 3], [28, 30, 10, 4, 1], [28, 46, 10, 4, 1], [40, 4, 6, 12, 3],
-        [44, 64, 8, 6, 2], [42, 64, 2, 6, 1], [56, 20, 8, 5, 2], [56, 25, 8, 2, 1]],
+        [44, 64, 8, 6, 2], [42, 64, 2, 6, 1], [56, 20, 8, 5, 2], [56, 25, 8, 2, 1],
+        [22, 0, 12, 4, 2], [34, 22, 2, 2, 3], [34, 56, 2, 2, 3], [8, 66, 6, 2, 1], [48, 50, 2, 6, 1]],
+      stairs: [[28, 4, 4, 7, 'N', 2], [52, 64, 7, 6, 'W', 2]],
+      pads: [[44, 39, 0], [11, 18, 30]],
+      bush: [[22, 14, 6, 6], [30, 57, 8, 5], [44, 26, 5, 8], [9, 22, 5, 5], [36, 10, 3, 6]],
     },
     {
-      name: '涂鸦天台', desc: '长条通道与高台狙击点，基地前有矮墙，适合远程武器。', goalX: 31,
-      bush: [[16, 22, 10, 5], [28, 50, 8, 6], [46, 20, 6, 6], [50, 50, 6, 8]],
+      name: '涂鸦天台', desc: '长条通道与高台狙击点；基地旁的狙击台有楼梯，屋顶之间用弹跳板连通。', goalX: 31, sky: 1,
       rects: [[14, 18, 22, 3, 3], [14, 59, 22, 3, 3], [40, 0, 4, 14, 3], [40, 34, 3, 12, 2], [37, 36, 3, 8, 1],
-        [24, 36, 6, 8, 1], [52, 10, 16, 3, 3]],
+        [24, 36, 6, 8, 1], [52, 10, 16, 3, 3], [6, 6, 8, 7, 2], [46, 58, 6, 2, 1], [30, 66, 2, 7, 1], [26, 26, 3, 3, 1]],
+      stairs: [[14, 8, 7, 4, 'W', 2], [43, 36, 7, 8, 'W', 2]],
+      pads: [[32, 28, 330], [20, 70, 20]],
+      bush: [[16, 22, 10, 5], [28, 50, 8, 6], [46, 20, 6, 6], [50, 50, 6, 8], [4, 52, 6, 5]],
     },
     {
-      name: '齿轮广场', desc: '中央被可攀爬的环形高台包围，上下层立体乱斗。', goalX: 37,
-      bush: [[12, 24, 6, 8], [22, 48, 8, 6], [36, 26, 6, 6], [53, 33, 5, 5]],
+      name: '齿轮广场', desc: '中央被环形高台包围，从里侧的楼梯能爬上齿轮环，弹跳板把你送进场中央。', goalX: 37, sky: 2,
       rects: [[44, 22, 12, 3, 2], [44, 22, 3, 10, 2], [64, 22, 12, 3, 2], [73, 22, 3, 10, 2], [48, 19, 4, 3, 1],
-        [18, 12, 8, 8, 2], [26, 14, 2, 4, 1], [30, 38, 4, 4, 1], [8, 18, 10, 3, 3], [8, 59, 10, 3, 3]],
+        [18, 12, 8, 8, 2], [26, 14, 2, 4, 1], [30, 38, 4, 4, 1], [8, 18, 10, 3, 3], [8, 59, 10, 3, 3],
+        [20, 56, 3, 3, 3], [30, 64, 6, 2, 1], [36, 6, 2, 6, 1]],
+      stairs: [[47, 25, 3, 7, 'N', 2], [18, 20, 4, 7, 'N', 2]],
+      pads: [[34, 48, 330], [12, 30, 0]],
+      bush: [[12, 24, 6, 8], [22, 48, 8, 6], [36, 26, 6, 6], [53, 33, 5, 5], [40, 64, 6, 5]],
+    },
+    {
+      name: '樱花庭院', desc: '花瓣飘落的天台庭院：石灯笼和矮墙围出一条条小路，到处是可以埋伏的花丛。', goalX: 26, sky: 3, isNew: true,
+      rects: [[14, 22, 2, 10, 3], [14, 48, 2, 10, 3], [24, 12, 7, 3, 1], [30, 15, 3, 5, 1], [22, 60, 8, 3, 1],
+        [38, 30, 3, 3, 3], [38, 47, 3, 3, 3], [44, 6, 10, 4, 2], [48, 36, 3, 2, 1], [48, 42, 3, 2, 1], [28, 36, 2, 8, 1],
+        [6, 4, 3, 3, 3], [50, 66, 6, 3, 1]],
+      stairs: [[44, 10, 4, 7, 'N', 2]],
+      pads: [[20, 39, 0], [40, 20, 35]],
+      bush: [[18, 4, 8, 5], [33, 26, 4, 6], [33, 48, 4, 6], [8, 58, 6, 6], [42, 52, 6, 4], [52, 14, 4, 6]],
+    },
+    {
+      name: '集装箱码头', desc: '堆满集装箱的港口：长长的箱墙隔出三条路，楼梯通往箱顶，弹跳板能直接飞上去。', goalX: 32, sky: 4, isNew: true,
+      rects: [[16, 4, 14, 3, 3], [16, 73, 14, 3, 3], [26, 22, 3, 12, 2], [38, 48, 12, 3, 2], [34, 14, 3, 3, 1], [46, 28, 3, 3, 1],
+        [30, 60, 4, 3, 1], [50, 62, 3, 3, 1], [44, 34, 2, 8, 3], [8, 20, 8, 2, 1], [36, 0, 3, 8, 3]],
+      stairs: [[26, 34, 3, 7, 'N', 2], [50, 48, 7, 3, 'W', 2]],
+      pads: [[20, 40, 0], [40, 66, 330]],
+      bush: [[8, 11, 6, 5], [33, 38, 6, 5], [48, 4, 6, 4], [6, 64, 6, 5], [18, 52, 5, 5]],
+    },
+    {
+      name: '雪夜冰场', desc: '下雪的夜晚广场：四角是楼梯环绕的高地基地，中间一圈矮墙，适合来回拉扯。', goalX: 28, sky: 5, isNew: true,
+      rects: [[4, 4, 12, 9, 2], [4, 67, 12, 9, 2], [50, 26, 6, 2, 1], [50, 52, 6, 2, 1], [46, 30, 2, 6, 1], [46, 44, 2, 6, 1],
+        [24, 18, 3, 3, 3], [30, 30, 3, 3, 3], [24, 59, 3, 3, 3], [34, 48, 3, 3, 3], [38, 12, 6, 2, 1], [38, 66, 6, 2, 1]],
+      stairs: [[16, 5, 7, 4, 'W', 2], [16, 71, 7, 4, 'W', 2]],
+      pads: [[12, 22, 20], [12, 56, 340]],
+      bush: [[20, 26, 5, 5], [20, 49, 5, 5], [38, 4, 6, 5], [38, 71, 6, 5], [52, 36, 4, 8]],
+    },
+    {
+      name: '熔炉工厂', desc: '层层叠叠的工厂梯田：从矮台走楼梯上高台，两座熔炉塔居高临下，弹跳板直通塔顶。', goalX: 34, sky: 6, isNew: true,
+      rects: [[18, 6, 20, 8, 1], [24, 6, 8, 4, 2], [18, 66, 20, 8, 1], [50, 26, 5, 5, 2], [8, 28, 6, 2, 3], [8, 50, 6, 2, 3],
+        [40, 36, 3, 8, 1], [32, 30, 2, 2, 3], [32, 48, 2, 2, 3], [44, 56, 8, 3, 1], [36, 18, 3, 3, 3]],
+      stairs: [[22, 14, 4, 3, 'N', 1], [26, 10, 4, 4, 'N', 2, 1], [22, 63, 4, 3, 'S', 1], [43, 26, 7, 5, 'E', 2]],
+      pads: [[42, 22, 30], [28, 40, 0]],
+      bush: [[10, 14, 6, 5], [12, 62, 6, 5], [42, 46, 5, 6], [24, 44, 5, 5], [54, 6, 5, 5]],
     },
   ];
-  function mirror(r) { return [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3], r[4]]; }
-  // M = { top: 每格顶面高度, solid: 高墙（不可涂、不可站）, lv: 等级, rects }
+  const DIR_FLIP = { E: 'W', W: 'E', N: 'S', S: 'N' };
+  const mirror = (r) => [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3]];
+  S.PAD = { v: 560, push: 360 };
+  S.STAIR_LV = 4;   // 楼梯格的样式编号
+  // M = { top: 每格顶面高度, solid: 高墙, lv: 样式（0 地面 1 矮台 2 高台 3 高墙 4 楼梯）, pad: 弹跳板方向+1, rects, stairs, pads, bush }
   S.buildMap = function (mapIdx) {
     const m = S.MAPS[mapIdx];
-    const lv = new Uint8Array(GW * GH);
+    const lv = new Uint8Array(GW * GH), top = new Float32Array(GW * GH);
     const rects = [];
+    const put = (i, l, h) => { if (h > top[i]) { top[i] = h; lv[i] = l; } };
     for (const r of m.rects) {
       const rr = [r[0], r[1], r[2], r[3], r[4] == null ? 3 : r[4]];
+      const mr = mirror(rr).concat(rr[4]);
       rects.push(rr);
-      const mr = mirror(rr);
       if (mr[0] !== rr[0] || mr[1] !== rr[1]) rects.push(mr);
     }
     for (const [x, y, w, h, l] of rects)
       for (let j = y; j < y + h; j++)
         for (let i = x; i < x + w; i++)
-          if (i >= 0 && i < GW && j >= 0 && j < GH) lv[j * GW + i] = Math.max(lv[j * GW + i], l);
-    const top = new Float32Array(GW * GH), solid = new Uint8Array(GW * GH);
-    for (let i = 0; i < lv.length; i++) { top[i] = S.LEVEL_H[lv[i]]; solid[i] = lv[i] >= 3 ? 1 : 0; }
+          if (i >= 0 && i < GW && j >= 0 && j < GH) put(j * GW + i, l, S.LEVEL_H[l]);
+    // 楼梯：沿上坡方向每格高 10
+    const stairs = [];
+    for (const st of m.stairs || []) {
+      const [x, y, w, h, dir, to, from] = st;
+      for (const [rx, ry, rw, rh, d] of [[x, y, w, h, dir], mirror(st).concat(DIR_FLIP[dir])]) {
+        stairs.push([rx, ry, rw, rh, d, to]);
+        const h0 = S.LEVEL_H[from || 0], h1 = S.LEVEL_H[to];
+        for (let j = ry; j < ry + rh; j++)
+          for (let i = rx; i < rx + rw; i++) {
+            if (i < 0 || i >= GW || j < 0 || j >= GH) continue;
+            const k = d === 'E' ? i - rx : d === 'W' ? rx + rw - 1 - i : d === 'S' ? j - ry : ry + rh - 1 - j;
+            const hh = Math.min(h1 - 10, h0 + 10 * (k + 1));
+            const idx = j * GW + i;
+            if (lv[idx] === 3) continue;
+            if (hh >= top[idx]) { top[idx] = hh; lv[idx] = S.STAIR_LV; }
+          }
+      }
+    }
+    const solid = new Uint8Array(GW * GH);
+    for (let i = 0; i < lv.length; i++) solid[i] = lv[i] === 3 ? 1 : 0;
+    // 弹跳板（只放在地面上）
+    const pad = new Uint8Array(GW * GH), pads = [];
+    for (const [x, y, ang] of m.pads || []) {
+      for (const [px, py, a] of [[x, y, ang], [GW - x - 2, GH - y - 2, ang + 180]]) {
+        pads.push([px, py, ((a % 360) + 360) % 360]);
+        const code = 1 + Math.round(((((a % 360) + 360) % 360) / 360) * 250) % 251;
+        for (let j = py; j < py + 2; j++) for (let i = px; i < px + 2; i++) if (S.inBounds(i, j) && top[j * GW + i] === 0) pad[j * GW + i] = code;
+      }
+    }
     // 草丛：只长在地面上，进去之后敌人看不见你（靠得很近或你攻击时会暴露）
     const bush = new Uint8Array(GW * GH), bushes = [];
     for (const r of m.bush || []) {
-      for (const rr of [r, [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3]]]) {
+      for (const rr of [r, mirror(r)]) {
         bushes.push(rr);
         for (let j = rr[1]; j < rr[1] + rr[3]; j++)
           for (let i = rr[0]; i < rr[0] + rr[2]; i++)
-            if (i >= 0 && i < GW && j >= 0 && j < GH && !lv[j * GW + i]) bush[j * GW + i] = 1;
+            if (i >= 0 && i < GW && j >= 0 && j < GH && !top[j * GW + i] && !pad[j * GW + i]) bush[j * GW + i] = 1;
       }
     }
-    return { top, solid, lv, rects, bush, bushes };
+    return { top, solid, lv, rects, stairs, pad, pads, bush, bushes };
   };
+  S.padAngle = (code) => ((code - 1) / 250) * Math.PI * 2;
+  S.padAt = (M, x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return S.inBounds(cx, cy) ? M.pad[cy * GW + cx] : 0; };
 
   S.basePos = (team) => ({ x: team === 1 ? 6 * CELL : S.W - 6 * CELL, y: S.H / 2 });
   S.spawnPoint = (team, slot) => {
@@ -422,6 +500,16 @@
       if (dv < 0) { p.vx -= ux * dv; p.vy -= uy * dv; }
       const dk = p.kx * ux + p.ky * uy;
       if (dk < 0) { p.kx -= ux * dk * 1.4; p.ky -= uy * dk * 1.4; }   // 击退撞墙小幅反弹
+    }
+    // 弹跳板：站上去就被弹向空中
+    p.padT = Math.max(0, (p.padT || 0) - dt);
+    if (p.onGround && p.padT <= 0 && M.pad) {
+      const pc = S.padAt(M, p.x, p.y);
+      if (pc) {
+        const a = S.padAngle(pc);
+        p.vz = S.PAD.v; p.onGround = false; p.coy = 0; p.jumped = false; p.padT = 0.6; p.padded = true;
+        p.kx += Math.cos(a) * S.PAD.push; p.ky += Math.sin(a) * S.PAD.push;
+      }
     }
     // 垂直
     const gh = S.topAt(M, p.x, p.y);

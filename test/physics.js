@@ -41,6 +41,16 @@ const run = (p, inp, sec, M = flat, g = grid) => { let maxZ = p.z; for (let t = 
   run(p, { mx: 0.7, my: 0.7 }, 0.6, M0); ok(p.vy > 80 && Math.abs(p.vx) < 30, `贴墙滑行：沿墙速度 ${p.vy.toFixed(0)}，撞墙方向 ${p.vx.toFixed(0)}`); }
 // 9. 击退：独立于操控衰减，推人后 0.4s 内明显位移
 { const p = bot(), q = bot(); S.impulse(p, 300, 0, 0); run(p, { mx: -1, my: 0 }, 0.6); run(q, { mx: -1, my: 0 }, 0.6); ok(p.x - q.x > 30, `击退：反向推摇杆仍被推开 ${(p.x - q.x).toFixed(0)} 单位`); }
+// 9b. 弹跳板：走上去被弹向空中并朝箭头方向飞出去；楼梯可以直接走上高台
+{ const M = S.buildMap(0); const [px, py, ang] = M.pads[0];
+  const p = bot((px + 1) * S.CELL - 40 * Math.cos(ang * Math.PI / 180), (py + 1) * S.CELL - 40 * Math.sin(ang * Math.PI / 180));
+  const x0 = p.x, y0 = p.y; const a = ang * Math.PI / 180;
+  const h = run(p, { mx: Math.cos(a), my: Math.sin(a) }, 1.6, M);
+  ok(h > 120 && Math.hypot(p.x - x0, p.y - y0) > 250, `弹跳板：最高 ${h.toFixed(0)}，飞出 ${Math.hypot(p.x - x0, p.y - y0).toFixed(0)} 单位`); }
+{ const M = S.buildMap(0); const [sx, sy, w, h, d] = M.stairs[0];   // 霓虹工厂左上角楼梯：向北走上 80 高台
+  const p = bot((sx + w / 2) * S.CELL, (sy + h + 1.5) * S.CELL);
+  run(p, { mx: 0, my: -1 }, 2.5, M);
+  ok(p.z === 80, `楼梯：一路走上高台（高度 ${p.z}）`); }
 // 10. 服务器：命中会给真人发击退事件，给 AI 直接施加冲量；被击退后的预测位置不会被判作弊
 { const room = new Room('PHYS', null, { manual: true });
   room.settings = { mode: 'turf', map: 0, duration: 60, teamSize: 1, bots: false };

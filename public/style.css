@@ -539,3 +539,6 @@ body.topcam #game { cursor: none; }
   .sel-detail { position: static; }
 }
 .home-stage #preview { width: auto; height: auto; border-radius: 0; background: none; border: 0; box-shadow: none; overflow: visible; }
+
+#homeMapList .mapcard { position: relative; }
+#homeMapList .mapcard .new-badge { position: absolute; right: 6px; top: 6px; z-index: 2; background: #ff3ea5; color: #fff; font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 99px; border: 2px solid #000; }

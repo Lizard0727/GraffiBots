@@ -78,18 +78,38 @@
   const SKIES = [
     { // 霓虹工厂：黄昏
       zen: 0x231f5c, mid: 0xc4528c, hor: 0xffb877, sunC: 0xffd7a8, sunI: 0.95, hemiS: 0xffe2ef, hemiG: 0x4a3656, hemiI: 0.78, fill: 0x6f8dff, fog: 0x9a5f8a,
-      sun: [-0.55, 0.42, -0.72], floor: ['#7d7f96', '#73758c'], seam: '#5e6078', tops: ['#8d8fa8', '#a3a6c2', '#55586e'], win: 0.95,
-      sides: [['#ffb02e', '#14151d'], ['#4f7cff', '#2a3d8f'], ['#e9e6f2', '#9a97b0']], trim: ['#14151d', '#f4f2ff', '#ffd23f'], night: false,
+      sun: [-0.55, 0.42, -0.72], floor: ['#7d7f96', '#73758c'], seam: '#5e6078', tops: ['#8d8fa8', '#a3a6c2', '#55586e', '#9a9cb4'], win: 0.95,
+      sides: [['#ffb02e', '#14151d'], ['#4f7cff', '#2a3d8f'], ['#e9e6f2', '#9a97b0'], ['#8a8ea8', '#ffd23f']], trim: ['#14151d', '#f4f2ff', '#ffd23f', '#ffd23f'], night: false,
     },
     { // 涂鸦天台：晴天
       zen: 0x2a6ee8, mid: 0x6fb4ff, hor: 0xe4f5ff, sunC: 0xfff3dc, sunI: 0.9, hemiS: 0xeaf4ff, hemiG: 0x5a6070, hemiI: 0.75, fill: 0x9ab8ff, fog: 0xb3d2f2,
-      sun: [0.5, 0.75, -0.45], floor: ['#80848f', '#7a7e89'], seam: '#6a6e7a', tops: ['#9497a6', '#a88b66', '#5b5f70'], win: 0.35,
-      sides: [['#ff6a3d', '#2b2b33'], ['#2ec7a6', '#1b6e6a'], ['#f2efe6', '#a8a39a']], trim: ['#2b2b33', '#ffffff', '#ff6a3d'], night: false,
+      sun: [0.5, 0.75, -0.45], floor: ['#80848f', '#7a7e89'], seam: '#6a6e7a', tops: ['#9497a6', '#a88b66', '#5b5f70', '#a0a3b0'], win: 0.35,
+      sides: [['#ff6a3d', '#2b2b33'], ['#2ec7a6', '#1b6e6a'], ['#f2efe6', '#a8a39a'], ['#9a9ea8', '#ff6a3d']], trim: ['#2b2b33', '#ffffff', '#ff6a3d', '#ff6a3d'], night: false,
     },
     { // 齿轮广场：霓虹夜
       zen: 0x05071a, mid: 0x1b1450, hor: 0x5b2a80, sunC: 0xb7c6ff, sunI: 0.62, hemiS: 0x8f9cff, hemiG: 0x2a1a3a, hemiI: 0.72, fill: 0xff4fd8, fog: 0x2a1f52,
-      sun: [0.35, 0.6, 0.6], floor: ['#4d4f6a', '#45475f'], seam: '#35364c', tops: ['#5b5e7c', '#6a5a8c', '#33354a'], win: 1.25,
-      sides: [['#ff3ea5', '#20142e'], ['#3a4a8a', '#1fd6ee'], ['#2a2c40', '#8c5cff']], trim: ['#1fd6ee', '#ff3ea5', '#ffdf2e'], night: true,
+      sun: [0.35, 0.6, 0.6], floor: ['#4d4f6a', '#45475f'], seam: '#35364c', tops: ['#5b5e7c', '#6a5a8c', '#33354a', '#626584'], win: 1.25,
+      sides: [['#ff3ea5', '#20142e'], ['#3a4a8a', '#1fd6ee'], ['#2a2c40', '#8c5cff'], ['#3a3d58', '#1fd6ee']], trim: ['#1fd6ee', '#ff3ea5', '#ffdf2e', '#1fd6ee'], night: true,
+    },
+    { // 樱花庭院：粉色黄昏 + 飘落的花瓣
+      zen: 0x3a2a6a, mid: 0xf08cb4, hor: 0xffd8c8, sunC: 0xffe4d4, sunI: 0.9, hemiS: 0xffeaf2, hemiG: 0x5a4256, hemiI: 0.8, fill: 0xa08cff, fog: 0xd8a0b8,
+      sun: [-0.4, 0.5, 0.75], floor: ['#8e8698', '#867e90'], tops: ['#b48a68', '#a493b4', '#5a5266', '#a88060'], win: 0.6,
+      sides: [['#c46a4a', '#3a2420'], ['#efe4d8', '#b84a4a'], ['#f6eee6', '#7a3a3a'], ['#b88a60', '#5a3a24']], trim: ['#3a2420', '#b83a3a', '#7a3a3a', '#5a3a24'], night: false, fx: 'petals',
+    },
+    { // 集装箱码头：阴天的港口
+      zen: 0x5a7aa8, mid: 0x9fbad6, hor: 0xe2eaf0, sunC: 0xfff4e4, sunI: 0.8, hemiS: 0xeef4ff, hemiG: 0x58606c, hemiI: 0.85, fill: 0x9ab8ff, fog: 0xbac8d8,
+      sun: [0.3, 0.7, -0.6], floor: ['#7a838e', '#747d88'], tops: ['#9a8a6a', '#a05a50', '#3a5a80', '#8a9098'], win: 0.3,
+      sides: [['#d8a030', '#3a3a40'], ['#c4463a', '#7a2a24'], ['#2f70b2', '#1d4a7a'], ['#8a9098', '#ffd23f']], trim: ['#3a3a40', '#ffffff', '#ffd23f', '#ffd23f'], night: false,
+    },
+    { // 雪夜冰场：下雪的夜晚
+      zen: 0x0a1430, mid: 0x2a3a6a, hor: 0x7a8ab8, sunC: 0xd0e0ff, sunI: 0.7, hemiS: 0xc0d0ff, hemiG: 0x3a4460, hemiI: 0.85, fill: 0x7dfcff, fog: 0x4a5a8a,
+      sun: [-0.3, 0.6, -0.7], floor: ['#bcc8da', '#b2bfd2'], tops: ['#dfe8f4', '#e8f0fa', '#9aa8c0', '#cfdbea'], win: 1.0,
+      sides: [['#6a8ab0', '#e8f0fa'], ['#4a5a7a', '#dfe8f4'], ['#2a3450', '#c8d8f0'], ['#7a8aa8', '#ffffff']], trim: ['#e8f0fa', '#7dfcff', '#ffffff', '#7dfcff'], night: true, fx: 'snow',
+    },
+    { // 熔炉工厂：橙红色的炉火
+      zen: 0x2a1010, mid: 0xa03c1a, hor: 0xffa050, sunC: 0xffc488, sunI: 0.95, hemiS: 0xffe0c8, hemiG: 0x4a2a20, hemiI: 0.78, fill: 0xff6a3a, fog: 0x8a4a30,
+      sun: [0.6, 0.45, 0.5], floor: ['#6c605a', '#645852'], tops: ['#8a6a50', '#7a6a64', '#4a3e3a', '#8a7060'], win: 0.9,
+      sides: [['#a85a2a', '#2a1a14'], ['#5a5050', '#ff7a2a'], ['#3a3030', '#ff9a3a'], ['#6a5a50', '#ffb03a']], trim: ['#2a1a14', '#ff7a2a', '#ffb03a', '#ffb03a'], night: false, glow: true, fx: 'embers',
     },
   ];
 
@@ -98,7 +118,7 @@
     dispose();
     shared();
     scene = new T.Scene();
-    const SK = SKIES[G.map % SKIES.length];
+    const SK = SKIES[(S.MAPS[G.map].sky == null ? G.map : S.MAPS[G.map].sky) % SKIES.length];
     scene.background = new T.Color(SK.hor);
     scene.fog = new T.Fog(SK.fog, 1500, 5200);
     scene.add(new T.HemisphereLight(SK.hemiS, SK.hemiG, SK.hemiI));
@@ -126,6 +146,8 @@
     buildCity(G.map);
     buildProps(G.map);
     buildBushes();
+    buildPads();
+    buildAmbient(SK);
     buildModeDecor(G);
     buildDynamic(G);
     buildParticles();
@@ -303,6 +325,14 @@
     for (let i = 0; i < S.W; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(i, 0, 32, 10); x.fillRect(i, S.H - 10, 32, 10); }
     for (let i = 0; i < S.H; i += 32) { x.fillStyle = (i / 32) % 2 ? '#ffd23f' : '#14151d'; x.fillRect(0, i, 10, 32); x.fillRect(S.W - 10, i, 10, 32); }
     x.restore();
+    // 楼梯顶面：每级台阶前沿一道亮线
+    for (let cy = 0; cy < S.GH; cy++)
+      for (let cx = 0; cx < S.GW; cx++) {
+        if (M.lv[cy * S.GW + cx] !== S.STAIR_LV) continue;
+        x.fillStyle = 'rgba(255,255,255,0.28)';
+        x.fillRect(cx * C, cy * C, C, 1.5); x.fillRect(cx * C, cy * C, 1.5, C);
+        x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(cx * C, cy * C + C - 1.5, C, 1.5);
+      }
     // 平台顶面：边缘警示带 + 高墙顶部斜纹
     for (const [rx, ry, rw, rh, lv] of M.rects) {
       x.save(); x.beginPath(); x.rect(rx * C, ry * C, rw * C, rh * C); x.clip();
@@ -368,7 +398,15 @@
     const [a, b] = SK.sides[lv - 1];
     const c = document.createElement('canvas'); c.width = 256; c.height = lv === 3 ? 512 : 256;
     const x = c.getContext('2d'), R = rng(seed), H = c.height;
-    if (lv === 1) {
+    if (lv === 4) {
+      // 楼梯：混凝土台阶侧面，顶部一道警示色
+      x.fillStyle = a; x.fillRect(0, 0, 256, H);
+      const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,255,255,0.15)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
+      x.fillStyle = g; x.fillRect(0, 0, 256, H);
+      x.fillStyle = b; x.fillRect(0, 0, 256, 18);
+      x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(0, 18, 256, 4);
+      for (let k = 0; k < 256; k += 64) x.fillRect(k, 22, 2, H - 22);
+    } else if (lv === 1) {
       // 矮掩体：工业路障箱，上下警示斜纹 + 铆钉
       x.fillStyle = a; x.fillRect(0, 0, 256, H);
       const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0.25)');
@@ -438,7 +476,7 @@
     const M = W.M, GW = S.GW, GH = S.GH, C = S.CELL, SK = W.SK;
     const used = new Uint8Array(GW * GH);
     const geo = () => ({ p: [], n: [], uv: [] });
-    const top = geo(), sides = [null, geo(), geo(), geo()], trim = [null, geo(), geo(), geo()];
+    const top = geo(), sides = [null, geo(), geo(), geo(), geo()], trim = [null, geo(), geo(), geo(), geo()];
     const quad = (o, v, n, uv) => {
       for (const k of [0, 1, 2, 0, 2, 3]) { o.p.push(v[k][0], v[k][1], v[k][2]); o.n.push(n[0], n[1], n[2]); o.uv.push(uv[k][0], uv[k][1]); }
     };
@@ -457,12 +495,13 @@
       quad(top, [[x0, H, z0], [x0, H, z1], [x1, H, z1], [x1, H, z0]], [0, 1, 0], [tuv(x0, z0), tuv(x0, z1), tuv(x1, z1), tuv(x1, z0)]);
       const o = sides[lv];
       // 每个面随机水平偏移，避免相邻墙面图案一模一样
-      const ul = lv === 3 ? 512 : 128;
+      const ul = lv === 3 ? 512 : lv === 4 ? 64 : 128;
       const suv = (len) => { const u0 = (faceSeed++ * 0.37) % 1; return [[u0, 0], [u0 + len / ul, 0], [u0 + len / ul, 1], [u0, 1]]; };
       quad(o, [[x1, 0, z0], [x0, 0, z0], [x0, H, z0], [x1, H, z0]], [0, 0, -1], suv(w));
       quad(o, [[x0, 0, z1], [x1, 0, z1], [x1, H, z1], [x0, H, z1]], [0, 0, 1], suv(w));
       quad(o, [[x0, 0, z0], [x0, 0, z1], [x0, H, z1], [x0, H, z0]], [-1, 0, 0], suv(d));
       quad(o, [[x1, 0, z1], [x1, 0, z0], [x1, H, z0], [x1, H, z1]], [1, 0, 0], suv(d));
+      if (lv === S.STAIR_LV) return;   // 楼梯不加压边，免得挡住台阶
       // 顶部外沿压边（只在外侧，不挡住顶面涂料）
       const t = 2.2, y0 = H - 4, y1 = H + 0.8, tg = trim[lv];
       cuboid(tg, x0 - t, y0, z0 - t, x1 + t, y1, z0);
@@ -475,17 +514,19 @@
     };
     for (let cy = 0; cy < GH; cy++)
       for (let cx = 0; cx < GW; cx++) {
-        const i = cy * GW + cx, lv = M.lv[i];
+        const i = cy * GW + cx, lv = M.lv[i], tp = M.top[i];
         if (!lv || used[i]) continue;
+        // 贪心合并：样式和高度都相同的格子合成一个方块（楼梯每一级单独一块）
+        const same = (j) => M.lv[j] === lv && M.top[j] === tp && !used[j];
         let w = 1;
-        while (cx + w < GW && M.lv[i + w] === lv && !used[i + w]) w++;
+        while (cx + w < GW && same(i + w)) w++;
         let h = 1;
         outer: while (cy + h < GH) {
-          for (let k = 0; k < w; k++) { const j = (cy + h) * GW + cx + k; if (M.lv[j] !== lv || used[j]) break outer; }
+          for (let k = 0; k < w; k++) if (!same((cy + h) * GW + cx + k)) break outer;
           h++;
         }
         for (let j = 0; j < h; j++) for (let k = 0; k < w; k++) used[(cy + j) * GW + cx + k] = 1;
-        box(cx * C, cy * C, w * C, h * C, S.LEVEL_H[lv], lv);
+        box(cx * C, cy * C, w * C, h * C, tp, lv);
       }
     const mk = (o) => {
       const g = new T.BufferGeometry();
@@ -498,12 +539,12 @@
       const tm = new T.Mesh(mk(top), W.groundMat);
       tm.receiveShadow = true; tm.castShadow = true; scene.add(tm);
     }
-    for (let lv = 1; lv <= 3; lv++) {
+    for (let lv = 1; lv <= 4; lv++) {
       if (!sides[lv].p.length) continue;
       const sm = new T.Mesh(mk(sides[lv]), lambert(0xffffff, { map: sideTexture(lv, SK, lv * 3 + W.G.map) }));
       sm.receiveShadow = true; sm.castShadow = true; scene.add(sm);
       const tc = new T.Color(SK.trim[lv - 1]);
-      const glow = SK.night && lv !== 3;
+      const glow = (SK.night || SK.glow) && lv !== 3;
       const tmm = new T.Mesh(mk(trim[lv]), glow ? basic(tc) : lambert(tc));
       tmm.castShadow = true; tmm.receiveShadow = !glow; scene.add(tmm);
     }
@@ -648,7 +689,9 @@
   function buildBushes() {
     const SK = W.SK, C = S.CELL;
     W.bushes = [];
-    const base = SK.night ? 0x2a7d6a : 0x3d8f45, tip = SK.night ? 0x5fcfae : 0x86c95a;
+    let base = SK.night ? 0x2a7d6a : 0x3d8f45, tip = SK.night ? 0x5fcfae : 0x86c95a;
+    if (SK.fx === 'petals') { base = 0xc8578a; tip = 0xffb8d8; }     // 樱花庭院：开花的杜鹃丛
+    if (SK.fx === 'snow') { base = 0x3a7a8a; tip = 0xeef6ff; }        // 雪夜：积雪的灌木
     for (const [bx, by, bw, bh] of W.M.bushes || []) {
       const R = rng(bx * 31 + by * 7);
       const mat = toon(base, { transparent: true });
@@ -667,6 +710,62 @@
       bake(g, true);
       W.bushes.push({ g, mats: [mat, matT], rect: [bx, by, bw, bh], fade: 1 });
     }
+  }
+  // ---------------- 弹跳板：发光圆盘 + 指向弹飞方向的箭头 ----------------
+  function buildPads() {
+    const C = S.CELL;
+    W.pads = [];
+    const baseM = toon(0x2a2d3a), ringM = basic(0x7dfcff, { transparent: true, opacity: 0.9 });
+    for (const [px, py, ang] of W.M.pads || []) {
+      if (!W.M.pad[py * S.GW + px]) continue;
+      const g = new T.Group();
+      g.position.set((px + 1) * C, 0, (py + 1) * C);
+      g.add(part(SH.cyl, baseM, 15, 3, 15, 0, 1.5, 0));
+      const ring = new T.Mesh(SH.ring, ringM); ring.rotation.x = -Math.PI / 2; ring.position.y = 3.2; ring.scale.setScalar(13); g.add(ring);
+      const arrows = new T.Group(); arrows.rotation.y = -ang * Math.PI / 180; arrows.position.y = 3.3; g.add(arrows);
+      const am = basic(0xffdf2e);
+      for (let k = 0; k < 2; k++) {
+        const a1 = part(SH.box, am, 2, 0.6, 9, -2 + k * 6, 0, -3.2); a1.rotation.y = 0.7; arrows.add(a1);
+        const a2 = part(SH.box, am, 2, 0.6, 9, -2 + k * 6, 0, 3.2); a2.rotation.y = -0.7; arrows.add(a2);
+      }
+      scene.add(g);
+      W.pads.push({ g, ring, ringM });
+    }
+  }
+  // ---------------- 环境粒子：樱花花瓣 / 雪 / 炉火余烬 ----------------
+  function buildAmbient(SK) {
+    W.amb = null;
+    if (!SK.fx) return;
+    const N = HQ ? 420 : 220;
+    const pos = new Float32Array(N * 3), vel = new Float32Array(N * 3);
+    const R = rng(77);
+    for (let i = 0; i < N; i++) { pos[i * 3] = R() * S.W; pos[i * 3 + 1] = R() * 500; pos[i * 3 + 2] = R() * S.H; vel[i * 3] = R(); vel[i * 3 + 1] = R(); vel[i * 3 + 2] = R(); }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(pos, 3));
+    const color = SK.fx === 'petals' ? 0xffb8d8 : SK.fx === 'snow' ? 0xffffff : 0xffa040;
+    const m = new T.PointsMaterial({ color, size: SK.fx === 'snow' ? 6 : SK.fx === 'petals' ? 7 : 4, transparent: true, opacity: SK.fx === 'embers' ? 0.9 : 0.85, depthWrite: false,
+      blending: SK.fx === 'embers' ? T.AdditiveBlending : T.NormalBlending });
+    const pts = new T.Points(g, m); pts.frustumCulled = false;
+    scene.add(pts);
+    W.amb = { pts, pos, vel, N, kind: SK.fx };
+  }
+  function stepAmbient(dt, now) {
+    const A = W.amb;
+    if (!A) return;
+    const { pos, vel, N, kind } = A;
+    for (let i = 0; i < N; i++) {
+      const k = i * 3;
+      if (kind === 'embers') { pos[k + 1] += (30 + vel[k + 1] * 50) * dt; pos[k] += Math.sin(now / 900 + vel[k] * 9) * 20 * dt; if (pos[k + 1] > 420) pos[k + 1] = 0; }
+      else {
+        const fall = kind === 'snow' ? 40 + vel[k + 1] * 30 : 30 + vel[k + 1] * 25;
+        pos[k + 1] -= fall * dt;
+        pos[k] += (Math.sin(now / 1300 + vel[k] * 7) * 25 + (kind === 'petals' ? 18 : 6)) * dt;
+        pos[k + 2] += Math.cos(now / 1700 + vel[k + 2] * 7) * 15 * dt;
+        if (pos[k + 1] < 0) { pos[k + 1] = 480; pos[k] = Math.random() * S.W; pos[k + 2] = Math.random() * S.H; }
+      }
+      if (pos[k] > S.W) pos[k] -= S.W;
+    }
+    A.pts.geometry.attributes.position.needsUpdate = true;
   }
   // 场景静态物体合并（复用机兵的 bake）
   function bakeStatic(g) { bake(g, true); for (const m of g.children) { m.receiveShadow = true; } }
@@ -1853,6 +1952,8 @@
     if (W.dirty) { W.surfTex.needsUpdate = true; W.dirty = false; }
     syncBots(G, now, dt, myId);
     syncWorld(G, now, dt);
+    stepAmbient(dt, now);
+    if (W.pads) for (const p of W.pads) { const k = (now / 600) % 1; p.ring.scale.setScalar(9 + k * 6); p.ringM.opacity = 0.9 * (1 - k); }
     stepParticles(dt);
     renderer.render(scene, camera);
   }
