@@ -1278,7 +1278,7 @@ class Room {
   constructor(code, host, opts = {}) {
     this.code = code; this.hostId = host ? host.id : 0;
     this.members = new Map();
-    this.settings = { mode: 'turf', map: -1, duration: 180, teamSize: 4, bots: true };
+    this.settings = { mode: 'turf', map: -1, duration: 180, teamSize: 3, bots: true };
     this.state = 'lobby'; this.game = null;
     this.colorSet = randInt(S.COLOR_SETS.length);
     this.manual = !!opts.manual;

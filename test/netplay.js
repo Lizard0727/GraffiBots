@@ -24,14 +24,14 @@ class Bot {
   }
   onMsg(m) {
     if (m.t === 'welcome') this.id = m.id;
-    if (m.t === 'start') { this.game = m; this.grid = new Uint8Array(S.GW * S.GH); this.M = S.buildMap(m.map); this.sync = -1; this.sq = 0; }
+    if (m.t === 'start') { this.game = m; this.grid = new Uint8Array(S.GW * S.GH); this.M = S.buildMap(m.map); this.sync = -1; this.gq = 0; }
     if (m.t === 's') {
       this.snaps++;
       for (const v of m.d) this.grid[v >> 2] = v & 3;
       this.last = m;
       const me = m.p.find((a) => a[0] === this.id);
       if (me && (me[13] !== this.sync || !(me[7] & 1))) { this.sync = me[13]; this.pos = { x: me[1], y: me[2], z: me[17], vx: 0, vy: 0, vz: 0, onGround: true }; this.resyncs = (this.resyncs || 0) + 1; }
-      if (me) this.server = { x: me[1], y: me[2], z: me[17], tank: me[5], team: this.team, sm: me[10] / 100 };
+      if (me) this.server = { x: me[1], y: me[2], z: me[17], ammo: me[5] / 100, skills: me[21], team: this.team, sm: me[10] / 100 };
     }
     if (m.t === 'lobby') { const me = m.room.players.find((p) => p.id === this.id); if (me) this.team = me.team; this.room = m.room; }
     this.handlers = this.handlers.filter((h) => { if (h.t === m.t) { h.res(m); return false; } return true; });
@@ -46,7 +46,7 @@ class Bot {
         this.pos = { x: st.x, y: st.y, z: st.z, vx: st.vx, vy: st.vy, vz: st.vz, onGround: st.onGround };
         this.maxZ = Math.max(this.maxZ || 0, st.z);
       }
-      if (this.pos) this.send({ t: 'in', mx, my, a: aim, pt: pitch, f: fire, w: false, sq: this.sq, qq: 0, x: this.pos.x, y: this.pos.y, z: this.pos.z, vx: this.pos.vx, vy: this.pos.vy, vz: this.pos.vz, sync: this.sync });
+      if (this.pos) this.send({ t: 'in', mx, my, a: aim, pt: pitch, f: fire, w: false, gq: this.gq, qq: 0, x: this.pos.x, y: this.pos.y, z: this.pos.z, vx: this.pos.vx, vy: this.pos.vy, vz: this.pos.vz, sync: this.sync });
       await sleep(1000 / 30);
     }
   }
@@ -84,15 +84,15 @@ class Bot {
     await sleep(150);
     const moved = Math.abs(A.server.x - start.x);
     check(moved > 250, `A 客户端预测移动被服务器接受：移动了 ${moved.toFixed(0)}px（重新同步 ${A.resyncs} 次）`);
-    check(A.server.tank < 95, `A 开火消耗了涂料（剩余 ${A.server.tank}）`);
+    check(A.server.ammo < 2.9, `A 开火消耗了弹药（剩余 ${A.server.ammo.toFixed(2)} 格）`);
     let mine = 0;
     for (let i = 0; i < A.grid.length; i++) if (A.grid[i] === A.team) mine++;
-    check(mine > 100, `地面被涂色：A 队 ${mine} 格`);
+    check(mine > 40, `地面被涂色：A 队 ${mine} 格`);
     const seen = B.last.p.find((p) => p[0] === A.id);
     check(seen && Math.abs(seen[1] - A.server.x) < 40, 'B 的快照里能看到 A 的最新位置');
     // 作弊校验：瞬移应被拒绝
     const before = { ...A.server };
-    A.send({ t: 'in', mx: 0, my: 0, a: 0, pt: 0, f: false, w: false, sq: 0, qq: 0, x: before.x + 600 * dir, y: before.y, z: 0, vx: 0, vy: 0, vz: 0, sync: A.sync });
+    A.send({ t: 'in', mx: 0, my: 0, a: 0, pt: 0, f: false, w: false, gq: 0, qq: 0, x: before.x + 600 * dir, y: before.y, z: 0, vx: 0, vy: 0, vz: 0, sync: A.sync });
     await sleep(200);
     check(Math.abs(A.server.x - before.x) < 50, '瞬移被服务器拒绝并强制同步');
     // 跳跃：客户端预测的高度被服务器接受
@@ -103,15 +103,15 @@ class Bot {
     check(A.maxZ > 40 && peak > 25, `跳跃：本地最高 ${A.maxZ.toFixed(0)}，服务器确认最高 ${peak}`);
     // 浮空作弊：直接报告 z=300 应被拒绝
     const zb = A.server.z;
-    A.send({ t: 'in', mx: 0, my: 0, a: 0, pt: 0, f: false, w: false, sq: A.sq, qq: 0, x: A.server.x, y: A.server.y, z: 300, vx: 0, vy: 0, vz: 0, sync: A.sync });
+    A.send({ t: 'in', mx: 0, my: 0, a: 0, pt: 0, f: false, w: false, gq: A.gq, qq: 0, x: A.server.x, y: A.server.y, z: 300, vx: 0, vy: 0, vz: 0, sync: A.sync });
     await sleep(200);
     check(A.server.z < 150, `浮空作弊被拒绝（z 报告 300，服务器保持 ${A.server.z}，原 ${zb}）`);
     await A.drive(300, 0, 0, false, 0);
-    // 炸弹
-    const tankBefore = A.server.tank;
-    A.sq++;
+    // 驾驶员技能（每局 3 次）
+    const skBefore = A.server.skills;
+    A.gq++;
     await A.drive(400, 0, 0, false, 0);
-    check(A.server.tank < tankBefore - 30 || tankBefore < S.SUB_COST, `扔炸弹消耗涂料（${tankBefore} → ${A.server.tank}）`);
+    check(skBefore === S.SKILL_USES && A.server.skills === S.SKILL_USES - 1, `使用驾驶员技能：剩余次数 ${skBefore} → ${A.server.skills}`);
     // 快捷语音
     A.send({ t: 'chat', k: 1 });
     const qc = await B.wait('qc');

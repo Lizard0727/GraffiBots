@@ -648,7 +648,7 @@
   function buildBushes() {
     const SK = W.SK, C = S.CELL;
     W.bushes = [];
-    const base = SK.night ? 0x2f8f7a : 0x4fae3c, tip = SK.night ? 0x6fe0c0 : 0x9fe05a;
+    const base = SK.night ? 0x2a7d6a : 0x3d8f45, tip = SK.night ? 0x5fcfae : 0x86c95a;
     for (const [bx, by, bw, bh] of W.M.bushes || []) {
       const R = rng(bx * 31 + by * 7);
       const mat = toon(base, { transparent: true });
@@ -1619,6 +1619,33 @@
     PV.cam.position.set(d * 0.78, PV.big ? 46 : 44, d * 0.78); PV.cam.lookAt(0, PV.big ? 22 : 17, 0);
     PV.w = w; PV.h = h;
   }
+  // 机体卡片缩略图：用展示台的渲染器单独拍一张（结果缓存）
+  const THUMBS = new Map();
+  let TH = null;
+  function mechThumb(opt) {
+    const key = [opt.color, opt.head, opt.weapon, opt.pilot].join('|');
+    if (THUMBS.has(key)) return THUMBS.get(key);
+    if (!pvInit()) return '';
+    shared();
+    if (!TH) {
+      TH = { scene: new T.Scene(), cam: new T.PerspectiveCamera(30, 1, 1, 1000), canvas: document.createElement('canvas') };
+      TH.r = new T.WebGLRenderer({ canvas: TH.canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+      TH.r.setPixelRatio(1); TH.r.setSize(200, 200, false);
+      TH.scene.add(new T.HemisphereLight(0xe8ecff, 0x4a3a5a, 1.0));
+      const sun = new T.DirectionalLight(0xffffff, 0.8); sun.position.set(60, 140, 90); TH.scene.add(sun);
+      TH.cam.position.set(66, 40, 82); TH.cam.lookAt(0, 18, 0);
+    }
+    const b = makeBot(opt.color, opt.head, opt.weapon, opt.pilot);
+    b.wpnType = opt.weapon;
+    animateBot(b, { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, a: 0.75, pt: 0, flags: 1, charge: 0, tank: 100, flash: 0, weapon: opt.weapon }, 0, 0.05);
+    b.root.position.set(0, 0, 0);
+    TH.scene.add(b.root);
+    TH.r.render(TH.scene, TH.cam);
+    const url = TH.canvas.toDataURL('image/png');
+    TH.scene.remove(b.root);
+    THUMBS.set(key, url);
+    return url;
+  }
   function previewMode(m) { PV.mode = m; PV.t0 = performance.now(); }
   function previewFrame(now, dt) {
     if (!PV.r || !PV.bot || !PV.host || !PV.canvas.isConnected || PV.canvas.offsetParent === null) return;
@@ -1718,7 +1745,7 @@
     const A = G.aimShow;
     for (const m of [W.aimLine, W.aimFan, W.aimCircle, W.aimRing]) m.visible = false;
     if (A) {
-      W.aimMat.color.set(A.color || '#ffffff'); W.aimMat.opacity = A.strong ? 0.38 : 0.16;
+      W.aimMat.color.set(A.strong ? (A.color || '#ffffff') : '#ffffff'); W.aimMat.opacity = A.strong ? 0.42 : 0.2;
       const y = A.z + 1.6;
       if (A.kind === 'line') { const m = W.aimLine; m.visible = true; m.position.set(A.x, y, A.y); m.rotation.z = -A.a; m.scale.set(A.len, A.w, 1); }
       else if (A.kind === 'fan') { const m = W.aimFan; m.visible = true; m.position.set(A.x, y, A.y); m.rotation.z = -A.a; m.scale.set(A.len, A.len, 1); if (W.fanArc !== A.arc) { W.fanArc = A.arc; m.geometry.dispose(); m.geometry = new T.CircleGeometry(1, 24, -A.arc / 2, A.arc); } }
@@ -1834,7 +1861,7 @@
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
-    build, paintCell, burst, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, setQuality,
+    build, paintCell, burst, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();

@@ -18,10 +18,15 @@
     get(k, d) { try { const v = localStorage.getItem('gb_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('gb_' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
-  const profile = Object.assign({ name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 }, store.get('profile', {}));
+  const profile = Object.assign({ name: '', weapon: 'blaster', head: 'antenna', pilot: 'blaze', trophies: 0, mode: 'turf', map: -1, size: 3, dur: 180, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0 }, store.get('profile', {}));
   if (!S.WEAPONS[profile.weapon]) profile.weapon = 'blaster';
   if (!S.HEADS.some((h) => h.id === profile.head)) profile.head = 'antenna';
   if (!S.PILOTS.some((p) => p.id === profile.pilot)) profile.pilot = 'blaze';
+  if (!S.MODES[profile.mode]) profile.mode = 'turf';
+  if (!(profile.map >= -1 && profile.map < S.MAPS.length)) profile.map = -1;
+  if (!(profile.size >= 1 && profile.size <= 4)) profile.size = 3;
+  if (![120, 180, 240].includes(profile.dur)) profile.dur = 180;
+  if (S.HEADS.some((h) => h.id === profile.head && h.tr > (profile.trophies || 0))) profile.head = 'antenna';
   const level = () => S.levelFromXp(profile.xp);
   const saveProfile = () => store.set('profile', profile);
 
@@ -183,55 +188,6 @@
   }
   function setConn(text, cls) { const e = $('connStatus'); e.textContent = text; e.className = 'conn ' + (cls || ''); }
 
-  function renderProfile() {
-    const lv = level(), cur = S.xpForLevel(lv), next = S.xpForLevel(lv + 1);
-    $('lvText').textContent = 'Lv.' + lv;
-    $('xpText').textContent = `${profile.xp - cur} / ${next - cur} XP`;
-    $('xpBar').style.width = ((profile.xp - cur) / (next - cur)) * 100 + '%';
-    $('statsText').innerHTML = `<span>对战 ${profile.matches}</span><span>胜利 ${profile.wins}</span><span>击倒 ${profile.kills}</span><span>涂地 ${profile.paint}</span>`;
-    $('chipName').textContent = profile.name || '未命名机兵';
-    const P = S.pilot(profile.pilot);
-    $('chipBot').innerHTML = GP.portrait(P, { face: true });
-    $('chipBot').style.setProperty('--ring', P.accent);
-    $('heroPortrait').innerHTML = GP.portrait(P);
-    const hp = $('heroPilot');
-    hp.style.setProperty('--pc', P.accent);
-    hp.innerHTML = `<b>${P.name}<small>「${P.code}」${P.title}</small></b><i>“${P.line}”</i>`;
-    $('stagePortrait').innerHTML = GP.portrait(P);
-    $('garageStage').style.setProperty('--pc', P.accent);
-    $('stageModes').style.setProperty('--pc', P.accent);
-    mountPreview();
-  }
-  // 3D 展示台跟着当前打开的面板走：整备界面是大展示台，主界面是小圆窗
-  function mountPreview() {
-    const P = S.pilot(profile.pilot);
-    const garage = !$('panel-garage').classList.contains('hidden');
-    if (R3.preview(garage ? $('garageStage') : $('preview'), { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: P.id }, garage)) PV_OK = true;
-  }
-  let PV_OK = false;
-  // ---------------- 驾驶员选择 ----------------
-  function renderPilots() {
-    const box = $('pilotList');
-    box.innerHTML = '';
-    for (const P of S.PILOTS) {
-      const el = document.createElement('button');
-      el.className = 'pcard' + (profile.pilot === P.id ? ' sel' : '');
-      el.style.setProperty('--pc', P.accent);
-      el.innerHTML = GP.portrait(P) + `<div class="pname"><small>「${P.code}」</small><b>${P.name}</b></div>`;
-      el.onclick = () => { profile.pilot = P.id; saveProfile(); sendLoadout(); renderPilots(); renderProfile(); sfx.click(); };
-      box.appendChild(el);
-    }
-    const P = S.pilot(profile.pilot), d = $('pilotDetail');
-    d.style.setProperty('--pc', P.accent);
-    const rec = S.WEAPONS[P.weapon];
-    d.innerHTML = `<h3>${P.name}<small>「${P.code}」</small></h3><div class="ttl">${P.title}</div>
-      <blockquote>“${P.line}”</blockquote><p>${P.bio}</p>
-      <p>擅长武器：<b style="color:#fff">${rec.name}</b></p>
-      ${profile.weapon === P.weapon ? '<small style="color:#7dff9a">✓ 已装备擅长武器</small>' : `<button class="btn small" id="recWpn">装备「${rec.name}」</button>`}`;
-    const b = $('recWpn');
-    if (b) b.onclick = () => { profile.weapon = P.weapon; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
-  }
-
   // ---------------- 设置 ----------------
   function renderSettings() {
     const c = AU.cfg, cur = AU.current();
@@ -274,36 +230,194 @@
   function openSettings() { renderSettings(); $('dlgClose').textContent = G && !G.over ? '继续对战' : '关闭'; $('settingsDlg').classList.remove('hidden'); }
   function closeSettings() { $('settingsDlg').classList.add('hidden'); if (G && !G.over) lockPointer(); }
   function menuMusic() { if (!G) AU.music('menu'); setTimeout(updateNowPlaying, 100); }
+  // ================= 大厅 =================
+  const MODE_ICON = { turf: '🎨', zone: '🎯', escort: '💎', soccer: '⚽', battery: '🔋' };
+  const mapName = (i) => (i < 0 ? '随机地图' : S.MAPS[i].name);
+  function nextHead() { return S.HEADS.find((h) => h.tr > (profile.trophies || 0)); }
+  function renderProfile() {
+    const lv = level(), cur = S.xpForLevel(lv), next = S.xpForLevel(lv + 1);
+    $('lvText').textContent = 'Lv.' + lv;
+    $('xpText').textContent = `${profile.xp - cur} / ${next - cur} XP`;
+    $('xpBar').style.width = ((profile.xp - cur) / (next - cur)) * 100 + '%';
+    $('statsText').innerHTML = `<span>对战 ${profile.matches}</span><span>胜利 ${profile.wins}</span><span>击毁 ${profile.kills}</span><span>涂地 ${profile.paint}</span><span>🏆 ${profile.trophies || 0}</span>`;
+    $('chipName').textContent = profile.name || '未命名机兵';
+    // 奖杯
+    const tr = profile.trophies || 0, nh = nextHead();
+    const prevTr = [...S.HEADS].reverse().find((h) => h.tr <= tr);
+    $('trophyText').textContent = tr;
+    $('trophyBar').style.width = nh ? ((tr - prevTr.tr) / (nh.tr - prevTr.tr)) * 100 + '%' : '100%';
+    $('trophyNext').textContent = nh ? `${nh.tr} 解锁「${nh.name}」` : '全部解锁！';
+    // 驾驶员 + 机体
+    const P = S.pilot(profile.pilot), W = S.WEAPONS[profile.weapon];
+    $('chipBot').innerHTML = GP.portrait(P, { face: true });
+    $('chipBot').style.setProperty('--ring', P.accent);
+    $('sidePilot').innerHTML = GP.portrait(P, { face: true });
+    $('sidePilotName').textContent = P.name;
+    $('sideMechName').textContent = W.name;
+    $('heroPortrait').innerHTML = GP.portrait(P);
+    const hp = $('heroPilot');
+    hp.style.setProperty('--pc', P.accent);
+    hp.innerHTML = `<b>${P.name}<small>「${P.code}」${P.title}</small></b><i>“${P.line}”</i>`;
+    const sk = S.SKILLS[P.skill], sp = S.SPECIALS[W.special];
+    $('heroLoadout').innerHTML = `<span class="pill mech">🤖 ${W.name}</span><span class="pill">💥 大招 · ${sp.name}</span><span class="pill" style="--pc:${P.accent}">✨ 技能 · ${sk.name}</span><span class="pill" style="--pc:${P.accent}">🛡 被动 · ${P.passive.name}</span>`;
+    $('title').style.setProperty('--pc', P.accent);
+    renderModeCard();
+    mountPreview();
+  }
+  function renderModeCard() {
+    const m = S.MODES[profile.mode] || S.MODES.turf;
+    $('modeIcon').textContent = MODE_ICON[profile.mode] || '🎨';
+    $('modeName').textContent = m.name;
+    $('modeMap').textContent = `${mapName(profile.map)} · ${profile.size}v${profile.size}`;
+  }
+  // 3D 展示台跟着当前打开的界面走：机体面板里是小展示台，大厅里是大展示台
+  function mountPreview() {
+    const P = S.pilot(profile.pilot);
+    const inMech = !$('ov-mechs').classList.contains('hidden');
+    const host = inMech ? $('garageStage') : $('preview');
+    if (R3.preview(host, { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: P.id }, true)) PV_OK = true;
+  }
+  let PV_OK = false;
+  function openOv(name) {
+    for (const o of document.querySelectorAll('.ov')) o.classList.toggle('hidden', o.id !== 'ov-' + name);
+    if (name === 'road') renderRoad();
+    if (name === 'modes') renderModes();
+    if (name === 'mechs') renderWeaponLists();
+    mountPreview();
+    sfx.click();
+  }
+  function closeOv() {
+    let any = false;
+    for (const o of document.querySelectorAll('.ov')) { if (!o.classList.contains('hidden')) any = true; o.classList.add('hidden'); }
+    if (any) { mountPreview(); sfx.click(); }
+    return any;
+  }
+  // ---------------- 驾驶员选择 ----------------
+  function renderPilots() {
+    const box = $('pilotList');
+    box.innerHTML = '';
+    for (const P of S.PILOTS) {
+      const el = document.createElement('button');
+      el.className = 'pcard' + (profile.pilot === P.id ? ' sel' : '');
+      el.style.setProperty('--pc', P.accent);
+      el.innerHTML = GP.portrait(P) + `${P.isNew ? '<span class="new-badge">NEW</span>' : ''}<div class="pname"><small>「${P.code}」</small><b>${P.name}</b></div>`;
+      el.onclick = () => { profile.pilot = P.id; saveProfile(); sendLoadout(); renderPilots(); renderProfile(); sfx.click(); };
+      box.appendChild(el);
+    }
+    const P = S.pilot(profile.pilot), d = $('pilotDetail');
+    d.style.setProperty('--pc', P.accent);
+    const rec = S.WEAPONS[P.weapon], sk = S.SKILLS[P.skill];
+    d.innerHTML = `<div class="det-art">${GP.portrait(P)}</div>
+      <h3>${P.name}<small>「${P.code}」</small></h3><div class="ttl">${P.title}</div>
+      <blockquote>“${P.line}”</blockquote>
+      <div class="abil"><b>✨ 技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
+      <div class="abil"><b>🛡 被动 · ${P.passive.name}</b><p>${P.passive.desc}</p></div>
+      <p class="bio">${P.bio}</p>
+      ${profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>`}`;
+    const b = $('recWpn');
+    if (b) b.onclick = () => { profile.weapon = P.weapon; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
+  }
+  // ---------------- 机体选择 ----------------
+  function mechStats(id) {
+    const W = S.WEAPONS[id];
+    const perAtk = { burst: W.shots * W.dmg, fan: W.pellets * W.dmg, flick: W.pellets * W.dmg + W.rollDmg, charge: W.dmg, lob: W.dmg, punch: W.dmg }[W.attack];
+    return [['生命', W.hp, W.hp / 150], ['单发伤害', Math.round(perAtk), Math.min(1, perAtk / 130)], ['射程', S.weaponRange(id), Math.min(1, S.weaponRange(id) / 620)], ['速度', Math.round(W.spd * 100) + '%', W.spd / 1.1], ['装填', W.reload + '秒', Math.min(1, 0.85 / W.reload)]];
+  }
   function renderWeaponLists() {
-    for (const [id, compact] of [['weaponList', false], ['roomWeaponList', true]]) {
-      const box = $(id);
+    const P = S.pilot(profile.pilot);
+    const box = $('weaponList');
+    if (box) {
       box.innerHTML = '';
       for (const wid of S.WEAPON_ORDER) {
-        const w = S.WEAPONS[wid];
+        const W = S.WEAPONS[wid];
         const el = document.createElement('button');
-        el.className = 'wcard' + (profile.weapon === wid ? ' sel' : '');
-        el.innerHTML = `<canvas width="112" height="112"></canvas><div><b>${w.name}</b>${compact ? '' : `<p>${w.desc}</p>`}<small>大招：${S.SPECIALS[w.special].name}${compact ? '' : ' — ' + S.SPECIALS[w.special].desc}</small></div>`;
-        drawBotIcon(el.querySelector('canvas'), wid, profile.head);
+        el.className = 'mcard2' + (profile.weapon === wid ? ' sel' : '');
+        const img = R3.mechThumb ? R3.mechThumb({ color: P.accent, head: profile.head, weapon: wid, pilot: P.id }) : '';
+        el.innerHTML = `${W.isNew ? '<span class="new-badge">NEW</span>' : ''}<div class="thumb">${img ? `<img src="${img}" alt="">` : ''}</div><b>${W.name}</b><small>${W.role}</small>`;
         el.onclick = () => { profile.weapon = wid; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
         box.appendChild(el);
+      }
+      const W = S.WEAPONS[profile.weapon], sp = S.SPECIALS[W.special];
+      $('mechDetail').innerHTML = `<h3>${W.name}<small>${W.role}</small></h3><p class="bio">${W.desc}</p>
+        <div class="statbars">${mechStats(profile.weapon).map(([k, v, f]) => `<div><span>${k}</span><i><em style="width:${Math.round(f * 100)}%"></em></i><b>${v}</b></div>`).join('')}</div>
+        <div class="abil"><b>💥 大招 · ${sp.name}</b><p>${sp.desc}</p></div>`;
+    }
+    const rbox = $('roomWeaponList');
+    if (rbox) {
+      rbox.innerHTML = '';
+      for (const wid of S.WEAPON_ORDER) {
+        const W = S.WEAPONS[wid];
+        const el = document.createElement('button');
+        el.className = 'wcard' + (profile.weapon === wid ? ' sel' : '');
+        el.innerHTML = `<div><b>${W.name}</b><small>${W.role} · 大招：${S.SPECIALS[W.special].name}</small></div>`;
+        el.onclick = () => { profile.weapon = wid; saveProfile(); sendLoadout(); renderWeaponLists(); renderProfile(); sfx.click(); };
+        rbox.appendChild(el);
       }
     }
   }
   function renderHeads() {
     const box = $('headList');
     box.innerHTML = '';
-    const lv = level();
+    const tr = profile.trophies || 0;
     for (const h of S.HEADS) {
       const el = document.createElement('button');
-      const locked = lv < h.lv;
+      const locked = tr < h.tr;
       el.className = 'hchip' + (profile.head === h.id ? ' sel' : '') + (locked ? ' locked' : '');
-      el.textContent = locked ? `🔒 ${h.name} Lv.${h.lv}` : h.name;
+      el.textContent = locked ? `🔒 ${h.name} · ${h.tr}🏆` : h.name;
       el.onclick = () => {
-        if (locked) return toast(`达到 Lv.${h.lv} 解锁「${h.name}」`);
-        profile.head = h.id; saveProfile(); sendLoadout(); renderHeads(); renderWeaponLists(); renderProfile(); sfx.click();
+        if (locked) return toast(`奖杯达到 ${h.tr} 解锁「${h.name}」`);
+        profile.head = h.id; saveProfile(); sendLoadout(); renderHeads(); renderProfile(); sfx.click();
       };
       box.appendChild(el);
     }
+  }
+  function renderRoad() {
+    // 节点等距排开，进度条按奖杯数在相邻节点之间插值
+    const tr = profile.trophies || 0, H = S.HEADS, n = H.length;
+    const pos = (i) => 4 + (i / (n - 1)) * 92;
+    let k = n - 1;
+    for (let i = 0; i < n - 1; i++) if (tr < H[i + 1].tr) { k = i + (tr - H[i].tr) / (H[i + 1].tr - H[i].tr); break; }
+    const meX = k >= n - 1 ? 96 : 4 + (k / (n - 1)) * 92;
+    let html = `<div class="road-line"><i style="width:${meX}%"></i></div>`;
+    H.forEach((h, i) => {
+      const got = tr >= h.tr;
+      html += `<div class="road-node${got ? ' got' : ''}" style="left:${pos(i)}%"><div class="rn-dot">${got ? '✓' : '🔒'}</div><b>${h.tr} 🏆</b><small>头部涂装「${h.name}」</small></div>`;
+    });
+    html += `<div class="road-me" style="left:${meX}%"><span>你 · ${tr} 🏆</span></div>`;
+    $('roadTrack').innerHTML = html;
+  }
+  function renderModes() {
+    const box = $('homeModeList');
+    box.innerHTML = '';
+    for (const id of S.MODE_ORDER) {
+      const m = S.MODES[id];
+      const el = document.createElement('button');
+      el.className = 'mode-tile m-' + id + (profile.mode === id ? ' sel' : '');
+      el.innerHTML = `<span class="mt-ico">${MODE_ICON[id]}</span><b>${m.name}</b>${m.original ? '<span class="orig">原创</span>' : ''}<p>${m.desc}</p>`;
+      el.onclick = () => { profile.mode = id; saveProfile(); renderModes(); renderModeCard(); sfx.click(); };
+      box.appendChild(el);
+    }
+    const mb = $('homeMapList');
+    mb.innerHTML = '';
+    for (let i = -1; i < S.MAPS.length; i++) {
+      const el = document.createElement('button');
+      el.className = 'mapcard' + (profile.map === i ? ' sel' : '');
+      el.innerHTML = i < 0 ? '<div class="rnd">?</div><b>随机地图</b>' : `<canvas width="120" height="80"></canvas><b>${S.MAPS[i].name}</b>`;
+      if (i >= 0) drawMapPreview(el.querySelector('canvas'), i);
+      el.onclick = () => { profile.map = i; saveProfile(); renderModes(); renderModeCard(); sfx.click(); };
+      mb.appendChild(el);
+    }
+    $('homeSize').value = String(profile.size); $('homeDur').value = String(profile.dur);
+  }
+  // 「对战」：建一个只有自己的房间，AI 补满后立刻开打
+  let quick = null, quickRoom = false;
+  function quickPlay() {
+    ensureName();
+    quick = { mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, bots: true };
+    $('playBtn').classList.add('busy');
+    const go = () => send({ t: 'create' });
+    if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
+    setTimeout(() => { $('playBtn').classList.remove('busy'); if (quick) { quick = null; toast('没有连上服务器，请稍后再试'); } }, 4000);
   }
   function ensureName() {
     if (!profile.name.trim()) {
@@ -437,29 +551,31 @@
     $('sizeSel').onchange = (e) => send({ t: 'settings', teamSize: +e.target.value });
     $('botChk').onchange = (e) => send({ t: 'settings', bots: e.target.checked });
     $('startBtn').onclick = () => send({ t: 'start' });
-    $('resBack').onclick = () => { $('results').classList.add('hidden'); R3.clear(); if (room) { showScreen('room'); renderRoom(); } else showScreen('title'); };
-    // 主界面导航
-    for (const btn of document.querySelectorAll('.mbtn')) {
-      btn.onclick = () => {
-        for (const x of document.querySelectorAll('.mbtn')) x.classList.toggle('sel', x === btn);
-        for (const pnl of document.querySelectorAll('.mpanel')) pnl.classList.toggle('hidden', pnl.id !== 'panel-' + btn.dataset.panel);
-        mountPreview();
-        if (btn.dataset.panel === 'settings') renderSettings();
-        sfx.click();
-      };
-    }
+    $('resBack').onclick = () => {
+      $('results').classList.add('hidden'); R3.clear();
+      if (quickRoom) { quickRoom = false; send({ t: 'leave' }); showScreen('title'); renderProfile(); }
+      else if (room) { showScreen('room'); renderRoom(); } else showScreen('title');
+    };
+    // 大厅导航：侧边按钮打开全屏面板
+    for (const btn of document.querySelectorAll('[data-ov]')) btn.onclick = () => openOv(btn.dataset.ov);
+    for (const btn of document.querySelectorAll('[data-close]')) btn.onclick = closeOv;
+    $('homeSettings').onclick = openSettings;
+    $('playBtn').onclick = quickPlay;
+    $('homeSize').onchange = (e) => { profile.size = +e.target.value; saveProfile(); renderModeCard(); };
+    $('homeDur').onchange = (e) => { profile.dur = +e.target.value; saveProfile(); };
     $('guideModes').innerHTML = S.MODE_ORDER.map((id) => { const m = S.MODES[id]; return `<div class="mcard"><b>${m.name}</b>${m.original ? '<span class="orig">原创</span>' : ''}<p>${m.desc}</p></div>`; }).join('');
     $('roomSetBtn').onclick = openSettings;
     $('dlgClose').onclick = closeSettings;
     $('settingsDlg').addEventListener('click', (e) => { if (e.target.id === 'settingsDlg') closeSettings(); });
     let lastHover = null;
     document.addEventListener('mouseover', (e) => {
-      const t = e.target.closest ? e.target.closest('.btn, .mbtn, .wcard, .mcard, .mapcard, .hchip, .jukebox button') : null;
+      const t = e.target.closest ? e.target.closest('.btn, .side-btn, .pcard, .mcard2, .mode-tile, .wcard, .mcard, .mapcard, .hchip, .play-btn, .mode-card, .jukebox button') : null;
       if (t && t !== lastHover && !t.disabled) sfx.hover();
       lastHover = t;
     });
     addEventListener('keydown', (e) => {
       if (e.code !== 'Escape' || performance.now() - lastUnlock < 400) return;
+      if (!G && closeOv()) return;
       if ($('settingsDlg').classList.contains('hidden')) { if (G || room) openSettings(); } else closeSettings();
     });
     addEventListener('pointerdown', () => setTimeout(updateNowPlaying, 150));
@@ -625,11 +741,19 @@
         sfx.click(); break;
       case 'lobby':
         room = m.room;
+        if (quick && room.hostId === myId && room.state === 'lobby') {
+          const q = quick; quick = null; quickRoom = true;
+          $('playBtn').classList.remove('busy');
+          send(Object.assign({ t: 'settings' }, q));
+          send({ t: 'start' });
+          break;
+        }
+        if (quickRoom) break;
         if (!G && $('results').classList.contains('hidden')) showScreen('room');
         renderRoom();
         break;
       case 'left':
-        room = null;
+        room = null; quickRoom = false;
         if (!FILE_MODE) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ } }
         showScreen('title');
         if (net && net.kind === 'peer') backToLocal(); else if (net && net.kind === 'local') stopHost();
@@ -1175,7 +1299,8 @@
     // 镜头稍微看向瞄准方向
     let lx = 0, ly = 0;
     if (G.aimPt && me) { lx = clamp((G.aimPt.x - fx) * 0.18, -90, 90); ly = clamp((G.aimPt.y - fy) * 0.18, -70, 70); }
-    const tx = fx + lx + fwx * 60, ty = fy + ly + fwy * 60;
+    // 镜头不要拍到场外太多：焦点限制在场地内
+    const tx = clamp(fx + lx + fwx * 60, 260, S.W - 260), ty = clamp(fy + ly + fwy * 60, 170, S.H - 170);
     if (!G.camF) G.camF = { x: tx, y: ty, z: fz };
     const k = Math.min(1, dt * 7);
     G.camF.x += (tx - G.camF.x) * k; G.camF.y += (ty - G.camF.y) * k; G.camF.z += (fz - G.camF.z) * Math.min(1, dt * 5);
@@ -1183,7 +1308,7 @@
     G.camDip = Math.max(-18, Math.min(8, G.camDip + G.camDipV * Math.min(dt, 0.05)));
     const aspect = VW / Math.max(1, VH);
     const far = aspect < 1.4 ? 1.18 : 1;                 // 屏幕越窄镜头越高
-    const back = 330 * far, height = 600 * far;
+    const back = 250 * far, height = 450 * far;
     const cx = G.camF.x - fwx * back, cy = G.camF.y - fwy * back, cz = G.camF.z + height + G.camDip;
     const sk = shakeOn ? G.shake : 0;
     const dx = G.camF.x - cx, dy = G.camF.y - cy, dz = G.camF.z - cz, L = Math.hypot(dx, dy, dz);
@@ -1727,8 +1852,9 @@
     if (now - G.startedAt < 16000 && !G.over) {
       ctx.globalAlpha = Math.min(1, (16000 - (now - G.startedAt)) / 1500);
       const lines = TOUCH
-        ? ['左半屏：摇杆移动 · 右半屏：滑动转视角', '按住「开火」射击（按住时也能滑动瞄准）', '「滚轮」切换形态 · 💣 炸弹 · 大招充满后点击']
-        : ['WASD 移动 · 鼠标转视角 · 左键开火 · 空格跳跃', 'Shift 变滚轮：己方涂料上加速、隐身、补涂料；滚轮跳得更高', '右键/E 炸弹 · Q 大招 · 1-4 快捷语音 · Tab 记分板 · Esc 暂停'];
+        ? ['左半屏：摇杆移动 · 「攻击」拖动瞄准、松手发射，点一下自动瞄准', '「大招」充满后同样拖动瞄准 · 「技能」每局 3 次', '机体被摧毁后驾驶员会弹出：活下来就能原地空投新机体']
+        : TOP() ? ['WASD 移动 · 鼠标瞄准 · 左键攻击（消耗 1 格弹药）', 'E / 右键 大招（打中敌人充能）· Q 驾驶员技能 · 空格 跳跃', 'Shift 滚轮：己方涂料上加速、隐身、装填更快 · 躲进草丛敌人看不见你']
+        : ['WASD 移动 · 鼠标转视角 · 左键攻击 · 空格跳跃', 'Shift 变滚轮：己方涂料上加速、隐身、装填更快', 'E/右键 大招 · Q 驾驶员技能 · 1-4 快捷语音 · Tab 记分板 · Esc 暂停'];
       lines.forEach((l, i) => txt(l, 12, (TOUCH ? 190 : 230) + i * 20, 13, '#dfe1ee', 'left', 3));
       ctx.globalAlpha = 1;
     }
@@ -1752,7 +1878,7 @@
         const spk = foot ? 0 : Math.min(1, me.sp / W.spNeed);
         ring(bx - 104, by + 6, 32, spk, '#ffdf2e', foot ? '—' : '大招', 'E / 右键', spk >= 1 && !foot, !!foot);
         const sk = S.SKILLS[P.skill], uses = me.skUses == null ? 3 : me.skUses;
-        ring(bx - 186, by + 12, 26, me.skCd > 0 ? 1 - me.skCd / S.SKILL_CD : 1, P.accent, sk.name.slice(0, 2), `Q · 剩 ${uses}`, false, uses <= 0);
+        ring(bx - 186, by + 12, 26, me.skCd > 0 ? 1 - me.skCd / S.SKILL_CD : 1, P.accent, sk.short, `Q · 剩 ${uses}`, false, uses <= 0);
         txt('空格 跳跃 · Shift 滚轮', bx - 70, by - 64, 11, '#9a9db5', 'center', 3);
       }
       if (foot && alive) {
@@ -1939,14 +2065,16 @@
       const gain = 60 + (won ? 60 : draw ? 30 : 0) + meRow.kills * 10 + Math.floor(meRow.paint / 25) + meRow.obj * 12 + (mvp && mvp.id === myId ? 40 : 0);
       profile.xp += gain; profile.matches++; if (won) profile.wins++;
       profile.kills += meRow.kills; profile.paint += meRow.paint;
+      // 奖杯：赢 +8，平 +2，输 −3
+      const trBefore = profile.trophies || 0;
+      const dTr = won ? S.TROPHY_WIN : draw ? S.TROPHY_DRAW : -S.TROPHY_LOSS;
+      profile.trophies = Math.max(0, trBefore + dTr);
       saveProfile();
       const after = level();
-      let msg = `+${gain} XP`;
-      if (after > before) {
-        msg += `　🎉 升级到 Lv.${after}！`;
-        const un = S.HEADS.filter((h) => h.lv > before && h.lv <= after).map((h) => h.name);
-        if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
-      }
+      let msg = `${dTr >= 0 ? '+' : ''}${dTr} 🏆（共 ${profile.trophies}）　+${gain} XP`;
+      if (after > before) msg += `　🎉 升级到 Lv.${after}！`;
+      const un = S.HEADS.filter((h) => h.tr > trBefore && h.tr <= profile.trophies).map((h) => h.name);
+      if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
       $('resXp').textContent = msg;
       renderProfile(); renderHeads(); sendLoadout();
     } else $('resXp').textContent = '';

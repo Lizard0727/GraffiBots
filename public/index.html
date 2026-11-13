@@ -18,101 +18,123 @@
   <canvas id="gl"></canvas>
   <canvas id="game"></canvas>
 
-  <!-- ============ 主界面 ============ -->
-  <section id="title" class="screen menu">
+  <!-- ============ 主界面（大厅） ============ -->
+  <section id="title" class="screen home">
     <canvas id="menuBg"></canvas>
-    <div class="menu-wrap">
-      <aside class="menu-left">
-        <header class="logo">
-          <h1><span>涂鸦</span>机兵</h1>
-          <p>GRAFFI·BOTS</p>
-        </header>
-        <nav class="menu-nav">
-          <button class="mbtn sel" data-panel="play"><b>开始游戏</b><small>创建或加入房间</small></button>
-          <button class="mbtn" data-panel="garage"><b>机兵整备</b><small>武器 · 涂装 · 代号</small></button>
-          <button class="mbtn" data-panel="guide"><b>玩法说明</b><small>模式 · 操作 · 技巧</small></button>
-          <button class="mbtn" data-panel="settings"><b>设置</b><small>音乐 · 音效 · 画面</small></button>
-        </nav>
-        <div class="me-chip">
-          <div id="chipBot" class="avatar"></div>
-          <div><b id="chipName">机兵</b><div class="lvrow"><span id="lvText">Lv.1</span><small id="xpText"></small></div><div class="bar"><i id="xpBar"></i></div></div>
-        </div>
-        <div id="connStatus" class="conn">正在连接服务器…</div>
-        <div class="nowplay" id="nowPlaying">♪ 点击任意位置开启音乐</div>
-      </aside>
+    <header class="home-top">
+      <button class="me-chip" data-ov="profile" title="名片 / 头部涂装">
+        <div id="chipBot" class="avatar"></div>
+        <div class="chip-txt"><b id="chipName">机兵</b><div class="lvrow"><span id="lvText">Lv.1</span><small id="xpText"></small></div><div class="bar"><i id="xpBar"></i></div></div>
+      </button>
+      <button class="trophy-chip" data-ov="road" title="奖杯之路">
+        <span class="tro-ico">🏆</span><div><b id="trophyText">0</b><div class="bar gold"><i id="trophyBar"></i></div><small id="trophyNext"></small></div>
+      </button>
+      <div class="top-gap"></div>
+      <div id="connStatus" class="conn">正在连接服务器…</div>
+      <button class="icon-btn" data-ov="guide" title="玩法说明">?</button>
+      <button class="icon-btn" id="homeSettings" title="设置">⚙</button>
+    </header>
 
-      <main class="menu-right">
-        <div class="mpanel" id="panel-play">
-          <div class="play-hero">
-            <div class="hero-art">
-              <div id="heroPortrait" class="hero-portrait"></div>
-              <div id="preview" class="pv-host"></div>
-            </div>
-            <div class="hero-txt">
-              <div class="hero-pilot" id="heroPilot"></div>
-              <h2>4v4 联机涂装对战</h2>
-              <p>和朋友组队，用涂料抢地盘、打比赛。创建房间后把邀请链接发给朋友，空位会由 AI 驾驶员补上。</p>
-              <div class="stats" id="statsText"></div>
-            </div>
-          </div>
-          <button id="createBtn" class="btn big">创建房间</button>
-          <div class="join">
-            <input id="codeInput" maxlength="4" placeholder="输入房间码" autocomplete="off">
-            <button id="joinBtn" class="btn">加入房间</button>
-          </div>
-        </div>
+    <nav class="home-left">
+      <button class="side-btn" data-ov="pilots"><div id="sidePilot" class="side-face"></div><div><b>驾驶员</b><small id="sidePilotName"></small></div></button>
+      <button class="side-btn" data-ov="mechs"><span class="side-ico">🤖</span><div><b>机体</b><small id="sideMechName"></small></div></button>
+      <button class="side-btn" data-ov="road"><span class="side-ico">🏆</span><div><b>奖杯之路</b><small>解锁头部涂装</small></div></button>
+      <button class="side-btn" data-ov="guide"><span class="side-ico">📖</span><div><b>玩法</b><small>模式 · 操作 · 技巧</small></div></button>
+    </nav>
 
-        <div class="mpanel hidden" id="panel-garage">
-          <div class="showroom">
-            <div class="stage pv-host" id="garageStage">
-              <div class="stage-portrait" id="stagePortrait"></div>
-              <div class="stage-modes" id="stageModes">
-                <button data-mode="auto" class="sel">自动</button><button data-mode="idle">待机</button><button data-mode="walk">行走</button>
-                <button data-mode="fire">开火</button><button data-mode="jump">跳跃</button><button data-mode="wheel">滚轮</button>
-              </div>
-              <div class="stage-hint">⟲ 拖动旋转机兵</div>
-            </div>
-            <div id="pilotDetail" class="pilot-detail"></div>
-          </div>
-          <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
-          <h2>驾驶员</h2>
-          <div id="pilotList" class="pilot-list"></div>
-          <h2>武器</h2>
-          <div id="weaponList" class="weapon-list"></div>
-          <h2>头部涂装 <small>升级解锁</small></h2>
-          <div id="headList" class="head-list"></div>
-        </div>
-
-        <div class="mpanel hidden" id="panel-guide">
-          <h2>核心玩法</h2>
-          <ul class="tips">
-            <li>第三人称 3D 视角：鼠标转动视角，准星对准哪里就打向哪里。子弹飞出射程后会<b>抛物线下坠</b>，可以抬高枪口打得更远。</li>
-            <li>场地有<b>矮台、高台和高墙</b>：空格跳跃可跳上矮台；滚轮形态跳得更高，能直接跳上高台。平台顶面同样可以涂色。</li>
-            <li>开火会把地面涂成己方颜色。<b>站在己方涂料上</b>按住 <kbd>Shift</kbd> 变成滚轮：移动极快、对敌人隐身，并迅速补充涂料。</li>
-            <li>踩在<b>敌方涂料</b>上会减速并持续掉血，先把脚下涂成自己的颜色再推进。</li>
-            <li>涂地会给<b>大招</b>充能，充满后按 <kbd>Q</kbd> 发动。被击倒会损失一半充能。</li>
-            <li>涂料罐会被射击、炸弹消耗。不开火时自动缓慢恢复，变滚轮潜入己方涂料恢复更快。</li>
-            <li>被击倒的位置会被炸开一片敌方涂料，5 秒后在基地重新部署。</li>
-            <li>机兵有重量：起步要加速、松手会滑行；<b>长按空格跳得高、短按小跳</b>。被打中或被炸到会被<b>击退</b>，滚轮形态更轻、被推得更远。</li>
-            <li>在「机兵整备」里挑选你的<b>驾驶员</b>，每位驾驶员都有擅长的武器，会坐在你的机兵驾驶舱里。</li>
-          </ul>
-          <h2>对战模式</h2>
-          <div id="guideModes" class="guide-modes"></div>
-          <h2>操作</h2>
-          <ul class="controls">
-            <li><kbd>W A S D</kbd>移动　<kbd>鼠标</kbd>转动视角 / 瞄准　<kbd>左键</kbd>开火</li>
-            <li><kbd>空格</kbd>跳跃　<kbd>Shift</kbd>按住变成滚轮　<kbd>← →</kbd>键盘转视角</li>
-            <li><kbd>右键</kbd>/<kbd>E</kbd>喷漆炸弹（消耗 55% 涂料，投向准星位置）</li>
-            <li><kbd>Q</kbd>大招　<kbd>1</kbd>–<kbd>4</kbd>快捷语音　<kbd>Tab</kbd>记分板</li>
-            <li><kbd>Esc</kbd>暂停 / 设置（可调鼠标灵敏度）　<kbd>M</kbd>静音</li>
-          </ul>
-        </div>
-
-        <div class="mpanel hidden" id="panel-settings">
-          <div class="settings-box"></div>
-        </div>
-      </main>
+    <div class="home-stage">
+      <div id="preview" class="pv-host"></div>
+      <div id="heroPortrait" class="hero-portrait"></div>
+      <div class="hero-plate">
+        <div id="heroPilot" class="hero-pilot"></div>
+        <div id="heroLoadout" class="loadout-pills"></div>
+      </div>
     </div>
+
+    <div class="home-right">
+      <button class="mode-card" id="modeCard" data-ov="modes">
+        <span id="modeIcon" class="mode-ico">🎨</span>
+        <div><small>对战模式 · 点击切换</small><b id="modeName">涂地大战</b><span id="modeMap">随机地图 · 3v3</span></div>
+      </button>
+      <button id="playBtn" class="play-btn"><span>对 战</span><small>和 AI 驾驶员立即开打</small></button>
+      <div class="team-row">
+        <button id="createBtn" class="btn ghost">组队房间</button>
+        <input id="codeInput" maxlength="4" placeholder="房间码" autocomplete="off">
+        <button id="joinBtn" class="btn">加入</button>
+      </div>
+      <div class="nowplay" id="nowPlaying">♪ 点击任意位置开启音乐</div>
+    </div>
+
+    <!-- ===== 全屏面板 ===== -->
+    <section id="ov-pilots" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close>← 返回</button><h2>选择驾驶员</h2><small>驾驶员决定技能和被动，可以和任何机体自由搭配</small></header>
+      <div class="ov-body sel-layout">
+        <div id="pilotList" class="pilot-grid"></div>
+        <aside id="pilotDetail" class="sel-detail"></aside>
+      </div>
+    </section>
+    <section id="ov-mechs" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close>← 返回</button><h2>选择机体</h2><small>机体决定生命、武器和大招；被摧毁后驾驶员会弹出继续战斗</small></header>
+      <div class="ov-body sel-layout">
+        <div id="weaponList" class="mech-grid"></div>
+        <aside class="sel-detail mech-side">
+          <div class="stage pv-host" id="garageStage">
+            <div class="stage-modes" id="stageModes">
+              <button data-mode="auto" class="sel">自动</button><button data-mode="idle">待机</button><button data-mode="walk">行走</button>
+              <button data-mode="fire">攻击</button><button data-mode="jump">跳跃</button><button data-mode="wheel">滚轮</button>
+            </div>
+            <div class="stage-hint">⟲ 拖动旋转</div>
+          </div>
+          <div id="mechDetail"></div>
+        </aside>
+      </div>
+    </section>
+    <section id="ov-modes" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close>← 返回</button><h2>对战模式</h2><small>点「对战」会和 AI 驾驶员打这个模式；组队房间里也能改</small></header>
+      <div class="ov-body">
+        <div id="homeModeList" class="mode-grid"></div>
+        <h3>地图</h3>
+        <div id="homeMapList" class="map-list"></div>
+        <div class="row">
+          <label>每队人数 <select id="homeSize"><option value="1">1v1</option><option value="2">2v2</option><option value="3">3v3</option><option value="4">4v4</option></select></label>
+          <label>时长 <select id="homeDur"><option value="120">2 分钟</option><option value="180">3 分钟</option><option value="240">4 分钟</option></select></label>
+        </div>
+      </div>
+    </section>
+    <section id="ov-road" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close>← 返回</button><h2>奖杯之路</h2><small>赢一局 +8 🏆，平局 +2，输了 −3</small></header>
+      <div class="ov-body"><div id="roadTrack" class="road"></div></div>
+    </section>
+    <section id="ov-profile" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close>← 返回</button><h2>机兵名片</h2></header>
+      <div class="ov-body narrow">
+        <label class="field">机兵代号<input id="nameInput" maxlength="12" placeholder="输入你的昵称"></label>
+        <div class="stats" id="statsText"></div>
+        <h3>头部涂装 <small>沿奖杯之路解锁，戴在驾驶员头上</small></h3>
+        <div id="headList" class="head-list"></div>
+      </div>
+    </section>
+    <section id="ov-guide" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close>← 返回</button><h2>玩法说明</h2></header>
+      <div class="ov-body narrow">
+        <h3>核心玩法</h3>
+        <ul class="tips">
+          <li><b>驾驶员 + 机体</b>：驾驶员带来技能和被动，机体决定生命值、武器和大招，两者自由搭配。</li>
+          <li><b>弹药</b>：每次攻击消耗 1 格弹药（共 3 格），停火后自动装填；在己方涂料上变滚轮装填更快。</li>
+          <li><b>大招</b>：打中敌人和涂地都会充能，充满后发动。<b>技能</b>每局 3 次，冷却 6 秒。</li>
+          <li><b>弹出驾驶员</b>：机体被摧毁时驾驶员会弹出，拿着手枪继续战斗。活过 6 秒，新机体就空投在你脚下；驾驶员也被击倒才算真正倒下。</li>
+          <li><b>草丛</b>：躲进草丛敌人就看不见你（靠得很近或你开火时会暴露）。脱战 3 秒后会快速回血。</li>
+          <li>涂色面积决定涂地大战胜负；踩在敌方涂料上会减速并持续掉血。</li>
+        </ul>
+        <h3>操作</h3>
+        <ul class="controls">
+          <li><b>电脑</b>：<kbd>W A S D</kbd>移动　<kbd>鼠标</kbd>瞄准　<kbd>左键</kbd>攻击　<kbd>E</kbd>/<kbd>右键</kbd>大招　<kbd>Q</kbd>技能　<kbd>空格</kbd>跳跃　<kbd>Shift</kbd>滚轮　<kbd>Tab</kbd>记分板　<kbd>Esc</kbd>暂停</li>
+          <li><b>手机</b>：左手摇杆移动；「攻击」「大招」按住拖动瞄准、松手发射，点一下自动瞄准最近的敌人。</li>
+        </ul>
+        <h3>对战模式</h3>
+        <div id="guideModes" class="guide-modes"></div>
+      </div>
+    </section>
   </section>
 
   <!-- ============ 房间 ============ -->
