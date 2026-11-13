@@ -20,7 +20,28 @@
   // 常驻角色：新手宝箱从这 5 位里给 1 位
   E.STARTER_PILOTS = ['blaze', 'frost', 'candy', 'titan', 'raven'];
   E.STARTER_MECHS = ['blaster', 'roller', 'charger'];
-  E.SEASON = { id: 1, name: '灰城重涂', en: 'REPAINT' };
+  E.SEASON = { id: 1, name: '灰城重涂', en: 'REPAINT', start: Date.UTC(2026, 10, 13), end: Date.UTC(2026, 11, 11) };
+  // ---------------- 赛季通行证：30 级，免费线 + 高级线（宝石解锁） ----------------
+  E.PASS = { tiers: 30, xpPer: 600, price: 480 };
+  const C = (k, n) => ({ k, n }), CH = (id) => ({ k: 'chest', id, n: 1 }), SK = (id) => ({ k: 'skin', id }), TP = () => ({ k: 'tp', n: 1 });
+  E.PASS.free = [C('coins', 100), CH('supply'), C('parts', 60), C('gems', 20), CH('military'), C('coins', 150), TP(), C('parts', 80), CH('supply'), SK('fr_tape'),
+    C('coins', 200), C('gems', 30), CH('supply'), C('parts', 100), CH('military'), C('coins', 250), TP(), C('crystals', 1), CH('supply'), SK('av_flag'),
+    C('coins', 300), C('gems', 40), CH('military'), C('parts', 150), C('crystals', 1), C('coins', 400), TP(), CH('supply'), C('gems', 50), CH('airdrop')];
+  E.PASS.prem = [SK('blaze_grey'), C('gems', 30), CH('military'), C('coins', 300), SK('m_camo'), C('parts', 150), CH('airdrop'), C('gems', 50), C('crystals', 1), SK('fx_stars'),
+    CH('military'), C('coins', 500), TP(), SK('echo_midnight'), CH('airdrop'), C('parts', 250), C('gems', 80), CH('military'), C('crystals', 2), SK('m_neon'),
+    CH('airdrop'), C('coins', 800), SK('fr_rebel'), TP(), CH('airdrop'), C('gems', 100), C('crystals', 2), SK('fx_confetti'), CH('airdrop'), SK('flag_red')];
+  E.passLevel = (o) => Math.min(E.PASS.tiers, Math.floor(((o.pass && o.pass.xp) || 0) / E.PASS.xpPer));
+  E.matchPassXp = (rw) => 30 + (rw.won ? 30 : rw.draw ? 15 : 0) + Math.min(20, rw.kills * 2) + (rw.mvp ? 10 : 0);
+  // ---------------- 每日 / 每周任务（按日期挑选，客户端和服务器一样） ----------------
+  E.QUESTS = {
+    win: { name: '赢 {n} 局', stat: 'won' }, play: { name: '完成 {n} 局对战', stat: 'play' }, kills: { name: '击毁 / 击倒 {n} 次', stat: 'kills' },
+    paint: { name: '涂地 {n} 格', stat: 'paint' }, mvp: { name: '拿到 {n} 次 MVP', stat: 'mvp' },
+  };
+  E.DAILY_POOL = [['win', 2, 150], ['play', 3, 120], ['kills', 8, 120], ['paint', 1500, 120], ['mvp', 1, 150], ['kills', 12, 150], ['paint', 2500, 150]];
+  E.WEEKLY = [['win', 10, 700], ['play', 25, 600], ['kills', 60, 600], ['paint', 15000, 600]];
+  E.weekIndex = (now) => Math.floor((E.dayIndex(now) + 3) / 7);
+  E.dailyQuests = (day) => { const out = [], used = new Set(); let h = (day * 2654435761) >>> 0; while (out.length < 3) { h = (h * 1103515245 + 12345) >>> 0; const i = h % E.DAILY_POOL.length; if (!used.has(i)) { used.add(i); out.push(E.DAILY_POOL[i]); } } return out; };
+  E.questName = (q) => E.QUESTS[q[0]].name.replace('{n}', q[1]);
   E.SEASON_PILOTS = ['flag', 'hammer', 'echo'];      // 本赛季新角色：只能从街头宝箱开出
   E.SEASON_MECHS = ['dozer', 'flamer', 'carrier', 'wrecker', 'megaphone'];
   E.START = { coins: 200, gems: 40, parts: 30, crystals: 0 };
@@ -82,6 +103,8 @@
       pilot: '', weapon: E.STARTER_MECHS[0], head: 'antenna', mode: 'turf', map: -1, size: 3, dur: 180, fair: false,
       trophies: 0, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0, day: 0, dayWin: 0,
       talents: [], tal: [], tpBonus: 0,
+      pass: { s: 1, xp: 0, prem: false, cf: [], cp: [] }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
+      skins: [], wear: {},
     }, E.START);
   };
   // 读取任意来源的资料：旧版本直接重置成新手号；字段做类型和范围检查
@@ -105,6 +128,17 @@
     }
     o.mechs = Array.isArray(p.mechs) ? [...new Set(p.mechs.filter((w) => S.WEAPONS[w]))] : E.STARTER_MECHS.slice();
     for (const w of E.STARTER_MECHS) if (!o.mechs.includes(w)) o.mechs.push(w);
+    // 通行证 / 任务 / 皮肤
+    const ps = p.pass && typeof p.pass === 'object' && p.pass.s === E.SEASON.id ? p.pass : null;
+    if (ps) {
+      const tierList = (a) => (Array.isArray(a) ? [...new Set(a.filter((t) => Number.isInteger(t) && t >= 1 && t <= E.PASS.tiers))] : []);
+      o.pass = { s: E.SEASON.id, xp: int(ps.xp, 0, E.PASS.tiers * E.PASS.xpPer), prem: !!ps.prem, cf: tierList(ps.cf), cp: tierList(ps.cp) };
+    }
+    if (p.q && typeof p.q === 'object') {
+      const arr = (a, n, hi) => Array.from({ length: n }, (_, i) => int(Array.isArray(a) ? a[i] : 0, 0, hi));
+      o.q = { d: int(p.q.d, 0, 1e7), dp: arr(p.q.dp, 3, 1e6), w: int(p.q.w, 0, 1e7), wp: arr(p.q.wp, 4, 1e7) };
+    }
+    o.skins = Array.isArray(p.skins) ? [...new Set(p.skins.filter((id) => S.skin(id)))] : [];
     o.chests = {};
     if (p.chests && typeof p.chests === 'object') for (const c in E.CHESTS) { const n = int(p.chests[c], 0, 999); if (n) o.chests[c] = n; }
     E.setLoadout(o, p);
@@ -122,6 +156,12 @@
     if (Number.isInteger(p.size) && p.size >= 1 && p.size <= 4) o.size = p.size;
     if ([120, 180, 240].includes(p.dur)) o.dur = p.dur;
     if (typeof p.fair === 'boolean') o.fair = p.fair;
+    if (p.wear && typeof p.wear === 'object') {
+      const w = { pilot: {} };
+      if (p.wear.pilot && typeof p.wear.pilot === 'object') for (const [pid, sk] of Object.entries(p.wear.pilot)) { const K = S.skin(sk); if (K && K.kind === 'pilot' && K.pilot === pid && o.skins.includes(sk)) w.pilot[pid] = sk; }
+      for (const k of ['mech', 'fx', 'frame', 'avatar']) { const K = S.skin(p.wear[k]); if (K && K.kind === k && o.skins.includes(K.id)) w[k] = K.id; }
+      o.wear = w;
+    }
     if (Array.isArray(p.tal)) o.tal = [...new Set(p.tal)].filter((id) => o.talents.includes(id)).slice(0, S.TALENT_SLOTS);
     o.tal = (o.tal || []).filter((id) => o.talents.includes(id));
     const head = S.HEADS.find((h) => h.id === p.head);
@@ -129,7 +169,11 @@
     if (!S.HEADS.some((h) => h.id === o.head && h.tr <= (o.trophies || 0))) o.head = 'antenna';
     return o;
   };
-  E.LOADOUT_FIELDS = ['pilot', 'weapon', 'head', 'mode', 'map', 'size', 'dur', 'fair', 'tal'];
+  E.LOADOUT_FIELDS = ['pilot', 'weapon', 'head', 'mode', 'map', 'size', 'dur', 'fair', 'tal', 'wear'];
+  // 对战里别人看得到的外观
+  E.looks = (o) => { const w = o.wear || {}; return { pskin: (w.pilot || {})[o.pilot] || '', paint: w.mech || '', fx: w.fx || '', frame: w.frame || '', avatar: w.avatar || '' }; };
+  E.dailyDeal = (day) => { const list = S.SKINS.filter((k) => k.price > 0); return { id: list[((day * 7) >>> 0) % list.length].id, off: 0.3 }; };
+  E.skinPrice = (K, now) => { const d = E.dailyDeal(E.dayIndex(now)); return d.id === K.id ? Math.round(K.price * (1 - d.off)) : K.price; };
   // 天赋点：账号每升 1 级 +1，开局送 2 点，通行证还会给
   E.tpTotal = (o) => 2 + S.levelFromXp(o.xp || 0) - 1 + (o.tpBonus || 0);
   E.tpSpent = (o) => (o.talents || []).reduce((a, id) => a + ((S.talent(id) || {}).cost || 0), 0);
@@ -167,6 +211,9 @@
       if (it.k === 'pilot') { o.pilots[it.id] = { lv: 1, bt: 0 }; if (!o.pilots[o.pilot]) o.pilot = it.id; }
       else if (it.k === 'mech') { if (!o.mechs.includes(it.id)) o.mechs.push(it.id); }
       else if (it.k === 'chest') o.chests[it.id] = (o.chests[it.id] || 0) + it.n;
+      else if (it.k === 'skin') { if (!o.skins.includes(it.id)) o.skins.push(it.id); }
+      else if (it.k === 'tp') o.tpBonus = (o.tpBonus || 0) + it.n;
+      else if (it.k === 'passxp') o.pass.xp = Math.min(E.PASS.tiers * E.PASS.xpPer, o.pass.xp + it.n);
       else if (E.CUR[it.k]) o[it.k] = (o[it.k] || 0) + it.n;
     }
   }
@@ -253,6 +300,44 @@
         if (o.tal.length < S.TALENT_SLOTS) o.tal.push(T.id);   // 有空位就直接装上
         return { ok: true, items: [] };
       }
+      case 'buyPass': {
+        if (o.pass.prem) return no('已经解锁高级通行证了');
+        if (o.gems < E.PASS.price) return no(`宝石不够（需要 ${E.PASS.price}）`);
+        o.gems -= E.PASS.price; o.pass.prem = true;
+        return { ok: true, items: [], spent: { gems: E.PASS.price } };
+      }
+      case 'claimPass': {
+        const t = a.tier | 0, prem = !!a.prem;
+        if (t < 1 || t > E.PASS.tiers) return no('没有这一级');
+        if (E.passLevel(o) < t) return no(`通行证升到 ${t} 级才能领`);
+        if (prem && !o.pass.prem) return no('需要先解锁高级通行证');
+        const list = prem ? o.pass.cp : o.pass.cf;
+        if (list.includes(t)) return no('已经领过了');
+        list.push(t);
+        const it = Object.assign({}, (prem ? E.PASS.prem : E.PASS.free)[t - 1]);
+        grant(o, [it]);
+        return { ok: true, items: [it] };
+      }
+      case 'claimAll': {
+        const items = [], lv = E.passLevel(o);
+        for (let t = 1; t <= lv; t++) {
+          if (!o.pass.cf.includes(t)) { o.pass.cf.push(t); items.push(Object.assign({}, E.PASS.free[t - 1])); }
+          if (o.pass.prem && !o.pass.cp.includes(t)) { o.pass.cp.push(t); items.push(Object.assign({}, E.PASS.prem[t - 1])); }
+        }
+        if (!items.length) return no('没有可以领的奖励');
+        grant(o, items);
+        return { ok: true, items: E.merge(items) };
+      }
+      case 'buySkin': {
+        const K = S.skin(a.id);
+        if (!K) return no('没有这个皮肤');
+        if (o.skins.includes(K.id)) return no('已经拥有了');
+        if (!K.price) return no('这个皮肤只能从通行证获得');
+        const price = E.skinPrice(K, a.now);
+        if (o.gems < price) return no(`宝石不够（需要 ${price}）`);
+        o.gems -= price; o.skins.push(K.id);
+        return { ok: true, items: [{ k: 'skin', id: K.id }], spent: { gems: price } };
+      }
       case 'resetTalents': {
         if (o.gems < 30) return no('重置天赋需要 30 宝石');
         o.gems -= 30; o.talents = []; o.tal = [];
@@ -272,10 +357,21 @@
     const d = E.dayIndex(now);
     if (o.day !== d) { o.day = d; o.dayWin = 0; }
     if (rw.won && !o.dayWin) { o.dayWin = 1; items.push({ k: 'gems', n: E.FIRST_WIN_GEMS, why: '每日首胜' }); }
+    // 通行证经验 + 每日 / 每周任务
+    const pxp = E.matchPassXp(rw);
+    items.push({ k: 'passxp', n: pxp, why: '对战' });
+    const wk = E.weekIndex(now);
+    if (o.q.d !== d) { o.q.d = d; o.q.dp = [0, 0, 0]; }
+    if (o.q.w !== wk) { o.q.w = wk; o.q.wp = [0, 0, 0, 0]; }
+    const gain = { won: rw.won ? 1 : 0, play: 1, kills: rw.kills, paint: rw.paint, mvp: rw.mvp ? 1 : 0 };
+    const done = [];
+    E.dailyQuests(d).forEach((q, i) => { const before = o.q.dp[i]; o.q.dp[i] = Math.min(q[1], before + gain[E.QUESTS[q[0]].stat]); if (before < q[1] && o.q.dp[i] >= q[1]) { items.push({ k: 'passxp', n: q[2], why: '每日任务：' + E.questName(q) }); done.push(E.questName(q)); } });
+    E.WEEKLY.forEach((q, i) => { const before = o.q.wp[i]; o.q.wp[i] = Math.min(q[1], before + gain[E.QUESTS[q[0]].stat]); if (before < q[1] && o.q.wp[i] >= q[1]) { items.push({ k: 'passxp', n: q[2], why: '每周任务：' + E.questName(q) }); done.push(E.questName(q)); } });
+    const passBefore = E.passLevel(o);
     const ups = S.levelFromXp(o.xp) - lvBefore;
     if (ups > 0) items.push({ k: 'coins', n: E.LEVELUP.coins * ups, why: '账号升级' }, { k: 'gems', n: E.LEVELUP.gems * ups, why: '账号升级' });
     grant(o, items);
-    return { items: E.merge(items), lvBefore, trBefore, lvUps: ups };
+    return { items: E.merge(items), lvBefore, trBefore, lvUps: ups, passBefore, passAfter: E.passLevel(o), quests: done };
   };
   return E;
 });

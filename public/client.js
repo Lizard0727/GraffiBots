@@ -271,8 +271,11 @@
     $('trophyBar').style.width = nh ? ((tr - prevTr.tr) / (nh.tr - prevTr.tr)) * 100 + '%' : '100%';
     $('trophyNext').textContent = nh ? `${nh.tr} 解锁「${nh.name}」` : '全部解锁！';
     // 驾驶员 + 机体
-    const P = S.pilot(profile.pilot), W = S.WEAPONS[profile.weapon];
-    $('chipBot').innerHTML = GP.portrait(P, { face: true });
+    const ws = (profile.wear && profile.wear.pilot || {})[profile.pilot];
+    const P = S.pilot(ws ? profile.pilot + '@' + ws : profile.pilot), W = S.WEAPONS[profile.weapon];
+    const av = profile.wear && profile.wear.avatar && S.skin(profile.wear.avatar), fr = profile.wear && profile.wear.frame && S.skin(profile.wear.frame);
+    $('chipBot').innerHTML = av ? avatarSvg(av.avatar) : GP.portrait(P, { face: true });
+    document.querySelector('.me-chip').className = 'me-chip' + (fr ? ' frame-' + fr.frame : '');
     $('chipBot').style.setProperty('--ring', P.accent);
     $('sidePilot').innerHTML = GP.portrait(P, { face: true });
     $('sidePilotName').textContent = profile.pilot ? `${P.name} · Lv.${E.power(profile, profile.pilot).lv}` : '还没有驾驶员';
@@ -302,7 +305,8 @@
     const P = S.pilot(profile.pilot);
     const inMech = !$('ov-mechs').classList.contains('hidden');
     const host = inMech ? $('garageStage') : $('preview');
-    if (R3.preview(host, { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: P.id }, true)) PV_OK = true;
+    const ws = (profile.wear && profile.wear.pilot || {})[profile.pilot];
+    if (R3.preview(host, { color: P.accent, head: profile.head, weapon: profile.weapon, pilot: ws ? P.id + '@' + ws : P.id, paint: profile.wear && profile.wear.mech }, true)) PV_OK = true;
   }
   let PV_OK = false;
   function openOv(name) {
@@ -313,6 +317,8 @@
     if (name === 'pilots') { viewPilot = null; renderPilots(); }
     if (name === 'chests') renderChests();
     if (name === 'talents') renderTalents();
+    if (name === 'pass') { renderPass(); if (!store.get('seenS' + E.SEASON.id, false)) { store.set('seenS' + E.SEASON.id, true); playSeasonIntro(); } }
+    if (name === 'shop') renderShop();
     mountPreview();
     sfx.click();
   }
@@ -508,7 +514,7 @@
       ['正在给墙面打底…', async () => { GWall.apply(); }],
       ['驾驶员正在换装…', async () => { for (const P of S.PILOTS) { faceImg(P.id); GP.portrait(P); await nextFrame(); } }],
       ['正在组装机兵…', async () => { const P = S.pilot(profile.pilot); for (const w of S.WEAPON_ORDER) { if (R3.mechThumb) R3.mechThumb({ color: P.accent, head: profile.head, weapon: w, pilot: P.id }); await nextFrame(); } }],
-      ['点亮霓虹灯…', async () => { renderProfile(); renderPilots(); renderWallet(); renderChests(); await nextFrame(); }],
+      ['点亮霓虹灯…', async () => { renderProfile(); renderPilots(); renderWallet(); renderChests(); renderPass(); await nextFrame(); }],
     ];
     const t0 = performance.now();
     for (let i = 0; i < steps.length; i++) {
@@ -728,7 +734,7 @@
   let net = null, localHub = null, peerHost = null, hostCode = null, p2pStatus = { text: '', cls: '' };
   const deliver = (str) => { let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
   const send = (o) => { if (net) net.send(o); };
-  const loadoutMsg = (t) => ({ t, name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot || 'blaze', level: level(), power: E.power(profile, profile.pilot) });
+  const loadoutMsg = (t) => ({ t, name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot || 'blaze', level: level(), power: E.power(profile, profile.pilot), looks: E.looks(profile) });
   const sendHello = () => send(loadoutMsg('hello'));
   const sendLoadout = () => send(loadoutMsg('loadout'));
   setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
@@ -1060,6 +1066,7 @@
       case 'wreck': {
         const by = G.players.get(e[1]), v = G.players.get(e[2]);
         if (!v) break;
+        legendKill(by, e[3], e[4], e[5]);
         const col = G.colors[by ? by.team : 3 - v.team];
         boomFx(e[3], e[4], e[5] || 0, col, true);
         R3.emit(e[3], e[4], (e[5] || 0) + 18, '#3a3e52', 24, 300, 1.2, { size: 9, life: 1 });
@@ -1077,6 +1084,7 @@
         G.fx.push({ k: 'ring', x: e[2], y: e[3], z: e[4] || 0, r: 75, color: G.colors[p.team], t0: now, dur: 500 });
         G.fx.push({ k: 'line', x0: e[2], y0: e[3], z0: 900, x1: e[2], y1: e[3], z1: e[4] || 0, color: G.colors[p.team], w: 16, t0: now, dur: 420 });
         R3.burst(e[2], e[3], (e[4] || 0) + 4, G.colors[p.team], 30, 260, 0.5);
+        { const sk = skinInfo(p); if (sk.rare >= 3) { for (let i = 0; i < 3; i++) ringFx(e[2], e[3], e[4] || 0, 60 + i * 45, i === 1 ? '#ffffff' : sk.col, 600, i * 120); R3.emit(e[2], e[3], (e[4] || 0) + 10, sk.col, sk.rare >= 4 ? 60 : 30, 300, 1, { sys: 'pg', size: 12, life: 0.8, grav: -80, drag: 2 }); } }
         if (!silent && e[1] === myId) { sfx.respawn(); bigText('新机体空投完成！', G.colors[p.team]); }
         else if (!silent && nearMe(e[2], e[3], 400)) sfx.boom();
         break;
@@ -1113,6 +1121,7 @@
       case 'kill': {
         const by = G.players.get(e[1]), v = G.players.get(e[2]);
         if (!v) break;
+        legendKill(by, e[3], e[4], e[5]);
         R3.burst(e[3], e[4], (e[5] || 0) + 18, G.colors[by ? by.team : 3 - v.team], 45, 320);
         G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r: 60, color: G.colors[by ? by.team : 3 - v.team], t0: now, dur: 450 });
         G.feed.unshift({ by, v, t: now }); if (G.feed.length > 5) G.feed.pop();
@@ -1182,23 +1191,41 @@
     }
   }
   function addProj(e, mine) {
-    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12] });
+    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12], fx: fxOf(e[11]) });
+    if (G.projs.get(e[1]).fx && G.projs.get(e[1]).fx.rare >= 3) { const F = G.projs.get(e[1]).fx; R3.emit(e[2], e[3], e[4], F.fx.cols[0], F.rare >= 4 ? 6 : 3, 140, 0, { sys: 'pg', size: 9, life: 0.25, grav: 0, drag: 5 }); }
     // 枪口火光：白色核心 + 队伍色火花，沿射击方向喷出
     const L = Math.hypot(e[5], e[6], e[7]) || 1, dir = { x: e[5] / L, y: e[6] / L, z: e[7] / L };
     R3.emit(e[2], e[3], e[4], '#ffffff', 1, 0, 0, { sys: 'pg', size: 16, life: 0.07, grav: 0 });
     R3.emit(e[2], e[3], e[4], G.colors[e[9]], 3, 160, 0, { sys: 'pg', size: 7, life: 0.14, grav: 0, drag: 6, dir, spread: 0.7 });
   }
+  // 皮肤等级（驾驶员服装 / 机甲涂装里更高的那个）与颜色
+  const pk = (p) => (p && p.looks && p.looks.pskin ? p.pilot + '@' + p.looks.pskin : p.pilot);   // 带服装的驾驶员
+  function skinInfo(p) {
+    const ks = [p && p.looks && p.looks.pskin, p && p.looks && p.looks.paint].map((k) => k && S.skin(k)).filter(Boolean).sort((a, b) => b.rare - a.rare);
+    return ks.length ? { rare: ks[0].rare, col: ks[0].over ? ks[0].over.accent : ks[0].paint.light } : { rare: 0, col: '#fff' };
+  }
+  function fxOf(ownerId) { const o = G && G.players.get(ownerId), K = o && o.looks && o.looks.fx && S.skin(o.looks.fx); return K ? { fx: K.fx, rare: K.rare } : null; }
+  // 传说皮肤：击倒时炸出星光
+  function legendKill(by, x, y, z) {
+    const sk = skinInfo(by);
+    if (sk.rare < 4) return;
+    for (let i = 0; i < 3; i++) ringFx(x, y, z || 0, 50 + i * 40, i === 1 ? '#ffffff' : sk.col, 700, i * 100);
+    for (let i = 0; i < 16; i++) R3.emit(x, y, (z || 0) + 30, i % 2 ? '#ffffff' : sk.col, 1, 420, 0, { sys: 'pg', size: 12, life: 0.7, grav: -60, drag: 2.5, dir: { x: Math.cos(i * 0.39), y: Math.sin(i * 0.39), z: 0.4 }, spread: 0.2 });
+  }
   function killProj(pr, x, y, z) {
     G.projs.delete(pr.id);
     const px = x == null ? pr.x : x, py = y == null ? pr.y : y, pz = z == null ? pr.z : z;
+    if (pr.fx) { const F = pr.fx.fx, n = F.n + pr.fx.rare * 2; for (let i = 0; i < n; i++) R3.emit(px, py, pz + 4, F.cols[i % F.cols.length], 1, 90 + pr.fx.rare * 30, 1, { sys: pr.fx.rare >= 2 ? 'pg' : 'ps', size: 6 + pr.fx.rare * 1.5, life: 0.5, grav: -200, drag: 2 }); }
     R3.emit(px, py, pz + 2, G.colors[pr.team], 6, 120, 0.8, { size: 6, life: 0.4 });
     R3.emit(px, py, pz + 3, G.colors[pr.team], 1, 0, 0, { sys: 'pg', size: 18, life: 0.12, grav: 0 });
   }
   // ---------------- 演出：大招横幅 / 侧边横幅 ----------------
   function cutinBig(p, title, small, sub) {
     const el = $('cutin');
-    const P = S.pilot(p.pilot);
+    const P = S.pilot(pk(p)), sk = skinInfo(p);
     el.style.setProperty('--tc', G.colors[p.team]);
+    el.classList.toggle('legend', sk.rare >= 4);   // 传说皮肤：金边横幅
+    el.classList.toggle('epic', sk.rare === 3);
     el.innerHTML = `<div class="band"></div><div class="art">${GP.portrait(P, { bust: true })}</div><div class="ttl"><small>${small}</small><b>${title}</b><i>${sub}</i></div>`;
     el.classList.remove('hidden');
     clearTimeout(cutinBig.h);
@@ -1206,7 +1233,7 @@
   }
   function cutinSide(p, title, small) {
     const box = $('cutinSide');
-    const P = S.pilot(p.pilot);
+    const P = S.pilot(pk(p));
     const d = document.createElement('div');
     d.className = 'cs'; d.style.setProperty('--tc', G.colors[p.team]);
     d.innerHTML = `<div class="face">${GP.portrait(P, { face: true })}</div><div><small>${small}</small><b>${title}</b></div>`;
@@ -1803,6 +1830,7 @@
       const gh = S.topAt(G.M, q.x, q.y);
       if (t > 3.2 || (pr.ghost ? t > pr.ts : q.z < gh - 1)) { killProj(pr, q.x, q.y, gh < 1e3 ? Math.max(gh, q.z) : q.z); continue; }
       pr.x = q.x; pr.y = q.y; pr.z = q.z;
+      if (pr.fx && pr.fx.rare >= 4 && Math.random() < 0.6) R3.emit(q.x, q.y, q.z, pr.fx.fx.cols[(Math.random() * pr.fx.fx.cols.length) | 0], 1, 10, 1, { sys: 'pg', size: 7, life: 0.3, grav: 0, drag: 2 });   // 传说：子弹拖尾
     }
     for (const [id, b] of G.bombs) { S.stepBomb(b, dt, G.M); b.life += dt; if (b.life > 5) G.bombs.delete(id); }
     if (G.fires) {
@@ -2392,6 +2420,10 @@
     const after = level();
     let msg = `${rw.trophies >= 0 ? '+' : ''}${rw.trophies} 🏆（共 ${profile.trophies}）　+${rw.xp} XP`;
     for (const it of items || []) if (E.CUR[it.k]) msg += `　+${it.n} ${E.CUR[it.k].name}${it.why ? `（${it.why}）` : ''}`;
+    const px = (items || []).filter((it) => it.k === 'passxp').reduce((a, b) => a + b.n, 0);
+    if (px) msg += `　+${px} 通行证经验`;
+    const qs = (items || []).filter((it) => it.k === 'passxp' && it.why && it.why.includes('任务'));
+    if (qs.length) msg += `　✔ 完成任务：${qs.map((q) => q.why.split('：')[1]).join('、')}`;
     if (after > lvBefore) msg += `　🎉 升级到 Lv.${after}！`;
     const un = S.HEADS.filter((h) => h.tr > trBefore && h.tr <= profile.trophies).map((h) => h.name);
     if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
@@ -2423,12 +2455,12 @@
     const cb = ecoWait.get(m.req);
     if (cb) { ecoWait.delete(m.req); cb(m); }
   }
-  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); renderTalents(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); sendLoadout(); }
+  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); renderTalents(); renderPass(); renderShop(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); sendLoadout(); }
   const fmtN = (n) => (n >= 100000 ? Math.floor(n / 1000) + 'k' : String(n));
   const cur = (k, n, cls) => `<span class="cur cur-${k} ${cls || ''}">${ic(k)}<b>${fmtN(n)}</b></span>`;
   function renderWallet() {
     const html = ['coins', 'gems', 'parts', 'crystals'].map((k) => cur(k, profile[k] || 0)).join('');
-    for (const id of ['wallet', 'wallet2']) { const el = $(id); if (el) el.innerHTML = html; }
+    for (const id of ['wallet', 'wallet2', 'wallet3']) { const el = $(id); if (el) el.innerHTML = html; }
     const n = Object.values(profile.chests || {}).reduce((a, b) => a + b, 0), badge = $('chestBadge');
     if (badge) { badge.textContent = n; badge.classList.toggle('hidden', !n); }
     const t = $('sideChestTxt'); if (t) t.textContent = n ? `有 ${n} 个宝箱没开` : '商店 · 兑换';
@@ -2479,6 +2511,144 @@
         sfx.pick(); toast(`兑换成功：+${r.items[0].n} ${E.CUR[r.items[0].k].name}`);
       };
       xl.appendChild(el);
+    }
+  }
+  // ---------------- 赛季通行证 ----------------
+  const rewardLabel = (it) => it.k === 'chest' ? E.CHESTS[it.id].name : it.k === 'skin' ? S.skin(it.id).name : it.k === 'tp' ? `天赋点 +${it.n}` : `${E.CUR[it.k].name} ×${it.n}`;
+  function rewardArt(it) {
+    if (it.k === 'chest') return GI.chestArt(it.id);
+    if (it.k === 'tp') return ic('star');
+    if (it.k === 'skin') return skinArt(S.skin(it.id), true);
+    return ic(it.k);
+  }
+  function renderPass() {
+    const lv = E.passLevel(profile), ps = profile.pass, max = E.PASS.tiers * E.PASS.xpPer;
+    const inTier = ps.xp >= max ? E.PASS.xpPer : ps.xp % E.PASS.xpPer;
+    const claimable = []; for (let t = 1; t <= lv; t++) { if (!ps.cf.includes(t)) claimable.push(t); if (ps.prem && !ps.cp.includes(t)) claimable.push(t); }
+    if ($('passLv')) { $('passLv').textContent = 'Lv.' + lv; $('passBar').style.width = (lv >= E.PASS.tiers ? 100 : (inTier / E.PASS.xpPer) * 100) + '%'; }
+    const pb = $('passBadge'); if (pb) pb.classList.toggle('hidden', !claimable.length);
+    const sp = $('sidePassTxt'); if (sp) sp.textContent = claimable.length ? `有 ${claimable.length} 个奖励可领` : `Lv.${lv} · ${ps.prem ? '高级' : '免费'}`;
+    if (!$('passTrack')) return;
+    $('passLv2').textContent = lv;
+    $('passXp').textContent = lv >= E.PASS.tiers ? '已满级' : `${inTier} / ${E.PASS.xpPer}`;
+    const days = Math.max(0, Math.ceil((E.SEASON.end - Date.now()) / 86400e3));
+    $('passEnds').textContent = `赛季剩余 ${days} 天 · 对战和任务都给通行证经验`;
+    $('passBuy').textContent = ps.prem ? '✓ 高级通行证已解锁' : `解锁高级通行证 · ${E.PASS.price} 宝石`;
+    $('passBuy').disabled = ps.prem;
+    $('passBuy').onclick = async () => { const r = await eco('buyPass'); if (!r.ok) return toast(r.err); sfx.win(); toast('高级通行证已解锁！高级线的奖励都可以领了'); };
+    $('passAll').disabled = !claimable.length;
+    $('passAll').onclick = async () => { const r = await eco('claimAll'); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '通行证奖励'); };
+    $('passIntro').onclick = playSeasonIntro;
+    const tr = $('passTrack');
+    tr.innerHTML = '';
+    for (let t = 1; t <= E.PASS.tiers; t++) {
+      const col = document.createElement('div');
+      col.className = 'pt-col' + (t <= lv ? ' reached' : '') + (t === lv + 1 ? ' next' : '');
+      const cell = (it, prem) => {
+        const got = (prem ? ps.cp : ps.cf).includes(t), can = t <= lv && !got && (!prem || ps.prem);
+        const rare = it.k === 'skin' ? S.skin(it.id).rare : it.k === 'chest' ? E.CHESTS[it.id].tier : 0;
+        return `<button class="pt-cell ${prem ? 'prem' : 'free'} ${got ? 'got' : can ? 'can' : ''} ${prem && !ps.prem ? 'lock' : ''} r${rare}" data-t="${t}" data-p="${prem ? 1 : 0}">
+          <div class="pt-art">${rewardArt(it)}</div><small>${rewardLabel(it)}</small>${got ? '<em>✓</em>' : can ? '<em class="go">领取</em>' : prem && !ps.prem ? `<em class="lk">${ic('lock')}</em>` : ''}</button>`;
+      };
+      col.innerHTML = cell(E.PASS.free[t - 1], false) + `<div class="pt-num">${t}</div>` + cell(E.PASS.prem[t - 1], true);
+      tr.appendChild(col);
+    }
+    for (const b of tr.querySelectorAll('.pt-cell.can')) b.onclick = async () => {
+      const r = await eco('claimPass', { tier: +b.dataset.t, prem: b.dataset.p === '1' });
+      if (!r.ok) return toast(r.err);
+      sfx.pick(); showGain(r.items, '通行证奖励');
+    };
+    const nx = tr.querySelector('.pt-col.next') || tr.lastElementChild;
+    if (nx && !tr.dataset.scrolled) { tr.dataset.scrolled = 1; setTimeout(() => { tr.scrollLeft = Math.max(0, nx.offsetLeft - 160); }, 50); }
+    // 任务
+    const d = E.dayIndex(), wk = E.weekIndex();
+    const dp = profile.q.d === d ? profile.q.dp : [0, 0, 0], wp = profile.q.w === wk ? profile.q.wp : [0, 0, 0, 0];
+    const qrow = (q, v) => `<div class="qrow ${v >= q[1] ? 'done' : ''}"><div><b>${E.questName(q)}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small><em>+${q[2]}</em></div>`;
+    $('questBox').innerHTML = `<h4>每日任务 <small>北京时间 0 点刷新</small></h4>${E.dailyQuests(d).map((q, i) => qrow(q, dp[i])).join('')}
+      <h4>每周任务</h4>${E.WEEKLY.map((q, i) => qrow(q, wp[i])).join('')}<p class="qnote">完成任务自动获得通行证经验</p>`;
+  }
+  // 领到奖励（宝箱会进「我的宝箱」）
+  function showGain(items, title) {
+    const parts = items.map((it) => rewardLabel(it)).join('、');
+    toast(`${title}：${parts}`, 3200);
+    if (items.some((it) => it.k === 'chest')) setTimeout(() => toast('宝箱已放进「宝箱」页，随时去打开', 2600), 3300);
+  }
+  // ---------------- 赛季出场动画 ----------------
+  let introT = [];
+  function playSeasonIntro() {
+    const el = $('seasonIntro');
+    introT.forEach(clearTimeout); introT = [];
+    el.classList.remove('hidden', 'out', 'go');
+    const chars = E.SEASON_PILOTS.map((id) => S.pilot(id));
+    $('siChars').innerHTML = chars.map((P, i) => `<div class="si-char c${i}" style="--pc:${P.accent}"><div class="si-art">${GP.portrait(P)}</div><div class="si-name"><small>「${P.code}」${P.title}</small><b>${P.name}</b></div></div>`).join('');
+    const sp = $('siSplats'); sp.innerHTML = '';
+    const cols = ['#ff3ea5', '#ffe600', '#1fd6ee', '#9cff2e', '#ff8a1f', '#ff5a36', '#2ef0c8'];
+    for (let i = 0; i < 14; i++) sp.insertAdjacentHTML('beforeend', `<i style="left:${Math.random() * 100}%;top:${Math.random() * 100}%;--c:${cols[i % cols.length]};--d:${(0.15 + i * 0.12).toFixed(2)}s;--s:${(0.6 + Math.random() * 1.2).toFixed(2)}"></i>`);
+    void el.offsetWidth; el.classList.add('go');
+    sfx.special && sfx.special();
+    [700, 1500, 2300].forEach((t, i) => introT.push(setTimeout(() => { sfx.boom && sfx.boom(); if (i === 2) sfx.win(); }, t)));
+    const close = () => { introT.forEach(clearTimeout); el.classList.add('out'); setTimeout(() => el.classList.add('hidden'), 400); };
+    $('siGo').onclick = (e) => { e.stopPropagation(); close(); };
+    el.onclick = () => { if (el.classList.contains('skip')) close(); else { el.classList.add('skip'); } };
+  }
+  // ---------------- 皮肤商店 ----------------
+  let shopTab = 'pilot';
+  function skinArt(K, small) {
+    if (!K) return '';
+    if (K.kind === 'pilot') return GP.portrait(S.pilot(K.pilot + '@' + K.id), small ? { face: true } : {});
+    if (K.kind === 'mech') { const img = R3.mechThumb ? R3.mechThumb({ color: '#ff5a36', head: 'antenna', weapon: 'blaster', pilot: 'flag', paint: K.id }) : ''; return img ? `<img src="${img}" alt="">` : ic('mech'); }
+    if (K.kind === 'fx') return `<div class="fx-demo">${K.fx.cols.map((c, i) => `<i style="--c:${c};--i:${i}"></i>`).join('')}</div>`;
+    if (K.kind === 'frame') return `<div class="frame-demo frame-${K.frame}"><div class="fd-in">${GP.portrait(S.pilot(profile.pilot || 'blaze'), { face: true })}</div></div>`;
+    if (K.kind === 'avatar') return avatarSvg(K.avatar);
+    return '';
+  }
+  function avatarSvg(a) {
+    const st = 'stroke="#141018" stroke-width="3" stroke-linejoin="round"';
+    if (a === 'flag') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#5b5e68" ${st}/><path d="M15,38 L15,10" ${st} stroke-width="4"/><path d="M15,11 C24,6 28,16 37,11 L37,26 C28,31 24,21 15,26 Z" fill="#ff5a36" ${st}/><path d="M24,16 l2,4 l4,0 l-3,3 l1,4 l-4,-2 l-4,2 l1,-4 l-3,-3 l4,0 Z" fill="#ffe14d"/></svg>`;
+    if (a === 'can') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#ffe600" ${st}/><rect x="17" y="16" width="14" height="24" rx="3" fill="#ff3ea5" ${st}/><rect x="20" y="9" width="8" height="7" fill="#c9d3dc" ${st}/><circle cx="34" cy="10" r="2" fill="#1fd6ee"/><circle cx="38" cy="14" r="1.6" fill="#1fd6ee"/></svg>`;
+    return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#9aa0a8" ${st}/><path d="M12,18 L14,8 L20,15 Q24,13 28,15 L34,8 L36,18 Q38,30 24,36 Q10,30 12,18 Z" fill="#5b5e68" ${st}/><circle cx="19" cy="22" r="2.4" fill="#ffe600"/><circle cx="29" cy="22" r="2.4" fill="#ffe600"/><path d="M22,27 l2,2 l2,-2" fill="none" ${st} stroke-width="2"/></svg>`;
+  }
+  function wearing(K) {
+    const w = profile.wear || {};
+    return K.kind === 'pilot' ? (w.pilot || {})[K.pilot] === K.id : w[K.kind] === K.id;
+  }
+  function toggleWear(K) {
+    const w = profile.wear = Object.assign({ pilot: {} }, profile.wear || {});
+    w.pilot = Object.assign({}, w.pilot || {});
+    if (K.kind === 'pilot') { if (w.pilot[K.pilot] === K.id) delete w.pilot[K.pilot]; else w.pilot[K.pilot] = K.id; }
+    else if (w[K.kind] === K.id) delete w[K.kind]; else w[K.kind] = K.id;
+    saveProfile(); sendLoadout(); renderShop(); renderProfile(); sfx.click();
+  }
+  function renderShop() {
+    const grid = $('skinGrid');
+    if (!grid) return;
+    const deal = E.dailyDeal(E.dayIndex()), dk = S.skin(deal.id);
+    const st = $('sideShopTxt'); if (st) st.textContent = `今日特惠：${dk.name}`;
+    $('shopTabs').innerHTML = S.SKIN_KINDS.map(([k, n]) => `<button class="${shopTab === k ? 'sel' : ''}" data-k="${k}">${n}</button>`).join('');
+    for (const b of $('shopTabs').children) b.onclick = () => { shopTab = b.dataset.k; renderShop(); sfx.click(); };
+    const desc = shopTab === 'fx' ? S.FX_RARE : shopTab === 'frame' ? S.FRAME_RARE : S.RARE.map((r) => r && r.fx);
+    $('rareLegend').innerHTML = [1, 2, 3, 4].map((r) => `<span style="--rc:${S.RARE[r].c}"><b>${S.RARE[r].name}</b>${desc[r]}</span>`).join('');
+    grid.innerHTML = '';
+    for (const K of S.SKINS.filter((k) => k.kind === shopTab).sort((a, b) => b.rare - a.rare)) {
+      const own = profile.skins.includes(K.id), price = E.skinPrice(K), on = own && wearing(K);
+      const el = document.createElement('div');
+      el.className = `skin-card r${K.rare}` + (on ? ' wearing' : '');
+      el.style.setProperty('--rc', S.RARE[K.rare].c);
+      const who = K.kind === 'pilot' ? `${S.pilot(K.pilot).name}的服装${E.hasPilot(profile, K.pilot) ? '' : '（还没有这位驾驶员）'}` : { mech: '所有机体通用', fx: '子弹和命中特效', frame: '大厅名片边框', avatar: '大厅名片头像' }[K.kind];
+      const btn = own ? `<button class="btn small ${on ? 'ghost' : ''}" data-act="wear">${on ? '卸下' : '装上'}</button>`
+        : K.price ? `<button class="btn small" data-act="buy" ${profile.gems < price ? 'disabled' : ''}>${ic('gems')}${price}${price < K.price ? `<s>${K.price}</s>` : ''}</button>`
+        : `<span class="pass-only">通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级</span>`;
+      el.innerHTML = `${K.id === deal.id && !own ? '<span class="deal">今日 7 折</span>' : ''}<span class="rare-tag">${S.RARE[K.rare].name}</span>
+        <div class="sk-art ${K.kind}">${skinArt(K)}</div><b>${K.name}</b><small>${who}</small>${btn}`;
+      const b = el.querySelector('[data-act]');
+      if (b) b.onclick = async () => {
+        if (b.dataset.act === 'wear') return toggleWear(K);
+        const r = await eco('buySkin', { id: K.id });
+        if (!r.ok) return toast(r.err);
+        sfx.win(); toast(`获得皮肤「${K.name}」！`);
+        if (!wearing(K)) toggleWear(K);
+      };
+      grid.appendChild(el);
     }
   }
   // ---------------- 天赋树 ----------------
@@ -2786,7 +2956,7 @@
   }
   function afterAccountChange() {
     $('nameInput').value = profile.name;
-    renderProfile(); renderPilots(); renderHeads(); renderWallet(); renderChests(); renderTalents();
+    renderProfile(); renderPilots(); renderHeads(); renderWallet(); renderChests(); renderTalents(); renderPass(); renderShop();
     if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists();
     sendLoadout();
   }

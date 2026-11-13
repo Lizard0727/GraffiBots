@@ -183,6 +183,46 @@
     { id: 's4', br: 'sup', tier: 4, cost: 2, name: '急救包', desc: '击毁机体或击倒驾驶员后回复 15 生命' },
   ];
   S.talent = (id) => S.TALENTS.find((t) => t.id === id);
+  // ---------------- 皮肤（第一赛季商店 / 通行证） ----------------
+  // pilot：驾驶员服装（换配色，立绘和 3D 都会变）；mech：机甲涂装；fx：涂料特效；frame：名片框；avatar：头像
+  S.SKINS = [
+    { id: 'blaze_grey', kind: 'pilot', pilot: 'blaze', name: '灰城游击', rare: 2, price: 0, pass: 'p1', over: { hair: '#ff8a1f', hair2: '#a3420c', accent: '#ff8a1f' } },
+    { id: 'frost_night', kind: 'pilot', pilot: 'frost', name: '夜巡', rare: 2, price: 150, over: { hair: '#1d2233', hair2: '#06080f', accent: '#2ef0c8', eye: '#2ef0c8' } },
+    { id: 'candy_neon', kind: 'pilot', pilot: 'candy', name: '霓虹偶像', rare: 2, price: 150, over: { hair: '#a46bff', hair2: '#5b2bb0', accent: '#a46bff', eye: '#ff3ea5' } },
+    { id: 'titan_hivis', kind: 'pilot', pilot: 'titan', name: '拆迁工装', rare: 1, price: 100, over: { accent: '#ff8a1f', hair: '#4a3020' } },
+    { id: 'raven_ash', kind: 'pilot', pilot: 'raven', name: '灰烬', rare: 2, price: 150, over: { hair: '#c9ccd4', hair2: '#6c7078', accent: '#ff3b52', eye: '#ff3b52' } },
+    { id: 'echo_midnight', kind: 'pilot', pilot: 'echo', name: '午夜频道', rare: 3, price: 0, pass: 'p14', over: { hair: '#ff3ea5', hair2: '#8f1060', accent: '#ff3ea5', eye: '#2ef0c8' } },
+    { id: 'hammer_gold', kind: 'pilot', pilot: 'hammer', name: '金牌工头', rare: 4, price: 380, over: { accent: '#ffd35e', hair: '#1e120a' } },
+    { id: 'flag_red', kind: 'pilot', pilot: 'flag', name: '红旗特装', rare: 4, price: 0, pass: 'p30', over: { hair: '#c8102e', hair2: '#5a0012', accent: '#ffe14d', eye: '#ffe14d' } },
+    { id: 'm_camo', kind: 'mech', name: '灰城迷彩', rare: 2, price: 0, pass: 'p5', paint: { frame: '#4a4d56', light: '#9aa0a8', joint: '#2a2c33' } },
+    { id: 'm_chrome', kind: 'mech', name: '铬合金', rare: 2, price: 180, paint: { frame: '#c9d3dc', light: '#ffffff', joint: '#8c94ab' } },
+    { id: 'm_graffiti', kind: 'mech', name: '涂鸦大师', rare: 3, price: 240, paint: { frame: '#ff3ea5', light: '#ffe600', joint: '#1fd6ee' } },
+    { id: 'm_neon', kind: 'mech', name: '霓虹描边', rare: 3, price: 0, pass: 'p20', paint: { frame: '#141018', light: '#2ef0c8', joint: '#141018', glow: 1 } },
+    { id: 'm_gold', kind: 'mech', name: '金色传说', rare: 4, price: 380, paint: { frame: '#b88a1a', light: '#ffd35e', joint: '#7a5a10', glow: 1 } },
+    { id: 'fx_stars', kind: 'fx', name: '星星涂料', rare: 2, price: 0, pass: 'p10', fx: { cols: ['#ffe600', '#ffffff'], n: 3 } },
+    { id: 'fx_confetti', kind: 'fx', name: '派对彩纸', rare: 3, price: 0, pass: 'p28', fx: { cols: ['#ff3ea5', '#1fd6ee', '#9cff2e', '#ffe600'], n: 5 } },
+    { id: 'fx_notes', kind: 'fx', name: '电台音符', rare: 2, price: 160, fx: { cols: ['#2ef0c8', '#a46bff'], n: 3 } },
+    { id: 'fx_galaxy', kind: 'fx', name: '星河涂料', rare: 4, price: 400, fx: { cols: ['#b78cff', '#4fb8ff', '#ffffff'], n: 6 } },
+    { id: 'fr_tape', kind: 'frame', name: '胶带框', rare: 1, price: 0, pass: 'f10', frame: 'tape' },
+    { id: 'fr_neon', kind: 'frame', name: '霓虹框', rare: 2, price: 120, frame: 'neon' },
+    { id: 'fr_rebel', kind: 'frame', name: '反抗军框', rare: 3, price: 0, pass: 'p23', frame: 'rebel' },
+    { id: 'fr_gold', kind: 'frame', name: '金框', rare: 3, price: 220, frame: 'gold' },
+    { id: 'fr_flame', kind: 'frame', name: '烈焰框', rare: 4, price: 300, frame: 'flame' },
+    { id: 'av_flag', kind: 'avatar', name: '反抗军旗', rare: 2, price: 0, pass: 'f20', avatar: 'flag' },
+    { id: 'av_can', kind: 'avatar', name: '喷漆罐', rare: 1, price: 60, avatar: 'can' },
+    { id: 'av_cat', kind: 'avatar', name: '灰城猫', rare: 2, price: 90, avatar: 'cat' },
+  ];
+  S.skin = (id) => S.SKINS.find((k) => k.id === id);
+  S.SKIN_KINDS = [['pilot', '驾驶员服装'], ['mech', '机甲涂装'], ['fx', '涂料特效'], ['frame', '名片框'], ['avatar', '头像']];
+  // 皮肤等级：等级越高特效越多（对战里的表现见 render3d.js / client.js）
+  S.RARE = [null,
+    { name: '普通', c: '#9aa0a8', fx: '专属配色' },
+    { name: '稀有', c: '#4fb8ff', fx: '专属配色 + 移动闪光拖尾' },
+    { name: '史诗', c: '#b78cff', fx: '专属配色 + 闪光拖尾 + 发光部件呼吸灯 + 空投 / 复活爆发特效' },
+    { name: '传说', c: '#ffc531', fx: '以上全部 + 常驻环绕光环 + 地面光圈 + 击倒特效 + 金边大招横幅' },
+  ];
+  S.FX_RARE = [null, '命中时少量彩色涂料', '命中时迸出彩色光点', '命中时迸出大片光点 + 枪口闪光', '命中光点 + 子弹拖尾 + 枪口星爆'];
+  S.FRAME_RARE = [null, '静态边框', '霓虹呼吸光', '流动条纹动画', '火焰流光动画'];
   S.TALENT_SLOTS = 3;
 
   // ---------------- 驾驶员被摧毁后：弹出继续战斗 ----------------
@@ -268,7 +308,17 @@
       skill: 'jam', passive: { name: '节拍同步', desc: '附近 180 范围内的队友装填速度 +15%。' },
       line: '各位灰城的夜猫子，今晚的歌，叫《反击》！', bio: '每天午夜，灰城所有的收音机都会被一个神秘频道占领。没人知道 DJ 长什么样，只知道她的音波能震碎灰石集团的扩音器。' },
   ];
-  S.pilot = (id) => S.PILOTS.find((p) => p.id === id) || S.PILOTS[0];
+  const pilotCache = new Map();
+  S.pilot = (id) => {
+    if (typeof id === 'string' && id.includes('@')) {   // 带皮肤的驾驶员：flag@flag_red
+      if (pilotCache.has(id)) return pilotCache.get(id);
+      const [pid, sk] = id.split('@'), base = S.PILOTS.find((p) => p.id === pid) || S.PILOTS[0], K = S.skin && S.skin(sk);
+      const P = K && K.pilot === base.id ? Object.assign({}, base, K.over, { skin: K.id }) : base;
+      pilotCache.set(id, P);
+      return P;
+    }
+    return S.PILOTS.find((p) => p.id === id) || S.PILOTS[0];
+  };
 
   S.levelFromXp =(xp) => Math.floor(Math.sqrt(Math.max(0, xp) / 120)) + 1;
   S.xpForLevel = (lv) => (lv - 1) * (lv - 1) * 120;

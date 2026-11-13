@@ -123,7 +123,8 @@ class Game {
       if (slots[c.team] >= S.MAX_PER_TEAM) continue;
       const pw = this.fair ? FAIR : c.power || { lv: 1, bt: 0 };
       humans.push(pw);
-      this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++, c.pilot, pw);
+      const pl = this.addPlayer(c.id, c.name, c.team, c.weapon, c.head, false, slots[c.team]++, c.pilot, pw);
+      pl.looks = c.looks || null;
     }
     const avgLv = humans.length ? Math.round(humans.reduce((a, b) => a + b.lv, 0) / humans.length) : 1;
     const botPw = this.fair ? FAIR : { lv: avgLv, bt: avgLv >= 9 ? 2 : avgLv >= 5 ? 1 : 0 };
@@ -151,7 +152,7 @@ class Game {
     }
     room.broadcast({
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
-      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt })),
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null })),
       fair: this.fair,
     });
     if (!opts.manual) this.interval = setInterval(() => this.step(), 1000 / S.TICK);
@@ -1554,6 +1555,11 @@ function setProfile(c, m) {
   if (S.PILOTS.some((p) => p.id === m.pilot)) c.pilot = m.pilot;
   if (Number.isInteger(m.level)) c.level = clamp(m.level, 1, 999);
   // 没登录在线账号（本机 / P2P）时相信客户端报的角色等级
+  if (m.looks && typeof m.looks === 'object') {   // 皮肤只影响外观；本机 / P2P 时相信客户端
+    const L = {};
+    for (const k of ['pskin', 'paint', 'fx', 'frame', 'avatar']) { const K = S.skin(m.looks[k]); if (K && (k === 'pskin' ? K.kind === 'pilot' && K.pilot === c.pilot : K.kind === { paint: 'mech', fx: 'fx', frame: 'frame', avatar: 'avatar' }[k])) L[k] = K.id; }
+    c.looks = L;
+  }
   if (m.power && typeof m.power === 'object') c.power = { lv: clamp(m.power.lv | 0 || 1, 1, E.MAX_LV), bt: clamp(m.power.bt | 0, 0, 2), tal: cleanTal(m.power.tal) };
 }
 

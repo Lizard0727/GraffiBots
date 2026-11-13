@@ -1070,7 +1070,7 @@
         add(outlined(rbox(10, 8, 8, 2.5), mt, 1, 1, 1, 1, 0, 0));
         add(part(s.box, dk, 10, 2, 2, 8, -2, 4)); add(part(s.box, dk, 10, 2, 2, 8, -2, -4));
         const blade = add(outlined(rbox(3.2, 16, 26, 1.4), cm, 1, 1, 1, 16, -1, 0)); blade.rotation.z = 0.22;
-        add(part(s.box, lt, 1.2, 12, 22, 17.8, 0, 0)).rotation.z = 0.22;
+        for (let i = -1; i <= 1; i++) add(part(s.box, dk, 1.2, 12, 2, 17.8, 0, i * 8)).rotation.z = 0.22;
         add(part(s.box, s.yellow, 2.4, 3, 26, 17.6, -7, 0));
         for (let i = -2; i <= 2; i++) add(part(s.box, mt, 3, 2, 2, 19, -9.5, i * 5.5));    // 铲齿
         add(part(s.box, dk, 1.2, 14, 1.2, 15.5, 2, 11)); add(part(s.box, dk, 1.2, 14, 1.2, 15.5, 2, -11));
@@ -1420,13 +1420,23 @@
   // 层级：root(位置/朝向) → lower(腿部朝向移动方向) / upper(上身朝向瞄准方向, 弹簧倾斜)
   // =====================================================================
   const LEG = { L1: 6.6, L2: 6.4, foot: 1.6, hipZ: 6.2 };
-  function makeBot(color, head, weapon, pilotId) {
+  function makeBot(color, head, weapon, pilotId, paintId) {
     const s = SH;
     const root = new T.Group();
     const bodyMat = toon(color, { map: panelTex() });
     const tint = toon(new T.Color(color).multiplyScalar(0.62), { map: panelTex() });
     const light = toon(new T.Color(color).lerp(new T.Color(0xffffff), 0.55));
-    const frame = toon(0x3a3e52), joint = toon(0x23252f), steel = toon(0xaab2c8);
+    let frame = toon(0x3a3e52), joint = toon(0x23252f);
+    const steel = toon(0xaab2c8);
+    // 机甲涂装皮肤：只换框架 / 高光 / 关节的颜色，机身还是队伍色（一眼分清敌我）
+    const PK = paintId && S.skin && S.skin(paintId);
+    if (PK && PK.paint) {
+      const P2 = PK.paint;
+      frame = toon(P2.frame, P2.glow ? { emissive: new T.Color(P2.light).multiplyScalar(0.25) } : undefined);
+      joint = toon(P2.joint);
+      light.color.set(P2.light);
+      if (P2.glow) light.emissive = new T.Color(P2.light).multiplyScalar(0.55);
+    }
     const glowC = new T.Color(color).lerp(new T.Color(0xffffff), 0.45);
     const strip = basic(glowC);                     // 发光灯条
     const P = S.pilot(pilotId);
@@ -1543,7 +1553,7 @@
     for (const g of [lower, lean, wpnMount, wpn, arm, spinG]) bake(g);
     for (const L of legs) { bake(L.hip); bake(L.knee); bake(L.ankle); }
     return {
-      root, body, hips, lower, upper, lean, legs, flames, foot, flegs, fpilot: fp, color, fxAcc: 0, stepPh: 0, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat,
+      root, body, hips, lower, upper, lean, legs, flames, foot, flegs, fpilot: fp, color, fxAcc: 0, stepPh: 0, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat, lightMat: light,
       fadeMats: [wheelMat, hubMat, spokeMat, tireMat, treadMat], shield, ud: wpn.userData,
       // 动画状态
       punch: 0, punchV: 0, spin: 0, moveA: 0, phase: 0, legYaw: 0, face: null, zs: null, lvx: 0, lvy: 0, avx: 0, avy: 0,
@@ -1728,7 +1738,16 @@
       const p = G.players.get(id);
       if (!p) continue;
       let b = W.bots.get(id);
-      if (!b) { b = makeBot(G.colors[p.team], p.head, p.weapon, p.pilot); W.bots.set(id, b); scene.add(b.root); }
+      if (!b) {
+        b = makeBot(G.colors[p.team], p.head, p.weapon, p.looks && p.looks.pskin ? p.pilot + '@' + p.looks.pskin : p.pilot, p.looks && p.looks.paint);
+        // 皮肤等级：取驾驶员服装和机甲涂装里更高的那个
+        const ks = [p.looks && p.looks.pskin, p.looks && p.looks.paint].map((k) => k && S.skin(k)).filter(Boolean);
+        b.rare = ks.reduce((m, k) => Math.max(m, k.rare), 0);
+        const top = ks.sort((x, y) => y.rare - x.rare)[0];
+        b.skinCol = top ? (top.over ? top.over.accent : top.paint.light) : null;
+        if (b.rare >= 4) { b.halo = new T.Mesh(new T.RingGeometry(20, 24, 40), basic(b.skinCol, { transparent: true, opacity: 0.55, side: T.DoubleSide, depthWrite: false })); b.halo.rotation.x = -Math.PI / 2; b.root.add(b.halo); }
+        W.bots.set(id, b); scene.add(b.root);
+      }
       if (!(p.flags & 1)) { b.zs = null; b.face = null; continue; }
       const enemy = me && p.team !== me.team;
       let vis = true, fade = 1;
@@ -1753,6 +1772,9 @@
         if (bf & 16) emit(p.x + Math.cos(p.a) * 18, p.y + Math.sin(p.a) * 18, z + 22, '#ff7a2e', 2, 40, 1, { sys: 'pg', size: 11, life: 0.35, grav: -160, drag: 2 });
         if (bf & 32) emit(p.x, p.y, z + 14, G.colors[p.team], 3, 30, 0.5, { sys: 'pg', size: 14, life: 0.4, grav: 0, drag: 3 });
         if (bf & 2) emit(p.x, p.y, z + 30, '#7af0ff', 1, 20, 0.5, { sys: 'pg', size: 8, life: 0.3, grav: 0 });
+        // 皮肤特效：稀有 = 移动拖尾；史诗 = 再加呼吸灯；传说 = 再加环绕光环
+        if (b.rare >= 2 && Math.hypot(p.vx || 0, p.vy || 0) > 60) emit(p.x - (p.vx || 0) * 0.03, p.y - (p.vy || 0) * 0.03, z + 10 + Math.random() * 14, b.skinCol, b.rare >= 3 ? 2 : 1, 25, 0.5, { sys: 'pg', size: b.rare >= 3 ? 11 : 8, life: 0.4, grav: 0, drag: 3 });
+        if (b.rare >= 4) { const a = now / 260; for (let k = 0; k < 2; k++) { const aa = a + k * Math.PI; emit(p.x + Math.cos(aa) * 24, p.y + Math.sin(aa) * 24, z + 22 + Math.sin(now / 200 + k) * 10, k ? '#ffffff' : b.skinCol, 1, 8, 1, { sys: 'pg', size: 10, life: 0.5, grav: -30, drag: 2 }); } }
         if (bf & 64) for (let k = 0; k < 2; k++) emit(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, z + 4 + Math.random() * 36, k ? '#b78cff' : '#ffffff', 1, 30, 1, { sys: 'pg', size: 12, life: 0.45, grav: -140, drag: 2 });   // 超载
         if (bf & 128) emit(p.x, p.y, z + 44, '#ff5a36', 1, 20, 0.3, { sys: 'pg', size: 8, life: 0.3, grav: -40 });   // 集结
       }
@@ -1760,6 +1782,8 @@
       if (p.flash > 0) b.bodyMat.emissive.setRGB(0.8, 0.8, 0.8);
       else if (p.flags & 128) b.bodyMat.emissive.set(G.colors[p.team]).multiplyScalar(0.35 + 0.3 * Math.sin(now / 50));
       else b.bodyMat.emissive.setRGB(0, 0, 0);
+      if (b.rare >= 3 && b.lightMat) b.lightMat.emissive.set(b.skinCol).multiplyScalar(0.25 + 0.25 * Math.sin(now / 260));
+      if (b.halo) { b.halo.visible = !p.foot && !!p.alive; b.halo.position.y = 1.5 - (p.z || 0) + (G.M ? Math.min(150, S.topAt(G.M, p.x, p.y)) : 0); b.halo.material.opacity = 0.35 + 0.25 * Math.sin(now / 180); b.halo.scale.setScalar(1 + 0.08 * Math.sin(now / 240)); }
       b.shield.visible = p.shield > 0;
       if (p.shield > 0) b.shield.material.opacity = 0.16 + 0.08 * Math.sin(now / 120);
     }
@@ -1807,10 +1831,10 @@
     shared();
     if (PV.host !== host) { host.appendChild(PV.canvas); PV.host = host; }
     PV.big = !!big;
-    const key = [opt.color, opt.head, opt.weapon, opt.pilot].join('|');
+    const key = [opt.color, opt.head, opt.weapon, opt.pilot, opt.paint || ''].join('|');
     if (key !== PV.key) {
       if (PV.bot) PV.scene.remove(PV.bot.root);
-      PV.bot = makeBot(opt.color, opt.head, opt.weapon, opt.pilot);
+      PV.bot = makeBot(opt.color, opt.head, opt.weapon, opt.pilot, opt.paint);
       PV.bot.wpnType = opt.weapon;
       PV.bot.root.traverse((o) => { if (o.isMesh && o.castShadow) o.castShadow = true; });
       PV.scene.add(PV.bot.root);
@@ -1833,7 +1857,7 @@
   const THUMBS = new Map();
   let TH = null;
   function mechThumb(opt) {
-    const key = [opt.color, opt.head, opt.weapon, opt.pilot].join('|');
+    const key = [opt.color, opt.head, opt.weapon, opt.pilot, opt.paint || ''].join('|');
     if (THUMBS.has(key)) return THUMBS.get(key);
     if (!pvInit()) return '';
     shared();
@@ -1845,7 +1869,7 @@
       const sun = new T.DirectionalLight(0xffffff, 0.8); sun.position.set(60, 140, 90); TH.scene.add(sun);
       TH.cam.position.set(66, 40, 82); TH.cam.lookAt(0, 18, 0);
     }
-    const b = makeBot(opt.color, opt.head, opt.weapon, opt.pilot);
+    const b = makeBot(opt.color, opt.head, opt.weapon, opt.pilot, opt.paint);
     b.wpnType = opt.weapon;
     animateBot(b, { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, a: 0.75, pt: 0, flags: 1, charge: 0, tank: 100, flash: 0, weapon: opt.weapon }, 0, 0.05);
     b.root.position.set(0, 0, 0);

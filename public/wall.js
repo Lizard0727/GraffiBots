@@ -4,20 +4,37 @@
   function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
   const NEON = ['#ff3ea5', '#ffe600', '#1fd6ee', '#9cff2e', '#ff8a1f', '#a46bff'];
 
+  let SEASON = 1;   // 当前赛季（决定墙面主题）
   function make(w, h, seed, dark) {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d'), R = rng(seed);
-    // 砖墙
-    x.fillStyle = dark ? '#1a1622' : '#2a2433'; x.fillRect(0, 0, w, h);
-    const bw = 96, bh = 40;
-    for (let row = 0, y = 0; y < h; row++, y += bh) {
-      for (let bx = (row % 2) * -bw / 2; bx < w; bx += bw) {
-        const v = R() * 14 - 7;
-        const base = dark ? 34 : 50;
-        x.fillStyle = `rgb(${base + 10 + v},${base - 2 + v},${base + 14 + v})`;
-        x.fillRect(bx + 2, y + 2, bw - 4, bh - 4);
-        x.fillStyle = 'rgba(255,255,255,0.03)'; x.fillRect(bx + 2, y + 2, bw - 4, 4);
-        x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(bx + 2, y + bh - 8, bw - 4, 6);
+    if (SEASON === 1) {
+      // 第一赛季「灰城重涂」：灰石集团刷白的混凝土墙板
+      x.fillStyle = dark ? '#2b2d33' : '#4a4d56'; x.fillRect(0, 0, w, h);
+      const pw = 240, ph = 160;
+      for (let y = 0; y < h; y += ph) for (let px = 0; px < w; px += pw) {
+        const v = R() * 12 - 6, b = dark ? 52 : 86;
+        x.fillStyle = `rgb(${b + v},${b + 2 + v},${b + 8 + v})`;
+        x.fillRect(px + 3, y + 3, pw - 6, ph - 6);
+        x.fillStyle = 'rgba(0,0,0,0.25)';
+        for (const [cx, cy] of [[14, 14], [pw - 14, 14], [14, ph - 14], [pw - 14, ph - 14]]) { x.beginPath(); x.arc(px + cx, y + cy, 3.5, 0, 7); x.fill(); }
+        // 刷白的滚筒痕
+        x.fillStyle = dark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)';
+        for (let k = 0; k < 3; k++) x.fillRect(px + 10, y + 20 + k * 44 + R() * 10, pw - 20, 22);
+      }
+    } else {
+      // 砖墙
+      x.fillStyle = dark ? '#1a1622' : '#2a2433'; x.fillRect(0, 0, w, h);
+      const bw = 96, bh = 40;
+      for (let row = 0, y = 0; y < h; row++, y += bh) {
+        for (let bx = (row % 2) * -bw / 2; bx < w; bx += bw) {
+          const v = R() * 14 - 7;
+          const base = dark ? 34 : 50;
+          x.fillStyle = `rgb(${base + 10 + v},${base - 2 + v},${base + 14 + v})`;
+          x.fillRect(bx + 2, y + 2, bw - 4, bh - 4);
+          x.fillStyle = 'rgba(255,255,255,0.03)'; x.fillRect(bx + 2, y + 2, bw - 4, 4);
+          x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(bx + 2, y + bh - 8, bw - 4, 6);
+        }
       }
     }
     // 噪点
@@ -36,6 +53,30 @@
       x.lineJoin = 'round'; x.lineWidth = size * 0.12; x.strokeStyle = '#000'; x.strokeText(words[i % words.length], 0, 0);
       x.fillStyle = col; x.fillText(words[i % words.length], 0, 0);
       x.restore();
+    }
+    if (SEASON === 1) {
+      // 灰石集团的模板字「禁止涂鸦」被反抗军用喷漆打了大叉
+      for (let i = 0; i < 4; i++) {
+        x.save();
+        x.translate(R() * w, R() * h); x.rotate((R() - 0.5) * 0.2);
+        x.globalAlpha = dark ? 0.35 : 0.5;
+        x.font = `${36 + R() * 20}px GBHead, Impact, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillStyle = dark ? '#1c1d22' : '#2e3038';
+        x.fillText(i % 2 ? '禁止涂鸦' : 'GRAYCO · 灰石集团', 0, 0);
+        x.globalAlpha = dark ? 0.6 : 0.8;
+        x.strokeStyle = NEON[Math.floor(R() * NEON.length)]; x.lineWidth = 10; x.lineCap = 'round';
+        x.beginPath(); x.moveTo(-110, -30); x.lineTo(110, 30); x.moveTo(-110, 30); x.lineTo(110, -30); x.stroke();
+        x.restore();
+      }
+      // 爆裂的彩色涂料
+      for (let i = 0; i < 10; i++) {
+        const px = R() * w, py = R() * h, r = 30 + R() * 60, col = NEON[Math.floor(R() * NEON.length)];
+        x.globalAlpha = dark ? 0.35 : 0.5; x.fillStyle = col;
+        x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+        for (let k = 0; k < 10; k++) { const a = R() * 7, dd = r * (1.1 + R() * 0.9); x.beginPath(); x.arc(px + Math.cos(a) * dd, py + Math.sin(a) * dd, 3 + R() * 8, 0, 7); x.fill(); }
+        x.fillRect(px - 3, py, 6, r + 40 + R() * 60);
+      }
+      x.globalAlpha = 1;
     }
     // 喷漆滴落线
     for (let i = 0; i < 26; i++) {
@@ -74,5 +115,5 @@
     root.setProperty('--wall', `url(${make(1280, 800, seed, false)})`);
     root.setProperty('--wall-dark', `url(${make(1280, 800, seed + 7, true)})`);
   }
-  window.GWall = { make, apply };
+  window.GWall = { make, apply, setSeason: (n) => { SEASON = n; } };
 })();

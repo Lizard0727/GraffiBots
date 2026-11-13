@@ -78,6 +78,7 @@ class AccountStore {
     c.weapon = p.weapon; c.head = p.head; c.pilot = p.pilot || 'blaze'; c.level = S.levelFromXp(p.xp);
     c.power = E.power(p, p.pilot);
     c.owned = { pilots: Object.keys(p.pilots), mechs: p.mechs.slice() };
+    c.looks = E.looks(p);
   }
   handle(c, m) {
     const err = (msg) => c.conn.send({ t: 'auth', ok: false, op: m.op, err: msg });
@@ -140,7 +141,7 @@ class AccountStore {
     const now = Date.now();
     if (now - (c.lastEco || 0) < 150) return reply({ ok: false, err: '操作太快了' });
     c.lastEco = now;
-    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, pilot: m.pilot, id: m.id }, cryptoRand);
+    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, pilot: m.pilot, id: m.id, tier: m.tier, prem: m.prem, now: Date.now() }, cryptoRand);
     if (r.ok) { this.syncConn(c, acc); this.save(); }
     reply(Object.assign({}, r, { profile: this.publicProfile(acc) }));
   }

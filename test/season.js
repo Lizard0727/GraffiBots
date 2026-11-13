@@ -187,5 +187,46 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   ok(seen.size === 3, '金色空投能开出全部 3 位赛季角色');
 }
 
+// ---- 通行证 / 任务 / 皮肤 ----
+{
+  const o = E.newProfile('p');
+  ok(E.apply(o, 'claimPass', { tier: 1 }).ok === false, '通行证 0 级时不能领 1 级奖励');
+  const rw = { xp: 100, trophies: 8, won: true, draw: false, mvp: false, kills: 4, paint: 400 };
+  const r = E.applyMatch(o, rw, Date.UTC(2026, 10, 14, 4));
+  ok(o.pass.xp >= E.matchPassXp(rw), `一局给通行证经验 ${E.matchPassXp(rw)}`);
+  o.pass.xp = E.PASS.xpPer * 5;
+  ok(E.passLevel(o) === 5, '600 经验 = 1 级');
+  ok(E.apply(o, 'claimPass', { tier: 2 }).ok && o.chests.supply === 1, '领 2 级免费奖励：补给箱');
+  ok(E.apply(o, 'claimPass', { tier: 2 }).ok === false, '同一级不能重复领');
+  ok(E.apply(o, 'claimPass', { tier: 1, prem: true }).ok === false, '没解锁高级通行证不能领高级线');
+  o.gems = E.PASS.price;
+  ok(E.apply(o, 'buyPass').ok && o.pass.prem && o.gems === 0, `花 ${E.PASS.price} 宝石解锁高级通行证`);
+  const all = E.apply(o, 'claimAll');
+  ok(all.ok && o.skins.includes('blaze_grey') && o.skins.includes('m_camo') && o.pass.cp.length === 5, '一键领取：高级线 1–5 级（含凌焰服装和迷彩涂装）');
+  o.pass.xp = E.PASS.xpPer * 30; E.apply(o, 'claimAll');
+  ok(o.skins.includes('flag_red'), '通行证 30 级：传说皮肤「红旗特装」');
+  ok(E.normalize(Object.assign({}, o, { pass: Object.assign({}, o.pass, { s: 0 }) })).pass.xp === 0, '新赛季通行证从 0 开始');
+}
+{
+  const o = E.newProfile('q'), day = E.dayIndex(Date.UTC(2026, 10, 15, 4));
+  const qs = E.dailyQuests(day);
+  ok(qs.length === 3 && JSON.stringify(qs) === JSON.stringify(E.dailyQuests(day)), `每天 3 个任务，同一天客户端和服务器一样：${qs.map(E.questName).join(' / ')}`);
+  const big = { xp: 0, trophies: 8, won: true, draw: false, mvp: true, kills: 30, paint: 5000 };
+  const xp0 = o.pass.xp; const r = E.applyMatch(o, big, Date.UTC(2026, 10, 15, 4));
+  ok(r.quests.length >= 1 && o.pass.xp - xp0 > E.matchPassXp(big), `完成任务自动加通行证经验：${r.quests.join('、')}`);
+}
+{
+  const o = E.newProfile('k'); o.gems = 1000;
+  ok(E.apply(o, 'buySkin', { id: 'flag_red' }).ok === false, '通行证皮肤不能直接买');
+  const K = S.skin('m_gold'), price = E.skinPrice(K, Date.UTC(2026, 10, 15, 4));
+  ok(E.apply(o, 'buySkin', { id: 'm_gold', now: Date.UTC(2026, 10, 15, 4) }).ok && o.gems === 1000 - price, `买「${K.name}」（${S.RARE[K.rare].name}）花 ${price} 宝石`);
+  E.setLoadout(o, { wear: { mech: 'm_gold', fx: 'fx_galaxy', pilot: { flag: 'flag_red' } } });
+  ok(o.wear.mech === 'm_gold' && !o.wear.fx && !(o.wear.pilot || {}).flag, '只能装上已拥有的皮肤');
+  const deal = E.dailyDeal(5); const DK = S.skin(deal.id);
+  ok(DK.price > 0 && E.skinPrice(DK, 5 * 86400e3 - 8 * 3600e3 + 1000) === Math.round(DK.price * 0.7), `每日特惠 7 折（${DK.name}）`);
+  ok(S.pilot('flag@flag_red').hair === '#c8102e' && S.pilot('flag@nope').hair === S.pilot('flag').hair, '带服装的驾驶员换配色，无效服装不影响');
+  ok([1, 2, 3, 4].every((r) => S.SKINS.some((k) => k.rare === r)), '皮肤分普通 / 稀有 / 史诗 / 传说四个等级');
+}
+
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');
 process.exit(failed ? 1 : 0);

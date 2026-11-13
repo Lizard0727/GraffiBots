@@ -77,6 +77,7 @@
       <button class="trophy-chip" data-ov="road" title="奖杯之路">
         <span class="tro-ico" data-icon="trophy"></span><div><b id="trophyText">0</b><div class="bar gold"><i id="trophyBar"></i></div><small id="trophyNext"></small></div>
       </button>
+      <button class="pass-chip" data-ov="pass" title="第一赛季通行证"><b class="pc-s">S1</b><div><small>灰城重涂 · 通行证</small><b id="passLv">Lv.0</b><div class="bar pass"><i id="passBar"></i></div></div></button>
       <button class="wallet" id="wallet" data-ov="chests" title="宝箱 · 商店 · 兑换"></button>
       <div class="top-gap"></div>
       <div id="connStatus" class="conn">正在连接服务器…</div>
@@ -85,13 +86,13 @@
     </header>
 
     <nav class="home-left">
-      <div class="home-logo"><b><span>涂鸦</span>机兵</b><i>GRAFFI·BOTS</i></div>
+      <div class="home-logo"><b><span>涂鸦</span>机兵</b><i>GRAFFI·BOTS</i><em class="s1-badge">S1 · 灰城重涂</em></div>
       <button class="side-btn" data-ov="pilots"><div id="sidePilot" class="side-face"></div><div><b>驾驶员</b><small id="sidePilotName"></small></div></button>
       <button class="side-btn" data-ov="mechs"><span class="side-ico" data-icon="mech"></span><div><b>机体</b><small id="sideMechName"></small></div></button>
+      <button class="side-btn s1" data-ov="pass"><span class="side-ico s1-ico">S1</span><div><b>通行证</b><small id="sidePassTxt">灰城重涂</small></div><em class="badge hidden" id="passBadge">!</em></button>
+      <button class="side-btn" data-ov="shop"><span class="side-ico" data-icon="gems"></span><div><b>皮肤商店</b><small id="sideShopTxt">今日特惠</small></div></button>
       <button class="side-btn" data-ov="chests"><span class="side-ico" data-icon="chest"></span><div><b>宝箱</b><small id="sideChestTxt">商店 · 兑换</small></div><em class="badge hidden" id="chestBadge">0</em></button>
       <button class="side-btn" data-ov="talents"><span class="side-ico" data-icon="star"></span><div><b>天赋</b><small id="sideTalTxt">天赋树</small></div><em class="badge hidden" id="talBadge">0</em></button>
-      <button class="side-btn" data-ov="road"><span class="side-ico" data-icon="trophy"></span><div><b>奖杯之路</b><small>解锁头部涂装</small></div></button>
-      <button class="side-btn" data-ov="guide"><span class="side-ico" data-icon="book"></span><div><b>玩法</b><small>模式 · 操作 · 技巧</small></div></button>
     </nav>
 
     <div class="home-stage">
@@ -159,6 +160,22 @@
         <h3>我的宝箱</h3><div id="myChests" class="chest-row"></div>
         <h3>宝石商店 <small>点「概率」查看每种奖励的开出概率</small></h3><div id="shopChests" class="chest-row"></div>
         <h3>宝石兑换</h3><div id="exchangeList" class="xchg-row"></div>
+      </div>
+    </section>
+    <section id="ov-pass" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>S1 · 灰城重涂</h2><small id="passEnds">赛季剩余 28 天</small>
+        <div class="pass-head"><div class="pass-lv"><small>通行证等级</small><b id="passLv2">0</b><small id="passXp">0 / 600</small></div><button class="btn" id="passBuy">解锁高级通行证</button><button class="btn ghost small" id="passAll">一键领取</button><button class="link-btn" id="passIntro">▶ 赛季动画</button></div></header>
+      <div class="ov-body pass-body">
+        <div class="quests" id="questBox"></div>
+        <div class="pass-track-wrap"><div class="pass-rows"><span class="pr-free">免费</span><span class="pr-prem">高级</span></div><div class="pass-track" id="passTrack"></div></div>
+      </div>
+    </section>
+    <section id="ov-shop" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>皮肤商店</h2><small>皮肤只改变外观；等级越高，对战里的特效越炫</small><div class="wallet in-ov" id="wallet3"></div></header>
+      <div class="ov-body">
+        <div class="shop-tabs" id="shopTabs"></div>
+        <div class="rare-legend" id="rareLegend"></div>
+        <div class="skin-grid" id="skinGrid"></div>
       </div>
     </section>
     <section id="ov-talents" class="ov hidden">
@@ -295,6 +312,15 @@
     <div class="tut-face" id="tutFace"></div>
     <div class="tut-main"><small id="tutStep">准备</small><p id="tutText">教官秦岳：先熟悉一下机兵。</p><div class="tut-dots" id="tutDots"></div></div>
     <button class="tut-skip" id="tutSkipBtn">跳过</button>
+  </div>
+  <!-- 赛季出场动画 -->
+  <div id="seasonIntro" class="hidden">
+    <div class="si-wall"></div><div class="si-splats" id="siSplats"></div>
+    <div class="si-title"><small>SEASON 1</small><b>灰城重涂</b><i>REPAINT</i></div>
+    <div class="si-chars" id="siChars"></div>
+    <div class="si-sub">灰石集团把整座城刷成了灰色——<br>拿起喷罐，把颜色涂回去！</div>
+    <button class="btn big si-go" id="siGo">开始赛季</button>
+    <div class="si-skip">点击跳过</div>
   </div>
   <!-- 开箱动画 -->
   <div id="chestOpen" class="hidden">
