@@ -1300,7 +1300,7 @@
     let lx = 0, ly = 0;
     if (G.aimPt && me) { lx = clamp((G.aimPt.x - fx) * 0.18, -90, 90); ly = clamp((G.aimPt.y - fy) * 0.18, -70, 70); }
     // 镜头不要拍到场外太多：焦点限制在场地内
-    const tx = clamp(fx + lx + fwx * 60, 260, S.W - 260), ty = clamp(fy + ly + fwy * 60, 170, S.H - 170);
+    const tx = clamp(fx + lx + fwx * 60, 150, S.W - 150), ty = clamp(fy + ly + fwy * 60, 140, S.H - 140);
     if (!G.camF) G.camF = { x: tx, y: ty, z: fz };
     const k = Math.min(1, dt * 7);
     G.camF.x += (tx - G.camF.x) * k; G.camF.y += (ty - G.camF.y) * k; G.camF.z += (fz - G.camF.z) * Math.min(1, dt * 5);
@@ -2045,7 +2045,8 @@
     let mvp = null;
     for (const p of r.players) if (p.team === r.winner && (!mvp || val(p) > val(mvp))) mvp = p;
     const objLabel = { escort: '得分', battery: '电池', soccer: '—', zone: '—', turf: '—' }[r.mode];
-    let html = `<tr><th style="text-align:left">机兵</th><th>武器</th><th>击倒</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
+    $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
+    let html = `<tr><th style="text-align:left">驾驶员</th><th>机体</th><th>击毁</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
     for (const t of [myTeam, 3 - myTeam]) {
       for (const p of r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a))) {
         html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}">${p.bot ? '🤖 ' : ''}${esc(p.name)}${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
