@@ -126,27 +126,37 @@
 
     <!-- ===== 全屏面板 ===== -->
     <section id="ov-pilots" class="ov hidden">
-      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>选择驾驶员</h2><small>驾驶员决定技能和被动，可以和任何机体自由搭配</small></header>
-      <div class="ov-body sel-layout">
-        <div id="pilotList" class="pilot-grid"></div>
-        <aside id="pilotDetail" class="sel-detail"></aside>
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>驾驶员</h2><small>点驾驶员进入角色页面：3D 模型、能力、升级、皮肤和故事</small></header>
+      <div class="ov-body">
+        <div id="pilotList" class="pilot-grid wide"></div>
       </div>
     </section>
     <section id="ov-mechs" class="ov hidden">
-      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>选择机体</h2><small>机体决定生命、武器和大招；被摧毁后驾驶员会弹出继续战斗</small></header>
-      <div class="ov-body sel-layout">
-        <div id="weaponList" class="mech-grid"></div>
-        <aside class="sel-detail mech-side">
-          <div class="stage pv-host" id="garageStage">
-            <div class="stage-modes" id="stageModes">
-              <button data-mode="auto" class="sel">自动</button><button data-mode="idle">待机</button><button data-mode="walk">行走</button>
-              <button data-mode="fire">攻击</button><button data-mode="jump">跳跃</button><button data-mode="wheel">滚轮</button>
-            </div>
-            <div class="stage-hint">⟲ 拖动旋转</div>
-          </div>
-          <div id="mechDetail"></div>
-        </aside>
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>机体</h2><small>点机体进入机体页面：属性、大招、涂装和擅长的驾驶员</small></header>
+      <div class="ov-body">
+        <div id="weaponList" class="mech-grid wide"></div>
       </div>
+    </section>
+    <!-- 1.5：角色 / 机体页面（点头像进入） -->
+    <section id="ov-hero" class="ov hidden hero-page">
+      <header class="ov-head"><button class="back" id="hpBack" data-icon="back">返回</button><h2 id="hpKind">驾驶员</h2><small id="hpCount"></small><div class="wallet in-ov" id="wallet4"></div></header>
+      <div class="hp-body">
+        <div class="hp-left" id="hpLeft"></div>
+        <div class="hp-center">
+          <div class="hp-glow" id="hpGlow"></div>
+          <div class="hp-stage" id="hpStageP"></div>
+          <div class="hp-stage" id="hpStageM"></div>
+          <button class="hp-nav prev" id="hpPrev" aria-label="上一个">‹</button>
+          <button class="hp-nav next" id="hpNext" aria-label="下一个">›</button>
+          <div class="hp-acts" id="hpActs"></div>
+          <div class="hp-hint">⟲ 拖动旋转</div>
+        </div>
+        <div class="hp-right">
+          <nav class="hp-tabs" id="hpTabs"></nav>
+          <div class="hp-panel" id="hpPanel"></div>
+        </div>
+      </div>
+      <div class="hp-foot" id="hpFoot"></div>
     </section>
     <section id="ov-modes" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>对战模式</h2><small>点「对战」会和 AI 驾驶员打这个模式；组队房间里也能改</small></header>

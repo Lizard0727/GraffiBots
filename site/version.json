@@ -1,18 +1,24 @@
 {
-  "version": "1.4.1",
+  "version": "1.5",
   "date": "2026-11-14",
-  "title": "1.4.1 更新 · 开麦了",
-  "en_title": "Update 1.4.1 · Chat Is Live",
+  "title": "1.5 更新 · 焕然一新",
+  "en_title": "Update 1.5 · Fresh Coat",
   "page": "#updates",
   "force": true,
   "notes": [
-    "打字聊天",
-    "对手更像真人",
+    "角色页面",
+    "画面升级",
+    "AI 改进",
+    "机体平衡（全部 17 台重新审视）",
+    "驾驶员平衡（全部 16 位重新审视）",
     "更新奖励"
   ],
   "en_notes": [
-    "Text chat",
-    "Opponents feel more human",
+    "Character pages",
+    "Graphics upgrade",
+    "AI improvements",
+    "Mech balance (all 17 reviewed)",
+    "Pilot balance (all 16 reviewed)",
     "Update rewards"
   ]
 }

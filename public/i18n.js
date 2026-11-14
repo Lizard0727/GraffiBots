@@ -16,6 +16,14 @@
   const TIER = { 高级: 'Premium', 免费: 'Free' };
   // 带数字 / 名字的句式（先于片段替换）
   const PATTERNS = [
+    [/(\d+) \/ (\d+)（突破后上限更高）/g, '$1 / $2 (breakthrough raises the cap)'],
+    [/([QR]) 键 · 每局 (\d+) 次/g, (m, k, n) => `${k} key · ${n} per match`],
+    [/E 键 \/ 右键 · 充能 (\d+)/g, 'E / right-click · charge $1'],
+    [/换上擅长机体「([^」]+)」/g, (m, t) => `Use signature mech ${tr(t)}`],
+    [/^换上「([^」]+)」$/g, (m, t) => `Now using ${tr(t)}`],
+    [/^(.+) 出战！$/g, (m, t) => `${tr(t)} is ready!`],
+    [/^完成「活动 → ([^」]+)」全部任务免费获得$/g, (m, t) => `Free for finishing every quest in Events → ${tr(t)}`],
+    [/^任务机体：完成「活动 → ([^」]+)」(\d+) 个任务免费获得$/g, (m, t, n) => `Quest mech: free for finishing ${n} quests in Events → ${tr(t)}`],
     [/(我方|对方)拿下第 (\d+) 局！（(\d+) : (\d+)）/g, (m, w, r, a, b) => `${w === '我方' ? 'We' : 'They'} took round ${r}! (${a} : ${b})`],
     [/第 (\d+) 局 · 开始！/g, 'Round $1 · FIGHT!'],
     [/每局 (\d+) 次。/g, '$1 uses per match.'],

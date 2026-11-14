@@ -326,7 +326,7 @@ class Game {
     const p = {
       id, name, team, weapon, head, bot, slot, pilot: pid, lv, bt, pmul, tal,
       ov: 0, ovT: 0, ovUsed: false, lastOq: 0, rallyT: 0, revealT: 0, ovPulse: 0,
-      maxHp: Math.round(W.hp * (pid === 'titan' ? 1.15 : 1) * pmul * (tal.has('d1') ? 1.08 : 1)),
+      maxHp: Math.round(W.hp * (pid === 'titan' ? 1.18 : 1) * pmul * (tal.has('d1') ? 1.08 : 1)),
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, onGround: true,
       hp: 100, ammo: S.AMMO, sp: 0, alive: true, respawnT: 0, invulnT: 0,
       lastHurt: -10, lastAtk: -10, atkCd: 0, burst: null, rollT: 0, charge: 0, prevFire: false,
@@ -464,13 +464,13 @@ class Game {
     const ground = grounded ? S.cellAt(this.grid, p.x, p.y) : -1;
     const own = ground === p.team, enemy = ground > 0 && !own;
     const inBush = S.inBush(this.M, p.x, p.y, p.z);
-    let sm = p.foot ? (p.pilot === 'gale' ? 1.45 : 1) : W.spd * (p.pilot === 'gale' ? 1.06 : 1);
+    let sm = p.foot ? (p.pilot === 'gale' ? 1.45 : 1) : W.spd * (p.pilot === 'gale' ? 1.08 : 1);
     if (this.obj.tr && this.obj.tr.carrier === p.id) sm *= 0.72;
     if (p.carry) sm *= 1 - 0.04 * p.carry;
     if (spAct && p.spKind === 'charge') sm *= 1.45;
     if (p.rushT > 0) sm *= 1.35;
     if (p.slowT > 0) sm *= 0.55;
-    if (p.pilot === 'raven' && (inBush || own)) sm *= 1.15;
+    if (p.pilot === 'raven' && (inBush || own)) sm *= 1.12;
     if (OV && OV.spd) sm *= OV.spd;
     if (p.rallyT > 0) sm *= 1.15;
     if (p.cloakT > 0 && p.cloakFast) sm *= 1.25;
@@ -660,11 +660,11 @@ class Game {
     const a = p.input.a;
     this.knock(p, Math.cos(a), Math.sin(a), W.lunge, 0);
     const fx = p.x + Math.cos(a) * 30, fy = p.y + Math.sin(a) * 30;
-    this.paint(fx, fy, p.z, 30, p.team, p);
+    this.paint(fx, fy, p.z, W.paintR || 30, p.team, p);
     for (const t of this.players.values()) {
       if (!t.alive || t.team === p.team) continue;
       const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
-      if (d > W.range + S.R + 10 || Math.abs(t.z - p.z) > 40) continue;
+      if (d > W.range + S.R + 10 + (W.lunge || 0) * 0.1 || Math.abs(t.z - p.z) > 40) continue;   // 1.5：冲拳的前冲也算进攻击距离
       let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
       if (Math.abs(da) > W.arc / 2) continue;
       const dmg = W.dmg * p.dmgMul;
@@ -977,7 +977,7 @@ class Game {
       if (by.tal.has('a5') && by.team !== t.team) { by.hitN = (by.hitN || 0) + 1; if (by.hitN % 5 === 0) dmg *= 1.6; }
       if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
       if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
-      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.1;   // 韩冰被动：倒戈
+      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.08;   // 韩冰被动：倒戈
       const BW = !by.foot && S.WEAPONS[by.weapon];
       if (BW && BW.backstab && by.team !== t.team) {   // 刺客机体：从背后命中（在目标朝向 ±110° 以外）伤害提高
         let da = Math.atan2(by.y - t.y, by.x - t.x) - t.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
@@ -998,7 +998,7 @@ class Game {
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -5%
       let n = 0;
       for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 200) n++;
-      dmg *= 1 - 0.07 * Math.min(3, n);
+      dmg *= 1 - 0.08 * Math.min(3, n);
     }
     if (kdx != null && !(tOV && tOV.noKb)) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
@@ -1028,7 +1028,7 @@ class Game {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
     if (this.chat && t) this.chat.onKill(by, t);
-    if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 40, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
+    if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 60, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
     if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.4);
     if (by.tal && by.tal.has('s4') && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + 15);
   }
@@ -1040,11 +1040,11 @@ class Game {
     this.dropItems(t);
     t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = this.oneLife ? 1e9 : S.REBUILD - (t.pilot === 'aurora' ? 2 : 0) - (t.tal && t.tal.has('d3') ? 1 : 0);   // 一条命的模式：机体不会重建
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.quakeT = 0;
-    const sh = (t.pilot === 'hammer' ? 35 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
+    const sh = (t.pilot === 'hammer' ? 45 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
     if (sh) { t.shield = sh; t.shieldT = 6; }
     t.invulnT = 0.7; t.ammo = S.AMMO; t.wheel = false;
     this.ev(['wreck', by ? by.id : 0, t.id, r1(x), r1(y), r1(z)]);
-    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 55, 26, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
+    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 65, 26, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
     this.knock(t, Math.random() - 0.5, Math.random() - 0.5, 150, 300);
   }
   redeploy(p) {
@@ -1358,7 +1358,7 @@ class Game {
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
-          this.hurt(victim, pr.dmg * (far ? 1.22 : 1), owner, pr.vx, pr.vy, pr.kb);
+          this.hurt(victim, pr.dmg * (far ? 1.2 : 1), owner, pr.vx, pr.vy, pr.kb);
           if (pr.fx) this.sideFx(victim, pr.fx.poison ? Object.assign({ by: pr.owner }, pr.fx) : pr.fx);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
@@ -1907,11 +1907,13 @@ function botThink(g, p, dt) {
   const melee = !p.foot && (W.attack === 'punch' || p.weapon === 'roller' || p.weapon === 'bucket' || p.weapon === 'dozer' || p.weapon === 'flamer');
   const engage = melee || P.chase ? Math.max(range * 1.05, 300) : range * 1.05;
   if (enemy && ed < engage && ai.seenT > ai.react) {
-    const lead = ed / (P.trueLead ? (p.foot ? SA.speed : W.speed) || 650 : 650);   // 高手按真实弹速算提前量
+    const lobT = !p.foot && W.attack === 'lob' ? (W.flight || 0.6) : 0;   // 1.5：抛射武器按落地时间算提前量
+    const lead = lobT ? lobT / Math.max(0.35, P.lead) : ed / (P.trueLead ? (p.foot ? SA.speed : W.speed) || 650 : 650);   // 高手按真实弹速算提前量
     aim = aimAt(p, enemy.x + enemy.vx * lead * P.lead, enemy.y + enemy.vy * lead * P.lead, enemy.z + 16);
     aim.a += (Math.random() - 0.5) * P.aim; aim.pt += (Math.random() - 0.5) * P.aim / 3;
     inp.ad = ed;
-    wantAtk = ed < range * 1.1;
+    wantAtk = ed < (W.attack === 'punch' && !p.foot ? range + S.R + (W.lunge || 0) * 0.1 : range * 1.1);
+    if (wantAtk && W.attack === 'punch' && !p.foot) aim = aimAt(p, enemy.x + enemy.vx * 0.08, enemy.y + enemy.vy * 0.08, enemy.z + 16);   // 出拳时对准，不抖
     ai.strafeT -= dt;
     if (ai.strafeT <= 0) { ai.strafeT = rand(P.strafe[0], P.strafe[1]); ai.strafe = (Math.random() < 0.5 ? -1 : 1) * P.strafeK / 0.8; }
     const ea = Math.atan2(enemy.y - p.y, enemy.x - p.x);
@@ -1919,7 +1921,17 @@ function botThink(g, p, dt) {
       // 驾驶员：拿近战武器的冲上去，其他的边退边打
       if (SA.kind === 'melee' && (hpK > 0.45 || ed < 90)) { mx = Math.cos(ea) + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.3; my = Math.sin(ea) + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.3; }
       else { mx = -Math.cos(ea) * 0.7 + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.6; my = -Math.sin(ea) * 0.7 + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.6; }
-    } else if (melee) { mx = Math.cos(ea) + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.35; my = Math.sin(ea) + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.35; }
+    } else if (melee) {
+      // 1.5：近战绕到侧后方再出拳（刺客机体从背后打伤害更高）；离得远时走之字形躲子弹
+      let ta = ea;
+      if (W.attack === 'punch' && ed > 70) {
+        const fa = enemy.input.a, bx = enemy.x - Math.cos(fa) * 46, by = enemy.y - Math.sin(fa) * 46;
+        const k = W.backstab ? 0.75 : 0.4;
+        ta = Math.atan2((by - p.y) * k + (enemy.y - p.y) * (1 - k), (bx - p.x) * k + (enemy.x - p.x) * (1 - k));
+      }
+      const zig = ed > 150 ? 0.55 : 0.3;
+      mx = Math.cos(ta) + Math.cos(ta + Math.PI / 2) * ai.strafe * zig; my = Math.sin(ta) + Math.sin(ta + Math.PI / 2) * ai.strafe * zig;
+    }
     else if (p.weapon === 'charger') { mx = Math.cos(ea + Math.PI / 2) * ai.strafe * 0.5; my = Math.sin(ea + Math.PI / 2) * ai.strafe * 0.5; }
     else {
       const want = p.weapon === 'mortar' ? 0.75 : 0.55;

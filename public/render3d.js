@@ -2384,6 +2384,7 @@
     sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 10, far: 400 });
     PV.scene.add(sun);
     const back = new T.DirectionalLight(0x8fa8ff, 0.5); back.position.set(-80, 60, -90); PV.scene.add(back);
+    PV.rim = new T.DirectionalLight(0xffffff, 0.45); PV.rim.position.set(-60, 90, -120); PV.scene.add(PV.rim);   // 1.5：驾驶员色的轮廓光
     const stage = new T.Mesh(new T.CylinderGeometry(34, 37, 4, 48), new T.MeshLambertMaterial({ color: 0x2a2440 }));
     stage.position.y = -2; stage.receiveShadow = true; PV.scene.add(stage);
     const glow = new T.Mesh(new T.RingGeometry(30, 34, 64), new T.MeshBasicMaterial({ color: 0xffdf2e, transparent: true, opacity: 0.8 }));
@@ -2416,6 +2417,7 @@
       PV.scene.add(PV.bot.root);
       PV.key = key;
       PV.glow.material.color.set(opt.color);
+      if (PV.rim) PV.rim.color.set(opt.color);
     }
     pvResize();
     return true;
@@ -2496,6 +2498,12 @@
     CP.scene.add(new T.HemisphereLight(0xeef0ff, 0x4a3a5a, 0.62));
     const sun = new T.DirectionalLight(0xfff2e0, 0.62); sun.position.set(90, 110, 40); CP.scene.add(sun);
     const back = new T.DirectionalLight(0x9fb4ff, 0.3); back.position.set(-70, 50, -80); CP.scene.add(back);
+    // 1.5：角色色的轮廓光 + 脚下的接触阴影
+    CP.rim = new T.DirectionalLight(0xffffff, 0.55); CP.rim.position.set(-40, 60, -90); CP.scene.add(CP.rim);
+    const sc = document.createElement('canvas'); sc.width = sc.height = 64;
+    { const x = sc.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(0.6, 'rgba(0,0,0,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); }
+    CP.shadow = new T.Mesh(new T.PlaneGeometry(22, 22), new T.MeshBasicMaterial({ map: new T.CanvasTexture(sc), transparent: true, depthWrite: false }));
+    CP.shadow.rotation.x = -Math.PI / 2; CP.shadow.position.y = 0.12; CP.scene.add(CP.shadow);
     const disc = new T.Mesh(new T.CylinderGeometry(15, 16, 1.6, 40), new T.MeshLambertMaterial({ color: 0x2a2440 })); disc.position.y = -0.8; CP.scene.add(disc); CP.disc = disc;
     CP.ring = new T.Mesh(new T.RingGeometry(13.5, 15.2, 48), new T.MeshBasicMaterial({ color: 0xffdf2e, transparent: true, opacity: 0.85 })); CP.ring.rotation.x = -Math.PI / 2; CP.ring.position.y = 0.05; CP.scene.add(CP.ring);
     CP.cam = new T.PerspectiveCamera(28, 1, 1, 600);
@@ -2513,6 +2521,7 @@
     CP.ch = buildChar(pilotId, color, null);
     CP.scene.add(CP.ch.root); CP.key = key; CP.t0 = performance.now();
     CP.ring.material.color.set(S.pilot(pilotId).accent);
+    if (CP.rim) CP.rim.color.set(S.pilot(pilotId).accent);
     CP.ch.act = { name: 'show', t: 0 };   // 选中驾驶员：播一整套展示动作
   }
   function cpSize(w, h) {
@@ -2792,6 +2801,74 @@
     _r1.copy(_r0).sub(camera.position).normalize();
     return { x: camera.position.x, y: camera.position.z, z: camera.position.y, dx: _r1.x, dy: _r1.z, dz: _r1.y };
   }
+
+  // ---------------- 1.5：后期处理（高画质）：霓虹泛光 + 调色 + 暗角 ----------------
+  const POST = { k: 0.42, th: 0.8, sat: 1.12, con: 1.06, vig: 0.22 };
+  const PV_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+  function postInit() {
+    if (POST.rt) return true;
+    try {
+      const gl2 = renderer.capabilities.isWebGL2;
+      POST.rt = new T.WebGLRenderTarget(4, 4, { samples: gl2 ? 4 : 0 });
+      POST.a = new T.WebGLRenderTarget(4, 4); POST.b = new T.WebGLRenderTarget(4, 4);
+      POST.c = new T.WebGLRenderTarget(4, 4); POST.d = new T.WebGLRenderTarget(4, 4);
+      POST.cam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      POST.quad = new T.Mesh(new T.PlaneGeometry(2, 2)); POST.quad.frustumCulled = false;
+      POST.scene = new T.Scene(); POST.scene.add(POST.quad);
+      POST.bright = new T.ShaderMaterial({ uniforms: { t: { value: null }, th: { value: POST.th } }, vertexShader: PV_VS, depthTest: false, depthWrite: false,
+        fragmentShader: `uniform sampler2D t; uniform float th; varying vec2 vUv;
+          void main(){ vec3 c = texture2D(t, vUv).rgb; float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); float m = max(c.r, max(c.g, c.b));
+            float w = smoothstep(th, th + 0.22, mix(l, m, 0.35)); gl_FragColor = vec4(c * w, 1.0); }` });
+      POST.blur = new T.ShaderMaterial({ uniforms: { t: { value: null }, dir: { value: new T.Vector2() } }, vertexShader: PV_VS, depthTest: false, depthWrite: false,
+        fragmentShader: `uniform sampler2D t; uniform vec2 dir; varying vec2 vUv;
+          void main(){ vec3 c = texture2D(t, vUv).rgb * 0.227;
+            c += (texture2D(t, vUv + dir * 1.385).rgb + texture2D(t, vUv - dir * 1.385).rgb) * 0.316;
+            c += (texture2D(t, vUv + dir * 3.231).rgb + texture2D(t, vUv - dir * 3.231).rgb) * 0.070;
+            gl_FragColor = vec4(c, 1.0); }` });
+      POST.comp = new T.ShaderMaterial({ uniforms: { t: { value: null }, b1: { value: null }, b2: { value: null }, k: { value: POST.k }, sat: { value: POST.sat }, con: { value: POST.con }, vig: { value: POST.vig }, asp: { value: 1 } },
+        vertexShader: PV_VS, depthTest: false, depthWrite: false,
+        fragmentShader: `uniform sampler2D t, b1, b2; uniform float k, sat, con, vig, asp; varying vec2 vUv;
+          void main(){
+            vec3 c = texture2D(t, vUv).rgb;
+            vec3 bl = texture2D(b1, vUv).rgb * 0.6 + texture2D(b2, vUv).rgb * 0.8;
+            c += bl * k;
+            float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+            c = mix(vec3(l), c, sat);
+            c = (c - 0.5) * con + 0.5;
+            c = c / (1.0 + max(c - 1.0, 0.0) * 0.6);   // 高光柔和压回，不会一片死白
+            vec2 d = (vUv - 0.5) * vec2(asp, 1.0);
+            c *= 1.0 - vig * smoothstep(0.35, 1.05, length(d));
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+          }` });
+    } catch (e) { console.warn('post off', e); POST.fail = true; return false; }
+    return true;
+  }
+  const _ps = new T.Vector2();
+  function postSize() {
+    renderer.getDrawingBufferSize(_ps);
+    const w = Math.max(4, _ps.x | 0), h = Math.max(4, _ps.y | 0);
+    if (POST.w === w && POST.h === h) return;
+    POST.w = w; POST.h = h;
+    POST.rt.setSize(w, h);
+    const w4 = Math.max(4, w >> 2), h4 = Math.max(4, h >> 2), w8 = Math.max(4, w >> 3), h8 = Math.max(4, h >> 3);
+    POST.a.setSize(w4, h4); POST.b.setSize(w4, h4); POST.c.setSize(w8, h8); POST.d.setSize(w8, h8);
+    POST.comp.uniforms.asp.value = w / h;
+  }
+  function pass(mat, target) { POST.quad.material = mat; renderer.setRenderTarget(target); renderer.render(POST.scene, POST.cam); }
+  function renderPost() {
+    if (!HQ || POST.off || POST.fail || !postInit()) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+    postSize();
+    renderer.setRenderTarget(POST.rt); renderer.render(scene, camera);
+    POST.bright.uniforms.t.value = POST.rt.texture; pass(POST.bright, POST.a);
+    const B = POST.blur.uniforms;
+    B.t.value = POST.a.texture; B.dir.value.set(1 / POST.a.width, 0); pass(POST.blur, POST.b);
+    B.t.value = POST.b.texture; B.dir.value.set(0, 1 / POST.a.height); pass(POST.blur, POST.a);
+    B.t.value = POST.a.texture; B.dir.value.set(1 / POST.c.width, 0); pass(POST.blur, POST.c);   // 再缩小一半，泛光更柔更大
+    B.t.value = POST.c.texture; B.dir.value.set(0, 1 / POST.c.height); pass(POST.blur, POST.d);
+    const C = POST.comp.uniforms;
+    C.t.value = POST.rt.texture; C.b1.value = POST.a.texture; C.b2.value = POST.d.texture;
+    pass(POST.comp, null);
+  }
   function render(G, now, dt, myId) {
     if (!W || W.G !== G) return;
     if (W.dirty) { W.surfTex.needsUpdate = true; W.dirty = false; }
@@ -2800,13 +2877,14 @@
     stepAmbient(dt, now);
     if (W.pads) for (const p of W.pads) { const k = (now / 600) % 1; p.ring.scale.setScalar(9 + k * 6); p.ringM.opacity = 0.9 * (1 - k); }
     stepParticles(dt);
-    renderer.render(scene, camera);
+    renderPost();
   }
   function clear() { dispose(); show(false); }
 
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
+    setPost(on, o) { POST.off = !on; if (o && POST.comp) for (const k in o) { if (POST.comp.uniforms[k]) POST.comp.uniforms[k].value = o[k]; if (k === 'th') POST.bright.uniforms.th.value = o[k]; } },
     build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
