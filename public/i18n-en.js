@@ -1361,5 +1361,6 @@ window.GB_EN = {
   "点驾驶员进入角色页面：3D 模型、能力、升级、皮肤和故事": "Tap a pilot to open their page: 3D model, abilities, upgrades, skins and story",
   "点机体进入机体页面：属性、大招、涂装和擅长的驾驶员": "Tap a mech to open its page: stats, super, paints and signature pilots",
   "1.5 更新礼包": "Update 1.5 gift",
-  "1.5 版本上线啦：点驾驶员和机体就能进入全新的角色页面，画面更精致，所有角色和机体都重新调整了平衡。这份更新礼包请收下！": "Update 1.5 is live: tap any pilot or mech to open their new character page, enjoy sharper graphics, and every pilot and mech has been rebalanced. Please accept this update gift!"
+  "1.5 版本上线啦：点驾驶员和机体就能进入全新的角色页面，画面更精致，所有角色和机体都重新调整了平衡。这份更新礼包请收下！": "Update 1.5 is live: tap any pilot or mech to open their new character page, enjoy sharper graphics, and every pilot and mech has been rebalanced. Please accept this update gift!",
+  "失败": "Defeat"
 };

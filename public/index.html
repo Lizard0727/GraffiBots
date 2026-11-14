@@ -301,15 +301,24 @@
 
   <!-- ============ 结算 ============ -->
   <section id="results" class="screen overlay hidden">
-    <div class="res">
-      <h1 id="resTitle"></h1>
-      <div id="resSub" class="sub"></div>
-      <div class="turfbar"><i id="resA"></i><i id="resB"></i></div>
-      <div id="resScore" class="score"></div>
-      <div id="resMvp" class="res-mvp"></div>
-      <table id="resTable"></table>
-      <div id="resXp" class="xp"></div>
-      <button id="resBack" class="btn big">返回房间</button>
+    <div class="res res2">
+      <header class="r-head">
+        <h1 id="resTitle"></h1>
+        <div id="resSub" class="sub"></div>
+        <div id="resScore" class="score"></div>
+      </header>
+      <div class="r-body">
+        <div class="r-stage" id="resStage">
+          <div class="r-labels" id="resLabels" data-noi18n></div>
+        </div>
+        <div class="r-panel">
+          <div class="turfbar"><i id="resA"></i><i id="resB"></i></div>
+          <div id="resMvp" class="res-mvp"></div>
+          <div id="resTable" class="r-teams"></div>
+          <div id="resXp" class="r-rewards"></div>
+          <button id="resBack" class="btn big">返回房间</button>
+        </div>
+      </div>
     </div>
   </section>
 

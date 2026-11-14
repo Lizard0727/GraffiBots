@@ -1624,7 +1624,7 @@
     if (G) G.chats.set(m.id, { text: text.length > 18 ? text.slice(0, 17) + '…' : text, t: performance.now() + 1500 });
     if (m.id !== myId) sfx.hover();
   }
-  function chatReset() { $('chatLog').innerHTML = ''; $('chatLog').classList.toggle('hidden', !chatOn()); chatClose(); }
+  function chatReset() { $('chatLog').classList.remove('in-res'); $('chatLog').innerHTML = ''; $('chatLog').classList.toggle('hidden', !chatOn()); chatClose(); }
   function chatOpen() {
     if (!G || CHAT.open) return;
     CHAT.open = true; keys.clear(); mouse.down = false;
@@ -2102,6 +2102,7 @@
     }
     // 3D 驾驶员展示台（驾驶员详情 / 结算 MVP）：画布不在页面上时会自己跳过
     if (R3.charFrame) R3.charFrame(now, Math.min(0.05, (now - (loop.charLast || now)) / 1000));
+    if (R3.teamFrame && !$('results').classList.contains('hidden')) { R3.teamFrame(now, Math.min(0.05, (now - (loop.charLast || now)) / 1000)); if ((loop.labT = (loop.labT || 0) + 1) % 20 === 0) placeLabels(); }
     loop.charLast = now; loop.last = now;
   }
 
@@ -2818,6 +2819,7 @@
     const multi = (r.teams || 2) > 2;
     const cs = multi ? S.TEAM8 : S.COLOR_SETS[r.colorSet].c;
     const tName = (t) => (multi ? S.TEAM8_NAMES[t] : S.TEAM_NAMES[t]);
+    LAST_LOOKS = G ? new Map([...G.players.values()].map((p) => [p.id, p.looks || null])) : LAST_LOOKS;
     G = null;
     touchShow(false);
     if (document.exitPointerLock && locked()) document.exitPointerLock();
@@ -2849,21 +2851,41 @@
     const mvp = S.mvpOf(r);
     const objLabel = { escort: '得分', battery: '电池' }[r.mode] || '—';
     $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
-    let html = `<tr><th style="text-align:left">驾驶员</th><th>机体</th><th>击毁</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
+    // 1.5：数据卡片——每队一张卡，每人一行：头像、名字、机体、击毁 / 倒下 / 涂地条，MVP 金色标记
+    const maxPaint = Math.max(1, ...r.players.map((p) => p.paint)), maxK = Math.max(1, ...r.players.map((p) => p.kills));
+    const looksOf = (id) => (LAST_LOOKS && LAST_LOOKS.get(id)) || null;
+    const faceOf = (p) => { const L = looksOf(p.id); return GP.portrait(S.pilot(L && L.pskin ? p.pilot + '@' + L.pskin : p.pilot), { face: true }); };
+    let html = '';
     for (const t of r.place || [myTeam, 3 - myTeam]) {
-      for (const p of r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a))) {
-        html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}"><span data-noi18n>${esc(p.name)}</span>${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
+      const ps = r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a));
+      if (!ps.length) continue;
+      const tk = ps.reduce((a, b) => a + b.kills, 0), win = r.winner === t;
+      const tag = r.place ? `第 ${r.place.indexOf(t) + 1} 名` : !r.winner ? '平局' : win ? '胜利' : '失败';
+      html += `<div class="r-team ${win ? 'win' : ''} ${t === myTeam ? 'mine' : ''}" style="--tc:${cs[t]}"><div class="rt-head"><b>${t === myTeam ? '我方' : multi ? tName(t) : '对方'}</b><span class="rt-tag">${tag}</span><small>击毁 ${tk}${!multi ? ` · 涂地 ${(r.turf[t - 1] * 100).toFixed(1)}%` : ''}</small></div>`;
+      for (const p of ps) {
+        const isM = mvp && p.id === mvp.id;
+        html += `<div class="rt-row ${p.id === myId ? 'me' : ''} ${isM ? 'mvp' : ''}"><div class="rt-face">${faceOf(p)}</div>
+          <div class="rt-name"><b data-noi18n>${esc(p.name)}</b><small>${S.pilot(p.pilot).name} · ${S.WEAPONS[p.weapon].name}</small></div>
+          <div class="rt-stats"><span class="st k" title="击毁"><i>击毁</i><b>${p.kills}</b><em style="width:${Math.round(p.kills / maxK * 100)}%"></em></span>
+          <span class="st d" title="倒下"><i>倒下</i><b>${p.deaths}</b></span>
+          <span class="st p" title="涂地"><i>涂地</i><b>${p.paint}</b><em style="width:${Math.round(p.paint / maxPaint * 100)}%"></em></span>
+          ${objLabel !== '—' ? `<span class="st o"><i>${objLabel}</i><b>${p.obj}</b></span>` : ''}</div>
+          ${isM ? '<span class="mvp">★ MVP</span>' : p.id === myId ? '<span class="you">你</span>' : ''}</div>`;
       }
+      html += '</div>';
     }
     $('resTable').innerHTML = html;
-    const mv = $('resMvp');
-    if (mvp) {
-      const P = S.pilot(mvp.pilot);
-      mv.style.setProperty('--pc', cs[mvp.team]);
-      mv.innerHTML = `<div class="mvp-art mvp-3d" id="mvp3d">${GP.portrait(P)}</div><div><b>★ MVP</b><h3 style="color:${cs[mvp.team]}">${esc(mvp.name)}</h3><p>“${P.line}”</p><small style="color:var(--muted)">击倒 ${mvp.kills} · 涂地 ${mvp.paint}</small></div>`;
-      mv.classList.remove('show'); void mv.offsetWidth; mv.classList.add('show');
-      if (R3.charPreview && R3.charPreview($('mvp3d'), mvp.pilot, cs[mvp.team])) { $('mvp3d').classList.add('live'); setTimeout(() => R3.charAction && R3.charAction('victory'), 400); }
-    } else mv.classList.remove('show');
+    // 3D 结算台：我方全队（MVP 在中间），赢了庆祝、输了垂头丧气
+    const showTeam = meRow ? myTeam : r.winner;
+    const crew = r.players.filter((q) => q.team === showTeam).sort((a, b) => (mvp && a.id === mvp.id ? -1 : mvp && b.id === mvp.id ? 1 : a.id === myId ? -1 : b.id === myId ? 1 : val(b) - val(a))).slice(0, 4);
+    const stageOk = R3.teamShow && R3.teamShow($('resStage'), crew.map((p) => { const L = looksOf(p.id); return { pilot: L && L.pskin ? p.pilot + '@' + L.pskin : p.pilot, color: cs[p.team], mvp: !!(mvp && p.id === mvp.id) }; }), meRow ? won || rank === 1 : true);
+    $('resStage').classList.toggle('lose', !!meRow && !won && rank !== 1);
+    $('resStage').classList.toggle('no3d', !stageOk);
+    RES_CREW = crew;
+    $('resLabels').innerHTML = crew.map((p) => `<div class="r-lab ${mvp && p.id === mvp.id ? 'mvp' : ''} ${p.id === myId ? 'me' : ''}" style="--tc:${cs[p.team]}">${mvp && p.id === mvp.id ? '<span class="crown">★ MVP</span>' : ''}<b>${esc(p.name)}</b><small>${p.kills} 击毁 · ${p.paint} 涂地</small>${stageOk ? '' : `<div class="r-face2">${faceOf(p)}</div>`}</div>`).join('');
+    placeLabels(); setTimeout(placeLabels, 120);
+    $('chatLog').classList.add('in-res');
+    $('resMvp').classList.remove('show');
     // 经验 / 奖杯：在线账号由服务器结算（防止改本地数据刷分），其余在本机结算
     pendingReward = null;
     if (meRow) {
@@ -2877,6 +2899,21 @@
         showReward(rw, res.trBefore, res.lvBefore, res.items);
       }
     } else $('resXp').textContent = '';
+  }
+  // 奖励一项一块：🏆 / XP / 金币 / 宝石……（文字和以前一样，只是分成小卡片）
+  function setResXp(msg) {
+    const parts = String(msg).split('　').map((x) => x.trim()).filter(Boolean);
+    $('resXp').innerHTML = parts.map((x, i) => `<span class="rw ${/排位分|🏆/.test(x) ? 'big' : ''}" style="--i:${i}">${esc(x)}</span>`).join('');
+  }
+  let RES_CREW = [], LAST_LOOKS = null;
+  function placeLabels() {
+    const sl = R3.teamSlots ? R3.teamSlots() : [];
+    const labs = $('resLabels').children;
+    for (let i = 0; i < labs.length; i++) {
+      const s2 = sl[i];
+      if (s2) { labs[i].style.left = (s2.x * 100).toFixed(2) + '%'; labs[i].style.top = (Math.min(0.9, s2.y) * 100).toFixed(2) + '%'; }
+      else { labs[i].style.left = ((i + 0.5) / labs.length * 100).toFixed(2) + '%'; }
+    }
   }
   function showReward(rw, trBefore, lvBefore, items) {
     const after = level();
@@ -2897,7 +2934,7 @@
       msg = `排位分 ${d >= 0 ? '+' : ''}${d}（${T.name} ${rp}）${ti > rankBefore.ti ? `　⬆ 晋级「${T.name}」！` : ti < rankBefore.ti ? `　⬇ 降到「${T.name}」` : ''}　` + msg;
       rankBefore = null;
     }
-    $('resXp').textContent = msg;
+    setResXp(msg);
     renderProfile(); renderHeads(); sendLoadout();
   }
 

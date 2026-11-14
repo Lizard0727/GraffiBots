@@ -953,9 +953,22 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.5';
+  S.VERSION = '1.5.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.5.1', date: '2026-11-14', title: '1.5.1 更新 · 全新结算', en_title: 'Update 1.5.1 · New Results Screen', sections: [
+      ['结算画面', [
+        '比赛结束后，我方全队的 3D 角色站上结算台：赢了轮流跳起来庆祝、漫天彩纸，MVP 站在中间先来一整套展示；输了全队垂头丧气，背景下起小雨',
+        '每个人脚下有名字和本局数据，MVP 戴金色标记',
+        '数据改成卡片：每队一张，每人一行（头像、驾驶员和机体、击毁 / 倒下 / 涂地），击毁和涂地带对比条',
+        '奖励分成一个个小卡片依次弹出（奖杯、经验、金币、宝石、任务……）']],
+    ], en: [
+      ['Results screen', [
+        'After a match your whole team steps onto a 3D stage: win and they take turns jumping to celebrate under falling confetti, with the MVP in the middle doing a full routine; lose and the team hangs their heads in the rain',
+        'Each player has their name and match stats under their feet, and the MVP gets a gold badge',
+        'Stats are now cards: one per team, one row per player (portrait, pilot and mech, takedowns / KOs / paint) with comparison bars for takedowns and paint',
+        'Rewards pop in one by one as separate chips (trophies, XP, coins, gems, quests…)']],
+    ] },
     { v: '1.5', date: '2026-11-14', title: '1.5 更新 · 焕然一新', en_title: 'Update 1.5 · Fresh Coat', sections: [
       ['角色页面', [
         '点驾驶员或机体就进入专属页面：中间是可以拖动旋转的大型 3D 模型，左右切换上一个 / 下一个',

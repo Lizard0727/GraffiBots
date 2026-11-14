@@ -2557,6 +2557,116 @@
     CP.ch.root.rotation.y = -face + CP.ch.yawOff;
     CP.r.render(CP.scene, CP.cam);
   }
+
+  // ---------------- 1.5：结算台——我方全队 3D 模型，赢了轮流庆祝 + 彩纸，输了垂头丧气 ----------------
+  const TS = { list: [] };
+  function tsInit() {
+    if (TS.r) return true;
+    if (!T) return false;
+    try {
+      TS.canvas = document.createElement('canvas'); TS.canvas.className = 'ts-canvas';
+      TS.r = new T.WebGLRenderer({ canvas: TS.canvas, antialias: true, alpha: true });
+    } catch (e) { TS.r = null; return false; }
+    TS.scene = new T.Scene();
+    TS.scene.add(new T.HemisphereLight(0xeef0ff, 0x4a3a5a, 0.66));
+    const sun = new T.DirectionalLight(0xfff2e0, 0.66); sun.position.set(40, 110, 90); TS.scene.add(sun);
+    TS.rim = new T.DirectionalLight(0xffffff, 0.5); TS.rim.position.set(-30, 60, -90); TS.scene.add(TS.rim);
+    // 舞台：一条长台 + 每人脚下一个光圈
+    TS.stage = new T.Mesh(new T.CylinderGeometry(1, 1, 1, 48), new T.MeshLambertMaterial({ color: 0x2a2440 }));
+    TS.stage.scale.set(70, 2, 26); TS.stage.position.y = -1; TS.scene.add(TS.stage);
+    const sc = document.createElement('canvas'); sc.width = sc.height = 64;
+    { const x = sc.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); }
+    TS.shadowTex = new T.CanvasTexture(sc);
+    // 彩纸：一堆小方片从天上飘下来
+    const N = 160, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    const pal = [0xff3ea5, 0x1fd6ee, 0x9cff2e, 0xffe600, 0xff8a1f, 0xb78cff].map((c) => new T.Color(c));
+    TS.conf = [];
+    for (let i = 0; i < N; i++) { const c = pal[i % pal.length]; col.set([c.r, c.g, c.b], i * 3); TS.conf.push({ x: 0, y: 0, z: 0, vy: 0, sx: 0, ph: 0 }); }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
+    TS.points = new T.Points(g, new T.PointsMaterial({ size: 2.2, vertexColors: true, sizeAttenuation: true }));
+    TS.points.frustumCulled = false; TS.scene.add(TS.points);
+    TS.cam = new T.PerspectiveCamera(30, 2, 1, 900);
+    return true;
+  }
+  function resetConf(c, top) { c.x = (Math.random() - 0.5) * 150; c.y = top ? 60 + Math.random() * 70 : Math.random() * 120; c.z = (Math.random() - 0.5) * 50 - 5; c.vy = 9 + Math.random() * 12; c.sx = (Math.random() - 0.5) * 6; c.ph = Math.random() * 6; }
+  // list: [{ pilot: 'id@skin', color, mvp }]（第一个放中间）
+  function teamShow(host, list, won) {
+    if (!tsInit()) return false;
+    shared();
+    if (TS.host !== host) { host.appendChild(TS.canvas); TS.host = host; }
+    for (const m of TS.list) TS.scene.remove(m.g);
+    TS.list = [];
+    const n = Math.min(4, list.length);
+    const gap = n >= 4 ? 30 : 33;
+    // 中间站 MVP，其余左右交替
+    const xs = n === 1 ? [0] : n === 2 ? [-gap / 2, gap / 2] : n === 3 ? [0, -gap, gap] : [-gap / 2, gap / 2, -gap * 1.5, gap * 1.5];
+    for (let i = 0; i < n; i++) {
+      const it = list[i], ch = buildChar(it.pilot, it.color, null);
+      const g = new T.Group(); g.add(ch.root);
+      const sh = new T.Mesh(new T.PlaneGeometry(20, 20), new T.MeshBasicMaterial({ map: TS.shadowTex, transparent: true, depthWrite: false }));
+      sh.rotation.x = -Math.PI / 2; sh.position.y = 0.1; g.add(sh);
+      const ring = new T.Mesh(new T.RingGeometry(9.2, 10.6, 40), new T.MeshBasicMaterial({ color: it.mvp ? 0xffd23f : new T.Color(it.color), transparent: true, opacity: it.mvp ? 0.95 : 0.6 }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.15; g.add(ring);
+      const k = it.mvp ? 1.12 : 1;
+      g.scale.setScalar(k);
+      g.position.set(xs[i], 0, it.mvp ? 5 : (i >= 3 || (n === 3 && i > 0) ? -3 : 0));
+      TS.scene.add(g);
+      TS.list.push({ g, ch, mvp: !!it.mvp, delay: 0.25 + i * 0.35, next: 0.25 + i * 0.35, yaw: 0.25 * (xs[i] > 0 ? -1 : xs[i] < 0 ? 1 : 0) });
+    }
+    TS.won = !!won; TS.t = 0; TS.n = n;
+    TS.rim.color.set(list[0] ? list[0].color : '#ffffff');
+    TS.points.visible = !!won;
+    for (const c of TS.conf) resetConf(c, false);
+    tsSize();
+    return true;
+  }
+  function tsSize() {
+    const w = TS.host.clientWidth || 600, h = TS.host.clientHeight || 300;
+    TS.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); TS.r.setSize(w, h, false);
+    TS.cam.aspect = w / Math.max(1, h); TS.cam.updateProjectionMatrix();
+    // 让整排人都在画面里：宽度不够时拉远镜头
+    const span = (TS.n >= 4 ? 120 : TS.n === 3 ? 100 : TS.n === 2 ? 70 : 46);
+    const vfov = (TS.cam.fov * Math.PI) / 180, hfov = 2 * Math.atan(Math.tan(vfov / 2) * TS.cam.aspect);
+    const dist = Math.max(span / 2 / Math.tan(hfov / 2), 44 / Math.tan(vfov / 2)) * 1.05;
+    TS.cam.position.set(0, 22 + dist * 0.12, dist); TS.cam.lookAt(0, 14, 0);
+    TS.w = w; TS.h = h;
+  }
+  function teamFrame(now, dt) {
+    if (!TS.r || !TS.list.length || !TS.host || !TS.canvas.isConnected || TS.canvas.offsetParent === null) return;
+    if (TS.host.clientWidth !== TS.w || TS.host.clientHeight !== TS.h) tsSize();
+    TS.t += dt;
+    for (const m of TS.list) {
+      const c = m.ch;
+      // 赢了：每个人隔一会儿播一次庆祝（错开），MVP 先整套展示
+      if (TS.won && TS.t >= m.next && !c.act) { c.act = { name: m.mvp && m.next === m.delay ? 'show' : Math.random() < 0.7 ? 'victory' : 'hello', t: 0 }; m.next = TS.t + 2.2 + Math.random() * 1.6; }
+      const face = Math.PI / 2 + m.yaw;   // 面向镜头（+z）
+      animateChar(c, { a: face, vx: 0, vy: 0 }, dt, 0, {});
+      if (!TS.won) {
+        // 输了：低头、肩膀垂下、偶尔摇头叹气
+        const t = TS.t + m.delay * 3, shake = Math.max(0, Math.sin(t * 0.9)) ** 8;
+        c.head.rotation.x = 0.42 + Math.sin(t * 1.3) * 0.03; c.head.rotation.z = Math.sin(t * 9) * 0.18 * shake;
+        c.torso.rotation.x = 0.16; c.torso.position.y -= 0.6;
+        c.arms[0].rotation.z = -0.05; c.arms[0].rotation.x = 0.05; c.arms[1].rotation.z = 0.05; c.arms[1].rotation.x = -0.05;
+      }
+      c.root.rotation.y = -face + c.yawOff;
+    }
+    if (TS.points.visible) {
+      const P = TS.points.geometry.attributes.position;
+      TS.conf.forEach((c, i) => {
+        c.y -= c.vy * dt; c.x += Math.sin(TS.t * 2 + c.ph) * c.sx * dt;
+        if (c.y < -2) resetConf(c, true);
+        P.setXYZ(i, c.x, c.y, c.z);
+      });
+      P.needsUpdate = true;
+    }
+    TS.r.render(TS.scene, TS.cam);
+  }
+  // 屏幕位置：结算台上第 i 个人头顶（给名字标签定位）
+  function teamSlots() {
+    if (!TS.r || !TS.list.length) return [];
+    TS.cam.updateMatrixWorld();
+    return TS.list.map((m) => { const v = new T.Vector3(m.g.position.x, 0, m.g.position.z).project(TS.cam); return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; });
+  }
   // 拍一张角色照（展示用，结果缓存）
   const CSHOTS = new Map();
   function charShot(pilotId, color, w = 360, h = 440, stage = true) {
@@ -2885,6 +2995,7 @@
     get ok() { return init(); },
     get scene() { return scene; },
     setPost(on, o) { POST.off = !on; if (o && POST.comp) for (const k in o) { if (POST.comp.uniforms[k]) POST.comp.uniforms[k].value = o[k]; if (k === 'th') POST.bright.uniforms.th.value = o[k]; } },
+    teamShow, teamFrame, teamSlots,
     build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
