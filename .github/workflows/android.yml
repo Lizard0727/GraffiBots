@@ -19,7 +19,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # GitHub 的 ubuntu 机器自带 Android SDK（ANDROID_HOME），不用再单独安装
 
       - uses: gradle/actions/setup-gradle@v4
         with:
