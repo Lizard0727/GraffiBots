@@ -244,8 +244,9 @@ function createServer() {
     }
     if (url === '/') url = '/index.html';
     // /site/ 是官方网站（site 文件夹），其余是游戏本体（public 文件夹）
-    const root = url.startsWith('/site/') || url === '/site' ? SITE : PUBLIC;
+    let root = url.startsWith('/site/') || url === '/site' ? SITE : PUBLIC;
     if (root === SITE) { url = url.replace(/^\/site/, '') || '/'; if (url.endsWith('/')) url += 'index.html'; }
+    if (root === SITE && url.startsWith('/game/')) { root = PUBLIC; url = url.slice(5); }   // 官网的 3D 展示台用游戏的渲染代码
     const fp = path.normalize(path.join(root, url));
     if (!fp.startsWith(root)) { res.writeHead(403); return res.end(); }
     fs.readFile(fp, (err, data) => {

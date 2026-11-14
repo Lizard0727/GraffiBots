@@ -900,9 +900,28 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.3';
+  S.VERSION = '1.3.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.3.1', date: '2026-11-14', title: '1.3.1 更新 · 官网上线', en_title: 'Update 1.3.1 · Website Launch', sections: [
+      ['驾驶员展示动作', [
+        '选中驾驶员时，3D 模型会播放一整套动作：打招呼、招牌攻击、跳起来庆祝',
+        '枪手连开三枪再转枪，近战驾驶员横扫两下再跳起来往下砸，秦岳连扔两颗手雷',
+        '展示台下面新增「打招呼」「攻击」「庆祝」按钮，可以单独再看一次']],
+      ['官网', [
+        '官网改为独立的公开网站，不再需要通过 Claude 打开，支持被 Google 等搜索引擎收录',
+        '官网的「驾驶员与机兵」新增 3D 展示台：点任意驾驶员就能看到会动的 3D 模型，以及技能、被动、超载和弹出武器']],
+      ['更新奖励', ['信箱里有一份 1.3.1 更新礼包：50 宝石 + 1000 金币']],
+    ], en: [
+      ['Pilot showcase moves', [
+        'When you select a pilot, their 3D model plays a full routine: a hello, a signature attack and a victory jump',
+        'Gunners fire three shots and twirl their weapon, melee pilots swing twice then leap into a smash, and Qin lobs two grenades',
+        'New Hello, Attack and Celebrate buttons under the showcase let you replay each move']],
+      ['Website', [
+        'The website is now a standalone public site: no Claude needed to open it, and search engines like Google can index it',
+        'The Pilots & mechs section on the website has a new 3D showcase: pick any pilot to see their animated 3D model along with their skill, passive, overload and sidearm']],
+      ['Update rewards', ['A 1.3.1 update gift is waiting in your mailbox: 50 gems + 1,000 coins']],
+    ] },
     { v: '1.3', date: '2026-11-14', title: '1.3 更新 · 驾驶员出击', en_title: 'Update 1.3 · Pilots Unleashed', sections: [
       ['全新 3D 驾驶员模型', [
         '15 位驾驶员都有了精致的全身 3D 模型：大头卡通造型，专属的服装、发型、表情和配件',

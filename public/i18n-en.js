@@ -1171,5 +1171,9 @@ window.GB_EN = {
   "驾驶员弹出时自动获得 35 点护盾（安全帽）。": "Gets a 35-point shield (hard hat) when the pilot ejects.",
   "在脚下放一包炸药，0.9 秒后爆炸，造成 72 点伤害并涂满周围。": "Drops a charge at your feet that explodes after 0.9s, dealing 72 damage and painting the area.",
   "对生命高于 90% 的敌人伤害 +10%。": "+10% damage to enemies above 90% HP.",
-  "朝前方扔出闪光弹：扇形范围内的敌人受到 10 点伤害、减速 1.2 秒、0.8 秒内无法攻击，并暴露 4 秒。": "Throws a flashbang forward: enemies in the cone take 10 damage, are slowed for 1.2s, can't attack for 0.8s and are revealed for 4s."
+  "朝前方扔出闪光弹：扇形范围内的敌人受到 10 点伤害、减速 1.2 秒、0.8 秒内无法攻击，并暴露 4 秒。": "Throws a flashbang forward: enemies in the cone take 10 damage, are slowed for 1.2s, can't attack for 0.8s and are revealed for 4s.",
+  "打招呼": "Hello",
+  "庆祝": "Celebrate",
+  "1.3.1 更新礼包": "Update 1.3.1 gift",
+  "官网正式上线啦！在「驾驶员」里选中角色，看看他们的 3D 展示动作。这份小礼物请收下！": "The official website is live! Pick a pilot on the Pilots screen to watch their 3D showcase moves. Here's a little gift!"
 };

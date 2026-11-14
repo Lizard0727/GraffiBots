@@ -3,10 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>涂鸦机兵 GraffiBots</title>
+<title>涂鸦机兵 GraffiBots｜4v4 涂料机甲对战游戏</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="涂鸦机兵 GraffiBots 官方网站：开始游戏、下载最新版本、查看每次更新的内容。">
+<meta name="description" content="涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。">
+<meta name="theme-color" content="#1c1b21">
 <link rel="icon" href="img/icon.png">
+<link rel="apple-touch-icon" href="img/icon.png">
+<!-- seo:start（由 tools/build-site.js 根据官网地址生成，不要手改） -->
+<link rel="canonical" href="https://lizard0727.github.io/GraffiBots/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="涂鸦机兵 GraffiBots">
+<meta property="og:title" content="涂鸦机兵 GraffiBots｜4v4 涂料机甲对战游戏">
+<meta property="og:description" content="涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。">
+<meta property="og:image" content="https://lizard0727.github.io/GraffiBots/img/v13-lineup.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="涂鸦机兵 GraffiBots">
+<meta name="twitter:description" content="GraffiBots official site: a 4v4 paint-mech brawler where you spray a gray city back into color. Play free in your browser or download the offline and Android versions.">
+<meta name="twitter:image" content="https://lizard0727.github.io/GraffiBots/img/v13-lineup.jpg">
+<meta property="og:url" content="https://lizard0727.github.io/GraffiBots/">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"涂鸦机兵 GraffiBots","alternateName":"GraffiBots","description":"涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。","inLanguage":["zh-CN","en"],"genre":["Action","Shooter","Multiplayer"],"gamePlatform":["Web browser","Android"],"applicationCategory":"Game","operatingSystem":"Windows, macOS, Linux, Android","playMode":["MultiPlayer","SinglePlayer"],"numberOfPlayers":{"@type":"QuantitativeValue","minValue":1,"maxValue":8},"softwareVersion":"1.3.1","datePublished":"2026-11-13","dateModified":"2026-11-14","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://lizard0727.github.io/GraffiBots/img/v13-lineup.jpg","url":"https://lizard0727.github.io/GraffiBots/"}</script>
+<!-- seo:end -->
 <style>
 @font-face { font-family: 'GBHead'; src: url('fonts/huangyou.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: 'GBNum'; src: url('fonts/bangers.woff2') format('woff2'); font-display: swap; }
@@ -147,6 +167,34 @@ b.new { color: var(--ny); font-weight: 800; }
 .pc b { display: block; font: 21px/1.15 var(--f-head); }
 .pc span { font-size: 12px; color: var(--dust); }
 .pc .sticker { position: absolute; top: 9px; right: 8px; font-size: 13px; }
+.pc { cursor: pointer; padding: 0; text-align: left; font: inherit; color: inherit; transition: transform .12s, border-color .12s; }
+.pc:hover { transform: translateY(-3px); }
+.pc[aria-pressed="true"] { border-color: var(--ny); box-shadow: 0 0 0 3px var(--ny), 4px 5px 0 #0007; transform: translateY(-4px); }
+/* 3D 展示台 */
+.stage-wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; align-items: center; margin-bottom: 30px; }
+.stage { position: relative; aspect-ratio: 9 / 10; max-height: 520px; width: 100%; border-radius: 18px; border: 3px solid var(--ink); overflow: hidden; cursor: grab; touch-action: pan-y;
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--acc, #ffe600) 42%, #2a2440), #17141f 72%); box-shadow: 6px 8px 0 #0008; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(1.15); transform-origin: 50% 62%; transition: opacity .3s; }
+.stage canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; }
+.stage.live img { opacity: 0; }
+.stage-hint { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; color: #fff; opacity: .7; pointer-events: none; z-index: 1; text-shadow: 1px 1px 0 #000; }
+.stage-info { min-width: 0; }
+.stage-info .code { font: 15px/1 var(--f-tag); color: var(--acc, var(--ny)); }
+.stage-info h3 { font: clamp(40px, 5vw, 58px)/1.05 var(--f-head); margin: 6px 0 2px; }
+.stage-info .ttl { color: var(--dust); font-weight: 700; }
+.stage-info blockquote { margin: 14px 0 18px; font-size: 16px; color: #ddd8e2; border-left: 4px solid var(--acc, var(--ny)); padding-left: 12px; }
+.abils { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.abil { background: var(--wall); border: 2px solid var(--seam); border-radius: 12px; padding: 11px 13px; min-width: 0; }
+.abil .k { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey); font-weight: 800; }
+.abil b { display: block; font: 18px/1.25 var(--f-head); margin: 2px 0 3px; color: var(--chalk); }
+.abil p { margin: 0; font-size: 13px; color: var(--dust); line-height: 1.5; }
+.abil.side { border-color: var(--acc, var(--ny)); }
+.acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.acts button { font: 17px var(--f-head); letter-spacing: 1px; padding: 9px 16px 7px; border-radius: 10px; border: 3px solid var(--ink); background: var(--paper); color: var(--ink); cursor: pointer; box-shadow: 3px 4px 0 var(--ink); transition: transform .1s; }
+.acts button:hover { transform: translateY(-2px); background: var(--ny); }
+.acts button:active { transform: translateY(2px); box-shadow: 1px 1px 0 var(--ink); }
+.acts button[disabled] { opacity: .45; cursor: default; transform: none; }
+@media (max-width: 820px) { .stage-wrap { grid-template-columns: minmax(0, 1fr); } .stage { max-height: 420px; aspect-ratio: 1; } .abils { grid-template-columns: minmax(0, 1fr); } }
 .mechs { margin-top: 38px; overflow-x: auto; }
 .mechs table { width: 100%; border-collapse: collapse; min-width: 560px; font-variant-numeric: tabular-nums; }
 .mechs th { text-align: left; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey); font-weight: 700; padding: 0 12px 8px; border-bottom: 2px solid var(--seam); }
@@ -224,6 +272,16 @@ footer a { color: var(--dust); }
 </style>
 </head>
 <body class="zh-mode">
+<!-- noscript:start（由 tools/build-site.js 生成：搜索引擎和关掉 JavaScript 的人看到的内容） -->
+<noscript><div class="wrap" style="padding-block:24px">
+<h1>涂鸦机兵 GraffiBots</h1><p>涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。</p><p>GraffiBots official site: a 4v4 paint-mech brawler where you spray a gray city back into color. Play free in your browser or download the offline and Android versions.</p>
+<p>当前版本 1.3.1（2026-11-14）。驾驶员 15 位 · 机兵 13 台 · 地图 12 张 · 玩法 8 种。</p>
+<h2>1.3.1 更新 · 官网上线</h2><h3>驾驶员展示动作</h3><ul><li>选中驾驶员时，3D 模型会播放一整套动作：打招呼、招牌攻击、跳起来庆祝</li><li>枪手连开三枪再转枪，近战驾驶员横扫两下再跳起来往下砸，秦岳连扔两颗手雷</li><li>展示台下面新增「打招呼」「攻击」「庆祝」按钮，可以单独再看一次</li></ul><h3>官网</h3><ul><li>官网改为独立的公开网站，不再需要通过 Claude 打开，支持被 Google 等搜索引擎收录</li><li>官网的「驾驶员与机兵」新增 3D 展示台：点任意驾驶员就能看到会动的 3D 模型，以及技能、被动、超载和弹出武器</li></ul><h3>更新奖励</h3><ul><li>信箱里有一份 1.3.1 更新礼包：50 宝石 + 1000 金币</li></ul>
+<h2>驾驶员</h2><ul><li>凌焰（Blaze）：热血突击手，随身武器「火花双枪」</li><li>白夜（Frost）：冷面狙击手，随身武器「袖珍狙击枪」</li><li>苏糖（Candy）：元气偶像主播，随身武器「彩带喷枪」</li><li>雷豹（Titan）：重装开路者，随身武器「涂料拳套」</li><li>夜鸢（Raven）：神秘涂鸦师，随身武器「墨汁飞镖」</li><li>星澜（Aurora）：天才机兵工程师，随身武器「铆钉枪」</li><li>风羽（Gale）：天空竞速手，随身武器「疾风弩」</li><li>洛奇（Hex）：天才黑客，随身武器「电击枪」</li><li>包大福（Bao）：后勤大厨，随身武器「平底锅」</li><li>秦岳（Qin）：退役王牌，随身武器「手雷」</li><li>小柚（Yuzu）：无人机少女，随身武器「迷你无人机」</li><li>岚（Lan）：灰城反抗军队长，随身武器「信号枪」</li><li>石磊（Rocky）：拆迁队工头，随身武器「钉锤」</li><li>叶声（Echo）：地下电台 DJ，随身武器「口袋音箱」</li><li>韩冰（Han）：灰石集团前安保主管，随身武器「警用电棍」</li></ul>
+<h2>玩法</h2><ul><li>涂地大战：比赛结束时涂色面积更大的队伍获胜。最后 30 秒局势将被隐藏！</li><li>抢占据点：把中央据点涂到 70% 即可占领，占领期间己方倒计时减少，先归零者获胜。</li><li>护送宝物：抢下中央的宝物核心，带到敌方一侧的终点台得分（持有者受到的伤害降低 25%），先得 3 分获胜。</li><li>漆弹足球：用涂料子弹、炸弹和身体把大球推进对方球门，先进 5 球获胜。</li><li>电池掠夺：收集地图上的能量电池送回己方基地，被击倒会掉落全部电池，先存满 40 个获胜。</li><li>生死之战：只有一条命：机体被打爆不会重建，驾驶员也倒下就出局。先把对面全队消灭赢一局，三局两胜。</li><li>逃亡圈 · 四队：4 队 × 2 人分散空降。灰色毒圈不断缩小，捡空投箱变强，只有一条命，最后活下来的队伍获胜。</li><li>逃亡圈 · 单人：8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。</li></ul>
+<p><a href="#download">下载 / Download</a> · <a href="#updates">更新日志 / Patch notes</a></p>
+</div></noscript>
+<!-- noscript:end -->
 <header class="top">
   <div class="wrap">
     <a class="brand" href="#home"><b>涂鸦机兵</b><span>GRAFFIBOTS</span></a>
@@ -268,7 +326,11 @@ footer a { color: var(--dust); }
   <section class="band alt" id="roster-sec">
     <div class="wrap">
       <header class="sec-h"><h2 data-t="roster_h"></h2><p data-t="roster_p"></p></header>
-      <div class="roster" id="roster"></div>
+      <div class="stage-wrap" id="stageWrap">
+        <div class="stage" id="stage"><img id="stageImg" alt="" width="360" height="440"><span class="stage-hint" id="stageHint"></span></div>
+        <div class="stage-info" id="stageInfo" aria-live="polite"></div>
+      </div>
+      <div class="roster" id="roster" role="group"></div>
       <div class="mechs"><table><thead><tr><th data-t="th_mech"></th><th data-t="th_role"></th><th data-t="th_hp"></th><th data-t="th_range"></th></tr></thead><tbody id="mechRows"></tbody></table></div>
     </div>
   </section>
@@ -329,7 +391,8 @@ footer a { color: var(--dust); }
       poster_tag: '最新版本', poster_go: '看看更新了什么 →', updated: (d) => `${d} 更新`,
       all_notes: '完整更新日志 →', more_items: (n) => `还有 ${n} 项 →`,
       roster_h: '驾驶员与机兵', roster_p: '驾驶员和机兵分开选：每位驾驶员有自己的技能、被动、超载和 3D 模型，坐进哪台机兵都行。机兵被打爆后驾驶员会弹出，拿出自己的专属武器继续战斗。',
-      season: '赛季', quest: '任务', side: '弹出武器', th_mech: '机兵', th_role: '定位', th_hp: '生命', th_range: '射程',
+      season: '赛季', quest: '任务', side: '弹出武器', skill: '技能', passive: '被动', ov: '超载', fav: '擅长机兵',
+      act_hello: '打招呼', act_attack: '攻击', act_victory: '庆祝', act_show: '整套动作', drag: '拖动可以旋转', loading3d: '正在加载 3D 模型…', no3d: '你的浏览器不支持 3D，显示的是渲染图', th_mech: '机兵', th_role: '定位', th_hp: '生命', th_range: '射程',
       modes_h: '玩法', modes_p: '每种玩法都有 4 对 4 的快速对战，也可以开房间和朋友打。', maps_h: '地图',
       dl_h: '下载与开始', dl_lede: (v, d) => `当前版本 ${v}，${d} 发布。每次更新都会先发在这里。`,
       dl: {
@@ -352,7 +415,8 @@ footer a { color: var(--dust); }
       poster_tag: 'Latest version', poster_go: 'See what changed →', updated: (d) => `Updated ${d}`,
       all_notes: 'Full patch notes →', more_items: (n) => `${n} more →`,
       roster_h: 'Pilots & mechs', roster_p: 'Pick a pilot and a mech separately: every pilot has their own skill, passive, overload and 3D model, and can drive any mech. When a mech is destroyed the pilot ejects and keeps fighting with their own sidearm.',
-      season: 'SEASON', quest: 'QUEST', side: 'Sidearm', th_mech: 'Mech', th_role: 'Role', th_hp: 'HP', th_range: 'Range',
+      season: 'SEASON', quest: 'QUEST', side: 'Sidearm', skill: 'Skill', passive: 'Passive', ov: 'Overload', fav: 'Favorite mech',
+      act_hello: 'Hello', act_attack: 'Attack', act_victory: 'Celebrate', act_show: 'Full routine', drag: 'Drag to rotate', loading3d: 'Loading 3D model…', no3d: '3D isn\'t supported in this browser, showing a render', th_mech: 'Mech', th_role: 'Role', th_hp: 'HP', th_range: 'Range',
       modes_h: 'Modes', modes_p: 'Every mode has 4v4 quick matches, or open a room and play with friends.', maps_h: 'Maps',
       dl_h: 'Download & play', dl_lede: (v, d) => `Current version ${v}, released ${d}. Every update is posted here first.`,
       dl: {
@@ -383,6 +447,8 @@ footer a { color: var(--dust); }
   const onServer = /^\/site(\/|$)/.test(location.pathname);
   const offline = D.downloads.find((d) => d.id === 'offline');
   const playUrl = CFG.play || (onServer ? '/' : offline && offline.have ? offline.file : '../public/index.html');
+  let sel = (D.pilots.find((p) => p.id === 'blaze') || D.pilots[0]).id;
+  const R3 = { api: null, state: 'idle' };   // 3D 展示台：idle → loading → live / failed
 
   function render() {
     document.body.className = lang + '-mode';
@@ -407,7 +473,9 @@ footer a { color: var(--dust); }
       return `<section class="${i === big ? 'big' : ''}"><h3>${esc(h)}</h3><ul>${show.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul>${items.length > 3 ? `<a class="more" href="#${vid(N.v)}">${esc(t('more_items')(items.length - 3))}</a>` : ''}</section>`;
     }).join('');
     // 驾驶员 / 机兵
-    $('roster').innerHTML = D.pilots.map((p) => `<article class="pc" style="--acc:${esc(p.accent)}"><div class="art">${p.img ? `<img src="${esc(p.img)}" alt="${esc(nm(p))}" loading="lazy" width="360" height="440">` : p.svg}</div>${p.tag ? `<span class="sticker ${p.tag}">${esc(t(p.tag))}</span>` : ''}<div class="meta"><b>${esc(nm(p))}</b><span>${esc(L(p, 'title'))}</span><em>${esc(t('side'))} · ${esc(L(p, 'side'))}</em></div></article>`).join('');
+    $('roster').innerHTML = D.pilots.map((p) => `<button type="button" class="pc" data-id="${esc(p.id)}" aria-pressed="${p.id === sel}" style="--acc:${esc(p.accent)}"><div class="art">${p.img ? `<img src="${esc(p.img)}" alt="${esc(nm(p))}" loading="lazy" width="360" height="440">` : p.svg}</div>${p.tag ? `<span class="sticker ${p.tag}">${esc(t(p.tag))}</span>` : ''}<div class="meta"><b>${esc(nm(p))}</b><span>${esc(L(p, 'title'))}</span><em>${esc(t('side'))} · ${esc(L(p, 'side'))}</em></div></button>`).join('');
+    for (const btn of $('roster').querySelectorAll('.pc')) btn.addEventListener('click', () => { sel = btn.dataset.id; for (const o of $('roster').querySelectorAll('.pc')) o.setAttribute('aria-pressed', o === btn); renderStage(true); });
+    renderStage(false);
     const maxHp = Math.max(...D.mechs.map((m) => m.hp)), maxR = Math.max(...D.mechs.map((m) => m.range));
     $('mechRows').innerHTML = D.mechs.map((m) => `<tr><td>${esc(nm(m))}${m.tag ? `<span class="sticker ${m.tag}">${esc(t(m.tag))}</span>` : ''}</td><td>${esc(L(m, 'role'))}</td><td class="num">${m.hp}<i class="bar" style="width:${Math.round(m.hp / maxHp * 60)}px"></i></td><td class="num">${m.range || '—'}${m.range ? `<i class="bar r" style="width:${Math.round(m.range / maxR * 60)}px"></i>` : ''}</td></tr>`).join('');
     // 玩法 / 地图
@@ -432,9 +500,61 @@ footer a { color: var(--dust); }
     $('updIndex').innerHTML = D.notes.map((n) => `<a href="#${vid(n.v)}" data-v="${vid(n.v)}"><span class="vn">${esc(n.v)}</span><span class="tt">${esc(titleOf(n))}</span><time datetime="${n.date}">${n.date}</time></a>`).join('');
     $('notes').innerHTML = D.notes.map((n, i) => `<article class="note" id="${vid(n.v)}"><div class="note-head"><span class="vnum">${esc(n.v)}</span><div><h2>${esc(titleOf(n))}</h2><time datetime="${n.date}">${n.date}</time></div>${i === 0 ? `<span class="sticker">${esc(t('latest'))}</span>` : ''}</div><div class="note-body">${notesOf(n).map(([h, items]) => `<section><h3>${esc(h)}</h3><ul>${items.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
     $('footVer').textContent = t('foot_ver')(D.version);
-    document.title = lang === 'en' ? 'GraffiBots' : '涂鸦机兵 GraffiBots';
+    document.title = lang === 'en' ? 'GraffiBots | 4v4 Paint-Mech Brawler' : '涂鸦机兵 GraffiBots｜4v4 涂料机甲对战游戏';
     route(false);
   }
+
+  // ---------- 3D 驾驶员展示台（用游戏自己的渲染代码，选中时播放展示动作） ----------
+  function renderStage(picked) {
+    const p = D.pilots.find((x) => x.id === sel);
+    if (!p) return;
+    $('stageWrap').style.setProperty('--acc', p.accent);
+    $('stageImg').src = p.img || ''; $('stageImg').alt = nm(p);
+    const ab = (k, name, desc, cls) => `<div class="abil ${cls || ''}"><span class="k">${esc(t(k))}</span><b>${esc(name)}</b><p>${esc(desc)}</p></div>`;
+    $('stageInfo').innerHTML = `<span class="code">「${esc(L(p, 'code'))}」</span><h3>${esc(nm(p))}</h3><div class="ttl">${esc(L(p, 'title'))} · ${esc(t('fav'))}：${esc(L(p, 'mech'))}</div>
+      <blockquote>“${esc(L(p, 'line'))}”</blockquote>
+      <div class="abils">${ab('side', L(p, 'side'), L(p, 'side_desc'), 'side')}${ab('skill', L(p, 'skill'), L(p, 'skill_desc'))}${ab('passive', L(p, 'passive'), L(p, 'passive_desc'))}${ab('ov', L(p, 'ov'), L(p, 'ov_desc'))}</div>
+      <div class="acts">${['show', 'hello', 'attack', 'victory'].map((a) => `<button type="button" data-act="${a}" ${R3.state === 'live' ? '' : 'disabled'}>${esc(t('act_' + a))}</button>`).join('')}</div>`;
+    for (const b of $('stageInfo').querySelectorAll('[data-act]')) b.addEventListener('click', () => { if (R3.api) R3.api.charAction(b.dataset.act); });
+    $('stageHint').textContent = R3.state === 'live' ? t('drag') : R3.state === 'failed' ? t('no3d') : R3.state === 'loading' ? t('loading3d') : '';
+    if (R3.api) R3.api.charPreview($('stage'), p.id, p.accent);
+    if (picked && window.innerWidth < 820) $('stageWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function loadScript(srcs) {
+    return new Promise((res, rej) => {
+      const next = (i) => {
+        if (i >= srcs.length) return rej(new Error('load failed'));
+        const el = document.createElement('script'); el.src = srcs[i];
+        el.onload = () => res(); el.onerror = () => { el.remove(); next(i + 1); };
+        document.head.appendChild(el);
+      };
+      next(0);
+    });
+  }
+  function webgl() { try { const c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl'))); } catch (e) { return false; } }
+  async function load3D() {
+    if (R3.state !== 'idle') return;
+    if (!webgl()) { R3.state = 'failed'; renderStage(false); return; }
+    R3.state = 'loading'; renderStage(false);
+    try {
+      // 部署的官网：game/ 文件夹；node server.js：/site/game/ 映射到游戏；直接打开仓库里的 site/index.html：../public/
+      if (!window.THREE) await loadScript(['game/vendor/three.min.js', '../public/vendor/three.min.js']);
+      if (!window.GS) await loadScript(['game/shared.js', '../public/shared.js']);
+      if (!window.GB3D) await loadScript(['game/render3d.js', '../public/render3d.js']);
+      R3.api = window.GB3D;
+      const p0 = D.pilots.find((x) => x.id === sel);
+      if (!R3.api || !R3.api.charPreview($('stage'), sel, p0.accent)) throw new Error('no renderer');
+      R3.state = 'live'; $('stage').classList.add('live');
+      renderStage(false);
+      let last = performance.now();
+      const tick = (now) => { R3.api.charFrame(now, Math.min(0.05, (now - last) / 1000)); last = now; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    } catch (e) { R3.state = 'failed'; renderStage(false); }
+  }
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); load3D(); } }, { rootMargin: '300px' });
+    io.observe($('stageWrap'));
+  } else load3D();
 
   // ---------- 路由：#home / #updates / #v1-2 / #download ... ----------
   function route(scroll = true) {

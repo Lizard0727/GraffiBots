@@ -1,20 +1,18 @@
 {
-  "version": "1.3",
+  "version": "1.3.1",
   "date": "2026-11-14",
-  "title": "1.3 更新 · 驾驶员出击",
-  "en_title": "Update 1.3 · Pilots Unleashed",
+  "title": "1.3.1 更新 · 官网上线",
+  "en_title": "Update 1.3.1 · Website Launch",
   "page": "#updates",
   "force": true,
   "notes": [
-    "全新 3D 驾驶员模型",
-    "驾驶员专属随身武器",
-    "下载版必须更新",
+    "驾驶员展示动作",
+    "官网",
     "更新奖励"
   ],
   "en_notes": [
-    "All-new 3D pilot models",
-    "Pilot sidearms",
-    "Downloaded versions must update",
+    "Pilot showcase moves",
+    "Website",
     "Update rewards"
   ]
 }

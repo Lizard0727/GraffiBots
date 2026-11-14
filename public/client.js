@@ -356,7 +356,7 @@
     d.style.setProperty('--pc', P.accent);
     const rec = S.WEAPONS[P.weapon], sk = S.SKILLS[P.skill];
     const wsP = (profile.wear && profile.wear.pilot || {})[P.id];
-    d.innerHTML = `<div class="det-show"><div class="det-art">${GP.portrait(P)}</div><div class="det-3d" id="pilot3d"><small>3D · 拖动旋转</small></div></div>
+    d.innerHTML = `<div class="det-show"><div class="det-art">${GP.portrait(P)}</div><div class="det-3d" id="pilot3d"><div class="det-acts"><button data-act="hello">打招呼</button><button data-act="attack">攻击</button><button data-act="victory">庆祝</button></div></div></div>
       <h3>${P.name}<small>「${P.code}」</small></h3><div class="ttl">${P.title}</div>
       <blockquote>“${P.line}”</blockquote>
       <div class="abil"><b>${ic('skill', P.accent)}技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
@@ -368,6 +368,7 @@
       ${!E.hasPilot(profile, P.id) ? '' : profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : E.hasMech(profile, P.weapon) ? `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>` : `<small class="okline dim">擅长机体「${rec.name}」还没拥有</small>`}`;
     bindUpgrade(P);
     if (R3 && R3.charPreview) R3.charPreview($('pilot3d'), wsP && E.hasPilot(profile, P.id) ? P.id + '@' + wsP : P.id, P.accent);
+    for (const bt of d.querySelectorAll('[data-act]')) bt.onclick = (e) => { e.stopPropagation(); if (R3.charAction) R3.charAction(bt.dataset.act); sfx.click(); };
     const b = $('recWpn');
     if (b) b.onclick = () => { profile.weapon = P.weapon; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
   }

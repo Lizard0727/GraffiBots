@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://lizard0727.github.io/GraffiBots/sitemap.xml

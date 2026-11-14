@@ -182,6 +182,45 @@
 - **只保留俯视视角**：第三人称视角下线（狙击、迫击等机体在第三人称下优势过大）。
 - **平衡调整**：用 `node tools/balance.js [局数]` 让 AI 随机搭配打几百局，统计每个驾驶员 / 机体的胜率和 K/D，再按数据调整（具体数值见游戏内公告）。机体胜率差距从 34%–62% 缩小到大致 39%–60%，同时改进了近战机体的 AI。
 
+## 官网发布到网上（让大家在 Google 上找到）
+
+官网是普通的静态网页，可以放在任何静态网站托管上，不依赖 Claude 或任何服务器。
+
+**生成官网**
+
+```bash
+node tools/build-single.js                                   # 离线单文件版（官网的「下载」和「开始游戏」用）
+node tools/build-site.js --out _site --downloads --zip graffibots-site.zip
+```
+
+`_site/` 就是完整的官网（含下载包、3D 展示台需要的游戏渲染代码、`robots.txt`、`sitemap.xml`、`404.html`），`graffibots-site.zip` 是它的压缩包。
+
+**方式一：GitHub Pages（推荐，免费，推送后自动更新）**
+
+1. 把项目推送到 GitHub 仓库。
+2. 仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**。
+3. 之后每次推送，`.github/workflows/site.yml` 会自动测试、打包（含安卓 APK）并发布，地址是 `https://<用户名>.github.io/<仓库名>/`。
+
+**方式二：Netlify / Cloudflare Pages / 其他静态托管**
+
+注册账号后新建站点，选择「直接上传」，把 `graffibots-site.zip`（或 `_site` 文件夹）拖进去即可。
+
+**官网地址**：在 `site/site.config.json` 的 `url` 填正式地址（留空就用 `public/config.js` 的 `GB_SITE_URL`），并且让 `public/config.js` 的 `GB_SITE_URL` 也是这个地址（游戏靠它检查新版本）。改完重新运行上面的命令。用自己的域名时，在托管平台绑定域名，再把这两个地址都改成新域名。
+
+**让 Google 收录**
+
+1. 打开 [Google Search Console](https://search.google.com/search-console)，添加资源，选「网址前缀」，填官网地址。
+2. 验证方式选「HTML 标记」，把 `content="..."` 里的那串验证码填到 `site/site.config.json` 的 `googleVerification`，重新生成并发布官网，再回到 Search Console 点「验证」。
+3. 在「站点地图」里提交 `sitemap.xml`。一般几天到几周后就能在 Google 搜到「涂鸦机兵」。
+
+官网已经带好了搜索引擎需要的内容：标题和描述、分享预览图（Open Graph / Twitter）、游戏的结构化数据（schema.org VideoGame）、`robots.txt`、`sitemap.xml`，以及不开 JavaScript 时也能读到的文字版介绍和更新内容。
+
+## 1.3.1 更新 · 官网上线
+
+- **驾驶员展示动作**：选中驾驶员时，3D 模型播放一整套动作：打招呼 → 招牌攻击（枪手连开三枪再转枪，近战横扫两下跳起来砸，抛投手连扔两次）→ 跳起来转一圈庆祝。展示台下面的按钮可以单独再看（`R3.charAction`）。
+- **官网 3D 展示台**：官网的「驾驶员与机兵」里，点任意驾驶员就会在大展示台上看到 3D 模型和动作，旁边是技能、被动、超载和弹出武器（中英双语）。展示台直接用游戏的渲染代码（`public/render3d.js`），滚动到这里时才加载；浏览器不支持 3D 时显示渲染图。
+- **官网可以独立发布**：见上面的「官网发布到网上」。
+
 ## 1.3 更新 · 驾驶员出击
 
 - **3D 驾驶员模型**：15 位驾驶员都有全身 3D 模型（`public/render3d.js` 的 `buildChar`）：大头卡通比例、粗描边，每人有专属服装（`OUTFITS`）、发型和配件、表情（眼型 / 眉毛 / 嘴型来自驾驶员资料），右手拿着自己的随身武器。弹出后在战场上跑、瞄准、开火、近战挥击都有动画（`animateChar`）；驾驶舱里坐的是同一个模型的上半身；「驾驶员」详情里有可以拖动旋转的 3D 展示台。

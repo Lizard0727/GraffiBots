@@ -1,0 +1,5 @@
+{
+  "_说明": "官网发布设置。url 留空时使用 public/config.js 里的 GB_SITE_URL。googleVerification 填 Google Search Console 给你的验证码（content 里的那串），没有就留空。",
+  "url": "",
+  "googleVerification": ""
+}

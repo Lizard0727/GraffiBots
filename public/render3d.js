@@ -1693,6 +1693,19 @@
     if (pid !== 'titan') buildSidearm(prop, pid, P, teamColor);
     let propL = null;
     if (pid === 'blaze') { propL = dyn(new T.Group()); propL.position.set(0, -5.4, 0); propL.rotation.z = -Math.PI / 2; arms[0].add(propL); buildSidearm(propL, pid, P, teamColor); }
+    // 枪口火光（开火 / 展示动作时闪一下）
+    const flashes = [];
+    if (A.kind === 'gun') for (const pg of [prop, propL]) {
+      if (!pg) continue;
+      root.updateMatrixWorld(true);
+      const inv = new T.Matrix4().copy(pg.matrixWorld).invert(), m = new T.Matrix4(), bx = new T.Box3();
+      let mx = 0;
+      pg.traverse((o) => { if (o.isMesh && o.geometry && o.material !== OUTLINE) { o.geometry.computeBoundingBox(); m.multiplyMatrices(inv, o.matrixWorld); bx.copy(o.geometry.boundingBox).applyMatrix4(m); mx = Math.max(mx, bx.max.x); } });
+      const tip = new T.Vector3(mx + 0.9, 0.75, 0);
+      const fl = new T.Mesh(SH.sph, basic(0xfff36b, { transparent: true, opacity: 0.95, depthWrite: false, blending: T.AdditiveBlending }));
+      fl.position.copy(tip); fl.scale.set(1.6, 1.1, 1.1); fl.visible = false; fl.userData.keep = true; pg.add(fl);
+      flashes.push(fl);
+    }
     // 小柚的迷你无人机跟在肩膀旁边
     let drone = null;
     if (pid === 'yuzu' && !opts.bust) {
@@ -1704,7 +1717,7 @@
     }
     for (const g of [hips, ...legs, tb, ...arms, prop, headG]) bake(g, !opts.bust);
     if (propL) bake(propL, true);
-    return { root, hips, legs, torso, head: headG, arms, prop, propL, drone, kind: A.kind, pid, phase: 0, recoil: 0, swing: 0, lastAmmo: 3, idleT: Math.random() * 6, face: null };
+    return { root, hips, legs, torso, head: headG, arms, prop, propL, drone, flashes, kind: A.kind, pid, phase: 0, recoil: 0, swing: 0, lastAmmo: 3, idleT: Math.random() * 6, face: null, act: null, yawOff: 0, lift: 0 };
   }
 
   // 驾驶舱里的小人：同一个角色模型的上半身
@@ -1758,7 +1771,87 @@
       L.rotation.z = -swingL + 0.2; L.rotation.x = 0.2;
     }
     if (c.drone) { c.drone.position.y = 27 + Math.sin(c.idleT * 3) * 1.2; c.drone.rotation.y = c.idleT * 0.8; }
+    c.yawOff = 0; c.lift = 0;
+    c.prop.rotation.y = 0; if (c.propL) c.propL.rotation.y = 0;
+    if (c.act) charActionTick(c, dt);
+    if (c.lift) { c.torso.position.y += c.lift; c.hips.position.y += c.lift; }
+    for (const f of c.flashes) { f.visible = c.recoil > 0.55; if (f.visible) f.scale.setScalar(0.9 + Math.random() * 0.9); }
   }
+
+  // ---------------- 展示动作：打招呼 → 招牌攻击 → 胜利 ----------------
+  // 'show' = 整套（选中驾驶员时自动播放），也可以单独播 'hello' / 'attack' / 'victory'
+  const ACT_LEN = { hello: 1.1, attack: 1.9, victory: 1.5 };
+  const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+  const hump = (t, a, b) => (t <= a || t >= b ? 0 : Math.sin(((t - a) / (b - a)) * Math.PI));
+  function charActionTick(c, dt) {
+    const a = c.act; a.t += dt;
+    let name = a.name, t = a.t;
+    if (name === 'show') {
+      if (t < ACT_LEN.hello) name = 'hello';
+      else if (t < ACT_LEN.hello + ACT_LEN.attack) { name = 'attack'; t -= ACT_LEN.hello; }
+      else { name = 'victory'; t -= ACT_LEN.hello + ACT_LEN.attack; }
+    }
+    const total = a.name === 'show' ? ACT_LEN.hello + ACT_LEN.attack + ACT_LEN.victory : ACT_LEN[a.name];
+    if (a.t >= total) { c.act = null; return; }
+    const L = c.arms[0], R = c.arms[1];
+    if (name === 'hello') {
+      // 小跳一下 + 举起左手挥手 + 歪头笑
+      c.lift = hump(t, 0, 0.42) * 4;
+      for (const lg of c.legs) lg.rotation.z = -hump(t, 0, 0.42) * 0.5;
+      const up = ease(t / 0.25) * (1 - ease((t - 0.85) / 0.25));
+      L.rotation.z = 0.25 * up; L.rotation.x = 0.15 + up * (2.45 + Math.sin(t * 16) * 0.35);
+      c.head.rotation.x = -0.18 * up; c.head.rotation.z = 0.12 * up;
+      c.torso.rotation.x = -0.08 * up;
+    } else if (name === 'attack') {
+      const k = c.kind;
+      if (k === 'gun') {
+        // 连开三枪，最后转一圈枪
+        for (const ft of [0.15, 0.5, 0.85]) if (t >= ft && t - dt < ft) { c.recoil = 1; }
+        const aim = ease(t / 0.12) * (1 - ease((t - 1.15) / 0.2));
+        R.rotation.z = 1.5 * aim - c.recoil * 0.45 * aim + (1 - aim) * 0.3; R.rotation.x = -0.12;
+        if (c.propL) { L.rotation.z = R.rotation.z; L.rotation.x = 0.12; }
+        c.torso.rotation.z = -c.recoil * 0.08;
+        c.torso.rotation.y = Math.sin(t * 3) * 0.12 * aim;
+        if (t > 1.15) { const sp = ease((t - 1.15) / 0.6) * Math.PI * 4; c.prop.rotation.y = sp; if (c.propL) c.propL.rotation.y = -sp; R.rotation.z = 0.9; if (c.propL) L.rotation.z = 0.9; }
+      } else if (k === 'melee') {
+        // 左右横扫两下，最后跳起来往下砸
+        const s1 = hump(t, 0.05, 0.45), s2 = hump(t, 0.5, 0.9);
+        c.torso.rotation.y = s1 * 0.9 - s2 * 0.9;
+        R.rotation.z = 1.1 + s1 * 0.6 + s2 * 0.6; R.rotation.x = -0.5 + s1 * 1.6 - s2 * 0.6;
+        if (c.pid === 'titan') { L.rotation.z = 1.1 + s2 * 0.8; L.rotation.x = 0.4 - s2 * 1.2; }
+        if (t > 1.0) {
+          const u = (t - 1.0) / 0.9, rise = hump(u, 0, 0.55);
+          c.lift = rise * 6;
+          R.rotation.z = u < 0.45 ? 1.2 + ease(u / 0.45) * 1.9 : 3.1 - ease((u - 0.45) / 0.15) * 2.4; R.rotation.x = -0.3;
+          if (c.pid === 'titan') { L.rotation.z = R.rotation.z; L.rotation.x = 0.3; }
+          if (u > 0.55 && u - dt / 0.9 <= 0.55) c.recoil = 1;
+          c.torso.rotation.z = u > 0.55 ? -0.25 * (1 - ease((u - 0.6) / 0.4)) : 0.1;
+        }
+      } else {
+        // 抛投：后摆 → 甩出，两次
+        for (const [a0] of [[0.05], [0.9]]) {
+          const u = (t - a0) / 0.75;
+          if (u < 0 || u > 1) continue;
+          R.rotation.z = u < 0.45 ? 0.4 - ease(u / 0.45) * 1.6 : -1.2 + ease((u - 0.45) / 0.2) * 3.9 - ease((u - 0.7) / 0.3) * 1.2;
+          R.rotation.x = -0.25;
+          c.torso.rotation.y = u < 0.45 ? -0.35 * ease(u / 0.45) : -0.35 + ease((u - 0.45) / 0.25) * 0.7;
+          L.rotation.z = u < 0.45 ? 0.9 : 0.2;
+        }
+      }
+    } else if (name === 'victory') {
+      // 双手举高跳起来转一圈，落地摆姿势
+      const j = hump(t, 0.05, 0.75);
+      c.lift = j * 7;
+      c.yawOff = ease((t - 0.05) / 0.7) * Math.PI * 2;
+      for (const lg of c.legs) lg.rotation.z = -j * 0.6;
+      const up = ease(t / 0.15) * (1 - ease((t - 1.05) / 0.3));
+      L.rotation.z = 0.2 * up; L.rotation.x = 0.15 + up * 2.5;
+      R.rotation.z = 0.2 * up + (1 - up) * R.rotation.z; R.rotation.x = -0.12 - up * 2.5;
+      c.head.rotation.x = -0.25 * up;
+      if (t > 0.85) { const p2 = ease((t - 0.85) / 0.2); c.torso.rotation.z = -0.1 * p2; c.head.rotation.z = 0.15 * p2; }
+    }
+  }
+  function charAction(name) { if (CP.ch) { CP.ch.act = { name: name || 'show', t: 0 }; CP.t0 = performance.now(); } }
 
   // =====================================================================
   // 机兵模型：双足 + 圆角装甲 + 驾驶舱
@@ -2268,12 +2361,13 @@
     CP.ch = buildChar(pilotId, color, null);
     CP.scene.add(CP.ch.root); CP.key = key; CP.t0 = performance.now();
     CP.ring.material.color.set(S.pilot(pilotId).accent);
+    CP.ch.act = { name: 'show', t: 0 };   // 选中驾驶员：播一整套展示动作
   }
   function cpSize(w, h) {
     CP.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); CP.r.setSize(w, h, false);
     CP.cam.aspect = w / Math.max(1, h); CP.cam.updateProjectionMatrix();
-    const far = h > w * 1.15 ? 84 : 74;
-    CP.cam.position.set(far * 0.8, 22, far * 0.6); CP.cam.lookAt(0, 14.5, 0);
+    const far = h > w * 1.15 ? 88 : 98;   // 留出跳跃和帽子的空间
+    CP.cam.position.set(far * 0.8, 23, far * 0.6); CP.cam.lookAt(0, 16.5, 0);
     CP.w = w; CP.h = h;
   }
   function charPreview(host, pilotId, color) {
@@ -2288,13 +2382,18 @@
     if (!CP.r || !CP.ch || !CP.host || !CP.canvas.isConnected || CP.canvas.offsetParent === null) return;
     if (CP.host.clientWidth !== CP.w || CP.host.clientHeight !== CP.h) cpSize(CP.host.clientWidth || 220, CP.host.clientHeight || 260);
     const t = (now - (CP.t0 || 0)) / 1000, ph = t % 7.5;
-    if (!CP.drag) CP.yaw += dt * 0.3;
+    if (!CP.drag && !CP.ch.act) CP.yaw += dt * 0.3;
     const face = CP.yaw;
     let sp = 0, fire = false;
-    if (ph > 2.6 && ph < 4.4) sp = 120;
-    if (ph > 4.8 && ph < 7) fire = Math.floor((ph - 4.8) / 0.7) !== Math.floor((ph - 4.8 - dt) / 0.7);
+    if (!CP.ch.act) {
+      if (ph > 2.6 && ph < 4.4) sp = 120;
+      if (ph > 4.8 && ph < 7) fire = Math.floor((ph - 4.8) / 0.7) !== Math.floor((ph - 4.8 - dt) / 0.7);
+    }
+    // 展示动作时转到正面朝向镜头，慢慢转回来
+    const front = 0.45;
+    if (CP.ch.act) CP.yaw += wrapA(front - CP.yaw) * Math.min(1, dt * 5);
     animateChar(CP.ch, { a: face, vx: Math.cos(face) * sp, vy: Math.sin(face) * sp }, dt, sp, { fire });
-    CP.ch.root.rotation.y = -face;
+    CP.ch.root.rotation.y = -face + CP.ch.yawOff;
     CP.r.render(CP.scene, CP.cam);
   }
   // 拍一张角色照（展示用，结果缓存）
@@ -2534,7 +2633,7 @@
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
-    build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, setQuality,
+    build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();
