@@ -11,6 +11,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -48,3 +50,13 @@ jobs:
         with:
           name: 涂鸦机兵-安卓App
           path: 涂鸦机兵-GraffiBots.apk
+
+      # 同时放到 Releases 的「安卓 App（最新）」里，方便直接下载
+      - name: 更新 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(node -e "console.log(require('./public/shared.js').VERSION)")
+          cp 涂鸦机兵-GraffiBots.apk GraffiBots-$VER.apk
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest GraffiBots-$VER.apk --title "安卓 App $VER（最新）" --notes "涂鸦机兵 GraffiBots $VER 安卓安装包" --prerelease --target ${{ github.sha }}
