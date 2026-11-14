@@ -12,9 +12,10 @@ hub.accounts = null;   // 启动服务器时挂上账号系统（见文件末尾
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(__dirname, 'public');
+const SITE = path.join(__dirname, 'site');
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.zip': 'application/zip', '.apk': 'application/vnd.android.package-archive', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8',
 };
 
 
@@ -242,8 +243,11 @@ function createServer() {
       return res.end(JSON.stringify({ lan: lanAddresses(), port: PORT, rooms: hub.rooms.size }));
     }
     if (url === '/') url = '/index.html';
-    const fp = path.normalize(path.join(PUBLIC, url));
-    if (!fp.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
+    // /site/ 是官方网站（site 文件夹），其余是游戏本体（public 文件夹）
+    const root = url.startsWith('/site/') || url === '/site' ? SITE : PUBLIC;
+    if (root === SITE) { url = url.replace(/^\/site/, '') || '/'; if (url.endsWith('/')) url += 'index.html'; }
+    const fp = path.normalize(path.join(root, url));
+    if (!fp.startsWith(root)) { res.writeHead(403); return res.end(); }
     fs.readFile(fp, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Not found'); }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });

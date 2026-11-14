@@ -284,7 +284,7 @@ class Game {
     const ground = grounded ? S.cellAt(this.grid, p.x, p.y) : -1;
     const own = ground === p.team, enemy = ground > 0 && !own;
     const inBush = S.inBush(this.M, p.x, p.y, p.z);
-    let sm = p.foot ? (p.pilot === 'gale' ? 1.3 : 1) : W.spd;
+    let sm = p.foot ? (p.pilot === 'gale' ? 1.4 : 1) : W.spd;
     if (this.obj.tr && this.obj.tr.carrier === p.id) sm *= 0.72;
     if (p.carry) sm *= 1 - 0.04 * p.carry;
     if (spAct && p.spKind === 'charge') sm *= 1.45;
@@ -304,7 +304,7 @@ class Game {
     const maxHp = this.maxHpOf(p);
     if (enemy && p.invulnT <= 0 && !(spAct && p.spKind === 'charge') && p.hp > maxHp * 0.3) p.hp = Math.max(maxHp * 0.3, p.hp - maxHp * 0.1 * dt);
     if (!enemy && this.time - p.lastHurt > 3 && this.time - p.lastAtk > 2) {
-      const k = (wheel && own ? 0.32 : 0.16) * (p.pilot === 'chef' ? 1.8 : 1);
+      const k = (wheel && own ? 0.32 : 0.16) * (p.pilot === 'chef' ? 2 : 1);
       p.hp = Math.min(maxHp, p.hp + maxHp * k * dt);
     }
     if (own && p.tal.has('p4')) p.hp = Math.min(maxHp, p.hp + 3 * dt);   // 天赋：墨水回复
@@ -522,7 +522,7 @@ class Game {
       case 'dash': {
         let dx = p.input.mx, dy = p.input.my;
         if (Math.hypot(dx, dy) < 0.2) { dx = Math.cos(p.input.a); dy = Math.sin(p.input.a); }
-        this.knock(p, dx, dy, 520, 0); p.invulnT = Math.max(p.invulnT, 0.35);
+        this.knock(p, dx, dy, 520, 0); p.invulnT = Math.max(p.invulnT, p.pilot === 'gale' ? 0.5 : 0.35);
         break;
       }
       case 'emp':
@@ -540,8 +540,8 @@ class Game {
           if (!e.alive || e.team === p.team || dist(e, p) > 230) continue;
           let da = Math.atan2(e.y - p.y, e.x - p.x) - p.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
           if (Math.abs(da) > 1.25) continue;
-          e.slowT = Math.max(e.slowT, 1.5); e.silenceT = Math.max(e.silenceT, 0.8); e.revealT = 4; e.charge = 0; e.burst = null;
-          this.hurt(e, 15, p);
+          e.slowT = Math.max(e.slowT, 1.2); e.silenceT = Math.max(e.silenceT, 0.8); e.revealT = 4; e.charge = 0; e.burst = null;
+          this.hurt(e, 10, p);
         }
         break;
       case 'jam':
@@ -596,13 +596,13 @@ class Game {
         if (h.armed > 0) return true;
         for (const a of this.players.values()) {
           if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < 26 && Math.abs(a.z - h.z) < 30) {
-            a.hp = Math.min(this.maxHpOf(a), a.hp + 75); this.ev(['heal', a.id, 75]); return false;
+            a.hp = Math.min(this.maxHpOf(a), a.hp + 90); this.ev(['heal', a.id, 90]); return false;
           }
         }
         return true;
       }
       if (h.kind === 'charge') {   // 石磊的炸药：时间到就爆
-        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 8, 110, 80, 34, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 110, 0]); return false; }
+        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 8, 110, 72, 30, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 110, 0]); return false; }
         return true;
       }
       if (h.kind === 'wall') return true;   // 盾墙：挡子弹的判定在 updateProjs
@@ -723,7 +723,7 @@ class Game {
       if (by.tal.has('a5') && by.team !== t.team) { by.hitN = (by.hitN || 0) + 1; if (by.hitN % 5 === 0) dmg *= 1.6; }
       if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
       if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
-      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.15;   // 韩冰被动：倒戈
+      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.1;   // 韩冰被动：倒戈
     }
     // 防暴盾卫：正面（瞄准方向 ±60°）受到的伤害 -40%
     if (!t.foot && S.WEAPONS[t.weapon].front && (by || kdx != null)) {
@@ -739,7 +739,7 @@ class Game {
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -5%
       let n = 0;
       for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 200) n++;
-      dmg *= 1 - 0.05 * Math.min(3, n);
+      dmg *= 1 - 0.06 * Math.min(3, n);
     }
     if (kdx != null && !(tOV && tOV.noKb)) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
@@ -768,7 +768,7 @@ class Game {
   onTakedown(by) {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
-    if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.35);
+    if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.4);
     if (by.tal && by.tal.has('s4') && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + 15);
   }
   // 机体被摧毁：驾驶员弹出，6 秒后在驾驶员所在位置空投新机体
@@ -779,11 +779,11 @@ class Game {
     this.dropItems(t);
     t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = this.oneLife ? 1e9 : S.REBUILD - (t.pilot === 'aurora' ? 2 : 0) - (t.tal && t.tal.has('d3') ? 1 : 0);   // 一条命的模式：机体不会重建
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.quakeT = 0;
-    const sh = (t.pilot === 'hammer' ? 40 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
+    const sh = (t.pilot === 'hammer' ? 35 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
     if (sh) { t.shield = sh; t.shieldT = 6; }
     t.invulnT = 0.7; t.ammo = S.AMMO; t.wheel = false;
     this.ev(['wreck', by ? by.id : 0, t.id, r1(x), r1(y), r1(z)]);
-    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 45, 22, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
+    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 55, 26, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
     this.knock(t, Math.random() - 0.5, Math.random() - 0.5, 150, 300);
   }
   redeploy(p) {
@@ -1069,7 +1069,7 @@ class Game {
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
-          this.hurt(victim, pr.dmg * (far ? 1.12 : 1), owner, pr.vx, pr.vy, pr.kb);
+          this.hurt(victim, pr.dmg * (far ? 1.18 : 1), owner, pr.vx, pr.vy, pr.kb);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
         }
@@ -1477,18 +1477,42 @@ function botThink(g, p, dt) {
   }
   ai.seenT = enemy ? ai.seenT + dt : 0;
 
+  // 防挂机：1 秒内几乎没挪动（顶着墙原地踏步，或者站在目标点发呆）→ 侧移 + 跳一下，换一个新目标
   ai.stuckT += dt;
-  if (ai.stuckT > 1.2) {
-    if (Math.hypot(p.x - ai.lastX, p.y - ai.lastY) < 12 && ai.goal && dist(p, ai.goal) > 40) { ai.replan = 0; ai.forceRandom = true; }
+  if (ai.stuckT > 1.0) {
+    const moved = Math.hypot(p.x - ai.lastX, p.y - ai.lastY);
+    if (moved < 18 && !(enemy && ed < range * 1.1)) {
+      ai.replan = 0; ai.forceRandom = true;
+      ai.unstickT = 0.45; ai.unstickA = Math.random() * Math.PI * 2;
+      inp.j = true;
+    }
     ai.stuckT = 0; ai.lastX = p.x; ai.lastY = p.y;
   }
+  // 来回踱步检测：2.5 秒里走了不少路，位置却几乎没变（在原地走来走去）→ 去远一点的地方，并且锁定这个目标一会儿
+  ai.chkT = (ai.chkT || 0) + dt;
+  if (ai.chkT > 2.5) {
+    if (ai.chkX != null && Math.hypot(p.x - ai.chkX, p.y - ai.chkY) < 70 && !enemy) {
+      ai.forceRandom = true; ai.replan = 0; ai.lockT = 2.5;
+    }
+    ai.chkT = 0; ai.chkX = p.x; ai.chkY = p.y;
+  }
+  if (ai.lockT > 0) ai.lockT -= dt;
+  // 走到目标点、附近又没有敌人：马上去下一个地方，不站着
+  if (ai.goal && !enemy && dist(p, ai.goal) < 30 && ai.replan > 0.15) { ai.replan = 0.15; ai.lockT = 0; }
 
-  if (ai.replan <= 0 || !ai.goal) {
+  if ((ai.replan <= 0 && !(ai.lockT > 0 && !enemy)) || !ai.goal) {
     ai.replan = rand(0.5, 0.9);
-    ai.goal = ai.forceRandom ? randomGoal(g, p) : p.foot ? fleeGoal(g, p) : chooseGoal(g, p);
+    // 弹出的驾驶员：没有危险时认准原来的目标，走到为止（不然每次换一个方向，就在原地走来走去）
+    const threat = p.foot && [...g.players.values()].some((e) => e.alive && !e.out && e.team !== p.team && dist(e, p) < 450);
+    const keep = p.foot && !threat && !ai.forceRandom && ai.goal && ai.goal.calm && !ai.goal.near && dist(p, ai.goal) > 40;
+    if (!keep) ai.goal = ai.forceRandom ? randomGoal(g, p) : p.foot ? fleeGoal(g, p) : chooseGoal(g, p);
     ai.forceRandom = false;
+    if (ai.goal.calm) ai.replan = ai.goal.near ? 0.4 : 1.6;   // 没有危险时认准一个目标走过去，不来回改主意
     ai.path = findPath(g.nav, p.x, p.y, ai.goal.x, ai.goal.y);
     ai.pi = 0;
+    // 目标点走不到（路径在半路就结束了）：把路径终点当成目标，到了就换下一个，不要顶着墙来回走
+    const end = ai.path[ai.path.length - 1];
+    if (end && Math.hypot(end.x - ai.goal.x, end.y - ai.goal.y) > 60) ai.goal = Object.assign({}, ai.goal, { x: end.x, y: end.y });
   }
 
   let tx = ai.goal.x, ty = ai.goal.y;
@@ -1496,10 +1520,19 @@ function botThink(g, p, dt) {
     while (ai.pi < ai.path.length && dist(p, ai.path[ai.pi]) < 20) ai.pi++;
     if (ai.pi + 1 < ai.path.length && floorLos(g.M, p.x, p.y, ai.path[ai.pi + 1].x, ai.path[ai.pi + 1].y, p.z)) ai.pi++;
     if (ai.pi < ai.path.length) { tx = ai.path[ai.pi].x; ty = ai.path[ai.pi].y; }
+    else if (dist(p, ai.goal) > 40 && !enemy) ai.replan = 0;   // 路走完了却没到：马上重新规划
   }
   let mx = tx - p.x, my = ty - p.y;
   const dl = Math.hypot(mx, my);
   if (dl > 8) { mx /= dl; my /= dl; } else { mx = 0; my = 0; }
+  if (ai.unstickT > 0) { ai.unstickT -= dt; mx = Math.cos(ai.unstickA); my = Math.sin(ai.unstickA); }
+  // 跟在队友身边的驾驶员：绕着队友慢慢转，而不是站桩
+  if (p.foot && ai.goal && ai.goal.near && dist(p, ai.goal) < 60) {
+    ai.orbit = (ai.orbit || (Math.random() < 0.5 ? 1 : -1));
+    const a = Math.atan2(p.y - ai.goal.y, p.x - ai.goal.x) + ai.orbit * 0.6;
+    const ox = ai.goal.x + Math.cos(a) * 48 - p.x, oy = ai.goal.y + Math.sin(a) * 48 - p.y, ol = Math.hypot(ox, oy) || 1;
+    mx = (ox / ol) * 0.75; my = (oy / ol) * 0.75;
+  }
 
   const gh = S.topAt(g.M, p.x, p.y);
   const onOwn = p.z <= gh + 1 && S.cellAt(g.grid, p.x, p.y) === p.team;
@@ -1594,8 +1627,20 @@ function botThink(g, p, dt) {
 // 弹出的驾驶员：躲开敌人，等新机体空投
 function fleeGoal(g, p) {
   let ex = 0, ey = 0, n = 0;
-  for (const e of g.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 450) { ex += e.x; ey += e.y; n++; }
-  if (!n) return randomGoal(g, p);
+  for (const e of g.players.values()) if (e.alive && !e.out && e.team !== p.team && dist(e, p) < 450) { ex += e.x; ey += e.y; n++; }
+  if (!n) {
+    // 附近没有敌人：跑去最近的、还有机体的队友身边（抱团等空投），没有队友就躲进草丛
+    let best = null, bd = Infinity;
+    for (const a of g.players.values()) if (a !== p && a.alive && !a.out && !a.foot && a.team === p.team) { const d = dist(a, p); if (d < bd) { bd = d; best = a; } }
+    if (best && bd > 70) return { x: best.x + rand(-30, 30), y: best.y + rand(-30, 30), calm: true };
+    if (best) return { x: best.x, y: best.y, calm: true, near: true };
+    const M = g.M;
+    for (let k = 0; k < 40; k++) {
+      const i = randInt(S.GW * S.GH);
+      if (M.bush[i] === 1) { const x = (i % S.GW + 0.5) * S.CELL, y = (Math.floor(i / S.GW) + 0.5) * S.CELL; if (Math.hypot(x - p.x, y - p.y) < 700) return { x, y, calm: true }; }
+    }
+    return Object.assign(randomGoal(g, p), { calm: true });
+  }
   ex /= n; ey /= n;
   const dx = p.x - ex, dy = p.y - ey, l = Math.hypot(dx, dy) || 1;
   for (let k = 0; k < 12; k++) {
@@ -1607,9 +1652,12 @@ function fleeGoal(g, p) {
 }
 
 function randomGoal(g, p) {
-  for (let k = 0; k < 30; k++) {
-    const x = (randInt(S.GW) + 0.5) * S.CELL, y = (randInt(S.GH) + 0.5) * S.CELL;
-    if (S.topAt(g.M, x, y) === 0 && Math.hypot(x - p.x, y - p.y) < 500) return { x, y };
+  // 优先选 180–600 远的平地（太近的话等于原地打转）；逃亡圈里只在安全区内选
+  const c = g.obj && g.obj.circle, safe = c && (c.to || c);
+  for (let k = 0; k < 40; k++) {
+    const x = (randInt(S.GW) + 0.5) * S.CELL, y = (randInt(S.GH) + 0.5) * S.CELL, d = Math.hypot(x - p.x, y - p.y);
+    if (safe && Math.hypot(x - safe.x, y - safe.y) > safe.r * 0.8) continue;
+    if (S.topAt(g.M, x, y) === 0 && d > (k < 30 ? 180 : 60) && d < 600) return { x, y };
   }
   return { x: S.W / 2, y: S.H / 2 };
 }

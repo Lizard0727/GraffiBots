@@ -1269,3 +1269,12 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
   .icon-btn { width: 40px !important; height: 40px !important; }
   .loadout-pills .pill.tal, .loadout-pills .pill.ovp { display: none; }
 }
+.lg-lang { position: absolute; left: 14px; top: 8px; display: flex; gap: 2px; }
+.lg-lang button { font: 12px var(--head); background: #fff; color: var(--ink); border: 2px solid var(--ink); padding: 1px 8px; cursor: pointer; }
+.lg-lang button.sel { background: var(--ink); color: var(--ny); }
+.set-row select { font: inherit; padding: 4px 8px; border: 2px solid var(--ink); border-radius: 6px; }
+.upd-banner { position: absolute; top: calc(100% + 4px); right: max(18px, env(safe-area-inset-right)); z-index: 6; display: flex; align-items: center; gap: 8px; background: #ff5a36; color: #fff; border: 3px solid var(--ink); padding: 4px 6px 4px 12px; box-shadow: 3px 4px 0 #000a; transform: rotate(-1deg); animation: badgePop 1.6s ease-in-out infinite; }
+.upd-banner b { font: 14px var(--head); font-weight: 400; white-space: nowrap; }
+.upd-banner .btn { white-space: nowrap; }
+.upd-banner .link-btn { white-space: nowrap; }
+.upd-banner .link-btn { color: #fff; font-size: 12px; }

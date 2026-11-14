@@ -75,7 +75,7 @@ for (const [w, sp, dist] of [['dozer', 'bulldoze', 140], ['flamer', 'napalm', 16
   ok(B.hp < hp0 - 30, `石磊「定向爆破」：1.2 秒后爆炸，伤害 ${Math.round(hp0 - B.hp)}`);
   const d2 = duel({ pilot: 'hammer' }, {});
   d2.g.hurt(d2.A, 999, d2.B);
-  ok(d2.A.foot && d2.A.shield >= 40, '石磊被动「安全第一」：弹出时自带 40 护盾');
+  ok(d2.A.foot && d2.A.shield >= 35, '石磊被动「安全第一」：弹出时自带 35 护盾');
 }
 {
   const { A, B, run } = duel({ pilot: 'echo' }, {}, { dist: 150 });
@@ -324,7 +324,7 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   // 活动 / 信箱 / 限时购买
   const o = E.newProfile('ev'), now = Date.UTC(2026, 10, 21, 4);
   const box = E.mailbox(o, now);
-  ok(box.length === 4 && E.apply(o, 'claimMail', { id: 'v11', now }).ok && o.gems === E.START.gems + 100, '信箱：领取 1.1 补偿（100 宝石 + 军用箱）');
+  ok(box.length === E.MAILS.length && E.apply(o, 'claimMail', { id: 'v11', now }).ok && o.gems === E.START.gems + 100, '信箱：领取 1.1 补偿（100 宝石 + 军用箱）');
   ok(E.apply(o, 'claimMail', { id: 'v11', now }).ok === false, '同一封邮件不能领两次');
   ok(E.mailbox(o, Date.UTC(2027, 1, 1)).length === 0, '邮件 30 天后过期');
   const c0 = o.coins; E.applyMatch(o, { xp: 0, trophies: 8, won: false, draw: false, mvp: false, kills: 0, paint: 0, mode: 'turf' }, now);

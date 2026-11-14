@@ -217,6 +217,7 @@
       <label class="set-row toggle"><span>全部静音（快捷键 M）</span><input type="checkbox" data-set="muted" ${c.muted ? 'checked' : ''}></label>
       <div class="set-row"><span>鼠标灵敏度</span><input type="range" min="20" max="300" data-set="sens" value="${Math.round(sens * 100)}"><output>${Math.round(sens * 100)}</output></div>
       <label class="set-row toggle"><span>屏幕震动</span><input type="checkbox" data-set="shake" ${shakeOn ? 'checked' : ''}></label>
+      <label class="set-row"><span>语言 / Language</span><select data-set="lang"><option value="zh" ${window.GBI18N && GBI18N.lang === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${window.GBI18N && GBI18N.lang === 'en' ? 'selected' : ''}>English</option></select></label>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
       <div><div class="set-note" style="margin-bottom:6px">原创曲目试听：</div><div class="jukebox">${Object.entries(AU.TRACK_NAMES).map(([k, n]) => `<button data-track="${k}" class="${cur === k ? 'sel' : ''}">♪ ${n}</button>`).join('')}</div></div>
       <div class="set-note">所有音乐和音效都由浏览器实时合成，均为原创。主界面播放「霓虹喷漆街」，对战中播放「涂装突击」，最后 30 秒切换为「倒数冲刺」。</div>`;
@@ -238,6 +239,8 @@
           renderSettings();
         };
       }
+      const ls = box.querySelector('select[data-set=lang]');
+      if (ls) ls.onchange = () => { if (G && !G.over) { toast('对战结束后再切换语言'); ls.value = GBI18N.lang; return; } GBI18N.set(ls.value); };
       for (const btn of box.querySelectorAll('[data-track]')) btn.onclick = () => { AU.resume(); AU.music(btn.dataset.track); setTimeout(renderSettings, 50); updateNowPlaying(); };
     }
   }
@@ -1969,7 +1972,7 @@
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       ctx.fillStyle = '#0f1017'; ctx.fillRect(0, 0, VW, VH);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('同步对局中…', VW / 2, VH / 2);
+      ctx.fillText(L('同步对局中…'), VW / 2, VH / 2);
       return;
     }
     R3.render(G, now, dt, myId);
@@ -2093,7 +2096,9 @@
     ctx.fillRect(x - rx * 0.5, y + ry * 0.7, 4, 10); ctx.fillRect(x + rx * 0.35, y + ry * 0.75, 3, 7);
     ctx.restore();
   }
+  const L = (s) => (window.GBI18N ? window.GBI18N.tr(s) : s);   // 切到英文时翻译画布上的文字
   function txt(s, x, y, size, color, align = 'center', stroke = 4) {
+    s = L(String(s));
     ctx.font = `${size}px GBHead, "Microsoft YaHei", sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle';
     if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
     ctx.fillStyle = color; ctx.fillText(s, x, y);
@@ -2818,15 +2823,31 @@
   }
   // ---------------- 更新公告：每个新版本第一次进大厅弹一次，右上角随时可看 ----------------
   function showNews(force) {
-    const N = S.PATCH_NOTES[0];
+    const N = S.PATCH_NOTES[0], en = window.GBI18N && GBI18N.lang === 'en' && N.en;
     if (!force && store.get('seenVer', '') === N.v) return false;
     store.set('seenVer', N.v);
-    $('newsTitle').textContent = N.title; $('newsDate').textContent = `版本 ${N.v} · ${N.date}`;
-    $('newsBody').innerHTML = N.sections.map(([h, list]) => `<h4>${h}</h4><ul>${list.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`).join('');
+    $('newsTitle').textContent = en ? N.en_title : N.title; $('newsDate').textContent = `版本 ${N.v} · ${N.date}`;
+    $('newsBody').innerHTML = (en ? N.en : N.sections).map(([h, list]) => `<h4>${h}</h4><ul>${list.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`).join('');
     $('newsDlg').classList.remove('hidden');
     return true;
   }
   function onboard2() { if (!profile.pilot) needPilot(); }
+  // ---------------- 新版本提醒：读取官网的 version.json ----------------
+  // 用 node server.js 开的服：官网就在同一台服务器的 /site/；离线版 / 单文件版 / 安卓版：去 config.js 里填的官网查
+  const siteUrl = () => (window.GB_ARTIFACT ? '' : /^https?:$/.test(location.protocol) && !FILE_MODE ? location.origin + '/site/' : window.GB_SITE_URL || '');
+  const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+  function checkUpdate() {
+    const base = siteUrl();
+    if (!base) return;
+    fetch(base + 'version.json', { cache: 'no-store' }).then((r) => r.json()).then((v) => {
+      if (!v || !v.version || !newer(v.version, S.VERSION) || store.get('updLater', '') === v.version) return;
+      $('updText').textContent = `新版本 ${v.version}`;
+      $('updBanner').title = `发现新版本 ${v.version}（你正在玩的是 ${S.VERSION}）`;
+      $('updGo').href = base + (v.page || '#updates');
+      $('updLater').onclick = () => { store.set('updLater', v.version); $('updBanner').classList.add('hidden'); };
+      $('updBanner').classList.remove('hidden');
+    }).catch(() => {});
+  }
   // ---------------- 限时购买 ----------------
   function renderOffers() {
     const row = $('offerRow');
@@ -3171,6 +3192,7 @@
   function onboard() {
     setTimeout(() => {
       if (!$('login').classList.contains('hidden') || $('boot') || G || room) return;
+      checkUpdate();
       if (showNews(false)) return;   // 公告关掉后再走新手流程
       if (!profile.pilot) needPilot();
     }, 500);
@@ -3291,6 +3313,7 @@
     }
   }
   $('loginForm').addEventListener('submit', submitLogin);
+  for (const b of document.querySelectorAll('.lg-lang button')) { b.classList.toggle('sel', window.GBI18N && GBI18N.lang === b.dataset.lang); b.onclick = () => { if (GBI18N.lang !== b.dataset.lang) GBI18N.set(b.dataset.lang); }; }
   for (const b of document.querySelectorAll('.lg-tab')) b.onclick = () => { lgTab = b.dataset.tab; lgError(''); renderLogin(); sfx.click(); };
   $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 

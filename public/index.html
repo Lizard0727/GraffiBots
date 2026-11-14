@@ -49,6 +49,7 @@
     <div class="lg-logo"><b><span>涂鸦</span>机兵</b><i>GRAFFI·BOTS</i></div>
     <form class="lg-card" id="loginForm" autocomplete="on" novalidate>
       <div class="lg-mode" id="lgMode">本机账号</div>
+      <div class="lg-lang" data-noi18n><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">EN</button></div>
       <div class="lg-tabs">
         <button type="button" class="lg-tab sel" data-tab="login">登录</button>
         <button type="button" class="lg-tab" data-tab="register">注册</button>
@@ -80,6 +81,7 @@
       <button class="pass-chip" data-ov="pass" title="第一赛季通行证"><b class="pc-s">S1</b><div><small>灰城重涂 · 通行证</small><b id="passLv">Lv.0</b><div class="bar pass"><i id="passBar"></i></div></div></button>
       <button class="wallet" id="wallet" data-ov="chests" title="宝箱 · 商店 · 兑换"></button>
       <div class="top-gap"></div>
+      <div class="upd-banner hidden" id="updBanner"><b id="updText">发现新版本</b><a class="btn small" id="updGo" target="_blank" rel="noopener">去官网下载</a><button class="link-btn" id="updLater">以后再说</button></div>
       <div id="connStatus" class="conn">正在连接服务器…</div>
       <button class="icon-btn has-badge" data-ov="events" title="活动" data-icon="event"><em class="badge hidden" id="evBadge">!</em></button>
       <button class="icon-btn has-badge" data-ov="mail" title="信箱" data-icon="mail"><em class="badge hidden" id="mailBadge">0</em></button>
@@ -355,6 +357,9 @@
   <!-- 宝箱概率 / 通用弹窗 -->
   <div id="infoDlg" class="dlg hidden"><div class="dlg-card info-card"><h2 id="infoTitle"></h2><div id="infoBody"></div><button class="btn" id="infoOk">知道了</button></div></div>
   <div id="toast"></div>
+  <script src="config.js"></script>
+  <script src="i18n-en.js"></script>
+  <script src="i18n.js"></script>
   <script src="vendor/three.min.js"></script>
   <script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"><\/script>')</script>
   <script src="shared.js"></script>

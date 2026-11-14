@@ -4,3 +4,6 @@ android/build/
 android/app/build/
 android/local.properties
 data/
+site/downloads/
+_site/
+_zip/

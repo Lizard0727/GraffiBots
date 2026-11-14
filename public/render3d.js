@@ -120,6 +120,11 @@
       zen: 0x2a2228, mid: 0x8a5a48, hor: 0xffb070, sunC: 0xffc890, sunI: 0.9, hemiS: 0xffe0c8, hemiG: 0x4a3a34, hemiI: 0.76, fill: 0x6f8dff, fog: 0x9a7060,
       sun: [0.6, 0.4, -0.6], floor: ['#8a7f76', '#82776e'], seam: '#6a5f56', tops: ['#9a8f86', '#a89a88', '#6a6058', '#b0a494'], win: 0.25,
       sides: [['#b8aa98', '#5a4e44'], ['#ff8a1f', '#4a3a30'], ['#d8ccbc', '#8a7e70'], ['#9a8e80', '#9cff2e']], trim: ['#3a302a', '#f4ece0', '#ff8a1f', '#9cff2e'], night: false,
+    },
+    { // 地铁中转站：地下站台的冷光和霓虹指示牌
+      zen: 0x0b1424, mid: 0x1c3550, hor: 0x3a7a8a, sunC: 0xcfe8ff, sunI: 0.7, hemiS: 0xa8d8ff, hemiG: 0x20283a, hemiI: 0.78, fill: 0x2ef0c8, fog: 0x1a3040,
+      sun: [-0.3, 0.8, -0.4], floor: ['#5a6270', '#525a68'], seam: '#3e4654', tops: ['#6a7280', '#8a92a0', '#454c5a', '#7a8290'], win: 0.9,
+      sides: [['#2ef0c8', '#1a2a3a'], ['#ffe600', '#3a3d46'], ['#d8dce4', '#7a808c'], ['#5a6270', '#ff3ea5']], trim: ['#1a2a3a', '#e8f4ff', '#2ef0c8', '#ffe600'], night: true,
     }
   ];
 

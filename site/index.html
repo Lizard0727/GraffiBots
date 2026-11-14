@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>涂鸦机兵 GraffiBots</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="涂鸦机兵 GraffiBots 官方网站：开始游戏、下载最新版本、查看每次更新的内容。">
+<link rel="icon" href="img/icon.png">
+<style>
+@font-face { font-family: 'GBHead'; src: url('fonts/huangyou.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'GBNum'; src: url('fonts/bangers.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'GBTag'; src: url('fonts/marker.woff2') format('woff2'); font-display: swap; }
+/* 版式：夜里的一面灰色水泥墙正在被喷回彩色。首屏就是这面墙，下面的内容像胶带、模板字和海报贴在墙上。
+   只做一套深色外观（墙就是黑夜里的），所以所有颜色都在 :root 里写死。 */
+:root {
+  --wall: #1c1b21; --wall-2: #24232a; --wall-3: #2f2e36; --seam: #3b3943;
+  --chalk: #f2eee6; --dust: #a6a2ad; --grey: #7f7c86;
+  --ny: #ffe600; --np: #ff3ea5; --nc: #1fd6ee; --ng: #9cff2e;
+  --ink: #141018; --paper: #fff6e3; --tape: #f4e7a8cc;
+  --f-head: 'GBHead', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --f-num: 'GBNum', 'Impact', 'Arial Black', sans-serif;
+  --f-tag: 'GBTag', 'Comic Sans MS', 'Segoe Print', cursive;
+  --f-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', sans-serif;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body { margin: 0; background: var(--wall); color: var(--chalk); font: 15px/1.65 var(--f-body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; }
+img, svg { max-width: 100%; }
+:focus-visible { outline: 3px solid var(--nc); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); }
+h1, h2, h3 { text-wrap: balance; margin: 0; font-weight: 400; }
+.en-mode .zh-only, .zh-mode .en-only { display: none !important; }
+
+/* ---------- 顶栏 ---------- */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--wall); }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--wall) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--seam); }
+.top .wrap { display: flex; align-items: center; gap: 18px; height: 58px; }
+.brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; margin-right: auto; white-space: nowrap; }
+.brand b { font: 24px/1 var(--f-head); color: var(--ny); text-shadow: 2px 2px 0 var(--ink), 4px 4px 0 var(--np); transform: rotate(-2deg); display: inline-block; }
+.brand span { font: 15px/1 var(--f-num); letter-spacing: 2px; color: var(--dust); }
+.nav { display: flex; align-items: center; gap: 4px; }
+.nav a, .lang button { text-decoration: none; padding: 7px 11px; border-radius: 8px; color: var(--dust); font-weight: 700; font-size: 14px; white-space: nowrap; }
+.nav a:hover { color: var(--chalk); background: var(--wall-3); }
+.nav a[aria-current="page"] { color: var(--ink); background: var(--ny); }
+.lang { display: flex; border: 2px solid var(--seam); border-radius: 10px; overflow: hidden; }
+.lang button { border: 0; background: transparent; cursor: pointer; font-family: inherit; padding: 5px 10px; border-radius: 0; }
+.lang button[aria-pressed="true"] { background: var(--chalk); color: var(--ink); }
+@media (max-width: 620px) { .logo .lat { transform: rotate(-3deg); margin-top: 14px; } }
+@media (max-width: 620px) { .brand span, .nav .wide { display: none; } .top .wrap { gap: 8px; } .nav a { padding: 7px 8px; } }
+
+/* ---------- 按钮 ---------- */
+.btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 22px/1 var(--f-head); letter-spacing: 2px; padding: 15px 26px 13px; border: 3px solid var(--ink); border-radius: 12px 16px 11px 15px; cursor: pointer; transition: transform .1s, box-shadow .1s; }
+.btn-play { background: var(--ny); color: var(--ink); box-shadow: 4px 5px 0 var(--ink), 7px 8px 0 var(--np); transform: rotate(-1.5deg); }
+.btn-play:hover { transform: rotate(-1.5deg) translateY(-2px); box-shadow: 4px 7px 0 var(--ink), 8px 10px 0 var(--np); }
+.btn-play:active { transform: rotate(-1.5deg) translateY(3px); box-shadow: 2px 2px 0 var(--ink); }
+.btn-ghost { background: var(--wall-2); color: var(--chalk); border-color: var(--chalk); box-shadow: 4px 5px 0 var(--ink); transform: rotate(1deg); }
+.btn-ghost:hover { background: var(--wall-3); }
+.btn small { font: 13px/1 var(--f-body); font-weight: 700; letter-spacing: 0; opacity: .75; }
+.btn-sm { font-size: 17px; padding: 10px 16px 9px; transform: none; box-shadow: 3px 4px 0 var(--ink); }
+.btn-sm:hover { transform: translateY(-1px); box-shadow: 3px 5px 0 var(--ink); }
+.btn[aria-disabled="true"] { background: var(--wall-3); color: var(--grey); border-color: var(--seam); box-shadow: none; cursor: default; transform: none; }
+
+/* ---------- 首屏：墙 ---------- */
+.hero { position: relative; overflow: hidden; border-bottom: 3px solid var(--ink); }
+#wall { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #1c1b21f0 0%, #1c1b21b8 38%, #1c1b2100 66%); pointer-events: none; }
+.hero .wrap { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; padding-block: 64px 72px; }
+.kicker { font: 15px/1.2 var(--f-tag); color: var(--nc); letter-spacing: 1px; margin: 0 0 14px; transform: rotate(-1deg); }
+.kicker b { color: var(--chalk); font-weight: 400; }
+.logo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 18px; }
+.logo .zh { font: clamp(64px, 11vw, 132px)/0.95 var(--f-head); color: var(--ny); letter-spacing: 4px; transform: rotate(-3deg); text-shadow: 5px 5px 0 var(--ink), 10px 10px 0 var(--np); display: inline-block; }
+.logo .lat { font: clamp(28px, 4.4vw, 50px)/1 var(--f-num); letter-spacing: 5px; color: var(--chalk); text-shadow: 3px 3px 0 var(--ink); transform: rotate(-3deg) translateY(-6px); display: inline-block; }
+.lede { max-width: 34em; font-size: 17px; color: #ddd8e2; margin: 26px 0 30px; }
+.cta { display: flex; flex-wrap: wrap; gap: 18px 22px; align-items: center; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; list-style: none; padding: 0; margin: 34px 0 0; color: var(--dust); font-size: 14px; }
+.facts b { font: 26px/1 var(--f-num); color: var(--chalk); letter-spacing: 1px; margin-right: 5px; vertical-align: -2px; }
+
+/* 版本海报（贴在墙上的纸） */
+.poster { position: relative; display: block; width: 250px; text-decoration: none; background: var(--paper); color: var(--ink); padding: 26px 22px 20px; transform: rotate(4deg); box-shadow: 6px 8px 0 #0008; border-radius: 3px; transition: transform .15s; }
+.poster:hover { transform: rotate(2deg) scale(1.03); }
+.poster::before, .poster::after { content: ""; position: absolute; width: 86px; height: 26px; background: var(--tape); top: -12px; }
+.poster::before { left: -18px; transform: rotate(-28deg); }
+.poster::after { right: -18px; transform: rotate(24deg); }
+.poster .tag { font: 13px/1 var(--f-tag); color: var(--np); }
+.poster .v { display: block; font: 92px/0.9 var(--f-num); letter-spacing: 2px; margin: 8px 0 2px; color: var(--ink); text-shadow: 3px 3px 0 var(--ny); }
+.poster h2 { font: 26px/1.2 var(--f-head); }
+.poster time { display: block; font-size: 13px; color: #5c5560; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+.poster .go { font-weight: 800; font-size: 14px; border-top: 2px dashed #c9bfae; padding-top: 10px; display: block; }
+@media (max-width: 820px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-block: 44px 52px; }
+  .hero::after { background: linear-gradient(180deg, #1c1b21c8 0%, #1c1b21e0 60%, #1c1b21b0 100%); }
+  .poster { justify-self: start; transform: rotate(2deg); width: min(100%, 300px); }
+}
+
+/* ---------- 通用段落 ---------- */
+.band { padding-block: 72px; border-bottom: 1px solid var(--seam); }
+.band.alt { background: var(--wall-2); }
+.sec-h { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 22px; margin-bottom: 34px; }
+.sec-h h2 { font: clamp(32px, 4.5vw, 46px)/1.1 var(--f-head); position: relative; z-index: 0; }
+.sec-h h2::after { content: ""; position: absolute; left: -6px; right: -10px; bottom: 2px; height: 14px; background: var(--hl, var(--np)); opacity: .55; z-index: -1; transform: skew(-12deg) rotate(-1deg); border-radius: 4px; }
+.sec-h p { margin: 0; color: var(--dust); flex: 1 1 18em; min-width: 0; }
+.sec-h .more { font-weight: 800; color: var(--ny); text-decoration: none; white-space: nowrap; }
+.sec-h .more:hover { text-decoration: underline; }
+.sticker { display: inline-block; font: 15px/1 var(--f-num); letter-spacing: 1px; color: var(--ink); background: var(--ng); padding: 4px 7px 3px; border: 2px solid var(--ink); border-radius: 5px; transform: rotate(-6deg); }
+.sticker.season { background: var(--np); color: #fff; }
+.sticker.quest { background: var(--nc); }
+
+/* 最新更新：截图 */
+.shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; margin-bottom: 44px; }
+.shot { margin: 0; background: var(--paper); padding: 10px 10px 12px; color: var(--ink); box-shadow: 5px 7px 0 #0009; position: relative; }
+.shot:nth-child(1) { transform: rotate(-1.6deg); } .shot:nth-child(2) { transform: rotate(1.2deg) translateY(8px); } .shot:nth-child(3) { transform: rotate(-0.6deg); }
+.shot::before { content: ""; position: absolute; top: -11px; left: 50%; width: 92px; height: 24px; margin-left: -46px; background: var(--tape); transform: rotate(-3deg); }
+.shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: var(--wall-3); }
+.shot figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding-top: 9px; }
+.shot figcaption b { font: 20px/1.1 var(--f-head); }
+.shot figcaption span { font-size: 12px; color: #5c5560; }
+@media (max-width: 820px) { .shots { grid-template-columns: minmax(0, 1fr); gap: 30px; } .shot:nth-child(2) { transform: rotate(1deg); } }
+
+.hl { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-flow: dense; gap: 18px; }
+.hl section { background: var(--wall-2); border: 2px solid var(--seam); border-radius: 12px; padding: 18px 20px; min-width: 0; }
+.hl section.big { grid-row: span 2; }
+@media (max-width: 680px) { .hl { grid-template-columns: minmax(0, 1fr); } .hl section.big { grid-row: auto; } }
+.band.alt .hl section { background: var(--wall); }
+.hl h3 { font: 21px/1.25 var(--f-head); color: var(--ny); margin-bottom: 8px; }
+.hl ul, .note ul { margin: 0; padding-left: 1.1em; }
+.hl li { color: #d9d4de; font-size: 14px; margin: 4px 0; }
+.hl .more { display: inline-block; margin-top: 6px; font-weight: 800; font-size: 14px; color: var(--nc); text-decoration: none; }
+del.old { color: var(--grey); text-decoration-thickness: 2px; }
+b.new { color: var(--ny); font-weight: 800; }
+.sep { display: inline-block; width: 2px; height: 1em; background: var(--seam); margin: 0 .55em; vertical-align: -2px; }
+
+/* 驾驶员 */
+.roster { display: grid; grid-auto-flow: column; grid-auto-columns: 168px; gap: 16px; overflow-x: auto; padding: 6px 2px 18px; scroll-snap-type: x proximity; scrollbar-color: var(--seam) transparent; }
+.pc { scroll-snap-align: start; background: var(--wall); border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; position: relative; box-shadow: 4px 5px 0 #0007; }
+.pc .art { aspect-ratio: 1; background: var(--wall-3); }
+.pc .art svg { display: block; width: 100%; height: 100%; }
+.pc .meta { padding: 9px 12px 12px; border-top: 3px solid var(--acc, var(--ny)); }
+.pc b { display: block; font: 21px/1.15 var(--f-head); }
+.pc span { font-size: 12px; color: var(--dust); }
+.pc .sticker { position: absolute; top: 9px; right: 8px; font-size: 13px; }
+.mechs { margin-top: 38px; overflow-x: auto; }
+.mechs table { width: 100%; border-collapse: collapse; min-width: 560px; font-variant-numeric: tabular-nums; }
+.mechs th { text-align: left; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey); font-weight: 700; padding: 0 12px 8px; border-bottom: 2px solid var(--seam); }
+.mechs td { padding: 9px 12px; border-bottom: 1px solid var(--seam); font-size: 14px; }
+.mechs td:first-child { font: 18px/1.2 var(--f-head); white-space: nowrap; }
+.mechs td.num { font-family: var(--f-num); font-size: 18px; letter-spacing: 1px; }
+.mechs td .sticker { font-size: 12px; margin-left: 8px; transform: rotate(-4deg); vertical-align: 2px; }
+.bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--np); vertical-align: middle; margin-left: 8px; }
+.bar.r { background: var(--nc); }
+
+/* 玩法 + 地图 */
+.modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.mode { background: var(--wall-2); border-left: 5px solid var(--mc, var(--nc)); border-radius: 4px 12px 12px 4px; padding: 16px 18px; position: relative; min-width: 0; }
+.mode h3 { font: 22px/1.2 var(--f-head); margin-bottom: 6px; padding-right: 48px; }
+.mode p { margin: 0; color: var(--dust); font-size: 14px; }
+.mode .sticker { position: absolute; top: 12px; right: 12px; }
+.maps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; padding: 0; list-style: none; }
+.maps li { border: 2px dashed var(--seam); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: #d9d4de; display: flex; align-items: center; gap: 8px; }
+.maps li.new { border-style: solid; border-color: var(--ng); color: var(--chalk); }
+.maps li .sticker { font-size: 11px; padding: 2px 5px 1px; transform: rotate(-4deg); }
+.maps-h { font: 20px/1 var(--f-head); color: var(--dust); margin: 40px 0 0; }
+
+/* 下载 */
+.dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.dc { background: var(--wall); border: 2px solid var(--seam); border-radius: 14px; padding: 22px 20px 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.dc.main { border-color: var(--ny); background: linear-gradient(160deg, #ffe60014, transparent 60%), var(--wall); }
+.dc h3 { font: 24px/1.15 var(--f-head); }
+.dc .what { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey); font-weight: 700; }
+.dc p { margin: 0; color: var(--dust); font-size: 14px; flex: 1; }
+.dc .size { font: 15px/1 var(--f-num); letter-spacing: 1px; color: var(--dust); font-variant-numeric: tabular-nums; }
+.dc .btn { align-self: flex-start; margin-top: 6px; }
+@media (max-width: 980px) { .dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .dl { grid-template-columns: minmax(0, 1fr); } }
+.how { margin-top: 34px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px 26px; align-items: start; background: var(--wall-3); border-radius: 14px; padding: 22px 24px; }
+.how h3 { font: 22px/1.2 var(--f-head); color: var(--nc); }
+.how ol { margin: 0; padding-left: 1.3em; color: #d9d4de; }
+.how ol li { margin: 3px 0; }
+.how ol + p { margin: 10px 0 0; font-size: 13px; color: var(--dust); }
+@media (max-width: 700px) { .how { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- 更新日志 ---------- */
+.upd-h { padding-block: 56px 26px; }
+.upd-h h1 { font: clamp(44px, 7vw, 76px)/1 var(--f-head); color: var(--ny); text-shadow: 4px 4px 0 var(--ink), 8px 8px 0 var(--np); transform: rotate(-2deg); display: inline-block; }
+.upd-h .lat { font: 22px/1 var(--f-num); letter-spacing: 4px; color: var(--dust); margin-left: 12px; }
+.upd-h p { color: var(--dust); max-width: 40em; margin: 18px 0 0; }
+.upd { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; align-items: start; padding-bottom: 80px; }
+.upd-index { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 78px); display: flex; flex-direction: column; gap: 6px; }
+.upd-index a { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; text-decoration: none; padding: 10px 12px; border-radius: 10px; border: 2px solid transparent; }
+.upd-index a:hover { background: var(--wall-2); }
+.upd-index a.on { border-color: var(--seam); background: var(--wall-2); }
+.upd-index .vn { font: 28px/1 var(--f-num); letter-spacing: 1px; color: var(--ny); grid-row: span 2; align-self: center; }
+.upd-index .tt { font-weight: 700; font-size: 14px; color: var(--chalk); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upd-index time { font-size: 12px; color: var(--grey); font-variant-numeric: tabular-nums; }
+.notes { display: flex; flex-direction: column; gap: 34px; }
+.note { background: var(--wall-2); border: 2px solid var(--seam); border-radius: 16px; overflow: hidden; scroll-margin-top: 80px; }
+.note-head { display: flex; align-items: center; gap: 18px; padding: 22px 26px; background: var(--wall-3); border-bottom: 3px solid var(--ink); flex-wrap: wrap; }
+.note-head .vnum { font: 64px/0.85 var(--f-num); letter-spacing: 2px; color: var(--ink); background: var(--ny); padding: 10px 12px 4px; border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--np); transform: rotate(-3deg); }
+.note-head h2 { font: 30px/1.15 var(--f-head); }
+.note-head time { font-size: 13px; color: var(--dust); font-variant-numeric: tabular-nums; }
+.note-head .sticker { margin-left: auto; font-size: 17px; }
+.note-body { padding: 8px 26px 26px; }
+.note-body section { padding-top: 18px; min-width: 0; max-width: 62em; }
+.note h3 { font: 20px/1.25 var(--f-head); color: var(--nc); margin-bottom: 6px; }
+.note li { margin: 5px 0; color: #ddd8e2; font-size: 14.5px; }
+.note li::marker { color: var(--np); }
+@media (max-width: 860px) { .upd { grid-template-columns: minmax(0, 1fr); gap: 20px; } .upd-index { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 6px; } .upd-index a { flex: 0 0 auto; } }
+@media (max-width: 520px) { .note-head { padding: 18px; } .note-body { padding: 4px 18px 20px; } .note-head .vnum { font-size: 48px; } .note-head h2 { font-size: 24px; } }
+
+footer { padding-block: 34px 44px; color: var(--grey); font-size: 13px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 26px; align-items: center; }
+footer b { font: 18px/1 var(--f-head); color: var(--dust); }
+footer a { color: var(--dust); }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn, .poster { transition: none; } }
+</style>
+</head>
+<body class="zh-mode">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#home"><b>涂鸦机兵</b><span>GRAFFIBOTS</span></a>
+    <nav class="nav" aria-label="主导航">
+      <a href="#home" data-route="home" data-t="nav_home">首页</a>
+      <a href="#updates" data-route="updates" data-t="nav_upd">更新日志</a>
+      <a href="#download" data-t="nav_dl">下载</a>
+    </nav>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" id="langZh" data-lang="zh" aria-pressed="true">中</button>
+      <button type="button" id="langEn" data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</header>
+
+<main id="home">
+  <section class="hero">
+    <canvas id="wall" aria-hidden="true"></canvas>
+    <div class="wrap">
+      <div>
+        <p class="kicker" id="kicker"></p>
+        <h1 class="logo"><span class="zh">涂鸦机兵</span><span class="lat">GRAFFIBOTS</span></h1>
+        <p class="lede" data-t="lede"></p>
+        <div class="cta">
+          <a class="btn btn-play" id="playBtn" target="_blank" rel="noopener"><span data-t="play">开始游戏</span></a>
+          <a class="btn btn-ghost" href="#download" id="dlBtn"></a>
+        </div>
+        <ul class="facts" id="facts"></ul>
+      </div>
+      <a class="poster" href="#updates" id="poster"></a>
+    </div>
+  </section>
+
+  <section class="band" id="latest">
+    <div class="wrap">
+      <header class="sec-h" style="--hl: var(--ng)"><h2 id="latestTitle"></h2><p id="latestLede"></p><a class="more" href="#updates" data-t="all_notes"></a></header>
+      <div class="shots" id="shots"></div>
+      <div class="hl" id="hl"></div>
+    </div>
+  </section>
+
+  <section class="band alt" id="roster-sec">
+    <div class="wrap">
+      <header class="sec-h"><h2 data-t="roster_h"></h2><p data-t="roster_p"></p></header>
+      <div class="roster" id="roster"></div>
+      <div class="mechs"><table><thead><tr><th data-t="th_mech"></th><th data-t="th_role"></th><th data-t="th_hp"></th><th data-t="th_range"></th></tr></thead><tbody id="mechRows"></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="band" id="modes-sec">
+    <div class="wrap">
+      <header class="sec-h" style="--hl: var(--nc)"><h2 data-t="modes_h"></h2><p data-t="modes_p"></p></header>
+      <div class="modes" id="modes"></div>
+      <h3 class="maps-h" data-t="maps_h"></h3>
+      <ul class="maps" id="maps"></ul>
+    </div>
+  </section>
+
+  <section class="band alt" id="download">
+    <div class="wrap">
+      <header class="sec-h" style="--hl: var(--ny)"><h2 data-t="dl_h"></h2><p id="dlLede"></p></header>
+      <div class="dl" id="dl"></div>
+      <div class="how">
+        <h3 data-t="how_h"></h3>
+        <div><ol id="howSteps"></ol><p data-t="how_note"></p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<main id="updates" hidden>
+  <div class="wrap">
+    <header class="upd-h"><h1 data-t="upd_h">更新日志</h1><span class="lat">PATCH NOTES</span><p data-t="upd_p"></p></header>
+    <div class="upd">
+      <nav class="upd-index" id="updIndex" aria-label="版本"></nav>
+      <div class="notes" id="notes"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <b>涂鸦机兵 GraffiBots</b>
+    <span id="footVer"></span>
+    <a href="#updates" data-t="nav_upd">更新日志</a>
+    <span data-t="foot_fonts"></span>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+(() => {
+  'use strict';
+  const D = window.GB_SITE, CFG = window.GB_SITE_CFG || {};
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const T = {
+    zh: {
+      nav_home: '首页', nav_upd: '更新日志', nav_dl: '下载', play: '开始游戏',
+      kicker: '第一赛季 · <b>灰城重涂 REPAINT</b>',
+      lede: '4 对 4 的涂料机甲乱斗。驾驶机兵把被刷成灰色的城市重新涂回彩色：涂地、抢点、踢球、生死之战、逃亡圈。电脑和手机都能玩，不联网也能和 AI 打。',
+      dl_btn: (v) => `下载 v${v}`, facts: ['位驾驶员', '台机兵', '张地图', '种玩法'],
+      poster_tag: '最新版本', poster_go: '看看更新了什么 →', updated: (d) => `${d} 更新`,
+      all_notes: '完整更新日志 →', more_items: (n) => `还有 ${n} 项 →`,
+      roster_h: '驾驶员与机兵', roster_p: '驾驶员和机兵分开选：每位驾驶员有自己的技能、被动和超载，坐进哪台机兵都行。机兵被打爆后驾驶员会弹出，还能继续战斗。',
+      season: '赛季', quest: '任务', th_mech: '机兵', th_role: '定位', th_hp: '生命', th_range: '射程',
+      modes_h: '玩法', modes_p: '每种玩法都有 4 对 4 的快速对战，也可以开房间和朋友打。', maps_h: '地图',
+      dl_h: '下载与开始', dl_lede: (v, d) => `当前版本 ${v}，${d} 发布。每次更新都会先发在这里。`,
+      dl: {
+        web: ['网页版', '直接玩', '打开浏览器就能玩，不用安装。登录在线账号，进度保存在服务器上。'],
+        offline: ['离线单文件', 'HTML 文件', '一个文件，双击就能玩，也可以发给朋友。不联网时和 AI 对战，局域网里可以用房间码联机。'],
+        full: ['完整包', 'ZIP · 需要 Node.js', '带服务器：在自己电脑上开服，局域网联机、在线账号都在里面。解压后运行「node server.js」。'],
+        apk: ['安卓 App', 'APK', '安装到安卓手机上，全屏横屏玩，触屏双摇杆操作。'],
+      },
+      dl_go: '下载', web_go: '开始游戏', not_yet: '暂未提供', site_go: '去官网下载',
+      how_h: '怎么更新', how: ['打开游戏，大厅顶部出现「发现新版本」时点「去官网下载」。', '在这个页面看看更新了什么，再下载对应的新版本。', '用新文件替换旧文件（安卓直接覆盖安装）。'],
+      how_note: '在线账号的进度保存在服务器上，换新版本不会丢失。',
+      upd_h: '更新日志', upd_p: '涂鸦机兵每一次更新的内容都会第一时间发布在这里，包括新角色、新地图、平衡调整和更新奖励。',
+      latest: '最新', foot_ver: (v) => `当前版本 ${v}`, foot_fonts: '字体：站酷庆科黄油体、Bangers、Permanent Marker（开源字体）',
+    },
+    en: {
+      nav_home: 'Home', nav_upd: 'Patch notes', nav_dl: 'Download', play: 'Play now',
+      kicker: 'Season 1 · <b>REPAINT</b>',
+      lede: '4v4 paint-mech brawler. Pilot a mech and spray a city that was painted gray back into color: Turf War, Zone Control, Paintball Soccer, Last Stand and Escape Circle. Plays on desktop and phone, and offline against AI.',
+      dl_btn: (v) => `Download v${v}`, facts: ['pilots', 'mechs', 'maps', 'modes'],
+      poster_tag: 'Latest version', poster_go: 'See what changed →', updated: (d) => `Updated ${d}`,
+      all_notes: 'Full patch notes →', more_items: (n) => `${n} more →`,
+      roster_h: 'Pilots & mechs', roster_p: 'Pick a pilot and a mech separately: every pilot has their own skill, passive and overload, and can drive any mech. When a mech is destroyed the pilot ejects and keeps fighting.',
+      season: 'SEASON', quest: 'QUEST', th_mech: 'Mech', th_role: 'Role', th_hp: 'HP', th_range: 'Range',
+      modes_h: 'Modes', modes_p: 'Every mode has 4v4 quick matches, or open a room and play with friends.', maps_h: 'Maps',
+      dl_h: 'Download & play', dl_lede: (v, d) => `Current version ${v}, released ${d}. Every update is posted here first.`,
+      dl: {
+        web: ['Browser', 'Play now', 'Runs in your browser with nothing to install. Sign in to an online account and your progress is saved on the server.'],
+        offline: ['Offline file', 'HTML file', 'One file: double-click to play, or send it to a friend. Fight AI offline, or link up on a local network with a room code.'],
+        full: ['Full package', 'ZIP · needs Node.js', 'Includes the server: host on your own PC for LAN play and online accounts. Unzip and run “node server.js”.'],
+        apk: ['Android app', 'APK', 'Install on an Android phone for full-screen landscape play with twin-stick touch controls.'],
+      },
+      dl_go: 'Download', web_go: 'Play now', not_yet: 'Not available yet', site_go: 'Get it on the website',
+      how_h: 'How to update', how: ['Open the game. When “New version” appears at the top of the lobby, tap “Get it”.', 'Check what changed on this page, then download the new version.', 'Replace the old file with the new one (on Android, just install over it).'],
+      how_note: 'Online account progress lives on the server, so switching versions never loses it.',
+      upd_h: 'Patch notes', upd_p: 'Every GraffiBots update is posted here first: new pilots, new maps, balance changes and update rewards.',
+      latest: 'LATEST', foot_ver: (v) => `Version ${v}`, foot_fonts: 'Fonts: ZCOOL QingKe HuangYou, Bangers, Permanent Marker (open-source)',
+    },
+  };
+  let lang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+  try { const v = localStorage.getItem('gbsite_lang'); if (v === 'zh' || v === 'en') lang = v; } catch (e) { /* 没存过 */ }
+  const t = (k) => T[lang][k];
+  const L = (o, k) => (lang === 'en' ? o['en_' + k] || o[k] : o[k]);
+  const nm = (o) => (lang === 'en' ? o.en : o.name);
+  const mb = (n) => (n / 1048576).toFixed(1) + ' MB';
+  const vid = (v) => 'v' + String(v).replace(/\./g, '-');
+  const notesOf = (n) => (lang === 'en' ? n.en : n.sections);
+  const titleOf = (n) => { const s = lang === 'en' ? n.en_title : n.title; const i = s.indexOf(' · '); return i >= 0 ? s.slice(i + 3) : s; };
+  // 「5.8 → 5.4」：旧数值划掉，新数值高亮；「｜」换成分隔线
+  const fmt = (s) => esc(s).replace(/([+\-−]?\d[\d.,]*%?) → ([+\-−]?\d[\d.,]*%?)/g, '<del class="old">$1</del> → <b class="new">$2</b>').replace(/\s*[｜|]\s*/g, '<span class="sep" aria-hidden="true"></span>');
+
+  const onServer = /^\/site(\/|$)/.test(location.pathname);
+  const offline = D.downloads.find((d) => d.id === 'offline');
+  const playUrl = CFG.play || (onServer ? '/' : offline && offline.have ? offline.file : '../public/index.html');
+
+  function render() {
+    document.body.className = lang + '-mode';
+    document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+    $('langZh').setAttribute('aria-pressed', lang === 'zh'); $('langEn').setAttribute('aria-pressed', lang === 'en');
+    for (const el of document.querySelectorAll('[data-t]')) { const v = t(el.dataset.t); if (typeof v === 'string') el.textContent = v; }
+    $('kicker').innerHTML = t('kicker');
+    $('playBtn').href = playUrl;
+    $('dlBtn').textContent = t('dl_btn')(D.version);
+    const c = D.counts;
+    $('facts').innerHTML = [c.pilots, c.mechs, c.maps, c.modes].map((n, i) => `<li><b>${n}</b>${t('facts')[i]}</li>`).join('');
+    $('poster').innerHTML = `<span class="tag">${esc(t('poster_tag'))}</span><span class="v">${esc(D.version)}</span><h2>${esc(titleOf(D.notes[0]))}</h2><time datetime="${D.date}">${esc(t('updated')(D.date))}</time><span class="go">${esc(t('poster_go'))}</span>`;
+    $('poster').href = '#' + vid(D.version);
+    // 最新更新
+    const N = D.notes[0], secs = notesOf(N);
+    $('latestTitle').textContent = (lang === 'en' ? N.en_title : N.title);
+    $('latestLede').textContent = secs.map((s) => s[0]).join(lang === 'en' ? ' · ' : ' · ');
+    $('shots').innerHTML = D.shots.map((s) => `<figure class="shot"><img src="${esc(s.img)}" alt="${esc(lang === 'en' ? s.en_map : s.map)}" loading="lazy" width="1280" height="720"><figcaption><b>${esc(lang === 'en' ? s.en_map : s.map)}</b><span>${esc(lang === 'en' ? s.en_mode : s.mode)}</span></figcaption></figure>`).join('');
+    const rest = secs.slice(1), lens = rest.map((x) => x[1].length), big = rest.length % 2 ? lens.indexOf(Math.max(...lens)) : -1;
+    $('hl').innerHTML = rest.map(([h, items], i) => {
+      const show = items.slice(0, 3);
+      return `<section class="${i === big ? 'big' : ''}"><h3>${esc(h)}</h3><ul>${show.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul>${items.length > 3 ? `<a class="more" href="#${vid(N.v)}">${esc(t('more_items')(items.length - 3))}</a>` : ''}</section>`;
+    }).join('');
+    // 驾驶员 / 机兵
+    $('roster').innerHTML = D.pilots.map((p) => `<article class="pc" style="--acc:${esc(p.accent)}"><div class="art">${p.svg}</div>${p.tag ? `<span class="sticker ${p.tag}">${esc(t(p.tag))}</span>` : ''}<div class="meta"><b>${esc(nm(p))}</b><span>${esc(L(p, 'title'))}</span></div></article>`).join('');
+    const maxHp = Math.max(...D.mechs.map((m) => m.hp)), maxR = Math.max(...D.mechs.map((m) => m.range));
+    $('mechRows').innerHTML = D.mechs.map((m) => `<tr><td>${esc(nm(m))}${m.tag ? `<span class="sticker ${m.tag}">${esc(t(m.tag))}</span>` : ''}</td><td>${esc(L(m, 'role'))}</td><td class="num">${m.hp}<i class="bar" style="width:${Math.round(m.hp / maxHp * 60)}px"></i></td><td class="num">${m.range || '—'}${m.range ? `<i class="bar r" style="width:${Math.round(m.range / maxR * 60)}px"></i>` : ''}</td></tr>`).join('');
+    // 玩法 / 地图
+    const MC = ['var(--ny)', 'var(--nc)', 'var(--np)', 'var(--ng)'];
+    $('modes').innerHTML = D.modes.map((m, i) => `<article class="mode" style="--mc:${MC[i % 4]}"><h3>${esc(nm(m))}</h3>${m.isNew ? '<span class="sticker">NEW</span>' : ''}<p>${esc(L(m, 'desc'))}</p></article>`).join('');
+    $('maps').innerHTML = D.maps.map((m) => `<li class="${m.isNew ? 'new' : ''}">${esc(nm(m))}${m.isNew ? `<span class="sticker">NEW ${esc(D.version)}</span>` : ''}</li>`).join('');
+    // 下载
+    $('dlLede').textContent = t('dl_lede')(D.version, D.date);
+    const dl = t('dl');
+    const card = (id, main, btn) => `<article class="dc${main ? ' main' : ''}"><span class="what">${esc(dl[id][1])}</span><h3>${esc(dl[id][0])}</h3><p>${esc(dl[id][2])}</p>${btn}</article>`;
+    let html = card('web', true, `<span class="size">v${esc(D.version)}</span><a class="btn btn-play btn-sm" href="${esc(playUrl)}" target="_blank" rel="noopener">${esc(t('web_go'))}</a>`);
+    for (const d of D.downloads) {
+      let btn;
+      if (d.have) btn = `<span class="size">${mb(d.size)}</span><a class="btn btn-ghost btn-sm" href="${esc(d.file)}" download>${esc(t('dl_go'))}</a>`;
+      else if (CFG.home) btn = `<span class="size">v${esc(D.version)}${d.size ? ' · ' + mb(d.size) : ''}</span><a class="btn btn-ghost btn-sm" href="${esc(CFG.home)}#download" target="_blank" rel="noopener">${esc(t('site_go'))}</a>`;
+      else btn = `<span class="size">v${esc(D.version)}</span><a class="btn btn-sm" aria-disabled="true">${esc(t('not_yet'))}</a>`;
+      html += card(d.id, false, btn);
+    }
+    $('dl').innerHTML = html;
+    $('howSteps').innerHTML = t('how').map((s) => `<li>${esc(s)}</li>`).join('');
+    // 更新日志
+    $('updIndex').innerHTML = D.notes.map((n) => `<a href="#${vid(n.v)}" data-v="${vid(n.v)}"><span class="vn">${esc(n.v)}</span><span class="tt">${esc(titleOf(n))}</span><time datetime="${n.date}">${n.date}</time></a>`).join('');
+    $('notes').innerHTML = D.notes.map((n, i) => `<article class="note" id="${vid(n.v)}"><div class="note-head"><span class="vnum">${esc(n.v)}</span><div><h2>${esc(titleOf(n))}</h2><time datetime="${n.date}">${n.date}</time></div>${i === 0 ? `<span class="sticker">${esc(t('latest'))}</span>` : ''}</div><div class="note-body">${notesOf(n).map(([h, items]) => `<section><h3>${esc(h)}</h3><ul>${items.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
+    $('footVer').textContent = t('foot_ver')(D.version);
+    document.title = lang === 'en' ? 'GraffiBots' : '涂鸦机兵 GraffiBots';
+    route(false);
+  }
+
+  // ---------- 路由：#home / #updates / #v1-2 / #download ... ----------
+  function route(scroll = true) {
+    const h = location.hash.slice(1);
+    const upd = h === 'updates' || /^v\d/.test(h);
+    $('home').hidden = upd; $('updates').hidden = !upd;
+    for (const a of document.querySelectorAll('.nav a[data-route]')) { if ((a.dataset.route === 'updates') === upd) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+    for (const a of document.querySelectorAll('.upd-index a')) a.classList.toggle('on', a.dataset.v === h || (h === 'updates' && a === document.querySelector('.upd-index a')));
+    if (!scroll) return;
+    const el = h && h !== 'home' && h !== 'updates' ? document.getElementById(h) : null;
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }));
+    else window.scrollTo(0, 0);
+    if (!upd) paintWall();
+  }
+  window.addEventListener('hashchange', () => route(true));
+  for (const b of document.querySelectorAll('.lang button')) b.addEventListener('click', () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem('gbsite_lang', lang); } catch (e) { /* 不能存就算了 */ }
+    render();
+  });
+
+  // ---------- 首屏的墙：灰色水泥墙，上面被喷上三种颜色 ----------
+  const cv = $('wall');
+  let rnd;
+  const seed = (s) => { rnd = () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let x = Math.imul(s ^ (s >>> 15), 1 | s); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; }; };
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let anim = 0, lastW = 0;
+  function concrete(g, w, h) {
+    g.fillStyle = '#2a2930'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < w * h / 90; i++) { const v = rnd(); g.fillStyle = v < 0.5 ? `rgba(0,0,0,${0.08 + rnd() * 0.12})` : `rgba(255,255,255,${0.02 + rnd() * 0.04})`; const s = 1 + rnd() * 2.4; g.fillRect(rnd() * w, rnd() * h, s, s); }
+    // 浇筑缝和对拉螺栓孔
+    const pw = 300, ph = Math.max(180, h / 2);
+    g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 2;
+    for (let x = pw; x < w; x += pw) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, h); g.stroke(); }
+    for (let y = ph; y < h; y += ph) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(w, y + 0.5); g.stroke(); }
+    for (let x = pw / 4; x < w; x += pw / 2) for (let y = ph / 4; y < h; y += ph / 2) { g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.06)'; g.beginPath(); g.arc(x - 1, y - 1, 2, 0, 7); g.fill(); }
+    // 灰石集团刷上的灰漆（盖住了旧涂鸦）
+    g.fillStyle = 'rgba(140,138,146,.18)';
+    for (let i = 0; i < 5; i++) { const x = rnd() * w, y = rnd() * h, ww = 220 + rnd() * 380; g.save(); g.translate(x, y); g.rotate((rnd() - 0.5) * 0.1); g.fillRect(-ww / 2, -40, ww, 80 + rnd() * 50); g.restore(); }
+  }
+  function splat(g, x, y, r, col, k) {
+    g.fillStyle = col;
+    g.beginPath(); g.arc(x, y, r * k, 0, 7); g.fill();
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 6.28 + rnd() * 0.5, d = r * (0.7 + rnd() * 0.7) * k, s = r * (0.18 + rnd() * 0.3) * k;
+      g.beginPath(); g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, s, 0, 7); g.fill();
+      if (rnd() < 0.5) { const d2 = d + r * (0.4 + rnd() * 0.8) * k; g.beginPath(); g.arc(x + Math.cos(a) * d2, y + Math.sin(a) * d2, s * 0.35, 0, 7); g.fill(); }
+    }
+    for (let i = 0; i < 3; i++) { if (rnd() < 0.35) continue; const dx = x + (rnd() - 0.5) * r * 1.3, len = r * (0.8 + rnd() * 1.8) * k, wd = 4 + rnd() * 7; g.fillRect(dx - wd / 2, y, wd, len); g.beginPath(); g.arc(dx, y + len, wd * 0.7, 0, 7); g.fill(); }
+  }
+  function paintWall() {
+    if (!cv || $('home').hidden) return;
+    const box = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.round(box.width)), h = Math.max(1, Math.round(box.height));
+    cv.width = w * dpr; cv.height = h * dpr;
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    seed(1214); concrete(g, w, h);
+    const base = g.getImageData(0, 0, cv.width, cv.height);
+    // 颜料团：靠右上和右下，避开左边的文字
+    seed(77);
+    const cols = ['#ffe600', '#ff3ea5', '#1fd6ee', '#ff3ea5', '#ffe600', '#1fd6ee', '#9cff2e'];
+    const narrow = w < 820, list = [];
+    for (let i = 0; i < 11; i++) {
+      const x = narrow ? rnd() * w : w * (0.55 + rnd() * 0.47), y = h * (0.05 + rnd() * 0.9);
+      list.push({ x, y, r: (narrow ? 26 : 34) + rnd() * (narrow ? 40 : 70), c: cols[i % cols.length], s: rnd() });
+    }
+    cancelAnimationFrame(anim);
+    const t0 = performance.now(), dur = reduce ? 0 : 1400;
+    const frame = (now) => {
+      g.putImageData(base, 0, 0); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const p = dur ? Math.min(1, (now - t0) / dur) : 1;
+      seed(99);
+      list.forEach((sp, i) => { const local = Math.max(0, Math.min(1, (p * list.length - i) / 1.6)); if (local <= 0) { for (let j = 0; j < 40; j++) rnd(); return; } const e = 1 - Math.pow(1 - local, 3); g.globalAlpha = 0.92; splat(g, sp.x, sp.y, sp.r, sp.c, e); });
+      g.globalAlpha = 1;
+      if (p < 1) anim = requestAnimationFrame(frame);
+    };
+    anim = requestAnimationFrame(frame);
+    lastW = w;
+  }
+  window.addEventListener('resize', () => { if (cv && Math.abs(cv.getBoundingClientRect().width - lastW) > 40) paintWall(); });
+
+  render();
+  route(true);
+})();
+</script>
+</body>
+</html>

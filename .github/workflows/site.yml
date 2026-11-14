@@ -1,0 +1,78 @@
+# 发布涂鸦机兵官网（GitHub Pages）：打包单文件版、完整包和安卓 APK，生成官网，一起发布。
+# 第一次使用：仓库 Settings → Pages → Source 选「GitHub Actions」。之后每次推送到 main / master 都会自动更新官网。
+# 官网地址：https://<用户名>.github.io/<仓库名>/ ，要和 public/config.js 里的 GB_SITE_URL 一致（游戏靠它检查新版本）。
+name: 发布官网
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 测试
+        run: for t in test/*.js; do node "$t" || exit 1; done
+
+      - name: 打包单文件版和完整包
+        run: |
+          node tools/build-single.js
+          mkdir -p _zip/GraffiBots
+          git ls-files -z | xargs -0 -I{} cp --parents {} _zip/GraffiBots/
+          cp dist/涂鸦机兵-单文件版.html _zip/GraffiBots/
+          (cd _zip && zip -qr ../dist/GraffiBots.zip GraffiBots)
+
+      # 安卓 APK 打包失败也不影响官网发布（官网上会显示「暂未提供」）
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        continue-on-error: true
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: 打包安卓 APK
+        continue-on-error: true
+        working-directory: android
+        env:
+          KS_B64: ${{ secrets.GB_KEYSTORE_B64 }}
+          GB_KEYSTORE_PASS: ${{ secrets.GB_KEYSTORE_PASS }}
+        run: |
+          if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"; export GB_KEYSTORE="$RUNNER_TEMP/release.jks"; fi
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../dist/涂鸦机兵-GraffiBots.apk
+
+      - name: 生成官网
+        run: node tools/build-site.js --out _site --downloads
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
