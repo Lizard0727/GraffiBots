@@ -34,6 +34,8 @@
       <circle cx="24" cy="24" r="5.5" fill="#fff" ${st(2.4)}/><path d="M38,4 L28,20" ${st(3.4)}/><path d="M37,3 L44,4 L40,9 Z" fill="#141018"/>`,
     escort: (c = '#ffc531') => `<path d="M24,5 L40,17 L24,44 L8,17 Z" fill="${c}" ${st()}/><path d="M8,17 L40,17 M24,5 L18,17 L24,44 L30,17 Z" fill="none" ${st(2.4)}/>
       <path d="M15,13 L19,10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`,
+    // 乐园：一串气球
+    park: (c = '#ff6ec4') => `<path d="M24,26 L22,44 M30,24 L27,44" fill="none" ${st(2.4)}/><ellipse cx="18" cy="16" rx="9" ry="11" fill="${c}" ${st()}/><ellipse cx="32" cy="14" rx="8" ry="10" fill="#1fd6ee" ${st()}/><ellipse cx="26" cy="22" rx="8" ry="9" fill="#ffd23f" ${st()}/><path d="M15,11 q2,-3 5,-2" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
     soccer: (c = '#1fbf6e') => `<path d="M24,4 C36,4 44,13 44,24 C44,36 35,44 24,44 C12,44 4,36 4,24 C4,12 13,4 24,4 Z" fill="#fff" ${st()}/>
       <path d="M24,14 L32,20 L29,30 L19,30 L16,20 Z" fill="#141018"/><path d="M24,14 L24,5 M32,20 L42,17 M29,30 L35,40 M19,30 L13,40 M16,20 L6,17" ${st(2.4)}/>
       <path d="M8,30 C12,36 16,38 20,39" stroke="${c}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`,
@@ -60,6 +62,8 @@
     coins: (c = '#ffc531') => `<path d="M24,6 C35,6 42,13 42,23 C42,34 35,42 24,42 C13,42 6,34 6,23 C6,13 13,6 24,6 Z" fill="${c}" ${st()}/>
       <path d="M24,12 C31,12 36,16 36,23 C36,30 31,35 24,35 C17,35 12,30 12,23 C12,16 17,12 24,12 Z" fill="none" stroke="#b9800a" stroke-width="2.6"/>
       <path d="M19,17 L24,23 L29,17 M24,23 L24,31 M19,25 L29,25" fill="none" stroke="${K}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14,15 Q17,10 22,9" stroke="#fff9" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    // 乐园票
+    tickets: (c = '#ff6ec4') => `<path d="M6,14 L42,14 L42,20 C38,20 38,28 42,28 L42,34 L6,34 L6,28 C10,28 10,20 6,20 Z" fill="${c}" ${st()}/><path d="M30,14 L30,34" stroke="#141018" stroke-width="2" stroke-dasharray="3 3"/><path d="M16,20 l2,4 l4,0 l-3,3 l1,4 l-4,-2 l-4,2 l1,-4 l-3,-3 l4,0 Z" fill="#ffe600"/>`,
     gems: (c = '#ff3ea5') => `<path d="M12,8 L36,8 L44,19 L24,43 L4,19 Z" fill="${c}" ${st()}/><path d="M4,19 L44,19 M12,8 L18,19 L24,43 L30,19 L36,8 M18,19 L24,8 L30,19" fill="none" ${st(2.2)}/>
       <path d="M14,12 L17,16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`,
     parts: (c = '#7af0ff') => `<path d="M30,6 C36,6 41,10 42,16 L36,16 L33,20 L36,24 L42,24 C40,30 34,33 28,31 L14,44 C11,47 5,42 8,39 L21,25 C19,18 23,6 30,6 Z" fill="${c}" ${st()}/><circle cx="11.5" cy="40.5" r="2" fill="${K}"/>`,
@@ -78,12 +82,14 @@
     military: { body: '#4f6b3a', lid: '#63854a', band: '#ffe600', deco: 'stripes' },
     airdrop: { body: '#ffb42e', lid: '#ffd35e', band: '#141018', deco: 'chute' },
     hero: { body: '#7a4dff', lid: '#9a76ff', band: '#ffe600', deco: 'star' },
+    strike: { body: '#2a1f3a', lid: '#4a3a66', band: '#ff3b52', deco: 'skull' },
   };
   function chestArt(id, open) {
     const L = CHEST_LOOK[id] || CHEST_LOOK.supply;
     let deco = '';
     if (L.deco === 'bow') deco = `<path d="M60,58 C46,40 34,50 44,60 C34,70 46,78 60,62 C74,78 86,70 76,60 C86,50 74,40 60,58 Z" fill="${L.band}" ${st(3)}/>`;
     if (L.deco === 'stencil') deco = `<text x="60" y="104" text-anchor="middle" font-family="Impact, sans-serif" font-size="17" fill="#2a241c" opacity=".75" letter-spacing="2">SUPPLY</text>`;
+    if (L.deco === 'skull') deco = `<path d="M60,70 C48,70 42,78 42,88 C42,96 48,100 52,100 L52,108 L68,108 L68,100 C72,100 78,96 78,88 C78,78 72,70 60,70 Z" fill="#fff6e3" ${st(2.6)}/><circle cx="53" cy="88" r="5" fill="#ff3b52"/><circle cx="67" cy="88" r="5" fill="#ff3b52"/><path d="M30,64 L90,112 M90,64 L30,112" stroke="#ff3b52" stroke-width="5" opacity=".6"/>`;
     if (L.deco === 'stripes') deco = `<path d="M22,112 L34,90 M40,112 L52,90 M68,112 L80,90 M86,112 L98,90" stroke="#141018" stroke-width="6" opacity=".55"/>`;
     if (L.deco === 'chute') deco = `<path d="M18,30 C24,0 96,0 102,30 Z" fill="#fff6e3" ${st(3)}/><path d="M18,30 L34,62 M102,30 L86,62 M48,24 L52,62 M72,24 L68,62" stroke="#141018" stroke-width="2.4"/><path d="M38,30 C42,6 58,4 60,30 M60,30 C62,4 78,6 82,30" fill="#ff3ea5" ${st(2.4)}/>`;
     if (L.deco === 'star') deco = `<path d="M60,84 L65,95 L77,96 L68,104 L71,116 L60,110 L49,116 L52,104 L43,96 L55,95 Z" fill="${L.band}" ${st(2.6)}/>`;

@@ -47,7 +47,7 @@ const pilots = Object.values(S.PILOTS).map((p) => {
   };
 });
 const mechs = Object.entries(S.WEAPONS).map(([id, w]) => ({ id, name: w.name, en: tr(w.name), role: w.role, en_role: tr(w.role), hp: w.hp, range: w.range || 0,
-  tag: (E.SEASON_MECHS || []).includes(id) ? 'season' : questP.has(id) ? 'quest' : '' }));
+  tag: (E.SEASON_MECHS || []).includes(id) ? 'season' : questP.has(id) ? 'quest' : (E.STRIKE_MECHS || []).includes(id) ? 'strike' : '' }));
 const modes = Object.entries(S.MODES).map(([id, m]) => ({ id, name: m.name, en: tr(m.name), desc: m.desc, en_desc: tr(m.desc), isNew: !!m.isNew }));
 const maps = S.MAPS.map((m, i) => ({ name: m.name, en: tr(m.name), isNew: i >= S.MAPS.length - NEW_MAPS }));
 
@@ -70,11 +70,11 @@ const data = {
   notes, pilots, mechs, modes, maps, downloads,
   // 最新版本的截图（换版本时改这里）
   shots: [
-    { img: 'img/v131-stage.jpg', cap: '官网 3D 展示台', en_cap: '3D showcase on the website', sub: '点驾驶员就会播放动作', en_sub: 'Pick a pilot to see them move' },
-    { img: 'img/v131-detail.jpg', cap: '游戏里的展示动作', en_cap: 'Showcase moves in game', sub: '「驾驶员」界面', en_sub: 'Pilots screen' },
-    { img: 'img/v13-lineup.jpg', cap: '15 位驾驶员的 3D 模型', en_cap: '3D models for all 15 pilots', sub: '1.3 新内容', en_sub: 'New in 1.3' },
+    { img: 'img/v14-park.jpg', cap: '乐园模式', en_cap: 'Park Mode', sub: '花车巡游 + 打气球', en_sub: 'Parade float + balloons' },
+    { img: 'img/v14-summer.jpg', cap: '夏日系列 + 新角色卡卡', en_cap: 'Summer skins + new pilot Kaka', sub: '1.4 新内容', en_sub: 'New in 1.4' },
+    { img: 'img/v14-ranked.jpg', cap: '排位赛禁用阶段', en_cap: 'Ranked ban phase', sub: '黄金段位起', en_sub: 'From Gold tier' },
   ],
-  og: 'img/v13-lineup.jpg',
+  og: 'img/v14-summer.jpg',
 };
 
 // ---- 发布到网上：官网地址、搜索引擎（SEO）----

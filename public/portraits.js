@@ -342,6 +342,32 @@
         s += `<rect x="136" y="150" width="22" height="7" rx="3" fill="${a}" transform="rotate(-28 147 153)" ${ol(1.8)}/><rect x="140" y="164" width="22" height="7" rx="3" fill="#ffe14d" transform="rotate(-28 151 167)" ${ol(1.8)}/>`;
         break;
     }
+    // 1.4：卡卡的高礼帽；夏日皮肤配件
+    if (P.id === 'kaka') {
+      s += `<ellipse cx="200" cy="104" rx="118" ry="20" fill="#141018" ${ol(3)}/>`;
+      s += path('M136,104 L144,20 L256,20 L264,104 Z', '#141018', ol(3));
+      s += path('M140,86 L262,86 L264,104 L136,104 Z', a);
+      s += `<g transform="rotate(14 248 60)"><rect x="234" y="34" width="30" height="42" rx="4" fill="#fff" ${ol(2.4)}/><path d="M249,46 l6,8 l-6,8 l-6,-8 Z" fill="#ff3b52"/></g>`;
+      s += `<path d="M154,40 L160,30 M168,34 L168,24" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.5"/>`;
+    }
+    const X = P.extra || [];
+    if (X.includes('sunglasses')) {
+      for (const x of [164, 236]) s += `<rect x="${x - 30}" y="190" width="60" height="38" rx="16" fill="#1b1530" ${ol(3)}/><path d="M${x - 18},198 l14,0" stroke="#7af0ff" stroke-width="4" stroke-linecap="round" opacity="0.85"/>`;
+      s += `<path d="M194,204 Q200,198 206,204" fill="none" stroke="${LINE}" stroke-width="4"/>`;
+    }
+    if (X.includes('strawhat')) {
+      s += `<ellipse cx="200" cy="96" rx="168" ry="34" fill="#f2d38a" ${ol(3)}/>`;
+      s += path('M118,96 C118,40 150,22 200,22 C250,22 282,40 282,96 Z', '#f2d38a', ol(3));
+      s += path('M120,80 C150,70 250,70 280,80 L282,96 C250,88 150,88 118,96 Z', '#ff6ec4', ol(2.4));
+      s += `<path d="M120,60 Q200,48 280,60 M140,40 Q200,30 260,40" stroke="#c9a85e" stroke-width="2" fill="none" opacity="0.7"/>`;
+      s += `<circle cx="282" cy="88" r="14" fill="#ff6ec4" ${ol(2.4)}/><circle cx="282" cy="88" r="5" fill="#ffe14d"/>`;
+    }
+    if (X.includes('icecrown')) {
+      s += path('M128,104 L136,48 L156,86 L174,30 L190,82 L200,18 L210,82 L226,30 L244,86 L264,48 L272,104 Z', '#bff3ff', ol(3) + ' opacity="0.95"');
+      s += path('M150,98 L160,70 L170,96 M230,96 L240,70 L250,98', 'none', 'stroke="#fff" stroke-width="3" opacity="0.8"');
+      s += `<path d="M200,70 l9,12 l-9,12 l-9,-12 Z" fill="#ff6ec4" ${ol(2)}/>`;
+      for (const [x, y, r] of [[96, 140, 7], [318, 170, 6], [84, 250, 5], [330, 96, 5]]) s += `<path d="M${x},${y - r * 2} L${x + r},${y} L${x},${y + r * 2} L${x - r},${y} Z" fill="#dff8ff" ${ol(1.8)}/>`;
+    }
     return s;
   }
 
@@ -483,6 +509,39 @@
         s += `<path d="M176,400 L170,470 M224,400 L230,470" stroke="#fff" stroke-width="3"/><circle cx="170" cy="474" r="5" fill="#fff"/><circle cx="230" cy="474" r="5" fill="#fff"/>`;
         s += `<rect x="146" y="470" width="108" height="40" rx="12" fill="#f2b820" ${ol(2.4)}/>`;
         s += `<circle cx="200" cy="452" r="18" fill="#fff6e8" ${ol(2.4)}/><path d="M188,440 l4,-10 l6,8 M212,440 l-4,-10 l-6,8" fill="#fff6e8" ${ol(2)}/><circle cx="194" cy="452" r="2.4" fill="${LINE}"/><circle cx="206" cy="452" r="2.4" fill="${LINE}"/>`;
+        break;
+      }
+      case 'magician': {   // 燕尾服 + 白衬衫 + 红领结 + 披风领
+        s += path(shape([[20, 520, 1], [30, 410], [80, 352], [150, 330], [250, 330], [320, 352], [370, 410], [380, 520, 1]]), '#8f1a3a', ol(3));
+        s += path(shape(SH), '#2a1f3a', ol(3));
+        s += path('M162,338 L200,440 L238,338 Z', '#ffffff', ol(2.6));
+        s += path(shape([[110, 372], [168, 336], [200, 440, 1], [150, 520, 1], [96, 520, 1]]), '#3a2c55', ol(3)) + path(shape(mirrorPts([[110, 372], [168, 336], [200, 440, 1], [150, 520, 1], [96, 520, 1]])), '#3a2c55', ol(3));
+        s += path('M200,352 L172,338 L176,368 Z', '#ff3b52', ol(2.4)) + path('M200,352 L228,338 L224,368 Z', '#ff3b52', ol(2.4)) + `<circle cx="200" cy="352" r="7" fill="#ff3b52" ${ol(2)}/>`;
+        for (const y of [392, 418]) s += `<circle cx="200" cy="${y}" r="4" fill="#ffd23f" ${ol(1.6)}/>`;
+        s += `<path d="M120,430 l10,-14 l10,14 l-10,14 Z" fill="${a}" ${ol(2)}/>`;
+        break;
+      }
+      case 'surf': {       // 夏威夷花衬衫 + 白 T
+        s += path(shape(SH), P.accent, ol(3));
+        s += path('M164,338 L200,404 L236,338 Z', '#ffffff', ol(2.6));
+        s += path(shape([[104, 370], [166, 336], [150, 306, 1], [186, 342], [192, 420, 1], [148, 520, 1], [78, 520, 1]]), P.accent, ol(3)) + path(shape(mirrorPts([[104, 370], [166, 336], [150, 306, 1], [186, 342], [192, 420, 1], [148, 520, 1], [78, 520, 1]])), P.accent, ol(3));
+        for (const [x, y, r] of [[96, 430, 16], [140, 470, 12], [270, 440, 15], [316, 486, 12], [120, 396, 9], [292, 392, 10]]) { for (let k = 0; k < 5; k++) { const an = k * 1.257; s += `<circle cx="${(x + Math.cos(an) * r * 0.7).toFixed(1)}" cy="${(y + Math.sin(an) * r * 0.7).toFixed(1)}" r="${(r * 0.55).toFixed(1)}" fill="#ffe14d"/>`; } s += `<circle cx="${x}" cy="${y}" r="${r * 0.35}" fill="#ff3ea5"/>`; }
+        break;
+      }
+      case 'swim': {       // 泳装：露肩 + 吊带 + 蝴蝶结 + 波点
+        s += path(shape(SH), P.skin, ol(3));
+        s += path(shape([[110, 420, 1], [160, 392], [200, 404], [240, 392], [290, 420, 1], [300, 520, 1], [100, 520, 1]]), '#ff6ec4', ol(3));
+        s += `<path d="M160,394 L170,340 M240,394 L230,340" stroke="#ff6ec4" stroke-width="8" stroke-linecap="round"/>`;
+        for (const [x, y] of [[140, 450], [180, 480], [230, 446], [268, 486], [200, 432]]) s += `<circle cx="${x}" cy="${y}" r="6" fill="#fff"/>`;
+        s += path('M200,408 L176,396 L178,422 Z', '#ffe14d', ol(2)) + path('M200,408 L224,396 L222,422 Z', '#ffe14d', ol(2)) + `<circle cx="200" cy="408" r="6" fill="#ffe14d" ${ol(2)}/>`;
+        break;
+      }
+      case 'sorbet': {     // 冰沙女王：渐变冰裙 + 冰晶肩饰 + 宝石
+        s += path(shape(SH), '#e8faff', ol(3));
+        s += path(shape([[130, 360], [200, 400], [270, 360], [280, 420], [200, 452], [120, 420]]), '#bff3ff', ol(2.6));
+        for (const side of [-1, 1]) for (let k = 0; k < 3; k++) { const x = 200 + side * (110 + k * 22), y = 360 + k * 6; s += path(`M${x - 10},${y} L${x + side * 6},${y - 44 + k * 10} L${x + 10},${y} Z`, '#7af0ff', ol(2)); }
+        s += `<path d="M200,404 l10,14 l-10,14 l-10,-14 Z" fill="#ff6ec4" ${ol(2)}/>`;
+        s += `<path d="M90,480 Q200,500 310,480" stroke="#7af0ff" stroke-width="6" fill="none"/>`;
         break;
       }
       case 'engineer': {

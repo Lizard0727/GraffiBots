@@ -52,7 +52,7 @@ ok(p.weapon === 'charger', '可以换成已有的机体');
     const r = E.apply(q, 'buy', { chest: 'airdrop' }, rnd);
     for (const it of r.items) if (it.k === 'pilot' && before.has(it.id)) dupBad = true;
   }
-  ok(!dupBad && Object.keys(q.pilots).length === S.PILOTS.length - 1 && q.mechs.length === S.WEAPON_ORDER.length - 1 && !q.pilots.han && !q.mechs.includes('riot'), '不会抽到重复角色，开够了能集齐宝箱里的全部驾驶员和机体（任务角色韩冰 / 防暴盾卫不在宝箱里）');
+  ok(!dupBad && Object.keys(q.pilots).length === S.PILOTS.length - 1 && q.mechs.length === S.WEAPON_ORDER.length - 1 - E.STRIKE_MECHS.length && !q.pilots.han && !q.mechs.includes('riot') && !E.STRIKE_MECHS.some((m) => q.mechs.includes(m)), '不会抽到重复角色，开够了能集齐宝箱里的全部驾驶员和机体（任务角色、特攻队机体不在普通宝箱里）');
   const r = E.apply(q, 'buy', { chest: 'airdrop' }, () => 0);
   ok(r.items.some((i) => i.dup) && !r.items.some((i) => i.k === 'pilot'), '全部拥有后，角色 / 机体奖励换成金币');
 }

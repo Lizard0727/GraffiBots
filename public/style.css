@@ -1173,6 +1173,7 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
 .frame-neon, .me-chip.frame-neon .avatar { background: #141018; box-shadow: 0 0 0 3px #2ef0c8, 0 0 16px #2ef0c8; animation: neonPulse 1.6s ease-in-out infinite; }
 .frame-rebel, .me-chip.frame-rebel .avatar { background: repeating-linear-gradient(90deg, #ff5a36 0 10px, #141018 10px 20px); background-size: 40px 40px; animation: stripeMove 1s linear infinite; }
 .frame-gold, .me-chip.frame-gold .avatar { background: linear-gradient(135deg, #b88a1a, #fff3c4, #ffc531, #b88a1a); background-size: 200% 200%; animation: goldShine 2s linear infinite; }
+.frame-master, .me-chip.frame-master .avatar { background: conic-gradient(#b06bff, #ff6ec4, #7ab8ff, #b06bff); animation: spin 3s linear infinite; box-shadow: 0 0 16px #b06bff, 0 0 4px #fff inset; }
 .frame-flame, .me-chip.frame-flame .avatar { background: conic-gradient(#ff3b52, #ff8a1f, #ffe600, #ff8a1f, #ff3b52); animation: spin 2.4s linear infinite; box-shadow: 0 0 18px #ff8a1f; }
 .me-chip[class*=frame-] .avatar { border-radius: 50%; padding: 4px; }
 @keyframes neonPulse { 50% { box-shadow: 0 0 0 3px #2ef0c8, 0 0 30px #2ef0c8; } }
@@ -1308,3 +1309,79 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
 .ug-steps { margin: 16px 0 6px; padding-left: 1.3em; font-size: 13px; color: #5c5560; }
 .ug-foot { display: block; font-size: 12px; color: #7a7280; }
 @media (max-height: 520px) { .ug-card { padding: 20px 20px 14px; } .ug-card h2 { font-size: 26px; } .ug-ver { font-size: 30px; margin: 2px 0 6px; } .ug-steps, .ug-notes { display: none; } }
+
+/* ---------- 1.4：排位赛 ---------- */
+.rank-chip { display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; background: linear-gradient(120deg, #1d1b2a, #2a2440); color: #fff; border: 3px solid var(--ink, #141018); border-radius: 12px 16px 11px 15px; padding: 7px 12px; box-shadow: 3px 4px 0 var(--ink, #141018); cursor: pointer; font-family: inherit; margin-bottom: 8px; transform: rotate(-0.6deg); }
+.rank-chip:hover { transform: rotate(-0.6deg) translateY(-1px); }
+.rank-chip small { display: block; font-size: 11px; color: #c8c0d8; }
+.rank-chip b { font: 20px/1.05 var(--head, sans-serif); color: var(--rc, #ffd23f); margin-right: 8px; }
+.rank-chip span:not(.rk-badge) { font-size: 12px; color: #c8c0d8; }
+.rk-badge { width: 40px; height: 40px; flex: 0 0 auto; display: inline-block; }
+.rk-badge svg { width: 100%; height: 100%; display: block; }
+.rank-hero { display: flex; gap: 20px; align-items: center; background: #1d1b2a; color: #fff; border: 3px solid var(--ink, #141018); border-radius: 16px; padding: 18px 22px; box-shadow: 4px 6px 0 #0007; }
+.rank-hero .rk-badge { width: 110px; height: 110px; }
+.rank-hero small { display: block; }
+.rank-hero h3 { margin: 2px 0 4px; font: 40px/1 var(--head, sans-serif); color: var(--rc, #ffd23f); background: none !important; padding: 0 !important; transform: none !important; box-shadow: none !important; }
+.rank-hero .rp { font: 26px var(--num, sans-serif); letter-spacing: 1px; }
+.rank-bar { height: 12px; background: #0008; border-radius: 6px; overflow: hidden; margin: 8px 0 4px; border: 2px solid #0008; }
+.rank-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--rc, #ffd23f), #fff); }
+.rank-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.rank-info > div { background: #fff6e3; color: #141018; border: 3px solid #141018; border-radius: 12px; padding: 10px 14px; }
+.rank-info b { display: block; font: 18px var(--head, sans-serif); }
+.rank-info small { color: #5c5560; }
+.rank-go { width: 100%; font-size: 24px !important; padding: 14px !important; }
+.rank-need { margin: 8px 0 0; font-size: 13px; color: #ff5a36; font-weight: 700; text-align: center; }
+.rank-ladder { display: grid; gap: 8px; margin-top: 16px; }
+.rank-step { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; background: #1d1b2a; color: #fff; border: 2px solid #3a3550; border-radius: 12px; padding: 8px 12px; }
+.rank-step.cur { border-color: var(--rc); box-shadow: 0 0 0 2px var(--rc); }
+.rank-step.locked { opacity: .55; }
+.rank-step .rk-badge { width: 44px; height: 44px; }
+.rank-step b { font: 18px var(--head, sans-serif); color: var(--rc); }
+.rank-step small { display: block; color: #c8c0d8; font-size: 12px; }
+.rank-step .rw { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.rank-step .rw svg { width: 28px; height: 28px; }
+/* 禁用 / 选择阶段 */
+.draft-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
+.draft-grid h3 { margin: 6px 0 8px; font: 20px var(--head, sans-serif); color: #fff; text-shadow: 2px 2px 0 #000; }
+.draft-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.dcard { position: relative; background: #fff6e3; border: 3px solid #141018; border-radius: 10px; padding: 4px 4px 6px; cursor: pointer; font: 12px var(--head, sans-serif); color: #141018; text-align: center; box-shadow: 2px 3px 0 #0007; }
+.dcard img, .dcard svg { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; background: #2a2440; }
+.dcard.sel { outline: 4px solid #ff3b52; transform: translateY(-3px); }
+.dcard.pick.sel { outline-color: #9cff2e; }
+.dcard.banned { filter: grayscale(1) brightness(.6); cursor: not-allowed; }
+.dcard.banned::after { content: '禁'; position: absolute; inset: 20% 20% auto; font: 30px var(--head, sans-serif); color: #ff3b52; text-shadow: 2px 2px 0 #000; }
+.dcard.notown { opacity: .45; cursor: not-allowed; }
+.draft-side { background: #1d1b2a; color: #fff; border: 3px solid #141018; border-radius: 14px; padding: 14px; align-self: start; position: sticky; top: 0; }
+.draft-side h4 { margin: 0 0 8px; font: 18px var(--head, sans-serif); }
+.ban-row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid #3a3550; animation: banIn .35s both; }
+.ban-row img, .ban-row svg { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #2a2440; }
+.ban-row b { display: block; font-size: 14px; }
+.ban-row small { color: #c8c0d8; font-size: 12px; }
+.ban-row .side { font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 6px; margin-right: 6px; }
+.side-me { background: #9cff2e; color: #141018; } .side-ally { background: #1fd6ee; color: #141018; } .side-enemy { background: #ff3b52; color: #fff; }
+@keyframes banIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+.draft-side .btn { width: 100%; margin-top: 12px; }
+@media (max-width: 860px) { .draft-wrap { grid-template-columns: minmax(0, 1fr); } .draft-side { position: static; } .rank-info { grid-template-columns: 1fr; } }
+/* 活动商店 + 信箱滑动删除 */
+.ev-shop { margin-top: 12px; background: #fff6e3; border: 3px solid #141018; border-radius: 12px; padding: 10px; }
+.ev-shop-h { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.ev-shop-h b { font: 18px var(--head, sans-serif); color: #141018; }
+.ev-shop-h .tk { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; color: #d1408e; margin-right: auto; }
+.ev-shop-h .tk svg, .shop-it .btn svg { width: 20px; height: 20px; }
+.ev-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.shop-it { display: flex; flex-direction: column; align-items: center; gap: 3px; background: #fff; border: 2px solid #141018; border-radius: 10px; padding: 8px 6px; text-align: center; color: #141018; }
+.shop-it .si-art { width: 54px; height: 54px; display: grid; place-items: center; }
+.shop-it .si-art svg, .shop-it .si-art img { max-width: 100%; max-height: 100%; }
+.shop-it b { font-size: 12px; line-height: 1.25; }
+.shop-it small { font-size: 11px; color: #7a7280; }
+.shop-it.sold { opacity: .5; }
+.ev-art.chest { display: grid; place-items: center; background: #0003; }
+.ev-art.chest svg { width: 80%; }
+.mail { touch-action: pan-y; transition: transform .2s, opacity .2s; }
+.mail.swiped { transform: translateX(110%) !important; opacity: 0 !important; }
+.mail-exp { color: #ff5a36; font-weight: 700; }
+
+/* 结算：MVP 的 3D 胜利动作（3D 加载前显示立绘） */
+.res-mvp .mvp-3d { position: relative; background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--pc, #ffdf2e) 45%, #2a2440), #17141f 75%); }
+.res-mvp .mvp-3d canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+.res-mvp .mvp-3d.live svg { opacity: 0; }

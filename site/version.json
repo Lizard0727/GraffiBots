@@ -1,18 +1,32 @@
 {
-  "version": "1.3.1",
+  "version": "1.4",
   "date": "2026-11-14",
-  "title": "1.3.1 更新 · 官网上线",
-  "en_title": "Update 1.3.1 · Website Launch",
+  "title": "1.4 更新 · 乐园祭",
+  "en_title": "Update 1.4 · Park Fest",
   "page": "#updates",
   "force": true,
   "notes": [
-    "驾驶员展示动作",
-    "官网",
+    "限时活动「乐园祭」",
+    "新机体组「袭击！特攻队」",
+    "夏日系列皮肤",
+    "新常驻角色与机体",
+    "排位赛",
+    "新兵之路",
+    "信箱",
+    "更多新内容",
+    "平衡调整",
     "更新奖励"
   ],
   "en_notes": [
-    "Pilot showcase moves",
-    "Website",
+    "Limited event: Park Fest",
+    "New mech squad: Strike Team",
+    "Summer skins",
+    "New standard pilot and mech",
+    "Ranked",
+    "Rookie Path",
+    "Mailbox",
+    "More",
+    "Balance changes",
     "Update rewards"
   ]
 }

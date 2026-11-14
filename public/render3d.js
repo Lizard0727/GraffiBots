@@ -128,6 +128,11 @@
       zen: 0x0b1424, mid: 0x1c3550, hor: 0x3a7a8a, sunC: 0xcfe8ff, sunI: 0.7, hemiS: 0xa8d8ff, hemiG: 0x20283a, hemiI: 0.78, fill: 0x2ef0c8, fog: 0x1a3040,
       sun: [-0.3, 0.8, -0.4], floor: ['#5a6270', '#525a68'], seam: '#3e4654', tops: ['#6a7280', '#8a92a0', '#454c5a', '#7a8290'], win: 0.9,
       sides: [['#2ef0c8', '#1a2a3a'], ['#ffe600', '#3a3d46'], ['#d8dce4', '#7a808c'], ['#5a6270', '#ff3ea5']], trim: ['#1a2a3a', '#e8f4ff', '#2ef0c8', '#ffe600'], night: true,
+    },
+    { // 欢乐乐园：晴朗的乐园午后，粉蓝糖果色
+      zen: 0x3a8cff, mid: 0x8fd0ff, hor: 0xfff0d8, sunC: 0xfff4dc, sunI: 0.95, hemiS: 0xfff0f8, hemiG: 0x6a5a70, hemiI: 0.82, fill: 0xff9ad6, fog: 0xc8e4ff,
+      sun: [0.45, 0.7, -0.5], floor: ['#9a94a6', '#928ca0'], seam: '#7e788c', tops: ['#ff9ad6', '#8fe3ff', '#7a7490', '#ffe28a'], win: 0.3,
+      sides: [['#ff6ec4', '#ffffff'], ['#1fd6ee', '#ffffff'], ['#fff4dc', '#ff6ec4'], ['#ffd23f', '#b06bff']], trim: ['#ffffff', '#ff3ea5', '#1fd6ee', '#ffd23f'], night: false, fx: 'petals',
     }
   ];
 
@@ -946,6 +951,47 @@
       g.add(part(SH.cyl, SH.white, 3, 4, 3, 0, 10, 0));
       return g;
     });
+    // 卡卡：替身全息影像 + 惊喜礼盒
+    P.decoy = pool(() => {
+      const g = new T.Group(), hm = basic(0xb06bff, { transparent: true, opacity: 0.45, depthWrite: false, blending: T.AdditiveBlending });
+      g.add(part(SH.cyl, hm, 9, 30, 9, 0, 15, 0)); g.add(part(SH.cyl, hm, 6, 9, 6, 0, 36, 0)); g.add(part(SH.cyl, hm, 9, 1.2, 9, 0, 31, 0));
+      const ring = part(SH.ring, basic(0xffd23f, { transparent: true, opacity: 0.8, side: T.DoubleSide, depthWrite: false }), 16, 16, 1, 0, 1, 0); ring.rotation.x = -Math.PI / 2; g.add(ring);
+      for (let i = 0; i < 4; i++) { const c = part(SH.box, basic(i % 2 ? 0xff3e6c : 0xffffff), 4, 6, 0.4, Math.cos(i * 1.57) * 14, 20, Math.sin(i * 1.57) * 14); g.add(c); }
+      return g;
+    });
+    P.gift = pool(() => {
+      const g = new T.Group();
+      g.add(part(SH.box, lambert(0xb06bff), 12, 10, 12, 0, 5, 0));
+      g.add(part(SH.box, lambert(0xffd23f), 13, 2.4, 3, 0, 5, 0)); g.add(part(SH.box, lambert(0xffd23f), 3, 2.4, 13, 0, 5, 0));
+      g.add(part(SH.box, lambert(0xffd23f), 13, 10.4, 3, 0, 5, 0)); g.add(part(SH.sph, lambert(0xffd23f), 3, 2, 3, 0, 11, 0));
+      return g;
+    });
+    if (G.mode === 'park') {
+      // 气球：每个颜色随 id 变化
+      P.balloon = pool(() => {
+        const g = new T.Group(), m = toon(0xff3ea5);
+        const b = part(SH.sphH, m, 9, 11, 9, 0, 0, 0); g.add(b); g.userData.mat = m;
+        g.add(part(SH.cone, m, 2, 3, 2, 0, -11.5, 0));
+        g.add(part(SH.cyl, basic(0xffffff), 0.35, 44, 0.35, 0, -34, 0));
+        g.add(part(SH.sph, basic(0xffffff, { transparent: true, opacity: 0.7 }), 2.2, 3, 2.2, -3.5, 4, -3.5));
+        return g;
+      });
+      // 嘉年华花车：底盘 + 旋转木马顶棚 + 彩灯；地上一圈得分光圈
+      const fl = new T.Group();
+      fl.add(outlined(rbox(64, 10, 40, 4), toon(0xffd23f), 1, 1, 1, 0, 8, 0));
+      for (const [x, z] of [[-22, -17], [22, -17], [-22, 17], [22, 17]]) { const wh = part(SH.cyl, toon(0x2a2d3a), 5, 4, 5, x, 4, z); wh.rotation.x = Math.PI / 2; fl.add(wh); }
+      const top = new T.Group(); top.position.y = 13; fl.add(top);
+      top.add(part(SH.cyl, toon(0xff3ea5), 3, 34, 3, 0, 17, 0));
+      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; top.add(part(SH.cyl, toon(0xf4efe6), 0.9, 26, 0.9, Math.cos(a) * 16, 13, Math.sin(a) * 16)); top.add(part(SH.sphH, toon([0x1fd6ee, 0xff3ea5, 0x9cff2e, 0xffd23f, 0xff8a1f, 0xb06bff][i]), 4, 3, 5, Math.cos(a) * 16, 10 + (i % 2) * 5, Math.sin(a) * 16)); }
+      const roof = part(SH.cone, toon(0x1fd6ee), 24, 14, 24, 0, 33, 0); top.add(roof);
+      for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; top.add(part(SH.sph, basic(i % 2 ? 0xfff36b : 0xff3ea5), 1.6, 1.6, 1.6, Math.cos(a) * 23, 26, Math.sin(a) * 23)); }
+      top.add(part(SH.sph, basic(0xfff36b), 3, 3, 3, 0, 41, 0));
+      W.float = fl; W.floatTop = top; fl.name = 'parkFloat'; scene.add(fl);
+      W.floatRingM = basic(0xffffff, { transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false });
+      W.floatDiscM = basic(0xffffff, { transparent: true, opacity: 0.12, depthWrite: false });
+      W.floatRing = flat(part(SH.ring, W.floatRingM, S.PARK.r, S.PARK.r, 1), 0, 0, 1.5); scene.add(W.floatRing);
+      W.floatDisc = flat(part(SH.disc, W.floatDiscM, S.PARK.r, S.PARK.r, 1), 0, 0, 1.2); scene.add(W.floatDisc);
+    }
     if (G.mode === 'escort') {
       W.treasure = new T.Group();
       const core = new T.Mesh(new T.OctahedronGeometry(15), lambert(0xffd23f, { emissive: 0x8a5a00 }));
@@ -1039,6 +1085,36 @@
     const add = (o) => { g.add(o); return o; };
     const cylX = (m, r, len, x, y, z) => { const o = part(s.cyl, m, r, len, r, x, y, z); o.rotation.z = -Math.PI / 2; return add(o); };
     switch (weapon) {
+      case 'slinger': {   // 弹弓：Y 形叉 + 皮筋 + 涂料球
+        add(outlined(rbox(10, 5, 5, 1.8), mt, 1, 1, 1, 4, 0, 0));
+        for (const z of [-3.4, 3.4]) { const arm = add(outlined(rbox(10, 2.4, 2.4, 0.9), cm, 1, 1, 1, 12.5, 2.6, z)); arm.rotation.y = z > 0 ? -0.32 : 0.32; }
+        add(part(s.box, dk, 1, 0.9, 10, 17.5, 3.4, 0));
+        add(part(s.sph, lt, 3.2, 3.2, 3.2, 13, 3.4, 0));
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        break;
+      }
+      case 'blade': {     // 影刃：长刀 + 发光刃口
+        add(outlined(rbox(8, 4, 4, 1.4), dk, 1, 1, 1, 2, 0, 0));
+        add(part(s.box, mt, 1.8, 7.5, 7.5, 6.8, 0, 0));
+        add(outlined(rbox(30, 1.8, 5.4, 0.7), toon(0xdfe6ee), 1, 1, 1, 22, 0, 0));
+        add(part(s.box, basic(color), 28, 0.6, 1.2, 22.5, 0, 2.7));
+        add(part(s.cone, toon(0xdfe6ee), 2.7, 4, 0.9, 38.5, 0, 0)).rotation.z = -Math.PI / 2;
+        break;
+      }
+      case 'stinger': {   // 毒针：细长针管 + 绿色毒液罐
+        add(outlined(rbox(14, 4.5, 4.5, 1.6), cm, 1, 1, 1, 6, 0, 0));
+        cylX(mt, 0.8, 18, 21, 0.5, 0); cylX(dk, 1.5, 1.8, 30, 0.5, 0);
+        { const vial = part(s.cyl, toon(0x9cff2e, { emissive: 0x2a5a00, transparent: true, opacity: 0.85 }), 2.3, 9, 2.3, 6, 5.8, 0); vial.rotation.z = Math.PI / 2; add(vial); }
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        break;
+      }
+      case 'phantom': {   // 幻影：双管霰弹 + 半透明迷彩面板
+        add(outlined(rbox(16, 5, 6.4, 1.8), toon(0x2a2d3a), 1, 1, 1, 6, 0, 0));
+        cylX(mt, 1.4, 11, 18, 1.2, 1.7); cylX(mt, 1.4, 11, 18, 1.2, -1.7);
+        add(part(s.box, basic(color, { transparent: true, opacity: 0.75 }), 11, 1.3, 6.6, 5, 3, 0));
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        break;
+      }
       case 'blaster':
         add(outlined(rbox(15, 6, 6, 2), mt, 1, 1, 1, 5, 0, 0));
         add(outlined(rbox(7, 5, 5.4, 1.8), cm, 1, 1, 1, 9, 0.4, 0));
@@ -1526,6 +1602,11 @@
     worker:   { top: '#ff8a1f', inner: '#3a4a66', pants: '#3a4a66', shoes: '#4a3020', sleeve: 'long', vest: true },
     dj:       { top: '#1fd6ee', inner: '#1d1f2c', pants: '#1d1f2c', shoes: '#ff3ea5', sleeve: 'long', chain: true },
     security: { top: '#23252f', inner: '#3a3d48', pants: '#23252f', shoes: '#14151d', sleeve: 'long', armor: true },
+    // 1.4：卡卡的魔术师燕尾服；夏日系列皮肤
+    magician: { top: '#2a1f3a', inner: '#ffffff', pants: '#1d1a26', shoes: '#141018', sleeve: 'long', tailcoat: true, bowtie: '#ff3b52', cape: '#8f1a3a' },
+    surf:     { top: '#1fd6ee', inner: '#ffffff', pants: '#ff8a1f', shoes: '#ffd23f', sleeve: 'short', hawaii: '#ffe14d', shorts: true },
+    swim:     { top: '#ff6ec4', inner: '#ffe14d', pants: '#ff6ec4', shoes: '#ffffff', sleeve: 'none', swim: true, shorts: true, skirt: '#ffe14d' },
+    sorbet:   { top: '#e8faff', inner: '#7af0ff', pants: '#bff3ff', shoes: '#7af0ff', sleeve: 'short', skirt: '#bff3ff', ice: true },
   };
 
   // 随身武器模型：枪口朝 +x，握把在原点
@@ -1554,6 +1635,9 @@
         add(part(SH.sph, gl(0xffffff), 0.6, 0.6, 0.6, 1.8, 2.3, 0));
         break;
       }
+      case 'kaka':
+        for (const k of [-1, 0, 1]) { const c = add(part(SH.box, toon(k ? 0xffffff : 0xff3b52), 2.6, 0.12, 1.8, 1.6, 0.4 + k * 0.2, k * 0.9)); c.rotation.y = k * 0.35; add(part(SH.box, basic(k ? 0xff3b52 : 0xffffff), 0.8, 0.14, 0.6, 1.6, 0.42 + k * 0.2, k * 0.9)); }
+        break;
       case 'raven':
         for (const k of [-1, 0, 1]) { const d = add(part(SH.cone, toon(0x6a4cc8), 0.35, 4.2, 0.35, 2.2, 0.4 + k * 0.5, k * 0.5)); d.rotation.z = -Math.PI / 2 + k * 0.2; add(part(SH.cone, gl(0x2a1f3a), 0.5, 1.0, 0.18, 0.4, 0.4 + k * 0.5, k * 0.5)).rotation.z = -Math.PI / 2; }
         break;
@@ -1639,7 +1723,8 @@
     const legs = [];
     for (const side of [-1, 1]) {
       const lg = dyn(new T.Group()); lg.position.set(0, 0, side * 1.75 * W0); hips.add(lg);
-      lg.add(outlined(SH.cylH, pants, 1.25, 4.6, 1.25, 0, -2.6, 0, 1));
+      if (O.shorts) { lg.add(outlined(SH.cylH, pants, 1.35, 2.2, 1.35, 0, -1.3, 0, 1)); lg.add(outlined(SH.cylH, skin, 1.05, 2.8, 1.05, 0, -3.6, 0, 1)); }
+      else lg.add(outlined(SH.cylH, pants, 1.25, 4.6, 1.25, 0, -2.6, 0, 1));
       lg.add(part(SH.cylH, team, 1.3, 0.6, 1.3, 0, -4.3, 0));
       lg.add(outlined(rbox(4.2, 2, 2.6, 0.9), shoes, 1, 1, 1, 0.7, -5.6, 0, 1));
       lg.add(part(SH.box, M('#f4efe6'), 4.3, 0.5, 2.7, 0.7, -6.4, 0));
@@ -1665,6 +1750,30 @@
     if (O.chain) { const ch = TA(new T.Mesh(new T.TorusGeometry(2.0, 0.22, 6, 18), SH.gold)); ch.rotation.y = Math.PI / 2; ch.rotation.z = 0.25; ch.position.set(2.2, 5.6, 0); TA(part(SH.box, SH.gold, 0.4, 1.0, 1.0, 3.6, 3.8, 0)); }
     if (O.armor) { TA(outlined(rbox(1.4, 4.4, 4.8, 0.5), M('#3a3d48'), 1, 1, 1, 2.8, 3.6, 0, 1)); TA(part(SH.box, basic(0x7af0ff), 0.3, 0.4, 2.4, 3.55, 4.6, 0)); }
     if (O.pocket) TA(part(SH.box, inner, 0.5, 1.6, 3.0, 3.0, 1.6, 0));
+    if (O.tailcoat) {   // 燕尾服：白衬衫 + 红领结 + 燕尾 + 披风
+      TA(part(SH.box, inner, 0.6, 4.6, 2.2, 3.0, 4.4, 0));
+      for (const z of [-1, 1]) TA(part(SH.box, top, 0.5, 4.6, 1.4, 3.05, 4.2, z * 1.6));
+      for (const z of [-1, 1]) { const b = TA(part(SH.cone, M(O.bowtie), 0.9, 1.6, 0.9, 3.4, 6.9, z * 0.75)); b.rotation.x = z * Math.PI / 2; }
+      TA(part(SH.sph, M(O.bowtie), 0.5, 0.5, 0.5, 3.45, 6.9, 0));
+      for (const z of [-1, 1]) { const t = TA(part(SH.cone, top, 1.3, 5.5, 1.6, -2.2, -1.2, z * 1.2)); t.rotation.x = Math.PI; t.rotation.z = -0.2; }
+      const cape = TA(outlined(rbox(1.2, 9, 8.4, 0.5), M(O.cape), 1, 1, 1, -3.4, 2.6, 0, 1)); cape.rotation.z = 0.12;
+      for (const y of [3.4, 2.0]) TA(part(SH.sph, SH.gold, 0.3, 0.3, 0.3, 3.3, y, 0));
+    }
+    if (O.hawaii) {     // 夏威夷衬衫：大花朵 + 敞开的领子
+      TA(part(SH.box, inner, 0.6, 5, 1.8, 3.0, 3.6, 0));
+      for (const [y, z] of [[5.6, -2.2], [3.2, 2.4], [1.6, -1.6], [5.0, 2.0], [2.4, -2.8]]) { TA(part(SH.sph, M(O.hawaii), 0.3, 0.9, 0.9, 3.25, y, z)); TA(part(SH.sph, M('#ff3ea5'), 0.32, 0.35, 0.35, 3.35, y, z)); }
+      for (const z of [-1, 1]) TA(part(SH.box, top, 1.2, 1.4, 1.8, 2.7, 6.7, z * 1.6)).rotation.x = z * 0.5;
+    }
+    if (O.swim) {       // 泳装：露出锁骨，胸前蝴蝶结 + 波点
+      TA(part(SH.sphH, skin, 3.0, 1.6, 3.5, 0.2, 7.1, 0));
+      TA(part(SH.box, M(O.inner), 0.5, 1.0, 2.6, 3.1, 5.6, 0));
+      for (const [y, z] of [[4.4, -1.6], [3.0, 1.4], [2.0, -0.4], [4.0, 1.8]]) TA(part(SH.sph, M('#ffffff'), 0.25, 0.45, 0.45, 3.2, y, z));
+    }
+    if (O.ice) {        // 冰沙女王：冰晶肩甲 + 胸前宝石 + 渐变裙摆
+      for (const z of [-1, 1]) for (let i = 0; i < 3; i++) { const c = TA(part(SH.cone, M('#7af0ff'), 0.7, 3 - i * 0.6, 0.7, -0.4 + i * 0.6, 7.6 + (2 - i) * 0.4, z * (3.2 + i * 0.25))); c.rotation.x = z * (0.5 + i * 0.25); }
+      TA(part(SH.sph, basic(0xff6ec4), 0.6, 0.8, 0.8, 3.2, 5.0, 0));
+      TA(part(SH.cylH, M('#7af0ff'), 4.6, 0.5, 5.0, 0, -0.6, 0));
+    }
     // 队伍色：腰带 + 胸前徽章
     TA(part(SH.cylH, team, 3.15 * W0, 0.9, 3.8 * W0, 0, 0.9, 0));
     TA(part(SH.sph, team, 0.4, 1.0, 1.0, 3.0 * W0, 4.9, O.open ? 1.6 : -1.6));
@@ -1674,6 +1783,32 @@
     buildFace(headG, P, CH.headR);
     const deco = new T.Group(); const k = CH.headR / 4.3; deco.scale.setScalar(k); deco.position.set(0, -0.4 * k, 0); headG.add(deco);
     headDecor(deco, P, headCosmetic, teamColor);
+    const X = new Set(P.extra || []);
+    // 卡卡：高礼帽 + 帽檐上插着一张扑克牌
+    if (pid === 'kaka') {
+      deco.add(part(SH.cylH, toon(0x141018), 3.6, 6, 3.6, -0.4, 7.4, 0)); deco.add(part(SH.cylH, toon(0x141018), 5.6, 0.5, 5.6, -0.2, 4.6, 0));
+      deco.add(part(SH.cylH, toon(P.accent), 3.65, 1, 3.65, -0.4, 5.4, 0));
+      const card = part(SH.box, toon(0xffffff), 0.15, 2.2, 1.6, 2.6, 6.2, 2.3); card.rotation.x = 0.3; deco.add(card);
+      deco.add(part(SH.sph, basic(0xff3b52), 0.2, 0.45, 0.45, 2.72, 6.2, 2.3));
+    }
+    if (X.has('sunglasses')) {   // 墨镜
+      const lx = CH.headR * 0.86 + 1.25;
+      for (const z of [-2.1, 2.1]) headG.add(outlined(SH.sphH, toon(0x1b1530), 0.55, 1.45, 1.75, lx, 0.25, z, 0.8));
+      headG.add(part(SH.box, toon(0x141018), 0.4, 0.35, 1.4, lx, 0.55, 0));
+      for (const z of [-2.1, 2.1]) headG.add(part(SH.sph, basic(0x7af0ff), 0.12, 0.5, 0.8, lx + 0.5, 0.7, z - 0.4));
+    }
+    if (X.has('strawhat')) {     // 草帽 + 粉色缎带
+      deco.add(part(SH.cylH, toon(0xf2d38a), 7.6, 0.45, 7.6, -0.4, 4.8, 0));
+      deco.add(part(SH.sphH, toon(0xf2d38a), 4.4, 2.6, 4.4, -0.4, 5.6, 0));
+      deco.add(part(SH.cylH, toon(0xff6ec4), 4.5, 0.8, 4.5, -0.4, 5.3, 0));
+      const bow = part(SH.sph, toon(0xff6ec4), 0.8, 1.2, 1.6, -0.2, 5.4, 4.4); deco.add(bow);
+    }
+    if (X.has('icecrown')) {     // 冰晶王冠
+      const im = toon(0x7af0ff, { emissive: new T.Color(0x2a8aa8), transparent: true, opacity: 0.9 });
+      for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2, h = i % 2 ? 2 : 3.4; const c = part(SH.cone, im, 0.7, h, 0.7, -0.4 + Math.cos(a) * 3.6, 6.2 + h / 2, Math.sin(a) * 3.6); deco.add(c); }
+      deco.add(part(SH.cylH, im, 3.9, 0.7, 3.9, -0.4, 6.0, 0));
+      deco.add(part(SH.sph, basic(0xff6ec4), 0.6, 0.8, 0.6, 3.2, 6.5, 0));
+    }
     // ---- 手臂 ----
     const arms = [];
     const sleeve = O.sleeve === 'none' ? skin : top;
@@ -1687,6 +1822,15 @@
       arm.add(outlined(SH.sphH, big ? acc : skin, big ? 2.1 : 1.3, big ? 2.1 : 1.3, big ? 2.1 : 1.3, 0, -5.4, 0, 1));
       if (big) arm.add(part(SH.box, M('#ffffff'), 0.5, 1.2, 2.6, 1.6, -5.4, 0));
       arms.push(arm);
+    }
+    if (X.has('surfboard')) { const sb = outlined(rbox(1.2, 13, 4.6, 0.6), M('#ffffff'), 1, 1, 1, -4.3, 4.6, 0, 1); sb.rotation.z = 0.12; tb.add(sb); tb.add(part(SH.box, M(P.accent), 1.3, 12, 1.2, -4.25, 4.6, 0)); tb.add(part(SH.box, M('#ff8a1f'), 1.3, 1.2, 4.7, -4.25, 9.4, 0)); }
+    if (X.has('float')) { const ring = new T.Mesh(new T.TorusGeometry(4.2, 1.3, 10, 20), M('#ff6ec4')); ring.rotation.x = Math.PI / 2; ring.position.y = 1.2; tb.add(ring); for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + 0.4; tb.add(part(SH.sphH, M('#ffffff'), 1.35, 1.35, 1.35, Math.cos(a) * 4.2, 1.2, Math.sin(a) * 4.2)); } }
+    if (X.has('parasol')) {   // 冰沙女王左手的小阳伞
+      const ps = new T.Group(); ps.position.set(0, -5.4, 0); arms[0].add(ps);
+      ps.add(part(SH.cylH, M('#ffffff'), 0.2, 12, 0.2, 0, 4, 0));
+      ps.add(part(SH.cone, M('#bff3ff'), 6.5, 3, 6.5, 0, 10.6, 0));
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; ps.add(part(SH.sph, M(i % 2 ? '#ff6ec4' : '#7af0ff'), 0.7, 0.7, 0.7, Math.cos(a) * 6.3, 9.2, Math.sin(a) * 6.3)); }
+      bake(ps);
     }
     // 随身武器放在右手；凌焰双枪，左手也有一把
     const prop = dyn(new T.Group()); prop.position.set(0, -5.4, 0); prop.rotation.z = -Math.PI / 2; arms[1].add(prop);
@@ -1715,9 +1859,16 @@
       for (const [x, z] of [[2, 2], [2, -2], [-2, 2], [-2, -2]]) { drone.add(part(SH.cylH, M('#2a2d3a'), 0.2, 0.8, 0.2, x, 0.6, z)); drone.add(part(SH.cylH, basic(0xffffff, { transparent: true, opacity: 0.5 }), 1.4, 0.1, 1.4, x, 1.0, z)); }
       bake(drone);
     }
+    // 传说皮肤：身边环绕的冰晶
+    let orbit = null;
+    if (X.has('icecrown') && !opts.bust) {
+      orbit = dyn(new T.Group()); orbit.position.y = 14; root.add(orbit);
+      const im = basic(0xbff6ff, { transparent: true, opacity: 0.9 });
+      for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2; const c = new T.Mesh(new T.OctahedronGeometry(1.4), im); c.position.set(Math.cos(a) * 9, (i % 2) * 4, Math.sin(a) * 9); orbit.add(c); }
+    }
     for (const g of [hips, ...legs, tb, ...arms, prop, headG]) bake(g, !opts.bust);
     if (propL) bake(propL, true);
-    return { root, hips, legs, torso, head: headG, arms, prop, propL, drone, flashes, kind: A.kind, pid, phase: 0, recoil: 0, swing: 0, lastAmmo: 3, idleT: Math.random() * 6, face: null, act: null, yawOff: 0, lift: 0 };
+    return { root, hips, legs, torso, head: headG, arms, prop, propL, drone, flashes, orbit, kind: A.kind, pid, phase: 0, recoil: 0, swing: 0, lastAmmo: 3, idleT: Math.random() * 6, face: null, act: null, yawOff: 0, lift: 0 };
   }
 
   // 驾驶舱里的小人：同一个角色模型的上半身
@@ -1771,6 +1922,7 @@
       L.rotation.z = -swingL + 0.2; L.rotation.x = 0.2;
     }
     if (c.drone) { c.drone.position.y = 27 + Math.sin(c.idleT * 3) * 1.2; c.drone.rotation.y = c.idleT * 0.8; }
+    if (c.orbit) { c.orbit.rotation.y = c.idleT * 1.4; c.orbit.position.y = 14 + Math.sin(c.idleT * 2) * 1.5; }
     c.yawOff = 0; c.lift = 0;
     c.prop.rotation.y = 0; if (c.propL) c.propL.rotation.y = 0;
     if (c.act) charActionTick(c, dt);
@@ -2481,6 +2633,9 @@
       if (kind === 'charge') {         // 炸药：一闪一闪的涂料弹
         const m = P['shell' + team].next(); m.position.set(x, z + 6, y); m.scale.setScalar(1.3 + 0.4 * Math.abs(Math.sin(now / 70))); continue;
       }
+      if (kind === 'fog') continue;    // 毒雾用粒子画（client 收到 fg 事件）
+      if (kind === 'decoy') { const g = P.decoy.next(); g.position.set(x, z + Math.sin(now / 160) * 1.5, y); g.rotation.y = now / 260; continue; }
+      if (kind === 'bento' && h[6] === 7) { const g = P.gift.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }
       if (kind === 'bento') { const g = P.bento.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }
       const g = P[kind + team].next();
       g.position.set(x, z, y);
@@ -2581,6 +2736,25 @@
         const g = P.bat.next();
         g.position.set(f[i + 1], (f[i + 3] || 0) + 12 + Math.sin(now / 250 + f[i]) * 3, f[i + 2]);
         g.rotation.y = now / 400 + f[i];
+      }
+    }
+    if (G.mode === 'park' && o && W.float) {
+      const fx = lp(2), fy = lp(3), own = o[4];
+      const dx = fx - (W.floatPrev ? W.floatPrev.x : fx), dy = fy - (W.floatPrev ? W.floatPrev.y : fy);
+      if (Math.hypot(dx, dy) > 0.05) W.floatYaw = Math.atan2(dy, dx);
+      W.floatPrev = { x: fx, y: fy };
+      W.float.position.set(fx, 0, fy); W.float.rotation.y = -(W.floatYaw || 0);
+      W.floatTop.rotation.y = now / 900;
+      W.floatTop.position.y = 13 + Math.sin(now / 300) * 0.8;
+      const c = own ? cs[own] : '#ffffff';
+      W.floatRingM.color.set(c); W.floatDiscM.color.set(c); W.floatDiscM.opacity = own ? 0.18 + 0.06 * Math.sin(now / 180) : 0.08;
+      W.floatRing.position.set(fx, 1.5, fy); W.floatDisc.position.set(fx, 1.2, fy);
+      const f = o[5] || [], BC = ['#ff3ea5', '#1fd6ee', '#ffd23f', '#9cff2e', '#ff8a1f', '#b06bff'];
+      for (let i = 0; i < f.length; i += 4) {
+        const g = P.balloon.next();
+        g.position.set(f[i + 1] + Math.sin(now / 700 + f[i]) * 3, f[i + 3] + 10 + Math.sin(now / 420 + f[i]) * 3, f[i + 2]);
+        g.rotation.z = Math.sin(now / 600 + f[i]) * 0.12;
+        g.userData.mat.color.set(BC[f[i] % BC.length]);
       }
     }
     if (G.mode === 'zone' && o && W.zoneMat) {

@@ -33,27 +33,27 @@
     blaster: {
       name: '喷罐机兵', short: '喷罐', role: '均衡射手', desc: '每次攻击连射 5 发涂料弹，射程中等、上手简单，适合任何场合。',
       hp: 100, spd: 1, reload: 1.4, atkCd: 0.42, attack: 'burst', shots: 5, interval: 0.07,
-      speed: 650, range: 325, dmg: 13, spread: 0.05, splat: 22, trail: 13, size: 6, special: 'storm', spNeed: 260,
+      speed: 650, range: 325, dmg: 12, spread: 0.05, splat: 22, trail: 13, size: 6, special: 'storm', spNeed: 260,
     },
     roller: {
       name: '滚刷机兵', short: '滚刷', role: '冲锋开路', desc: '甩出一扇涂料并向前突进滚压，碾过的敌人受到伤害。生命值高。',
-      hp: 120, spd: 1, reload: 1.15, atkCd: 0.5, attack: 'flick', pellets: 5, arc: 0.7, speed: 520, range: 200, dmg: 24,
-      spread: 0.05, splat: 20, trail: 0, size: 7, rollWidth: 26, rollDmg: 27, lunge: 280, special: 'charge', spNeed: 230,
+      hp: 115, spd: 1, reload: 1.15, atkCd: 0.5, attack: 'flick', pellets: 5, arc: 0.7, speed: 520, range: 200, dmg: 24,
+      spread: 0.05, splat: 20, trail: 0, size: 7, rollWidth: 26, rollDmg: 24, lunge: 280, special: 'charge', spNeed: 230,
     },
     charger: {
       name: '狙击机兵', short: '狙击', role: '远程狙击', desc: '按住蓄力、松开射出贯穿直线，满蓄力伤害极高。蓄力时移动变慢，生命值低。',
-      hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.9, range: 720, dmg: 115, minDmg: 32,
+      hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.9, range: 720, dmg: 108, minDmg: 32,
       special: 'missiles', spNeed: 240,
     },
     bucket: {
       name: '泼桶机兵', short: '泼桶', role: '近距爆发', desc: '近距离泼出一大片涂料弹，覆盖面积大，贴脸伤害很高。',
-      hp: 115, spd: 0.95, reload: 1.6, atkCd: 0.55, attack: 'fan', pellets: 7, arc: 0.6, speed: 480, range: 240, dmg: 15.8,
+      hp: 115, spd: 0.95, reload: 1.6, atkCd: 0.55, attack: 'fan', pellets: 7, arc: 0.6, speed: 480, range: 240, dmg: 15.2,
       spread: 0.06, splat: 26, trail: 12, size: 7, special: 'bubble', spNeed: 250,
     },
     gatling: {
       name: '旋转机兵', short: '旋转', role: '持续压制', desc: '每次攻击持续扫射 1 秒，射程远、火力持续，但装填慢。',
-      hp: 110, spd: 0.92, reload: 2.6, atkCd: 0.3, attack: 'burst', shots: 12, interval: 0.075,
-      speed: 700, range: 400, dmg: 5.4, spread: 0.13, splat: 15, trail: 9, size: 5, special: 'beam', spNeed: 300,
+      hp: 110, spd: 0.92, reload: 2.8, atkCd: 0.3, attack: 'burst', shots: 12, interval: 0.075,
+      speed: 700, range: 400, dmg: 5, spread: 0.13, splat: 15, trail: 9, size: 5, special: 'beam', spNeed: 300,
     },
     mortar: {
       name: '迫击机兵', short: '迫击', role: '曲射炮手', desc: '把涂料炮弹抛到瞄准的位置，能越过墙壁和掩体，落地爆炸涂一大片。',
@@ -84,12 +84,12 @@
     },
     carrier: {
       name: '无人机母舰', short: '母舰', role: '追踪骚扰', desc: '放出会自动追踪敌人的小型涂装无人机，打不准也能命中，适合远距离骚扰。',
-      hp: 125, spd: 0.96, reload: 1.35, atkCd: 0.45, attack: 'burst', shots: 4, interval: 0.13, speed: 400, range: 500, dmg: 23, homing: 2.6,
+      hp: 125, spd: 0.96, reload: 1.35, atkCd: 0.45, attack: 'burst', shots: 4, interval: 0.13, speed: 400, range: 500, dmg: 24, homing: 2.6,
       spread: 0.12, splat: 22, trail: 10, size: 6, special: 'swarm', spNeed: 270, season: 1,
     },
     wrecker: {
       name: '拆楼锤', short: '拆楼', role: '重型挥击', desc: '抡起拆楼大锤横扫一大片，命中的敌人被狠狠砸飞。厚重装甲减伤 25%，一锤定音。',
-      hp: 180, spd: 1.12, reload: 1.15, atkCd: 0.5, attack: 'punch', range: 104, arc: 2.6, dmg: 60, kb: 340, lunge: 170,
+      hp: 190, spd: 1.12, reload: 1.15, atkCd: 0.5, attack: 'punch', range: 104, arc: 2.6, dmg: 64, kb: 340, lunge: 170,
       armor: 0.75, special: 'whirl', spNeed: 190, season: 1,
     },
     megaphone: {
@@ -97,14 +97,37 @@
       hp: 105, spd: 1, reload: 1.3, atkCd: 0.45, attack: 'fan', pellets: 3, arc: 0.42, speed: 560, range: 350, dmg: 23, ghost: true,
       spread: 0.02, splat: 16, trail: 10, size: 10, special: 'sonic', spNeed: 250, season: 1,
     },
+    // ---- 1.4：常驻新机体 ----
+    slinger: {
+      name: '弹弓机兵', short: '弹弓', role: '弹跳炮手', desc: '弹射一颗会弹跳的涂料球：落地爆炸后再往前弹出去炸第二次，能越过掩体打击后排。',
+      hp: 100, spd: 1, reload: 1.3, atkCd: 0.5, attack: 'lob', range: 360, minRange: 60, dmg: 40, blast: 54, flight: 0.55, bounce: 1,
+      special: 'cluster', spNeed: 250, isNew: true,
+    },
+    // ---- 1.4：袭击！特攻队（刺客型机体，只能从「特攻队补给箱」开出） ----
+    blade: {
+      name: '影刃机兵', short: '影刃', role: '突袭刺客', desc: '高速突进挥出一记影刃，从背后命中伤害 +30%。移动极快，但生命值低，一定要找准时机切入。',
+      hp: 115, spd: 1.18, reload: 0.95, atkCd: 0.36, attack: 'punch', range: 62, arc: 1.9, dmg: 46, kb: 120, lunge: 300, backstab: 1.3,
+      special: 'shadowstep', spNeed: 180, strike: 1, isNew: true,
+    },
+    stinger: {
+      name: '毒针机兵', short: '毒针', role: '毒素刺客', desc: '连射 3 根毒针，命中的敌人中毒 3 秒（每秒掉 6 点生命并减速）。射程远、生命值低，擅长消耗。',
+      hp: 85, spd: 1.12, reload: 1.3, atkCd: 0.4, attack: 'burst', shots: 3, interval: 0.08, speed: 950, range: 400, dmg: 9, poison: 3,
+      spread: 0.035, splat: 12, trail: 8, size: 4, special: 'venom', spNeed: 240, strike: 1, isNew: true,
+    },
+    phantom: {
+      name: '幻影机兵', short: '幻影', role: '隐形刺客', desc: '近距离霰弹，从背后命中伤害 +30%；大招让自己隐身，隐身状态下的第一击伤害再 +50%。',
+      hp: 95, spd: 1.15, reload: 1.25, atkCd: 0.5, attack: 'fan', pellets: 4, arc: 0.36, speed: 560, range: 230, dmg: 17, backstab: 1.3,
+      spread: 0.04, splat: 18, trail: 8, size: 6, special: 'cloak', spNeed: 220, strike: 1, isNew: true,
+    },
   };
-  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot'];
+  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'slinger', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot', 'blade', 'stinger', 'phantom'];
   S.weaponRange = function (id) {
     const w = S.WEAPONS[id];
     if (id === 'charger') return 620;
     if (id === 'roller') return 180;
     if (id === 'fist') return 80;
     if (id === 'wrecker') return 108;
+    if (id === 'blade') return 110;   // 算上突进距离
     return w.range;
   };
 
@@ -122,9 +145,13 @@
     whirl: { name: '大摆锤', desc: '抡着大锤原地旋转 2.2 秒，持续砸飞靠近的敌人，移动速度不减。' },
     sonic: { name: '音爆', desc: '以自己为中心炸开一圈巨大音波，穿墙伤害并击退周围所有敌人。' },
     aegis: { name: '盾墙', desc: '在面前立起一面 6 秒的能量盾墙，挡住敌人的所有子弹（队友可以从后面开火）。' },
+    cluster: { name: '连环弹', desc: '朝瞄准方向扇形弹出 5 颗弹跳涂料球，每颗都会弹两次。' },
+    shadowstep: { name: '影袭', desc: '瞬间冲向瞄准方向，穿过路上的敌人造成 60 点伤害，随后隐身 1.5 秒。' },
+    venom: { name: '毒雾', desc: '把毒雾罐扔到瞄准位置，5 秒内雾里的敌人持续中毒、减速并暴露位置。' },
+    cloak: { name: '光学迷彩', desc: '隐身 4 秒，移动速度 +25%；隐身时的第一击伤害 +50%（攻击后现形）。' },
   };
-  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis'];
-  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm';
+  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis', 'cluster', 'shadowstep', 'venom', 'cloak'];
+  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm' || sp === 'cluster' || sp === 'shadowstep' || sp === 'venom';
 
   // ---------------- 驾驶员技能（每局 3 次，冷却 6 秒；驾驶员弹出后也能用） ----------------
   S.SKILL_USES = 3; S.SKILL_CD = 6;
@@ -143,6 +170,7 @@
     rally: { short: '集结', name: '集结号', desc: '插下反抗军旗帜，5 秒内自己和附近队友伤害 +20%、移动速度 +15%。' },
     blast: { short: '爆破', name: '定向爆破', desc: '在脚下放一包炸药，0.9 秒后爆炸，造成 72 点伤害并涂满周围。' },
     jam: { short: '干扰', name: '声波干扰', desc: '附近敌人的大招充能减少 30%，并暴露位置 4 秒（草丛里也藏不住）。' },
+    decoy: { short: '替身', name: '魔术替身', desc: '原地留下一个替身，2 秒后炸开造成 40 点伤害；自己隐身 2 秒。' },
     flash: { short: '闪光', name: '闪光弹', desc: '朝前方扔出闪光弹：扇形范围内的敌人受到 10 点伤害、减速 1.2 秒、0.8 秒内无法攻击，并暴露 4 秒。' },
   };
   // ---------------- 超载技能（突破 I 解锁，每局 1 次，打出伤害充能） ----------------
@@ -165,6 +193,7 @@
     hammer: { name: '爆破专家', desc: '伤害 +40%，击退距离翻倍。', dmg: 1.4, kb: 2 },
     echo: { name: '音浪风暴', desc: '每秒向四周放出一圈音波，穿墙造成 22 点伤害。', pulse: 22 },
     han: { name: '反戈一击', desc: '受到的伤害 -20%，并把受到伤害的 50% 反弹给攻击者。', def: 0.8, reflect: 0.5 },
+    kaka: { name: '魔术秀', desc: '攻击速度 +35%，大招充能 +50%。', rof: 1.35, spGain: 1.5 },
   };
   // ---------------- 天赋树（账号共用；每局最多装 3 个已点亮的天赋） ----------------
   S.TALENT_BRANCHES = [
@@ -212,6 +241,10 @@
     { id: 'echo_midnight', kind: 'pilot', pilot: 'echo', name: '午夜频道', rare: 3, price: 0, pass: 'p14', over: { hair: '#ff3ea5', hair2: '#8f1060', accent: '#ff3ea5', eye: '#2ef0c8' } },
     { id: 'hammer_gold', kind: 'pilot', pilot: 'hammer', name: '金牌工头', rare: 4, price: 380, over: { accent: '#ffd35e', hair: '#1e120a' } },
     { id: 'flag_red', kind: 'pilot', pilot: 'flag', name: '红旗特装', rare: 4, price: 0, pass: 'p30', over: { hair: '#c8102e', hair2: '#5a0012', accent: '#ffe14d', eye: '#ffe14d' } },
+    // ---- 1.4：夏日系列 ----
+    { id: 'blaze_surf', kind: 'pilot', pilot: 'blaze', name: '冲浪少年', rare: 3, price: 320, series: 'summer', over: { hair: '#ffb21f', hair2: '#c45a0c', accent: '#1fd6ee', outfit: 'surf', extra: ['sunglasses', 'surfboard'] } },
+    { id: 'candy_beach', kind: 'pilot', pilot: 'candy', name: '海滩偶像', rare: 3, price: 320, series: 'summer', over: { hair: '#ff9ad6', hair2: '#d1408e', accent: '#ffe14d', eye: '#1fd6ee', outfit: 'swim', extra: ['strawhat', 'float'] } },
+    { id: 'frost_sorbet', kind: 'pilot', pilot: 'frost', name: '冰沙女王', rare: 4, price: 680, series: 'summer', over: { hair: '#bff3ff', hair2: '#5ec8f0', accent: '#7af0ff', eye: '#ff6ec4', outfit: 'sorbet', extra: ['icecrown', 'parasol'] } },
     { id: 'm_camo', kind: 'mech', name: '灰城迷彩', rare: 2, price: 0, pass: 'p5', paint: { frame: '#4a4d56', light: '#9aa0a8', joint: '#2a2c33' } },
     { id: 'm_chrome', kind: 'mech', name: '铬合金', rare: 2, price: 180, paint: { frame: '#c9d3dc', light: '#ffffff', joint: '#8c94ab' } },
     { id: 'm_graffiti', kind: 'mech', name: '涂鸦大师', rare: 3, price: 240, paint: { frame: '#ff3ea5', light: '#ffe600', joint: '#1fd6ee' } },
@@ -229,6 +262,8 @@
     { id: 'av_flag', kind: 'avatar', name: '反抗军旗', rare: 2, price: 0, pass: 'f20', avatar: 'flag' },
     { id: 'av_can', kind: 'avatar', name: '喷漆罐', rare: 1, price: 60, avatar: 'can' },
     { id: 'av_cat', kind: 'avatar', name: '灰城猫', rare: 2, price: 90, avatar: 'cat' },
+    { id: 'av_balloon', kind: 'avatar', name: '乐园气球', rare: 2, price: 0, event: 'parkfest', avatar: 'balloon' },
+    { id: 'fr_master', kind: 'frame', name: '大师段位框', rare: 4, price: 0, rank: 'master', frame: 'master' },
   ];
   S.skin = (id) => S.SKINS.find((k) => k.id === id);
   S.SKIN_KINDS = [['pilot', '驾驶员服装'], ['mech', '机甲涂装'], ['fx', '涂料特效'], ['frame', '名片框'], ['avatar', '头像']];
@@ -256,7 +291,7 @@
   S.SIDEARMS = {
     blaze:  { name: '火花双枪', desc: '一次连开 2 枪，近中距离压制。', kind: 'gun', shots: 2, interval: 0.08, dmg: 8, range: 240, speed: 640, spread: 0.06, reload: 0.8, atkCd: 0.36 },
     frost:  { name: '袖珍狙击枪', desc: '射程最远、单发伤害高，但开火很慢。', kind: 'gun', dmg: 22, range: 380, speed: 1150, reload: 1.15, atkCd: 0.7, size: 4, splat: 10 },
-    candy:  { name: '彩带喷枪', desc: '一次喷出 3 道彩带，近距离很难躲。', kind: 'gun', pellets: 3, arc: 0.42, dmg: 6, range: 200, speed: 560, reload: 0.8, atkCd: 0.38, splat: 14 },
+    candy:  { name: '彩带喷枪', desc: '一次喷出 3 道彩带，近距离很难躲。', kind: 'gun', pellets: 3, arc: 0.42, dmg: 5, range: 200, speed: 560, reload: 0.8, atkCd: 0.38, splat: 14 },
     titan:  { name: '涂料拳套', desc: '近身连拳，把敌人打飞。', kind: 'melee', dmg: 16, range: 46, arc: 1.8, kb: 140, lunge: 140, reload: 0.75, atkCd: 0.38 },
     raven:  { name: '墨汁飞镖', desc: '在草丛和墨雾里投掷不会暴露自己。', kind: 'gun', dmg: 11, range: 290, speed: 760, quiet: true, reload: 0.85, atkCd: 0.34, size: 4 },
     aurora: { name: '铆钉枪', desc: '射速很快，每发只用半格弹药。', kind: 'gun', dmg: 6, range: 230, speed: 700, cost: 0.5, spread: 0.08, reload: 0.9, atkCd: 0.16, size: 4 },
@@ -268,6 +303,7 @@
     flag:   { name: '信号枪', desc: '打中的敌人会暴露 2.5 秒，全队都能看见。', kind: 'gun', dmg: 10, range: 270, speed: 700, fx: { reveal: 2.5 }, reload: 0.85, atkCd: 0.35 },
     hammer: { name: '钉锤', desc: '挥得慢，但一锤很重，能把人砸退。', kind: 'melee', dmg: 20, range: 50, arc: 1.6, kb: 200, lunge: 100, reload: 0.95, atkCd: 0.62 },
     echo:   { name: '口袋音箱', desc: '短距离音波，可以穿过墙壁。', kind: 'gun', ghost: true, dmg: 9, range: 180, speed: 520, reload: 0.85, atkCd: 0.4, size: 7 },
+    kaka:   { name: '扑克飞牌', desc: '一次甩出 3 张飞牌，扇形散开。', kind: 'gun', pellets: 3, arc: 0.32, dmg: 5, range: 240, speed: 700, reload: 0.8, atkCd: 0.36, size: 4 },
     han:    { name: '警用电棍', desc: '近身电击，命中让敌人减速 0.6 秒。', kind: 'melee', dmg: 14, range: 44, arc: 1.5, kb: 110, lunge: 130, fx: { slow: 0.6 }, reload: 0.75, atkCd: 0.38 },
   };
   S.sidearm = (pid) => Object.assign({ kind: 'gun', size: 5, splat: 12, trail: 0, cost: 1, spread: 0.04 }, S.PISTOL, S.SIDEARMS[String(pid || '').split('@')[0]] || {});
@@ -294,7 +330,7 @@
       line: '涂料都装满了？那就冲啊！', bio: '街头涂鸦队的队长，永远第一个冲进敌阵。说话大声、笑声更大，护目镜是他唯一不肯借人的东西。' },
     { id: 'frost', name: '白夜', code: '霜刃', title: '冷面狙击手', weapon: 'charger', accent: '#5fd3ff',
       hair: '#e6eef8', hair2: '#8796b8', skin: '#fde3d2', eye: '#47c8ff', style: 'swept', eyeShape: 'cool', mouth: 'calm', outfit: 'coat',
-      skill: 'scan', passive: { name: '远距精准', desc: '对 60% 射程以外的目标伤害 +18%。' },
+      skill: 'scan', passive: { name: '远距精准', desc: '对 60% 射程以外的目标伤害 +22%。' },
       line: '一发，就够了。', bio: '曾经的天台竞速冠军，退役后只用一支狙击笔说话。刘海下藏着一只机械义眼，能看清八百米外的涂料滴。' },
     { id: 'candy', name: '苏糖', code: '电音', title: '元气偶像主播', weapon: 'gatling', accent: '#ff5fc1',
       hair: '#ff8fcf', hair2: '#c0367e', skin: '#ffe2d3', eye: '#b56bff', style: 'twintail', eyeShape: 'round', mouth: 'open', outfit: 'idol',
@@ -315,7 +351,7 @@
     // ---- 新驾驶员 ----
     { id: 'gale', name: '风羽', code: '疾风', title: '天空竞速手', weapon: 'fist', accent: '#4fb8ff', isNew: true,
       hair: '#d6ecff', hair2: '#6f8fc8', skin: '#ffe0cc', eye: '#2f9bff', style: 'braid', eyeShape: 'sharp', mouth: 'smile', outfit: 'aviator',
-      skill: 'dash', passive: { name: '轻装上阵', desc: '弹出后的驾驶员移动速度 +40%，冲刺无敌时间更长。' },
+      skill: 'dash', passive: { name: '轻装上阵', desc: '机体移动速度 +6%；弹出后的驾驶员移动速度 +45%，冲刺无敌时间更长。' },
       line: '追得上我的话，就来试试吧！', bio: '滑翔伞联赛三连冠，把机兵当成会走路的滑翔翼来开。长辫子和围巾是她在风里最好认的标志。' },
     { id: 'hex', name: '洛奇', code: '骇客', title: '天才黑客', weapon: 'charger', accent: '#c06bff', isNew: true,
       hair: '#2b2140', hair2: '#120a1c', skin: '#f4d9c6', eye: '#ff6bf0', style: 'undercut', eyeShape: 'cool', mouth: 'smirk', outfit: 'hacker',
@@ -336,7 +372,7 @@
     // ---- S1 灰城重涂：赛季驾驶员 ----
     { id: 'flag', name: '岚', code: '旗手', title: '灰城反抗军队长', weapon: 'dozer', accent: '#ff5a36', season: 1,
       hair: '#3a3a44', hair2: '#16161c', skin: '#f2c9a8', eye: '#ff7a3d', style: 'swept', eyeShape: 'sharp', mouth: 'calm', outfit: 'rebel',
-      skill: 'rally', passive: { name: '众志成城', desc: '附近每有 1 名队友，受到的伤害 -6%（最多 -18%）。' },
+      skill: 'rally', passive: { name: '众志成城', desc: '附近每有 1 名队友，受到的伤害 -7%（最多 -21%）。' },
       line: '墙刷白一次，我们就涂回去一次。', bio: '灰石集团把整座城刷成灰色的那天，她在市政厅门口喷下了第一面红旗。现在，整个反抗军都跟着那面旗走。' },
     { id: 'hammer', name: '石磊', code: '拆楼', title: '拆迁队工头', weapon: 'wrecker', accent: '#ffb000', season: 1,
       hair: '#4a3020', hair2: '#1e120a', skin: '#c98f66', eye: '#8a5a2e', style: 'veteran', eyeShape: 'bold', mouth: 'grin', outfit: 'worker',
@@ -351,13 +387,18 @@
       hair: '#dfe6ee', hair2: '#8e9aa8', skin: '#f6dccb', eye: '#5fa8ff', style: 'undercut', eyeShape: 'sharp', mouth: 'calm', outfit: 'security',
       skill: 'flash', passive: { name: '倒戈', desc: '对生命高于 90% 的敌人伤害 +10%。' },
       line: '我刷过的灰墙，我亲手涂回来。', bio: '灰石集团最年轻的安保主管，负责镇压所有涂鸦行动。直到她在档案室里看到「刷白计划」的真相——第二天，她带着整支防暴队的盾牌投奔了反抗军。' },
+    // ---- 1.4：常驻新驾驶员 ----
+    { id: 'kaka', name: '卡卡', code: '魔术', title: '街头魔术师', weapon: 'slinger', accent: '#b06bff', isNew: true,
+      hair: '#2a1f3a', hair2: '#120b1e', skin: '#ffe1cc', eye: '#ffd23f', style: 'swept', eyeShape: 'round', mouth: 'smirk', outfit: 'magician',
+      skill: 'decoy', passive: { name: '惊喜礼盒', desc: '击毁机体或击倒驾驶员时掉落一个礼盒，第一个碰到的队友回复 40 生命。' },
+      line: '看好了——涂料会从帽子里飞出来！', bio: '灰城夜市最受欢迎的街头魔术师，能把一罐喷漆变成一群鸽子。灰石集团没收了他的舞台，于是他把整座城市变成了舞台。' },
   ];
   const pilotCache = new Map();
   S.pilot = (id) => {
     if (typeof id === 'string' && id.includes('@')) {   // 带皮肤的驾驶员：flag@flag_red
       if (pilotCache.has(id)) return pilotCache.get(id);
       const [pid, sk] = id.split('@'), base = S.PILOTS.find((p) => p.id === pid) || S.PILOTS[0], K = S.skin && S.skin(sk);
-      const P = K && K.pilot === base.id ? Object.assign({}, base, K.over, { skin: K.id }) : base;
+      const P = K && K.pilot === base.id ? Object.assign({}, base, K.over, { skinId: K.id }) : base;   // 注意：skin 是肤色，皮肤 id 放在 skinId
       pilotCache.set(id, P);
       return P;
     }
@@ -376,9 +417,10 @@
     battery: { name: '电池掠夺', short: '电池', desc: '收集地图上的能量电池送回己方基地，被击倒会掉落全部电池，先存满 40 个获胜。', original: true },
     elim: { name: '生死之战', short: '生死', desc: '只有一条命：机体被打爆不会重建，驾驶员也倒下就出局。先把对面全队消灭赢一局，三局两胜。', original: true, oneLife: true, isNew: true },
     escape4: { name: '逃亡圈 · 四队', short: '逃亡', desc: '4 队 × 2 人分散空降。灰色毒圈不断缩小，捡空投箱变强，只有一条命，最后活下来的队伍获胜。', original: true, oneLife: true, teams: 4, size: 2, isNew: true },
+    park: { name: '乐园模式', short: '乐园', desc: '嘉年华花车沿着环形路线巡游：花车光圈里人多的队伍每秒得 1 分，打爆飘着的气球再得 3 分。先到 100 分获胜。', original: true, isNew: true },
     escape8: { name: '逃亡圈 · 单人', short: '单人逃亡', desc: '8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。', original: true, oneLife: true, teams: 8, size: 1, isNew: true },
   };
-  S.MODE_ORDER = ['turf', 'zone', 'escort', 'soccer', 'battery', 'elim', 'escape4', 'escape8'];
+  S.MODE_ORDER = ['park', 'turf', 'zone', 'escort', 'soccer', 'battery', 'elim', 'escape4', 'escape8'];
   S.teamsOf = (mode) => (S.MODES[mode] && S.MODES[mode].teams) || 2;
   S.isEscape = (mode) => mode === 'escape4' || mode === 'escape8';
   // 多队模式的涂料颜色（第 1–8 队）
@@ -390,6 +432,8 @@
   S.ZONE = { x0: 52, y0: 32, x1: 68, y1: 48 };             // 据点（格子坐标，右/下不含）
   S.SOCCER_GOAL = { depth: 56, half: 140 };                // 球门：距边缘深度、半高
   S.ESCORT_TARGET = 3; S.SOCCER_TARGET = 5; S.BATTERY_TARGET = 40;
+  // 乐园模式：花车沿路线巡游（格子坐标），光圈半径、每秒得分、气球分数、目标分
+  S.PARK = { path: [[38, 22], [82, 22], [82, 58], [38, 58]], loop: 64, r: 92, tick: 1, balloon: 3, target: 100, maxBalloons: 6, balloonT: 3.5 };
 
   // ---------------- 3D 参数 ----------------
   S.LEVEL_H = [0, 40, 80, 150];   // 地块高度：地面 / 矮台 / 高台 / 高墙（不可攀登、不可涂）
@@ -508,6 +552,13 @@
       stairs: [[29, 26, 7, 4, 'E', 2], [29, 50, 7, 4, 'E', 2]],
       pads: [[24, 40, 0], [44, 18, 330]],
       bush: [[14, 20, 16, 3], [14, 57, 16, 3], [42, 30, 4, 6], [42, 44, 4, 6], [4, 10, 4, 6], [54, 20, 4, 4]],
+    },
+    {
+      name: '欢乐乐园', desc: '乐园祭的主会场：中央旋转木马、摩天轮底座和售票亭，花车绕着木马巡游。乐园模式默认在这里。', goalX: 24, sky: 10, isNew: true, park: true,
+      rects: [[51, 32, 6, 5, 1], [51, 43, 6, 5, 1], [28, 8, 6, 6, 3], [16, 30, 4, 4, 1], [16, 46, 4, 4, 1], [42, 3, 14, 3, 1], [8, 18, 3, 8, 2], [64, 66, 6, 3, 1]],
+      stairs: [],
+      pads: [[30, 40, 0], [48, 12, 330]],
+      bush: [[44, 26, 6, 3], [44, 51, 6, 3], [22, 12, 4, 6], [6, 32, 4, 8], [30, 64, 8, 3]],
     },
   ];
   const DIR_FLIP = { E: 'W', W: 'E', N: 'S', S: 'N' };
@@ -874,8 +925,10 @@
     }
     const xp = 60 + (won ? 60 : draw ? 30 : 0) + me.kills * 10 + Math.floor(me.paint / 25) + me.obj * 12 + (isMvp ? 40 : 0);
     const trophies = won ? S.TROPHY_WIN : draw ? S.TROPHY_DRAW : -S.TROPHY_LOSS;
-    return { xp, trophies, won, draw, mvp: isMvp, kills: me.kills, paint: me.paint, mode: result.mode };
+    return { xp: xp + Math.min(60, me.float || 0), trophies, won, draw, mvp: isMvp, kills: me.kills, paint: me.paint, mode: result.mode, balloons: me.balloons || 0, float: me.float || 0, ranked: !!result.ranked };
   };
+  // 强度参考（AI 在排位赛禁用阶段用）：tools/balance.js 跑出来的胜率
+  S.META = {"pilots": {"yuzu": 0.548, "han": 0.503, "aurora": 0.541, "raven": 0.517, "hammer": 0.498, "candy": 0.5, "vet": 0.522, "chef": 0.512, "titan": 0.52, "hex": 0.49, "gale": 0.471, "frost": 0.498, "echo": 0.477, "blaze": 0.495, "flag": 0.458, "kaka": 0.44}, "mechs": {"blaster": 0.598, "gatling": 0.604, "dozer": 0.561, "stinger": 0.574, "roller": 0.558, "bucket": 0.551, "charger": 0.565, "flamer": 0.51, "megaphone": 0.455, "fist": 0.447, "riot": 0.465, "mortar": 0.453, "carrier": 0.45, "phantom": 0.422, "wrecker": 0.437, "slinger": 0.409, "blade": 0.34}};
   // ---------------- 账号规则 ----------------
   S.ACCOUNT = {
     nameOk: (n) => typeof n === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,12}$/.test(n),
@@ -900,9 +953,96 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.3.1';
+  S.VERSION = '1.4';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.4', date: '2026-11-14', title: '1.4 更新 · 乐园祭', en_title: 'Update 1.4 · Park Fest', sections: [
+      ['限时活动「乐园祭」', [
+        '全新模式「乐园模式」：嘉年华花车沿环形路线巡游，光圈里人多的队伍每秒得分；打爆飘在空中的气球再得 3 分，先到 100 分获胜',
+        '全新地图「欢乐乐园」：旋转木马、摩天轮底座、售票亭，乐园模式默认在这里',
+        '玩乐园模式赚「乐园票」（每局 10 张，赢了再 +5），完成活动任务拿更多',
+        '活动商店：用乐园票兑换特攻队补给箱、夏日皮肤「海滩偶像」、头像「乐园气球」、金色空投、宝石、能量结晶和金币']],
+      ['新机体组「袭击！特攻队」', [
+        '影刃机兵：高速突进挥刀，从背后命中 +30%；大招「影袭」冲过敌人造成 60 伤害并隐身',
+        '毒针机兵：连射毒针，中毒 3 秒持续掉血并减速；大招「毒雾」让雾里的敌人中毒、减速、暴露',
+        '幻影机兵：近距离霰弹，背后命中 +30%；大招「光学迷彩」隐身 4 秒，隐身时第一击 +50%',
+        '只能从「特攻队补给箱」开出：完成「活动 → 袭击！特攻队」任务线，或在乐园祭商店兑换']],
+      ['夏日系列皮肤', [
+        '凌焰「冲浪少年」（史诗）：夏威夷花衬衫、冲浪短裤、墨镜，背着冲浪板',
+        '苏糖「海滩偶像」（史诗）：波点泳装、草帽和游泳圈',
+        '白夜「冰沙女王」（传说）：冰晶王冠、冰裙和小阳伞，身边环绕冰晶，全套传说特效',
+        '3D 模型、立绘和对战特效都是全新制作']],
+      ['新常驻角色与机体', [
+        '新驾驶员「卡卡 · 魔术」：技能「魔术替身」留下会爆炸的替身并隐身；被动「惊喜礼盒」击倒敌人掉落回血礼盒；随身武器「扑克飞牌」',
+        '新机体「弹弓机兵」：弹射会弹跳两次的涂料球，越过掩体打击后排；大招「连环弹」',
+        '两周内限时购买必出卡卡和弹弓机兵，之后也会出现在宝箱里']],
+      ['排位赛', [
+        '新增排位赛（4 对 4 单排）：七个段位，从青铜到传奇；赢了加分、输了扣分，MVP 额外加分',
+        '至少拥有 3 位驾驶员和 3 台机体才能参加；青铜、白银段位输了不会掉段',
+        '黄金段位起有禁用阶段：你和 AI 队友各禁 1 个，对手禁 2 个；AI 会根据强度和克制关系选择禁用',
+        '每个段位第一次到达都有奖励（宝石、特攻队补给箱、金色空投、能量结晶、大师段位框）；排位赛金币和通行证经验 ×1.5',
+        '排位玩法每 2 小时轮换；AI 的强度跟着你的段位提高']],
+      ['新兵之路', [
+        '新账号开局送新手宝箱后，跟着「新兵之路」任务走：完成第一局送宝石，赢一局、击倒 10 次各送一个新手宝箱（必出新驾驶员），升到 3 级送角色宝箱',
+        '很快就能凑齐 3 位驾驶员、3 台机体，参加排位赛']],
+      ['信箱', [
+        '领过的邮件可以往右滑掉，或者点「删除已领取」一键清空',
+        '没领取的奖励 3 天后自动删除，邮件上会显示还剩多久']],
+      ['更多新内容', [
+        '连胜奖励：3 连胜起每局额外金币，结算时显示连胜火焰',
+        '结算界面的 MVP 会用 3D 模型摆出胜利动作',
+        '修复：驾驶员服装皮肤的肤色显示错误（立绘发黑、3D 发白）']],
+      ['平衡调整', [
+        '旋转机兵：伤害 5.4 → 5，装填 2.6 → 2.8 秒　｜　喷罐机兵：伤害 13 → 12　｜　泼桶机兵：伤害 15.8 → 15.2',
+        '滚刷机兵：生命 120 → 115，滚压伤害 27 → 24　｜　狙击机兵：满蓄力伤害 115 → 108',
+        '拆楼锤：伤害 60 → 64，生命 180 → 190　｜　无人机母舰：伤害 23 → 24',
+        '白夜「远距精准」+18% → +22%　｜　岚「众志成城」每个队友 -6% → -7%（最多 -21%）　｜　风羽：机体移速 +6%，弹出后 +40% → +45%',
+        '苏糖「彩带喷枪」伤害 6 → 5（随身武器强度不能超过机体）']],
+      ['更新奖励', ['信箱里有一份 1.4 更新礼包：200 宝石 + 特攻队补给箱 + 100 乐园票']],
+    ], en: [
+      ['Limited event: Park Fest', [
+        'New mode Park Mode: a carnival float parades around a loop; the team with more players in its ring scores every second, and popping floating balloons scores 3 more. First to 100 wins',
+        'New map Fun Park: a carousel, Ferris wheel base and ticket booths; Park Mode plays here by default',
+        'Earn Park Tickets by playing Park Mode (10 per match, +5 for a win) and from event quests',
+        'Event shop: trade tickets for Strike Team chests, the summer skin Beach Idol, the Park Balloons avatar, Golden Airdrops, gems, energy crystals and coins']],
+      ['New mech squad: Strike Team', [
+        'Shadow Blade: dashes in with a blade, +30% damage from behind; Super Shadowstep dashes through enemies for 60 damage and turns you invisible',
+        'Venom Stinger: fires poison needles that deal damage over 3s and slow; Super Venom Fog poisons, slows and reveals enemies inside the cloud',
+        'Phantom: close-range shotgun, +30% from behind; Super Optical Camo makes you invisible for 4s, and your first hit from stealth deals +50%',
+        'Only from Strike Team chests: complete the Events → Strike Team task line, or trade for them in the Park Fest shop']],
+      ['Summer skins', [
+        'Blaze "Surf Kid" (Epic): Hawaiian shirt, board shorts, sunglasses and a surfboard',
+        'Candy "Beach Idol" (Epic): polka-dot swimsuit, straw hat and swim ring',
+        'Frost "Sorbet Queen" (Legendary): ice crown, ice dress and parasol, with orbiting ice crystals and full Legendary effects',
+        'All-new 3D models, portraits and in-match effects']],
+      ['New standard pilot and mech', [
+        'New pilot Kaka "Trick": skill Magic Decoy leaves an exploding decoy and turns you invisible; passive Surprise Box drops a healing gift when you score a takedown; sidearm Card Throw',
+        'New mech Slinger Bot: launches paint balls that bounce twice, hitting the backline over cover; Super Cluster Shot',
+        'For two weeks Limited Offers always include Kaka and the Slinger Bot; they also drop from chests']],
+      ['Ranked', [
+        'New Ranked mode (4v4 solo queue): seven tiers from Bronze to Legend; win to gain points, lose to drop them, MVP earns extra',
+        'Requires 3 pilots and 3 mechs; Bronze and Silver never drop a tier on a loss',
+        'From Gold up there is a ban phase: you and your AI teammate ban 1 each, the enemy bans 2; the AI picks bans by strength and counters',
+        'Rewards the first time you reach each tier (gems, Strike Team chest, Golden Airdrop, energy crystals, Master frame); Ranked coins and pass XP ×1.5',
+        'The Ranked mode rotates every 2 hours, and AI strength rises with your tier']],
+      ['Rookie Path', [
+        'After the starter chest, new accounts follow the Rookie Path: gems for your first match, a starter chest (guaranteed new pilot) for your first win and for 10 takedowns, and a Hero Chest at level 3',
+        'You will have 3 pilots and 3 mechs for Ranked in no time']],
+      ['Mailbox', [
+        'Swipe right on claimed mail to delete it, or tap Delete Claimed to clear them all',
+        'Unclaimed rewards are deleted automatically after 3 days, and each mail shows how long is left']],
+      ['More', [
+        'Win streaks: extra coins from a 3-win streak onward, with a streak flame on the results screen',
+        'The MVP strikes a 3D victory pose on the results screen',
+        'Fix: pilot outfit skins showed the wrong skin color (black portraits, white 3D faces)']],
+      ['Balance changes', [
+        'Gatling Bot: damage 5.4 → 5, reload 2.6 → 2.8s | Spray Bot: damage 13 → 12 | Bucket Bot: damage 15.8 → 15.2',
+        'Roller Bot: HP 120 → 115, roll damage 27 → 24 | Sniper Bot: full-charge damage 115 → 108',
+        'Wrecking Hammer: damage 60 → 64, HP 180 → 190 | Drone Carrier: damage 23 → 24',
+        'Frost Long Shot +18% → +22% | Lan Strength in Numbers −6% → −7% per ally (up to −21%) | Gale: +6% mech speed, ejected +40% → +45%',
+        'Candy\'s Confetti Blaster damage 6 → 5 (sidearms must stay weaker than mechs)']],
+      ['Update rewards', ['A 1.4 update gift is waiting in your mailbox: 200 gems + Strike Team chest + 100 Park Tickets']],
+    ] },
     { v: '1.3.1', date: '2026-11-14', title: '1.3.1 更新 · 官网上线', en_title: 'Update 1.3.1 · Website Launch', sections: [
       ['驾驶员展示动作', [
         '选中驾驶员时，3D 模型会播放一整套动作：打招呼、招牌攻击、跳起来庆祝',

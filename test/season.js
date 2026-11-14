@@ -324,8 +324,10 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   // 活动 / 信箱 / 限时购买
   const o = E.newProfile('ev'), now = Date.UTC(2026, 10, 21, 4);
   const box = E.mailbox(o, now);
-  ok(box.length === E.MAILS.length && E.apply(o, 'claimMail', { id: 'v11', now }).ok && o.gems === E.START.gems + 100, '信箱：领取 1.1 补偿（100 宝石 + 军用箱）');
-  ok(E.apply(o, 'claimMail', { id: 'v11', now }).ok === false, '同一封邮件不能领两次');
+  const t11 = Date.UTC(2026, 10, 13, 4);
+  ok(E.mailbox(o, t11).some((m) => m.id === 'v11') && E.apply(o, 'claimMail', { id: 'v11', now: t11 }).ok && o.gems === E.START.gems + 100, '信箱：领取 1.1 补偿（100 宝石 + 军用箱）');
+  ok(E.apply(o, 'claimMail', { id: 'v11', now: t11 }).ok === false, '同一封邮件不能领两次');
+  ok(box.every((m) => now < m.t + E.MAIL_UNCLAIMED * 86400e3), '没领取的邮件 3 天后自动删除');
   ok(E.mailbox(o, Date.UTC(2027, 1, 1)).length === 0, '邮件 30 天后过期');
   const c0 = o.coins; E.applyMatch(o, { xp: 0, trophies: 8, won: false, draw: false, mvp: false, kills: 0, paint: 0, mode: 'turf' }, now);
   ok(o.coins - c0 === Math.round(E.matchCoins({ won: false, draw: false, kills: 0, mvp: false }) * 1.5), '「灰城反击周」期间金币 ×1.5');
@@ -365,7 +367,7 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   ok(new Set(ids.map((id) => S.SIDEARMS[id].name)).size === ids.length, '随身武器名字各不相同');
   // 强度：每秒伤害（受弹药限制）都远低于任何机体
   const sideDps = (A) => (A.dmg * (A.shots || 1) * (A.pellets || 1)) / (A.reload * (A.cost || 1));
-  const mechDps = (W) => ({ burst: W.shots * W.dmg, fan: W.pellets * W.dmg, flick: W.pellets * W.dmg, charge: W.dmg, lob: W.dmg, punch: W.dmg }[W.attack] || W.dmg) / W.reload;
+  const mechDps = (W) => (({ burst: W.shots * W.dmg, fan: W.pellets * W.dmg, flick: W.pellets * W.dmg, charge: W.dmg, lob: W.dmg, punch: W.dmg }[W.attack] || W.dmg) + (W.poison ? W.poison * 6 : 0)) / W.reload;
   const maxSide = Math.max(...ids.map((id) => sideDps(S.sidearm(id))));
   const minMech = Math.min(...Object.values(S.WEAPONS).map(mechDps));
   ok(maxSide < minMech, `最强随身武器每秒 ${maxSide.toFixed(1)} 伤害，低于最弱机体的 ${minMech.toFixed(1)}`);
@@ -405,6 +407,97 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
       ok(me.hidden === want, `${S.pilot(pid).name}：草丛里刚开过火 ${want ? '仍然隐身' : '会暴露'}`);
     }
   }
+}
+
+// ---- 1.4：乐园祭 / 特攻队 / 排位赛 / 信箱 ----
+{
+  // 特攻队补给箱：只开出三台刺客机体；普通宝箱开不出来
+  const q = E.newProfile('strike'); q.chests.strike = 400;
+  let mechs = 0; for (let i = 0; i < 400; i++) { const r = E.apply(q, 'open', { chest: 'strike' }, Math.random); mechs += r.items.filter((it) => it.k === 'mech').length; }
+  ok(E.STRIKE_MECHS.every((m) => q.mechs.includes(m)) && q.mechs.length === E.STARTER_MECHS.length + 3, `特攻队补给箱开出全部刺客机体（影刃 / 毒针 / 幻影），没有别的机体`);
+  ok(E.STRIKE_MECHS.every((m) => !E.offers(q, Date.UTC(2026, 10, 20)).mech || E.offers(q, Date.UTC(2026, 10, 20)).mech !== m), '限时购买不卖特攻队机体');
+  const of = E.offers(E.newProfile('x'), Date.UTC(2026, 10, 20));
+  ok(of.pilots[0] === 'kaka' && of.mech === 'slinger', `新常驻角色上架：限时购买必出卡卡 + 弹弓机兵`);
+}
+{
+  // 乐园祭：乐园模式给乐园票、活动任务、活动商店
+  const o = E.newProfile('park'), now = Date.UTC(2026, 10, 20, 4);
+  const rw = (won) => ({ xp: 0, trophies: 0, won, draw: false, mvp: false, kills: 2, paint: 300, mode: 'park', balloons: 3, float: 20 });
+  for (let i = 0; i < 3; i++) E.applyMatch(o, rw(true), now);
+  ok(o.tickets === 45, `乐园模式每局 10 张乐园票，赢了多 5 张（3 局 = ${o.tickets}）`);
+  ok(E.apply(o, 'claimEvent', { id: 'parkfest', i: 0, now }).ok && o.tickets === 105, '活动任务「玩 3 局乐园模式」：+60 乐园票');
+  ok(E.apply(o, 'eventShop', { id: 'parkfest', i: 0, now }).ok === false || o.tickets >= 120, '乐园票不够时不能兑换');
+  o.tickets = 1000;
+  ok(E.apply(o, 'eventShop', { id: 'parkfest', i: 0, now }).ok && o.chests.strike === 1 && o.tickets === 880, '活动商店：120 乐园票兑换特攻队补给箱');
+  ok(E.apply(o, 'eventShop', { id: 'parkfest', i: 1, now }).ok && o.skins.includes('candy_beach') && !E.apply(o, 'eventShop', { id: 'parkfest', i: 1, now }).ok, '活动商店：夏日皮肤「海滩偶像」限兑 1 次');
+  ok(E.normalize(JSON.parse(JSON.stringify(o))).ev.parkfest.s[0] === 1, '兑换次数会保存');
+}
+{
+  // 任务线：新兵之路 / 特攻队
+  const o = E.newProfile('rookie');
+  E.applyMatch(o, { xp: 2000, trophies: 0, won: true, draw: false, mvp: false, kills: 10, paint: 100, mode: 'turf' }, Date.UTC(2026, 10, 30));
+  ok(E.apply(o, 'claimTask', { id: 'rookie', i: 0 }).ok && E.apply(o, 'claimTask', { id: 'rookie', i: 1 }).ok && o.chests.starter === 1, '新兵之路：完成 1 局、赢 1 局 → 新手宝箱');
+  ok(E.apply(o, 'claimTask', { id: 'rookie', i: 4 }).ok && o.chests.hero === 1, `新兵之路：账号升到 3 级（现在 ${S.levelFromXp(o.xp)} 级）→ 角色宝箱`);
+  ok(!E.apply(o, 'claimTask', { id: 'rookie', i: 2 }).ok, '没完成的任务不能领');
+  ok(E.apply(o, 'claimTask', { id: 'strike', i: 1 }).ok === false, '特攻队任务按进度领取');
+}
+{
+  // 信箱：删除领过的；没领的不能删
+  const o = E.newProfile('mail'), now = Date.UTC(2026, 10, 14, 6);
+  const box = E.mailbox(o, now);
+  ok(!E.apply(o, 'delMail', { id: box[0].id, now }).ok, '没领取的邮件不能删除');
+  E.apply(o, 'claimMail', { id: '*', now });
+  ok(E.apply(o, 'delMail', { id: '*', now }).ok && E.mailbox(o, now).length === 0, '一键删除所有领过的邮件');
+}
+{
+  // 排位赛：门槛、加减分、低段位保护、段位奖励、AI 禁用
+  const o = E.newProfile('rank');
+  ok(!E.canRanked(o), '新手号（1 位驾驶员以下）不能打排位');
+  o.pilots = { blaze: { lv: 5, bt: 1 }, frost: { lv: 1, bt: 0 }, candy: { lv: 3, bt: 0 } };
+  ok(E.canRanked(o), '3 位驾驶员 + 3 台机体：可以打排位');
+  const R = (won) => ({ xp: 0, trophies: 0, won, draw: false, mvp: false, kills: 0, paint: 0, mode: 'zone', ranked: true });
+  E.applyMatch(o, R(false), Date.UTC(2026, 10, 30));
+  ok(o.rank.rp === 0, '青铜输了不会掉到 0 分以下');
+  for (let i = 0; i < 11; i++) E.applyMatch(o, R(true), Date.UTC(2026, 10, 30));
+  ok(E.rankTier(o.rank.rp) === 2 && o.chests.strike === 1 && o.rank.got.includes(1), `连赢 11 局到达${E.RANK.tiers[E.rankTier(o.rank.rp)].name}（${o.rank.rp} 分），领到白银 / 黄金段位奖励`);
+  const rp = o.rank.rp; E.applyMatch(o, R(false), Date.UTC(2026, 10, 30));
+  ok(o.rank.rp === rp + E.RANK.loss, '黄金以上输了照常扣分');
+  const bans = E.draftBans({ myBan: { k: 'mech', id: 'blade' }, pick: { pilot: 'blaze', mech: 'blaster' }, o });
+  const pl = bans.filter((b) => b.k === 'pilot').map((b) => b.id), mc = bans.filter((b) => b.k === 'mech').map((b) => b.id);
+  ok(bans.length === 4 && !bans.some((b) => b.side === 'ally' && b.id === 'blaze'), `禁用阶段：${bans.map((b) => b.side + ':' + b.id).join(' ')}（队友不会禁你的驾驶员）`);
+  ok(Object.keys(o.pilots).some((id) => !pl.includes(id)) && o.mechs.some((id) => !mc.includes(id)), '禁用后玩家仍然有可以用的驾驶员和机体');
+  const room = new Room('RK', null, { manual: true });
+  room.settings = { mode: 'zone', map: 0, duration: 120, teamSize: 4, bots: true, ranked: true, bans: { pilots: ['blaze', 'kaka'], mechs: ['blade', 'blaster'] }, botPower: { lv: 8, bt: 1 } };
+  const g = new Game(room, { manual: true });
+  ok([...g.players.values()].every((p) => !['blaze', 'kaka'].includes(p.pilot) && !['blade', 'blaster'].includes(p.weapon)) && [...g.players.values()].every((p) => p.lv === 8), '排位赛：AI 不会用被禁用的驾驶员 / 机体，等级跟着段位');
+}
+{
+  // 乐园模式：花车得分 + 打气球
+  const room = new Room('PK', null, { manual: true });
+  room.settings = { mode: 'park', map: -1, duration: 150, teamSize: 4, bots: true };
+  const g = new Game(room, { manual: true });
+  ok(S.MAPS[g.mapIdx].park, '乐园模式默认在「欢乐乐园」');
+  let t = 0; while (!g.over && t < 160 * S.TICK) { g.step(); t++; }
+  const pops = [...g.players.values()].reduce((a, p) => a + p.stats.balloons, 0);
+  ok(g.over && Math.max(g.obj.score[1], g.obj.score[2]) > 30 && pops > 0, `乐园模式打完一局：比分 ${g.obj.score[1]} : ${g.obj.score[2]}，打爆 ${pops} 个气球`);
+}
+{
+  // 毒针：中毒持续掉血；幻影：大招隐身、攻击现形；弹弓：落地后再弹一次
+  const { g, A, B, run } = duel({ weapon: 'stinger' }, {}, { dist: 200 });
+  B.invulnT = 0; fire(A); run(0.4); const hp1 = B.hp; run(1.5);
+  ok(B.poisonT > 0 || B.hp < hp1, `毒针：命中后中毒，1.5 秒里又掉了 ${Math.round(hp1 - B.hp)} 点`);
+  const d2 = duel({ weapon: 'phantom' }, {}, { dist: 160 });
+  d2.A.sp = S.WEAPONS.phantom.spNeed; d2.A.input.qq++; d2.run(0.2);
+  ok(d2.A.hidden && d2.A.cloakT > 0, '幻影：光学迷彩隐身');
+  fire(d2.A); d2.run(0.1);
+  ok(d2.A.cloakT === 0, '幻影：攻击后现形');
+  const d3 = duel({ weapon: 'slinger' }, {}, { dist: 200 });
+  d3.A.input.ad = 200; fire(d3.A); let lbs = 0; for (let i = 0; i < 40; i++) { d3.run(1 / S.TICK); } lbs = d3.events.filter((e) => e[0] === 'lb').length;
+  ok(lbs >= 2, `弹弓：涂料球落地后再弹一次（${lbs} 次抛物线）`);
+  const d4 = duel({ pilot: 'kaka' }, {}, { dist: 120 });
+  d4.g.kill(d4.B, d4.A);
+  ok(d4.g.helpers.some((h) => h.kind === 'bento' && h.gift), '卡卡：击倒敌人掉落惊喜礼盒');
+  void g;
 }
 
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');

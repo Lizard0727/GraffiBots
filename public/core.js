@@ -105,7 +105,9 @@ class Game {
     this.mode = st.mode;
     // 逃亡圈默认用「废墟逃亡区」
     const ruins = S.MAPS.findIndex((m) => m.name === '废墟逃亡区');
-    this.mapIdx = st.map < 0 ? (S.isEscape(this.mode) && ruins >= 0 ? ruins : randInt(S.MAPS.length)) : st.map;
+    const parkMap = S.MAPS.findIndex((m) => m.park);   // 乐园模式默认用「欢乐乐园」
+    this.mapIdx = st.map < 0 ? (S.isEscape(this.mode) && ruins >= 0 ? ruins : this.mode === 'park' && parkMap >= 0 ? parkMap : randInt(S.MAPS.length)) : st.map;
+    this.ranked = !!st.ranked; this.bans = st.bans || { pilots: [], mechs: [] };
     this.teams = S.teamsOf(this.mode);
     this.oneLife = !!(S.MODES[this.mode] && S.MODES[this.mode].oneLife);
     this.M = S.buildMap(this.mapIdx);
@@ -137,21 +139,23 @@ class Game {
       pl.looks = c.looks || null;
     }
     const avgLv = humans.length ? Math.round(humans.reduce((a, b) => a + b.lv, 0) / humans.length) : 1;
-    const botPw = this.fair ? FAIR : { lv: avgLv, bt: avgLv >= 9 ? 2 : avgLv >= 5 ? 1 : 0 };
+    const botPw = this.fair ? FAIR : st.botPower || { lv: avgLv, bt: avgLv >= 9 ? 2 : avgLv >= 5 ? 1 : 0 };   // 排位赛：AI 强度跟着段位
     if (st.bots) {
       let bi = 0;
       const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
       // AI 机兵由驾驶员们驾驶：优先使用还没人选的驾驶员（名字就是驾驶员的名字）
       const taken = new Set([...this.players.values()].map((p) => p.pilot));
-      const free = S.PILOTS.filter((pp) => !taken.has(pp.id)).sort(() => Math.random() - 0.5);
+      const bannedP = new Set(this.bans.pilots || []), bannedM = new Set(this.bans.mechs || []);   // 排位赛被禁用的驾驶员 / 机体 AI 也不能选
+      const mechPool = S.WEAPON_ORDER.filter((w) => !bannedM.has(w));
+      const free = S.PILOTS.filter((pp) => !taken.has(pp.id) && !bannedP.has(pp.id)).sort(() => Math.random() - 0.5);
       const perTeam = this.teams > 2 ? teamCap : st.teamSize;
       for (let team = 1; team <= this.teams; team++)
         while (slots[team] < perTeam && !(this.tutorial && team === 1)) {
           bi++;
           const pp = free.shift();
-          const pil = pp || S.PILOTS[randInt(S.PILOTS.length)];
+          const okP = S.PILOTS.filter((x) => !bannedP.has(x.id)), pil = pp || okP[randInt(okP.length)] || S.PILOTS[0];
           // 驾驶员和机体分开选：一半用擅长机体，一半随机
-          this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 ? pil.weapon : S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)],
+          this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 && !bannedM.has(pil.weapon) ? pil.weapon : mechPool[randInt(mechPool.length)],
             S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id, botPw);
         }
     }
@@ -188,7 +192,7 @@ class Game {
       quakeT: 0, quakeArm: 0,
       input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, qq: 0, gq: 0, aq: 0, oq: 0, ad: 200 },
       lastQq: 0, lastGq: 0, lastAq: 0, sync: 0, lastPosT: 0, hitCd: {},
-      stats: { kills: 0, deaths: 0, paint: 0, obj: 0 },
+      stats: { kills: 0, deaths: 0, paint: 0, obj: 0, balloons: 0, float: 0 },
     };
     this.players.set(id, p);
     this.respawn(p);
@@ -276,6 +280,11 @@ class Game {
     p.rushT = Math.max(0, p.rushT - dt); p.slowT = Math.max(0, p.slowT - dt);
     p.silenceT = Math.max(0, p.silenceT - dt); p.smokeT = Math.max(0, p.smokeT - dt);
     p.rallyT = Math.max(0, p.rallyT - dt); p.revealT = Math.max(0, p.revealT - dt);
+    p.cloakT = Math.max(0, (p.cloakT || 0) - dt);
+    if (p.poisonT > 0) {   // 中毒：每 0.5 秒掉 3 点生命并减速
+      p.poisonT -= dt; p.poisonAcc = (p.poisonAcc || 0) + dt; p.slowT = Math.max(p.slowT, 0.15);
+      if (p.poisonAcc >= 0.5) { p.poisonAcc -= 0.5; this.hurt(p, 3, this.players.get(p.poisonBy) || null, 0, 0); if (!p.alive) return; }
+    }
     const OV = p.ovT > 0 ? S.OVERLOADS[p.pilot] : null;
     if (p.ovT > 0) { p.ovT -= dt; if (p.ovT <= 0) p.ovT = 0; }
     const spAct = p.spT > 0;
@@ -284,7 +293,7 @@ class Game {
     const ground = grounded ? S.cellAt(this.grid, p.x, p.y) : -1;
     const own = ground === p.team, enemy = ground > 0 && !own;
     const inBush = S.inBush(this.M, p.x, p.y, p.z);
-    let sm = p.foot ? (p.pilot === 'gale' ? 1.4 : 1) : W.spd;
+    let sm = p.foot ? (p.pilot === 'gale' ? 1.45 : 1) : W.spd * (p.pilot === 'gale' ? 1.06 : 1);
     if (this.obj.tr && this.obj.tr.carrier === p.id) sm *= 0.72;
     if (p.carry) sm *= 1 - 0.04 * p.carry;
     if (spAct && p.spKind === 'charge') sm *= 1.45;
@@ -293,6 +302,7 @@ class Game {
     if (p.pilot === 'raven' && (inBush || own)) sm *= 1.15;
     if (OV && OV.spd) sm *= OV.spd;
     if (p.rallyT > 0) sm *= 1.15;
+    if (p.cloakT > 0 && p.cloakFast) sm *= 1.25;
     if (own && p.tal.has('p2')) sm *= 1.06;
     if (own && wheel0(p) && p.tal.has('p6')) sm *= 1.1;
     p.sm = sm;
@@ -328,7 +338,7 @@ class Game {
 
     // 隐身：草丛 / 己方涂料里的滚轮 / 墨雾；攻击后 0.9 秒内会暴露（墨雾除外）
     const recentAtk = this.time - p.lastAtk < 0.9 && p.quietAtk !== p.lastAtk;   // 夜鸢的飞镖不暴露
-    p.hidden = (p.smokeT > 0 || ((inBush || (wheel && own)) && !recentAtk)) && !(p.revealT > 0);
+    p.hidden = (p.smokeT > 0 || p.cloakT > 0 || ((inBush || (wheel && own)) && !recentAtk)) && !(p.revealT > 0);
 
     if (inp.qq !== p.lastQq) {
       p.lastQq = inp.qq;
@@ -393,8 +403,9 @@ class Game {
     if (want && p.atkCd <= 0 && p.ammo >= 1) {
       const OVr = p.ovT > 0 && S.OVERLOADS[p.pilot].rof;
       p.ammo -= 1; p.atkCd = W.atkCd / (OVr || 1); p.lastAtk = this.time; this.takeOverdrive(p);
+      if (p.cloakT > 0) { if (W.special === 'cloak') p.dmgMul *= 1.5; p.cloakT = 0; p.cloakFast = false; }   // 攻击会现形；幻影隐身第一击 +50%
       switch (W.attack) {
-        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null }; this.stepBurst(p, W, 0); break;
+        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : null }; this.stepBurst(p, W, 0); break;
         case 'fan': this.fireSpread(p, W); break;
         case 'flick':
           this.fireSpread(p, W);
@@ -402,7 +413,8 @@ class Game {
           break;
         case 'lob': {
           const d = clamp(inp.ad || 200, W.minRange, W.range);
-          this.spawnShell(p, p.x + Math.cos(inp.a) * d, p.y + Math.sin(inp.a) * d, W.dmg * p.dmgMul, W.blast, W.flight);
+          const sh = this.spawnShellRet(p, p.x + Math.cos(inp.a) * d, p.y + Math.sin(inp.a) * d, W.dmg * p.dmgMul, W.blast, W.flight);
+          if (W.bounce && sh) sh.bounce = 1;
           break;
         }
         case 'punch': this.punch(p, W); break;
@@ -454,6 +466,7 @@ class Game {
     if (!fx || !t.alive) return;
     if (fx.slow) t.slowT = Math.max(t.slowT, fx.slow);
     if (fx.reveal) t.revealT = Math.max(t.revealT || 0, fx.reveal);
+    if (fx.poison) { t.poisonT = Math.max(t.poisonT || 0, fx.poison); t.poisonBy = fx.by || t.poisonBy; }
   }
   stepBurst(p, W, dt) {
     const b = p.burst;
@@ -487,6 +500,7 @@ class Game {
       this.hurt(t, dmg, p, dx, dy, W.kb / (dmg * 1.8), 120);
     }
     this.pushBall(p, fx, fy, W.range, 1100);
+    if (this.mode === 'park') for (const b of this.obj.balloons.slice()) if (Math.hypot(b.x - fx, b.y - fy) < W.range + 20) this.popBalloon(b, p.team, p);
     this.ev(['pu', p.id, r2(a)]);
   }
 
@@ -544,6 +558,15 @@ class Game {
       if (s.t < s.T) return true;
       this.explode(s.x1, s.y1, s.z1, s.r, s.dmg, s.dmg * 0.45, s.team, this.players.get(s.owner));
       this.ev(['bx', r1(s.x1), r1(s.y1), r1(s.z1), s.team, s.r, 0]);
+      if (s.bounce) {   // 弹弓：落地后沿原方向再弹一次
+        const dx = s.x1 - s.x0, dy = s.y1 - s.y0, l = Math.hypot(dx, dy) || 1, d2 = 95;
+        const x2 = clamp(s.x1 + (dx / l) * d2, 10, S.W - 10), y2 = clamp(s.y1 + (dy / l) * d2, 10, S.H - 10);
+        let z2 = this.top(x2, y2); if (this.M.solid[Math.floor(y2 / S.CELL) * S.GW + Math.floor(x2 / S.CELL)]) z2 = S.LEVEL_H[3];
+        const b2 = { id: this.nextId++, x0: s.x1, y0: s.y1, z0: s.z1 + 4, x1: x2, y1: y2, z1: z2, T: 0.36, t: 0, team: s.team, owner: s.owner, dmg: s.dmg * 0.6, r: s.r * 0.8 };
+        this.shells.push(b2);
+        this.ev(['lb', b2.id, r1(b2.x0), r1(b2.y0), r1(b2.z0), r1(x2), r1(y2), r1(z2), r2(b2.T), s.team]);
+      }
+      if (s.fog) { this.helpers.push({ id: this.nextId++, kind: 'fog', x: s.x1, y: s.y1, z: s.z1, r: 105, team: s.team, owner: s.owner, t: 5, cd: 0 }); this.ev(['fg', r1(s.x1), r1(s.y1), r1(s.z1), 105, 5, s.team]); }
       if (s.fire) { this.helpers.push({ id: this.nextId++, kind: 'fire', x: s.x1, y: s.y1, z: s.z1, r: 110, team: s.team, owner: s.owner, t: 4, cd: 0 }); this.ev(['fz', r1(s.x1), r1(s.y1), r1(s.z1), 110, 4, s.team]); }
       return false;
     });
@@ -587,6 +610,10 @@ class Game {
           e.slowT = Math.max(e.slowT, 1.2); e.silenceT = Math.max(e.silenceT, 0.8); e.revealT = 4; e.charge = 0; e.burst = null;
           this.hurt(e, 10, p);
         }
+        break;
+      case 'decoy':
+        this.helpers.push({ id: this.nextId++, kind: 'decoy', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 2, cd: 99 });
+        p.cloakT = Math.max(p.cloakT || 0, 2); p.cloakFast = false;
         break;
       case 'jam':
         for (const e of this.players.values()) {
@@ -640,7 +667,7 @@ class Game {
         if (h.armed > 0) return true;
         for (const a of this.players.values()) {
           if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < 26 && Math.abs(a.z - h.z) < 30) {
-            a.hp = Math.min(this.maxHpOf(a), a.hp + 90); this.ev(['heal', a.id, 90]); return false;
+            const hv = h.heal || 90; a.hp = Math.min(this.maxHpOf(a), a.hp + hv); this.ev(['heal', a.id, hv]); return false;
           }
         }
         return true;
@@ -650,6 +677,18 @@ class Game {
         return true;
       }
       if (h.kind === 'wall') return true;   // 盾墙：挡子弹的判定在 updateProjs
+      if (h.kind === 'decoy') {    // 卡卡的替身：时间到就炸开
+        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 10, 90, 40, 20, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 10), h.team, 90, 0]); return false; }
+        return true;
+      }
+      if (h.kind === 'fog') {      // 毒雾：雾里的敌人中毒、减速、暴露
+        h.cd -= dt;
+        if (h.cd <= 0) {
+          h.cd = 0.5;
+          for (const e of this.players.values()) if (e.alive && e.team !== h.team && Math.hypot(e.x - h.x, e.y - h.y) < h.r && Math.abs(e.z - h.z) < 50) { this.sideFx(e, { poison: 1.2, slow: 0.6, reveal: 1, by: h.owner }); }
+        }
+        return true;
+      }
       if (h.kind === 'fire') {     // 燃料罐的火海：每 0.4 秒伤害并涂色
         h.cd -= dt;
         if (h.cd <= 0) {
@@ -768,6 +807,11 @@ class Game {
       if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
       if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
       if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.1;   // 韩冰被动：倒戈
+      const BW = !by.foot && S.WEAPONS[by.weapon];
+      if (BW && BW.backstab && by.team !== t.team) {   // 刺客机体：从背后命中（在目标朝向 ±110° 以外）伤害提高
+        let da = Math.atan2(by.y - t.y, by.x - t.x) - t.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+        if (Math.abs(da) > 1.92) { dmg *= BW.backstab; this.ev(['bs', t.id]); }
+      }
     }
     // 防暴盾卫：正面（瞄准方向 ±60°）受到的伤害 -40%
     if (!t.foot && S.WEAPONS[t.weapon].front && (by || kdx != null)) {
@@ -783,7 +827,7 @@ class Game {
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -5%
       let n = 0;
       for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 200) n++;
-      dmg *= 1 - 0.06 * Math.min(3, n);
+      dmg *= 1 - 0.07 * Math.min(3, n);
     }
     if (kdx != null && !(tOV && tOV.noKb)) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
@@ -809,16 +853,17 @@ class Game {
     this.ev(['hit', t.id, by ? by.id : 0, 0, Math.round(dmg)]);
     if (t.hp <= 0) { if (t.foot) this.kill(t, by); else this.wreck(t, by); }
   }
-  onTakedown(by) {
+  onTakedown(by, t) {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
+    if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 40, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
     if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.4);
     if (by.tal && by.tal.has('s4') && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + 15);
   }
   // 机体被摧毁：驾驶员弹出，6 秒后在驾驶员所在位置空投新机体
   wreck(t, by) {
     const x = t.x, y = t.y, z = t.z;
-    if (by && by !== t) this.onTakedown(by);
+    if (by && by !== t) this.onTakedown(by, t);
     this.paint(x, y, this.top(x, y), 55, by ? by.team : this.teams > 2 ? 0 : 3 - t.team, by && this.players.has(by.id) ? by : null);
     this.dropItems(t);
     t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = this.oneLife ? 1e9 : S.REBUILD - (t.pilot === 'aurora' ? 2 : 0) - (t.tal && t.tal.has('d3') ? 1 : 0);   // 一条命的模式：机体不会重建
@@ -846,7 +891,7 @@ class Game {
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.foot = false;
     const team = by ? by.team : this.teams > 2 ? 0 : 3 - t.team;
     this.paint(t.x, t.y, this.top(t.x, t.y), 40, team, by && this.players.has(by.id) ? by : null);
-    if (by && by !== t) this.onTakedown(by);
+    if (by && by !== t) this.onTakedown(by, t);
     t.sp = Math.floor(t.sp * 0.5);
     this.dropItems(t);
     this.ev(['kill', by ? by.id : 0, t.id, r1(t.x), r1(t.y), r1(t.z)]);
@@ -907,6 +952,7 @@ class Game {
   }
   explode(x, y, z, r, maxD, minD, team, owner, noLos) {
     this.paint(x, y, z, r, team, owner);
+    if (this.mode === 'park' && this.obj.balloons) for (const b of this.obj.balloons.slice()) if (Math.hypot(b.x - x, b.y - y) < r + 16 && Math.abs(b.z - z) < r + 70) this.popBalloon(b, team, owner);
     for (const t of this.players.values()) {
       if (!t.alive || t.team === team) continue;
       const d = Math.hypot(t.x - x, t.y - y, t.z + 18 - z - 10);
@@ -973,6 +1019,33 @@ class Game {
         break;
       case 'charge': p.spT = 4; break;
       case 'beam': p.spT = 2.6; break;
+      case 'cluster': {   // 弹弓：扇形 5 颗弹跳球
+        p.spT = 0.4;
+        const d = clamp(p.input.ad || 240, 120, 360);
+        for (let i = -2; i <= 2; i++) { const aa = a + i * 0.2, sh = this.spawnShellRet(p, p.x + Math.cos(aa) * d, p.y + Math.sin(aa) * d, 34, 48, 0.5 + Math.abs(i) * 0.06); if (sh) sh.bounce = 1; }
+        break;
+      }
+      case 'shadowstep': {   // 影刃：冲过去，路上的敌人受伤，随后隐身
+        p.spT = 0.3;
+        const d = clamp(p.input.ad || 220, 100, 260), ux = Math.cos(a), uy = Math.sin(a);
+        for (const t of this.players.values()) {
+          if (!t.alive || t.team === p.team) continue;
+          const dx = t.x - p.x, dy = t.y - p.y, along = dx * ux + dy * uy, across = Math.abs(-dx * uy + dy * ux);
+          if (along > -10 && along < d + 20 && across < 34 && Math.abs(t.z - p.z) < 40) this.hurt(t, 60, p, ux, uy, 1.2, 60);
+        }
+        this.paint(p.x + ux * d * 0.5, p.y + uy * d * 0.5, p.z, 40, p.team, p);
+        this.knock(p, ux, uy, Math.min(1000, d * 3.6), 0);
+        p.invulnT = Math.max(p.invulnT, 0.4); p.cloakT = 1.5; p.cloakFast = true;
+        break;
+      }
+      case 'venom': {   // 毒针：毒雾罐
+        p.spT = 0.3;
+        const d = clamp(p.input.ad || 260, 80, 420);
+        const sh = this.spawnShellRet(p, p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 20, 60, 0.7);
+        if (sh) sh.fog = 1;
+        break;
+      }
+      case 'cloak': p.spT = 0.3; p.cloakT = 4; p.cloakFast = true; break;
       case 'missiles': {
         p.spT = 0.3;
         const targets = [];
@@ -1113,10 +1186,14 @@ class Game {
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
-          this.hurt(victim, pr.dmg * (far ? 1.18 : 1), owner, pr.vx, pr.vy, pr.kb);
-          if (pr.fx) this.sideFx(victim, pr.fx);
+          this.hurt(victim, pr.dmg * (far ? 1.22 : 1), owner, pr.vx, pr.vy, pr.kb);
+          if (pr.fx) this.sideFx(victim, pr.fx.poison ? Object.assign({ by: pr.owner }, pr.fx) : pr.fx);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
+        }
+        if (this.mode === 'park' && this.obj.balloons.length) {
+          const bl = this.obj.balloons.find((b) => Math.hypot(b.x - pr.x, b.y - pr.y, b.z + 10 - pr.z) < 20 + pr.size);
+          if (bl) { this.popBalloon(bl, pr.team, owner); dead = true; break; }
         }
         if (ball && Math.hypot(ball.x - pr.x, ball.y - pr.y, ball.r - pr.z) < ball.r + pr.size) {
           const hs = Math.hypot(pr.vx, pr.vy) || 1;
@@ -1187,12 +1264,63 @@ class Game {
       case 'escort': o.tr = { x: S.W / 2, y: S.H / 2, z: this.top(S.W / 2, S.H / 2), carrier: 0, resetT: 0 }; break;
       case 'soccer': o.ball = { x: S.W / 2, y: S.H / 2, vx: 0, vy: 0, r: 26, last: 0, acc: 0 }; break;
       case 'battery': o.bats = []; o.batT = 2; o.batId = 1; break;
+      case 'park': o.fl = Object.assign({ k: 0, own: 0 }, this.parkPos(0)); o.balloons = []; o.balT = 1.5; o.balId = 1; o.acc = 0; break;
     }
+  }
+  // 乐园模式：花车在路线上的位置（k = 0..1 沿闭合路线）
+  parkPos(k) {
+    const P = S.PARK.path.map(([x, y]) => [x * S.CELL, y * S.CELL]);
+    const seg = P.map((a, i) => { const b = P[(i + 1) % P.length]; return Math.hypot(b[0] - a[0], b[1] - a[1]); });
+    let d = (((k % 1) + 1) % 1) * seg.reduce((x, y) => x + y, 0);
+    for (let i = 0; i < P.length; i++) {
+      if (d <= seg[i]) { const a = P[i], b = P[(i + 1) % P.length], t = d / seg[i]; return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t }; }
+      d -= seg[i];
+    }
+    return { x: P[0][0], y: P[0][1] };
+  }
+  popBalloon(b, team, owner) {
+    const o = this.obj;
+    o.balloons = o.balloons.filter((x) => x !== b);
+    o.score[team] = (o.score[team] || 0) + S.PARK.balloon;
+    if (owner && this.players.has(owner.id)) { owner.stats.balloons++; owner.stats.obj += 1; }
+    this.paint(b.x, b.y, this.top(b.x, b.y), 34, team, owner);
+    this.ev(['bp', b.id, team, r1(b.x), r1(b.y), r1(b.z)]);
+    if (o.score[team] >= S.PARK.target) this.finish(team);
   }
 
   updateMode(dt) {
     const o = this.obj;
     switch (this.mode) {
+      case 'park': {
+        // 花车巡游：光圈里人多的队伍每秒得分
+        o.fl.k = (this.time / S.PARK.loop) % 1;
+        Object.assign(o.fl, this.parkPos(o.fl.k));
+        const n = [0, 0, 0];
+        for (const p of this.players.values()) if (p.alive && Math.hypot(p.x - o.fl.x, p.y - o.fl.y) < S.PARK.r && p.z < this.top(p.x, p.y) + 60) n[p.team]++;
+        o.fl.own = n[1] > n[2] ? 1 : n[2] > n[1] ? 2 : 0;
+        o.acc += dt;
+        if (o.acc >= S.PARK.tick) {
+          o.acc -= S.PARK.tick;
+          if (o.fl.own) {
+            o.score[o.fl.own] += 1;
+            for (const p of this.players.values()) if (p.alive && p.team === o.fl.own && Math.hypot(p.x - o.fl.x, p.y - o.fl.y) < S.PARK.r) p.stats.float = (p.stats.float || 0) + 1;
+            this.paint(o.fl.x, o.fl.y, this.top(o.fl.x, o.fl.y), 40, o.fl.own, null);
+            if (o.score[o.fl.own] >= S.PARK.target) { this.finish(o.fl.own); return; }
+          }
+        }
+        // 气球：随机飘在空地上空
+        o.balT -= dt;
+        if (o.balT <= 0 && o.balloons.length < S.PARK.maxBalloons) {
+          o.balT = S.PARK.balloonT;
+          for (let tries = 0; tries < 20; tries++) {
+            const x = rand(120, S.W - 120), y = rand(100, S.H - 100);
+            if (this.M.solid[Math.floor(y / S.CELL) * S.GW + Math.floor(x / S.CELL)]) continue;
+            o.balloons.push({ id: o.balId++, x, y, z: this.top(x, y) + 62, ph: rand(0, 6) });
+            break;
+          }
+        }
+        break;
+      }
       case 'elim': {
         if (o.pause > 0) {
           o.pause -= dt; this.timeLeft = S.ELIM.roundTime;
@@ -1392,6 +1520,11 @@ class Game {
       case 'zone': return [o.owner, Math.ceil(o.count[1]), Math.ceil(o.count[2]), Math.round(o.share[1] * 100), Math.round(o.share[2] * 100)];
       case 'escort': return [r1(o.tr.x), r1(o.tr.y), o.tr.carrier, o.score[1], o.score[2], o.tr.resetT > 0 ? 1 : 0, r1(o.tr.z)];
       case 'soccer': return [r1(o.ball.x), r1(o.ball.y), o.score[1], o.score[2], o.ball.last, o.resetT > 0 ? 1 : 0];
+      case 'park': {
+        const flat = [];
+        for (const b of o.balloons) flat.push(b.id, r1(b.x), r1(b.y), r1(b.z));
+        return [o.score[1], o.score[2], r1(o.fl.x), r1(o.fl.y), o.fl.own, flat];
+      }
       case 'battery': {
         const flat = [];
         for (const b of o.bats) flat.push(b.id, r1(b.x), r1(b.y), r1(b.z));
@@ -1462,7 +1595,7 @@ class Game {
       if (this.mode !== 'turf' && ((this.mode === 'zone' && o.count[1] === o.count[2]) || (this.mode !== 'zone' && o.score[1] === o.score[2]))) reason = 'turf';
     }
     const result = {
-      mode: this.mode, map: this.mapIdx, winner, reason, turf: [pa, pb], score: o.score.slice(),
+      mode: this.mode, map: this.mapIdx, winner, reason, ranked: this.ranked, turf: [pa, pb], score: o.score.slice(),
       count: o.count ? o.count.map((c) => Math.ceil(c)) : null, colorSet: this.colorSet, teams: this.teams,
       rounds: o.wins ? o.wins.slice() : null,
       place: o.elim ? [winner, ...o.elim.slice().reverse().filter((t) => t !== winner)] : null,
@@ -1518,7 +1651,7 @@ function botThink(g, p, dt) {
     if (!e.alive || e.team === p.team) continue;
     const d = Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z);
     if (!botSees(g, p, e, d)) continue;
-    const lobber = p.foot ? SA.kind === 'lob' || SA.ghost : p.weapon === 'mortar';
+    const lobber = p.foot ? SA.kind === 'lob' || SA.ghost : p.weapon === 'mortar' || p.weapon === 'slinger';
     if (d < range + 160 && d < ed && (lobber || S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18))) { enemy = e; ed = d; }
   }
   ai.seenT = enemy ? ai.seenT + dt : 0;
@@ -1621,6 +1754,12 @@ function botThink(g, p, dt) {
     aim.a += Math.sin(ai.wob) * 0.6;
     ai.paintT -= dt;
     if (ai.paintT <= 0 && p.ammo > 2.2) { wantAtk = true; ai.paintT = rand(0.6, 1.6); inp.ad = rand(150, 320); }
+    if (g.mode === 'park' && p.ammo >= 1) {   // 乐园模式：射程内有气球就打
+      for (const b of g.obj.balloons) {
+        const d = Math.hypot(b.x - p.x, b.y - p.y);
+        if (d < range * 0.95 && d > 20) { aim = aimAt(p, b.x, b.y, b.z + 10); inp.ad = d; wantAtk = true; break; }
+      }
+    }
     if (g.mode === 'soccer' && g.obj.resetT <= 0) {
       const b = g.obj.ball, bd = dist(p, b);
       const gx = p.team === 1 ? S.W : 0;
@@ -1648,7 +1787,7 @@ function botThink(g, p, dt) {
   // 大招
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
-    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320 }[sp];
+    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450 }[sp];
     if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < 0.002) {
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
@@ -1662,7 +1801,7 @@ function botThink(g, p, dt) {
     const fight = enemy && ed < 300;
     const use = {
       rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
-      turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, overdrive: fight && p.ammo < 1, drone: fight,
+      turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
       rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
     }[sk];
     if (use) {
@@ -1712,6 +1851,14 @@ function randomGoal(g, p) {
 function chooseGoal(g, p) {
   const o = g.obj;
   switch (g.mode) {
+    case 'park': {
+      // 大部分时间守在花车前面一点的位置；偶尔去追近处的气球
+      let best = null, bd = 420;
+      for (const b of o.balloons) { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < bd) { bd = d; best = b; } }
+      if (best && (p.slot % 2 === 1 || Math.random() < 0.3)) return { x: best.x + rand(-60, 60), y: best.y + rand(-60, 60) };
+      const ahead = g.parkPos(o.fl.k + 0.03);
+      return { x: clamp(ahead.x + rand(-50, 50), 40, S.W - 40), y: clamp(ahead.y + rand(-50, 50), 40, S.H - 40) };
+    }
     case 'escape4': case 'escape8': {
       const c = o.circle, safe = c.to || c;
       if (Math.hypot(p.x - safe.x, p.y - safe.y) > safe.r * 0.75) return { x: clamp(safe.x + rand(-40, 40), 40, S.W - 40), y: clamp(safe.y + rand(-40, 40), 40, S.H - 40) };
@@ -1835,6 +1982,19 @@ class Room {
     if (Number.isInteger(m.teamSize) && m.teamSize >= 1 && m.teamSize <= 4) s.teamSize = m.teamSize;
     if (typeof m.bots === 'boolean') s.bots = m.bots;
     if (typeof m.fair === 'boolean') s.fair = m.fair;
+    // 排位赛：禁用名单 + AI 强度（单排房间，由客户端在禁用阶段决定）
+    if (typeof m.ranked === 'boolean') s.ranked = m.ranked;
+    if (m.bans && typeof m.bans === 'object') {
+      const pick = (arr, ok) => (Array.isArray(arr) ? [...new Set(arr.filter(ok))].slice(0, 4) : []);
+      s.bans = { pilots: pick(m.bans.pilots, (id) => S.PILOTS.some((P) => P.id === id)), mechs: pick(m.bans.mechs, (id) => !!S.WEAPONS[id]) };
+    }
+    if (m.botPower && typeof m.botPower === 'object') s.botPower = { lv: Math.max(1, Math.min(11, m.botPower.lv | 0)), bt: Math.max(0, Math.min(2, m.botPower.bt | 0)) };
+    const host = this.members.get(this.hostId);
+    if (s.ranked && host && host.rankTier != null) {   // 在线账号：按服务器记录的段位，客户端改不了
+      if (host.canRanked === false) s.ranked = false;
+      else s.botPower = E.rankBotPower(host.rankTier);
+    }
+    if (s.ranked) { s.bots = true; s.teamSize = 4; s.fair = false; }
     if (typeof m.tutorial === 'boolean' && this.hub && this.hub.local) s.tutorial = m.tutorial;   // 只有浏览器里的本机服务器能开教程
     this.broadcastLobby();
   }

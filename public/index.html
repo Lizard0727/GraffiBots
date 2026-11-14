@@ -110,6 +110,7 @@
     </div>
 
     <div class="home-right">
+      <button class="rank-chip" id="rankChip" data-ov="ranked"><span class="rk-badge" id="rankBadge"></span><div><small>排位赛</small><b id="rankName">青铜</b><span id="rankRp">0 分</span></div></button>
       <button class="mode-card" id="modeCard" data-ov="modes">
         <span id="modeIcon" class="mode-ico"></span>
         <div><small>对战模式 · 点击切换</small><b id="modeName">涂地大战</b><span id="modeMap">随机地图 · 3v3</span></div>
@@ -184,12 +185,20 @@
         <div class="skin-grid" id="skinGrid"></div>
       </div>
     </section>
+    <section id="ov-ranked" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>排位赛</h2><small>4 对 4 单排：赢了加分、输了扣分，段位越高奖励越丰厚。黄金段位开始有禁用阶段</small></header>
+      <div class="ov-body narrow"><div id="rankBody"></div></div>
+    </section>
+    <section id="ov-draft" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2 id="draftTitle">禁用阶段</h2><small id="draftSub">双方各禁用两个驾驶员 / 机体，被禁用的这一局谁都不能用</small></header>
+      <div class="ov-body"><div id="draftBody"></div></div>
+    </section>
     <section id="ov-events" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>活动</h2><small>限时活动和任务线，完成任务领奖励</small></header>
       <div class="ov-body"><div class="ev-list" id="evList"></div></div>
     </section>
     <section id="ov-mail" class="ov hidden">
-      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>信箱</h2><small>版本补偿和活动礼包会发到这里，30 天内有效</small><button class="btn" id="mailAll">全部领取</button></header>
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>信箱</h2><small>版本补偿和活动礼包会发到这里。没领取的奖励 3 天后自动删除；领过的邮件可以往右滑掉</small><button class="btn ghost small" id="mailDelAll">删除已领取</button><button class="btn" id="mailAll">全部领取</button></header>
       <div class="ov-body narrow"><div id="mailList"></div></div>
     </section>
     <section id="ov-talents" class="ov hidden">

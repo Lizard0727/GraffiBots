@@ -80,6 +80,8 @@ class AccountStore {
     c.power = E.power(p, p.pilot);
     c.owned = { pilots: Object.keys(p.pilots), mechs: p.mechs.slice() };
     c.looks = E.looks(p);
+    c.rankTier = E.rankTier((p.rank || {}).rp || 0);   // 排位赛：AI 强度由服务器按真实段位决定
+    c.canRanked = E.canRanked(p);
   }
   handle(c, m) {
     const err = (msg) => c.conn.send({ t: 'auth', ok: false, op: m.op, err: msg });

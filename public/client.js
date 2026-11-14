@@ -252,13 +252,14 @@
   function closeSettings() { $('settingsDlg').classList.add('hidden'); if (G && !G.over) lockPointer(); }
   function menuMusic() { if (!G) AU.music('menu'); setTimeout(updateNowPlaying, 100); }
   // ================= 大厅 =================
-  const MODE_ICON = { turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery', elim: 'elim', escape4: 'escape', escape8: 'escape' };
+  const MODE_ICON = { park: 'park', turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery', elim: 'elim', escape4: 'escape', escape8: 'escape' };
   const MODE_COL = { turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'],
-    elim: ['#2a1a1e', '#ff3b52'], escape4: ['#4a4d56', '#9cff2e'], escape8: ['#3a3d46', '#ff5a36'] };
+    park: ['#ff6ec4', '#1fd6ee'], elim: ['#2a1a1e', '#ff3b52'], escape4: ['#4a4d56', '#9cff2e'], escape8: ['#3a3d46', '#ff5a36'] };
   const ic = (n, c, size) => GI.svg(n, c, size);
   const mapName = (i) => (i < 0 ? '随机地图' : S.MAPS[i].name);
   function nextHead() { return S.HEADS.find((h) => h.tr > (profile.trophies || 0)); }
   function renderProfile() {
+    renderRankChip();
     const lv = level(), cur = S.xpForLevel(lv), next = S.xpForLevel(lv + 1);
     $('lvText').textContent = 'Lv.' + lv;
     $('xpText').textContent = `${profile.xp - cur} / ${next - cur} XP`;
@@ -323,6 +324,7 @@
     if (name === 'shop') renderShop();
     if (name === 'events') renderEvents();
     if (name === 'mail') renderMail();
+    if (name === 'ranked') renderRanked();
     mountPreview();
     sfx.click();
   }
@@ -331,6 +333,99 @@
     for (const o of document.querySelectorAll('.ov')) { if (!o.classList.contains('hidden')) any = true; o.classList.add('hidden'); }
     if (any) { mountPreview(); sfx.click(); }
     return any;
+  }
+  // ---------------- 排位赛 ----------------
+  const RT = () => E.RANK.tiers;
+  function rankBadge(ti) {
+    const T = RT()[ti] || RT()[0], c = T.color, n = ti;
+    const stars = Array.from({ length: Math.min(3, (n % 3) + 1) }, (_, i) => `<path transform="translate(${16 + i * 8 - (Math.min(3, (n % 3) + 1) - 1) * 4} 40)" d="M0,-4 l1.2,2.6 l2.8,.3 l-2.1,1.9 l.6,2.8 l-2.5,-1.4 l-2.5,1.4 l.6,-2.8 l-2.1,-1.9 l2.8,-.3 Z" fill="#fff"/>`).join('');
+    const wing = n >= 4 ? `<path d="M6,18 C0,14 2,6 8,8 C6,12 8,16 12,18 Z M42,18 C48,14 46,6 40,8 C42,12 40,16 36,18 Z" fill="${c}" stroke="#141018" stroke-width="2"/>` : '';
+    const crown = n >= 5 ? `<path d="M15,8 L19,2 L24,7 L29,2 L33,8 Z" fill="#ffd23f" stroke="#141018" stroke-width="2"/>` : '';
+    return `<svg viewBox="0 0 48 52">${wing}<path d="M24,6 L40,12 L38,32 C36,40 30,45 24,48 C18,45 12,40 10,32 L8,12 Z" fill="${c}" stroke="#141018" stroke-width="3" stroke-linejoin="round"/><path d="M24,11 L35,15 L33.5,31 C32,36 28,40 24,42 C20,40 16,36 14.5,31 L13,15 Z" fill="#fff" opacity=".22"/>${crown}<text x="24" y="31" text-anchor="middle" font-family="GBNum,Impact,sans-serif" font-size="15" fill="#141018">${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][n]}</text>${stars}</svg>`;
+  }
+  function renderRankChip() {
+    const r = profile.rank || { rp: 0 }, ti = E.rankTier(r.rp), T = RT()[ti];
+    const chip = $('rankChip'); if (!chip) return;
+    chip.style.setProperty('--rc', T.color);
+    $('rankBadge').innerHTML = rankBadge(ti); $('rankName').textContent = T.name; $('rankRp').textContent = `${r.rp} 分`;
+  }
+  function renderRanked() {
+    const r = profile.rank || { rp: 0, got: [] }, ti = E.rankTier(r.rp), T = RT()[ti], N = RT()[ti + 1];
+    const k = N ? (r.rp - T.rp) / (N.rp - T.rp) : 1, now = Date.now(), mode = E.rankedMode(now);
+    const np = Object.keys(profile.pilots).length, nm = profile.mechs.length, can = E.canRanked(profile);
+    const need = [];
+    if (np < E.RANK.need.pilots) need.push(`${E.RANK.need.pilots - np} 位驾驶员`);
+    if (nm < E.RANK.need.mechs) need.push(`${E.RANK.need.mechs - nm} 台机体`);
+    $('rankBody').innerHTML = `<div class="rank-hero" style="--rc:${T.color}"><span class="rk-badge">${rankBadge(ti)}</span><div style="flex:1">
+        <small>当前段位</small><h3>${T.name}</h3><div class="rp">${r.rp} 分</div>
+        <div class="rank-bar"><i style="width:${Math.round(k * 100)}%"></i></div><small>${N ? `再拿 ${N.rp - r.rp} 分升到「${N.name}」` : '已经是最高段位'} · 共打了 ${r.n || 0} 局</small></div></div>
+      <div class="rank-info"><div><small>本时段玩法（每 ${E.RANK_HOURS} 小时轮换）</small><b>${S.MODES[mode].name}</b><small>${fmtLeft(E.rankedModeEnds(now) - now)} 后换成「${S.MODES[E.rankedMode(E.rankedModeEnds(now) + 1)].name}」</small></div>
+        <div><small>规则</small><b>赢 +${E.RANK.win} · 输 ${E.RANK.loss} · MVP +${E.RANK.mvp}</b><small>金币和通行证经验 ×${E.RANK.coinMul} · ${RT()[E.RANK.banFrom].name}起有禁用阶段</small></div></div>
+      <button class="btn big rank-go" id="rankGo" ${can ? '' : 'disabled'}>开始排位</button>
+      ${can ? '' : `<p class="rank-need">还需要 ${need.join('、')}才能参加排位赛（至少 ${E.RANK.need.pilots} 位驾驶员和 ${E.RANK.need.mechs} 台机体）。去「活动 → 新兵之路」领新手宝箱吧！</p>`}
+      <div class="rank-ladder">${RT().map((t, i) => { const got = (r.got || []).includes(i), rw = t.reward; return `<div class="rank-step ${i === ti ? 'cur' : ''} ${i > ti ? 'locked' : ''}" style="--rc:${t.color}"><span class="rk-badge">${rankBadge(i)}</span><div><b>${t.name}</b><small>${t.rp} 分${i >= E.RANK.banFrom ? ' · 有禁用阶段' : ''}</small></div>
+        <div class="rw">${rw ? `${rewardArt(rw)}<span>${rewardLabel(rw)}${got ? ' ✓' : ''}</span>` : '<small>起点</small>'}</div></div>`; }).join('')}</div>`;
+    $('rankGo').onclick = () => startRanked();
+  }
+  let draft = null;
+  function pilotFace(id) { return GP.portrait(S.pilot(id), { face: true }); }
+  function mechFace(id) { const img = R3.mechThumb ? R3.mechThumb({ color: S.pilot(profile.pilot || 'blaze').accent, head: profile.head, weapon: id, pilot: profile.pilot || 'blaze' }) : ''; return img ? `<img src="${img}" alt="">` : ic('mech'); }
+  function startRanked() {
+    if (!E.canRanked(profile)) return toast('至少需要 3 位驾驶员和 3 台机体');
+    if (needPilot()) return;
+    const ti = E.rankTier(profile.rank.rp);
+    draft = { ti, step: ti >= E.RANK.banFrom ? 'ban' : 'pick', myBan: null, bans: [], pick: { pilot: profile.pilot, mech: profile.weapon } };
+    openOv('draft'); renderDraft();
+  }
+  function renderDraft() {
+    const D = draft, isBan = D.step === 'ban';
+    const banned = (k, id) => D.bans.some((b) => b.k === k && b.id === id);
+    $('draftTitle').textContent = isBan ? '禁用阶段' : '选择出战';
+    $('draftSub').textContent = isBan ? '你和队友各禁 1 个，对手禁 2 个；被禁用的驾驶员 / 机体这一局双方都不能用' : D.bans.length ? '从没被禁用、已经拥有的驾驶员和机体里选择出战组合' : `${RT()[D.ti].name}段位还没有禁用阶段，直接选择出战组合`;
+    const card = (k, id) => {
+      const own = k === 'pilot' ? !!profile.pilots[id] : profile.mechs.includes(id), b = banned(k, id);
+      const sel = isBan ? D.myBan && D.myBan.k === k && D.myBan.id === id : D.pick[k === 'pilot' ? 'pilot' : 'mech'] === id;
+      const name = k === 'pilot' ? S.pilot(id).name : S.WEAPONS[id].short;
+      return `<button class="dcard ${isBan ? '' : 'pick'} ${sel ? 'sel' : ''} ${b ? 'banned' : ''} ${!isBan && !own ? 'notown' : ''}" data-k="${k}" data-id="${id}" ${b || (!isBan && !own) ? 'disabled' : ''}>${k === 'pilot' ? pilotFace(id) : mechFace(id)}${name}</button>`;
+    };
+    const pilots = isBan ? S.PILOTS.map((P) => P.id) : S.PILOTS.map((P) => P.id).filter((id) => profile.pilots[id]);
+    const mechs = isBan ? S.WEAPON_ORDER : S.WEAPON_ORDER.filter((id) => profile.mechs.includes(id));
+    const why = (b) => (E.BAN_WHY[b.why] || '').replace('{v}', b.vs ? S.WEAPONS[b.vs].short : '');
+    const sideName = { me: '你', ally: '队友', enemy: '对手' };
+    const banList = D.bans.map((b, i) => `<div class="ban-row" style="animation-delay:${i * 0.35}s">${b.k === 'pilot' ? pilotFace(b.id) : mechFace(b.id)}<div><b><span class="side side-${b.side}">${sideName[b.side]}</span>${b.k === 'pilot' ? S.pilot(b.id).name : S.WEAPONS[b.id].name}</b><small>${why(b)}</small></div></div>`).join('');
+    const okPick = !banned('pilot', D.pick.pilot) && profile.pilots[D.pick.pilot] && !banned('mech', D.pick.mech) && profile.mechs.includes(D.pick.mech);
+    $('draftBody').innerHTML = `<div class="draft-wrap"><div class="draft-grid"><h3>驾驶员</h3><div class="draft-cards">${pilots.map((id) => card('pilot', id)).join('')}</div>
+        <h3>机体</h3><div class="draft-cards">${mechs.map((id) => card('mech', id)).join('')}</div></div>
+      <div class="draft-side"><h4>${isBan ? '选一个要禁用的' : '本局禁用'}</h4>${banList || `<small>${isBan ? '点左边任意一个驾驶员或机体' : '没有禁用'}</small>`}
+        ${isBan ? `<button class="btn" id="draftBan" ${D.myBan ? '' : 'disabled'}>确认禁用</button>` : `<p style="margin:10px 0 0">出战：<b>${S.pilot(D.pick.pilot).name}</b> + <b>${S.WEAPONS[D.pick.mech].name}</b></p><button class="btn" id="draftGo" ${okPick ? '' : 'disabled'}>开始比赛 · ${S.MODES[E.rankedMode()].name}</button>`}</div></div>`;
+    for (const el of $('draftBody').querySelectorAll('.dcard')) el.onclick = () => {
+      const k = el.dataset.k, id = el.dataset.id;
+      if (isBan) D.myBan = { k, id }; else D.pick[k === 'pilot' ? 'pilot' : 'mech'] = id;
+      sfx.click(); renderDraft();
+    };
+    const bb = $('draftBan');
+    if (bb) bb.onclick = () => {
+      D.bans = E.draftBans({ myBan: D.myBan, pick: D.pick, o: profile });
+      // 被禁了就换成第一个还能用的
+      if (banned('pilot', D.pick.pilot)) D.pick.pilot = Object.keys(profile.pilots).find((id) => !banned('pilot', id));
+      if (banned('mech', D.pick.mech)) D.pick.mech = profile.mechs.find((id) => !banned('mech', id));
+      D.step = 'pick'; sfx.special(); renderDraft();
+    };
+    const go = $('draftGo');
+    if (go) go.onclick = () => launchRanked();
+  }
+  let rankBefore = null;
+  function launchRanked() {
+    const D = draft;
+    profile.pilot = D.pick.pilot; profile.weapon = D.pick.mech; saveProfile(); sendLoadout(); renderProfile();
+    closeOv(); ensureName();
+    rankBefore = { rp: profile.rank.rp, ti: E.rankTier(profile.rank.rp) };
+    quick = { mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, bots: true, ranked: true, fair: false,
+      bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(D.ti) };
+    $('playBtn').classList.add('busy');
+    const go = () => send({ t: 'create' });
+    if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
+    setTimeout(() => { $('playBtn').classList.remove('busy'); if (quick) { quick = null; toast('没有连上服务器，请稍后再试'); } }, 4000);
   }
   // ---------------- 驾驶员选择 ----------------
   let viewPilot = null, viewMech = null;   // 详情里正在看的（可以看没拥有的）
@@ -668,6 +763,7 @@
     $('newsBtn').onclick = () => showNews(true);
     $('newsOk').onclick = () => { $('newsDlg').classList.add('hidden'); sfx.click(); onboard2(); };
     $('mailAll').onclick = async () => { const r = await eco('claimMail', { id: '*' }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '信箱'); };
+    $('mailDelAll').onclick = async () => { const r = await eco('delMail', { id: '*' }); if (!r.ok) return toast(r.err); toast(`删除了 ${r.deleted} 封邮件`); renderMail(); };
     setInterval(() => { if (!$('ov-chests').classList.contains('hidden')) renderOffers(); }, 1000);
     $('specPrev').onclick = () => specCycle(-1); $('specNext').onclick = () => specCycle(1); $('specLeave').onclick = specLeave;
     $('tutReplay').onclick = () => { closeOv(); if (profile.tut) startTutorial(); else showTutorialPrompt(); };
@@ -1190,6 +1286,16 @@
         break;
       }
       case 'fz': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0 }); break;
+      case 'fg': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0, fog: 1 }); if (!silent && nearMe(e[1], e[2], 500)) sfx.boom(); break;
+      case 'bp': {   // 乐园模式：气球被打爆
+        const BC = ['#ff3ea5', '#1fd6ee', '#ffd23f', '#9cff2e', '#ff8a1f', '#b06bff'], c = BC[e[1] % BC.length];
+        R3.burst(e[3], e[4], e[5] + 10, c, 26, 220, 0.4);
+        R3.emit(e[3], e[4], e[5] + 10, G.colors[e[2]], 14, 160, 1, { sys: 'pg', size: 10, life: 0.6, grav: 120, drag: 2 });
+        G.texts.push({ x: e[3], y: e[4], z: e[5] + 20, text: `+${S.PARK.balloon}`, color: G.colors[e[2]], t: now });
+        if (!silent && nearMe(e[3], e[4], 500)) sfx.pick();
+        break;
+      }
+      case 'bs': { const p = G.players.get(e[1]); if (p && !silent) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 60, text: '背刺！', color: '#ff3b52', t: now }); break; }
       case 'bx':
         if (e[6] === 2) {   // 音波：穿墙的大圈
           for (let i = 0; i < 3; i++) ringFx(e[1], e[2], e[3], e[5] * (0.5 + i * 0.25), i === 1 ? '#ffffff' : G.colors[e[4]], 420, i * 90);
@@ -1296,6 +1402,10 @@
     R3.emit(x, y, z + 20, col, 30, 260, 1, { sys: 'pg', size: 12, life: 0.5, grav: 0, drag: 3 });
     switch (kind) {
       case 'storm': for (let i = 0; i < 3; i++) ringFx(x, y, z, 120 + i * 70, col, 520, i * 330); break;
+      case 'shadowstep': ringFx(x, y, z, 60, '#2a1f3a', 300); R3.emit(x, y, z + 14, '#2a1f3a', 26, 180, 1, { sys: 'pk', size: 20, life: 0.6, grav: -30, drag: 2.5 }); break;
+      case 'cloak': ringFx(x, y, z, 80, '#b06bff', 420); R3.emit(x, y, z + 18, '#c8b8ff', 24, 140, 1, { sys: 'pg', size: 10, life: 0.7, grav: -60, drag: 2 }); break;
+      case 'venom': ringFx(x, y, z, 70, '#7cff4a', 300); break;
+      case 'cluster': ringFx(x, y, z, 90, col, 360); break;
       case 'charge': ringFx(x, y, z, 120, '#ffb02e', 500); R3.emit(x, y, z + 10, '#ffb02e', 30, 200, 1, { sys: 'pg', size: 16, life: 0.6, grav: -100, drag: 2 }); break;
       case 'missiles': for (let i = 0; i < 12; i++) R3.emit(x, y, z + 30, '#ffffff', 1, 700, 0, { sys: 'pg', size: 10, life: 0.6, grav: 0, dir: { x: 0, y: 0, z: 1 }, spread: 0.3 }); break;
       case 'bubble': ringFx(x, y, z, 170, '#bef6ff', 600); R3.emit(x, y, z + 10, '#bef6ff', 24, 120, 1, { sys: 'pk', size: 18, life: 1.2, grav: -60, drag: 1.5 }); break;
@@ -1514,6 +1624,8 @@
       else if (sp === 'barrage') Object.assign(base, { kind: 'line', len: 440, w: 70 });
       else if (sp === 'quake') { const dd = clamp(d, 80, 280); Object.assign(base, { kind: 'line', len: dd, w: 10, tx: me.px + Math.cos(a) * dd, ty: me.py + Math.sin(a) * dd, tz: me.pz, tr: 95 }); }
       else if (sp === 'charge') Object.assign(base, { kind: 'line', len: 300, w: 44 });
+      else if (sp === 'shadowstep') Object.assign(base, { kind: 'line', len: clamp(d, 100, 260), w: 34 });
+      else if (sp === 'cluster' || sp === 'venom') { const dd = clamp(d, sp === 'venom' ? 80 : 120, sp === 'venom' ? 420 : 360); Object.assign(base, { kind: 'line', len: dd, w: 6, tx: me.px + Math.cos(a) * dd, ty: me.py + Math.sin(a) * dd, tz: me.pz, tr: sp === 'venom' ? 105 : 90 }); }
       else Object.assign(base, { kind: 'circle', len: sp === 'storm' ? 260 : sp === 'bubble' ? 170 : 60 });
       base.color = '#ffdf2e'; G.aimShow = base; return;
     }
@@ -1718,7 +1830,7 @@
   }
   function superRange(me) {
     const sp = S.WEAPONS[me.weapon].special;
-    return { beam: 900, barrage: 440, quake: 280, charge: 300, bulldoze: 430, napalm: 430 }[sp] || 300;
+    return { beam: 900, barrage: 440, quake: 280, charge: 300, bulldoze: 430, napalm: 430, cluster: 360, shadowstep: 260, venom: 420 }[sp] || 300;
   }
   function updateCamera(dt) {
     if (TOP()) return updateCameraTop(dt);
@@ -1784,9 +1896,10 @@
     } else if (!$('title').classList.contains('hidden')) {
       menuBg(now);
       if (PV_OK) R3.previewFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
-      if (R3.charFrame) R3.charFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
-      loop.last = now;
     }
+    // 3D 驾驶员展示台（驾驶员详情 / 结算 MVP）：画布不在页面上时会自己跳过
+    if (R3.charFrame) R3.charFrame(now, Math.min(0.05, (now - (loop.charLast || now)) / 1000));
+    loop.charLast = now; loop.last = now;
   }
 
   // ---------------- 主界面背景：机兵四处涂鸦 ----------------
@@ -1933,7 +2046,8 @@
         while (f.acc > 0.03) {
           f.acc -= 0.03;
           const a = Math.random() * 6.283, rr2 = Math.sqrt(Math.random()) * f.r;
-          R3.emit(f.x + Math.cos(a) * rr2, f.y + Math.sin(a) * rr2, f.z + 4, Math.random() < 0.5 ? '#ff7a2e' : G.colors[f.team], 1, 30, 1, { sys: 'pg', size: 16, life: 0.5, grav: -140, drag: 1.5, grow: -0.5 });
+          if (f.fog) R3.emit(f.x + Math.cos(a) * rr2, f.y + Math.sin(a) * rr2, f.z + 6, Math.random() < 0.6 ? '#7cff4a' : '#6a3cff', 1, 14, 1, { sys: 'pk', size: 26, life: 1.1, grav: -24, drag: 1.2, grow: 0.8 });
+          else R3.emit(f.x + Math.cos(a) * rr2, f.y + Math.sin(a) * rr2, f.z + 4, Math.random() < 0.5 ? '#ff7a2e' : G.colors[f.team], 1, 30, 1, { sys: 'pg', size: 16, life: 0.5, grav: -140, drag: 1.5, grow: -0.5 });
         }
       }
     }
@@ -2093,6 +2207,7 @@
     } else if (G.mode === 'soccer') marker(o[0], o[1], 70, '', '#fff', '●');
     else if (G.mode === 'zone') { const Z = S.ZONE, C = S.CELL; marker((Z.x0 + Z.x1) * C / 2, (Z.y0 + Z.y1) * C / 2, 40, o[0] ? '' : '据点', o[0] ? G.colors[o[0]] : '#fff', '▣'); }
     else if (G.mode === 'battery' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '充电站', G.colors[myTeam], '⚡'); }
+    else if (G.mode === 'park') marker(o[2], o[3], 80, o[4] ? (o[4] === myTeam ? '花车 · 我方' : '花车 · 敌方') : '花车', o[4] ? G.colors[o[4]] : '#fff', '★');
   }
   // ================= HUD =================
   // 喷漆色块（边缘不规则的圆）
@@ -2265,6 +2380,16 @@
           }
         }
         txt(`${s[myTeam]} : ${s[otherTeam]}`, cx, py, 18, '#fff', 'center', 4);
+      } else if (G.mode === 'park') {
+        const w = 150;
+        for (const [t, side] of [[myTeam, -1], [otherTeam, 1]]) {
+          const v = Math.min(1, o[t - 1] / S.PARK.target), x = side < 0 ? cx - 12 - w : cx + 12;
+          ctx.fillStyle = '#000a'; rr(ctx, x - 3, py - 11, w + 6, 22, 10); ctx.fill();
+          ctx.fillStyle = G.colors[t];
+          if (side < 0) ctx.fillRect(x + w * (1 - v), py - 7, w * v, 14); else ctx.fillRect(x, py - 7, w * v, 14);
+          txt(`${o[t - 1]}`, side < 0 ? x - 10 : x + w + 10, py, 16, G.colors[t], side < 0 ? 'right' : 'left', 3);
+        }
+        txt(o[4] ? (o[4] === myTeam ? '花车由我方控制' : '敌方控制花车！') : '花车无人控制', cx, py + 24, 13, o[4] ? G.colors[o[4]] : '#bbb', 'center', 3);
       } else if (G.mode === 'battery') {
         const w = 150;
         for (const [t, side] of [[myTeam, -1], [otherTeam, 1]]) {
@@ -2352,6 +2477,7 @@
     ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
     const ms = mw / S.W;
     if (o && G.mode === 'escort' && !o[5]) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    if (o && G.mode === 'park') { ctx.fillStyle = o[4] ? G.colors[o[4]] : '#fff'; ctx.beginPath(); ctx.arc(mx + o[2] * ms, my + o[3] * ms, Math.max(4, S.PARK.r * ms), 0, 7); ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1; const f = o[5] || []; ctx.fillStyle = '#ffd23f'; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
     if (o && G.mode === 'soccer') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && G.mode === 'battery') { ctx.fillStyle = '#b8ff3a'; const f = o[2]; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
     if (o && G.teams > 2) {
@@ -2529,8 +2655,9 @@
     if (mvp) {
       const P = S.pilot(mvp.pilot);
       mv.style.setProperty('--pc', cs[mvp.team]);
-      mv.innerHTML = `<div class="mvp-art">${GP.portrait(P)}</div><div><b>★ MVP</b><h3 style="color:${cs[mvp.team]}">${esc(mvp.name)}</h3><p>“${P.line}”</p><small style="color:var(--muted)">击倒 ${mvp.kills} · 涂地 ${mvp.paint}</small></div>`;
+      mv.innerHTML = `<div class="mvp-art mvp-3d" id="mvp3d">${GP.portrait(P)}</div><div><b>★ MVP</b><h3 style="color:${cs[mvp.team]}">${esc(mvp.name)}</h3><p>“${P.line}”</p><small style="color:var(--muted)">击倒 ${mvp.kills} · 涂地 ${mvp.paint}</small></div>`;
       mv.classList.remove('show'); void mv.offsetWidth; mv.classList.add('show');
+      if (R3.charPreview && R3.charPreview($('mvp3d'), mvp.pilot, cs[mvp.team])) { $('mvp3d').classList.add('live'); setTimeout(() => R3.charAction && R3.charAction('victory'), 400); }
     } else mv.classList.remove('show');
     // 经验 / 奖杯：在线账号由服务器结算（防止改本地数据刷分），其余在本机结算
     pendingReward = null;
@@ -2557,6 +2684,14 @@
     if (after > lvBefore) msg += `　🎉 升级到 Lv.${after}！`;
     const un = S.HEADS.filter((h) => h.tr > trBefore && h.tr <= profile.trophies).map((h) => h.name);
     if (un.length) msg += `　解锁头部涂装：${un.join('、')}`;
+    for (const it of items || []) if (it.k !== 'passxp' && !E.CUR[it.k]) msg += `　🎁 ${rewardLabel(it)}${it.why ? `（${it.why}）` : ''}`;
+    if (profile.streak >= 2 && rw.won) msg += `　🔥 ${profile.streak} 连胜`;
+    // 排位赛：段位分变化
+    if (rw.ranked && rankBefore) {
+      const rp = profile.rank.rp, d = rp - rankBefore.rp, ti = E.rankTier(rp), T = E.RANK.tiers[ti];
+      msg = `排位分 ${d >= 0 ? '+' : ''}${d}（${T.name} ${rp}）${ti > rankBefore.ti ? `　⬆ 晋级「${T.name}」！` : ti < rankBefore.ti ? `　⬇ 降到「${T.name}」` : ''}　` + msg;
+      rankBefore = null;
+    }
     $('resXp').textContent = msg;
     renderProfile(); renderHeads(); sendLoadout();
   }
@@ -2735,6 +2870,7 @@
   function avatarSvg(a) {
     const st = 'stroke="#141018" stroke-width="3" stroke-linejoin="round"';
     if (a === 'flag') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#5b5e68" ${st}/><path d="M15,38 L15,10" ${st} stroke-width="4"/><path d="M15,11 C24,6 28,16 37,11 L37,26 C28,31 24,21 15,26 Z" fill="#ff5a36" ${st}/><path d="M24,16 l2,4 l4,0 l-3,3 l1,4 l-4,-2 l-4,2 l1,-4 l-3,-3 l4,0 Z" fill="#ffe14d"/></svg>`;
+    if (a === 'balloon') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#8fd0ff" ${st}/><path d="M22,30 L20,42 M28,28 L29,42" fill="none" ${st} stroke-width="2"/><ellipse cx="18" cy="18" rx="7" ry="9" fill="#ff3ea5" ${st}/><ellipse cx="30" cy="16" rx="7" ry="9" fill="#ffd23f" ${st}/><ellipse cx="25" cy="24" rx="6" ry="7" fill="#9cff2e" ${st}/></svg>`;
     if (a === 'can') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#ffe600" ${st}/><rect x="17" y="16" width="14" height="24" rx="3" fill="#ff3ea5" ${st}/><rect x="20" y="9" width="8" height="7" fill="#c9d3dc" ${st}/><circle cx="34" cy="10" r="2" fill="#1fd6ee"/><circle cx="38" cy="14" r="1.6" fill="#1fd6ee"/></svg>`;
     return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#9aa0a8" ${st}/><path d="M12,18 L14,8 L20,15 Q24,13 28,15 L34,8 L36,18 Q38,30 24,36 Q10,30 12,18 Z" fill="#5b5e68" ${st}/><circle cx="19" cy="22" r="2.4" fill="#ffe600"/><circle cx="29" cy="22" r="2.4" fill="#ffe600"/><path d="M22,27 l2,2 l2,-2" fill="none" ${st} stroke-width="2"/></svg>`;
   }
@@ -2767,7 +2903,7 @@
       const who = K.kind === 'pilot' ? `${S.pilot(K.pilot).name}的服装${E.hasPilot(profile, K.pilot) ? '' : '（还没有这位驾驶员）'}` : { mech: '所有机体通用', fx: '子弹和命中特效', frame: '大厅名片边框', avatar: '大厅名片头像' }[K.kind];
       const btn = own ? `<button class="btn small ${on ? 'ghost' : ''}" data-act="wear">${on ? '卸下' : '装上'}</button>`
         : K.price ? `<button class="btn small" data-act="buy" ${profile.gems < price ? 'disabled' : ''}>${ic('gems')}${price}${price < K.price ? `<s>${K.price}</s>` : ''}</button>`
-        : `<span class="pass-only">通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级</span>`;
+        : `<span class="pass-only">${K.pass ? `通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级` : K.event ? '乐园祭活动商店' : K.rank ? '排位赛大师段位奖励' : '活动奖励'}</span>`;
       el.innerHTML = `${K.id === deal.id && !own ? '<span class="deal">今日 7 折</span>' : ''}<span class="rare-tag">${S.RARE[K.rare].name}</span>
         <div class="sk-art ${K.kind}">${skinArt(K)}</div><b>${K.name}</b><small>${who}</small>${btn}`;
       const b = el.querySelector('[data-act]');
@@ -2788,6 +2924,7 @@
     for (const ev of E.activeEvents()) { const st = profile.ev[ev.id]; if (st) ev.quests.forEach((q, i) => { if (st.p[i] >= q[1] && !st.c[i]) can++; }); }
     const done = E.STORY.steps.filter((st, i) => profile.story.p[i] >= st[1]).length;
     for (const [n] of E.STORY.rewards) if (done >= n && !profile.story.c.includes(n)) can++;
+    for (const id of E.TASKLINE_ORDER) { const L = E.TASKLINES[id], st = (profile.tl || {})[id]; if (st) L.steps.forEach((q, i) => { if (st.p[i] >= q[1] && !st.c[i]) can++; }); }
     return can;
   }
   function renderEvents() {
@@ -2803,18 +2940,40 @@
       <div class="ev-quests">${E.STORY.steps.map((q, i) => { const v = profile.story.p[i]; return `<div class="qrow ${v >= q[1] ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small></div>`; }).join('')}</div>
       <div class="ev-rewards">${E.STORY.rewards.map(([n, it]) => { const got = profile.story.c.includes(n), can = done >= n && !got; const nm = it.k === 'pilot' ? `驾驶员「${S.pilot(it.id).name}」` : `机体「${S.WEAPONS[it.id].name}」`;
         return `<button class="btn small ${got ? 'ghost' : ''}" data-story="${n}" ${can ? '' : 'disabled'}>完成 ${n} 个：${nm}${got ? ' ✓' : ''}</button>`; }).join('')}</div></div></div>`;
+    // 任务线：新兵之路 / 袭击！特攻队（每完成一个任务领一次奖励）
+    for (const id of E.TASKLINE_ORDER) {
+      const L = E.TASKLINES[id], st = (profile.tl || {})[id] || { p: L.steps.map(() => 0), c: L.steps.map(() => false) };
+      if (id === 'rookie' && st.c.every(Boolean)) continue;   // 新兵之路全部领完就不再显示
+      const art = id === 'strike' ? `<div class="ev-art chest">${GI.chestArt('strike')}</div>` : `<div class="ev-art chest">${GI.chestArt('starter')}</div>`;
+      html += `<div class="ev-card story" style="--ec:${L.color}">${art}<div class="ev-main">
+        <div class="ev-tag">任务线 · 永久</div><h3>${L.name}</h3><p>${L.desc}</p>
+        <div class="ev-quests">${L.steps.map((q, i) => { const v = st.p[i], ok = v >= q[1]; return `<div class="qrow ${ok ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small>
+          <button class="btn small ${st.c[i] ? 'ghost' : ''}" data-task="${id}" data-i="${i}" ${ok && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button></div>`; }).join('')}</div></div></div>`;
+    }
     for (const ev of E.EVENTS) {
       const on = now >= ev.start && now < ev.end, soon = now < ev.start, st = profile.ev[ev.id] || { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) };
+      if (!on && !soon && now > ev.end + 3 * 86400e3) continue;   // 结束 3 天以上的活动不再显示
       html += `<div class="ev-card ${on ? '' : 'off'}" style="--ec:${ev.color}"><div class="ev-main">
         <div class="ev-tag">${on ? `限时活动 · 还剩 ${fmtLeft(ev.end - now)}` : soon ? `即将开始 · ${fmtLeft(ev.start - now)} 后` : '已结束'}</div><h3>${ev.name}</h3><p>${ev.desc}</p>
         <div class="ev-quests">${ev.quests.map((q, i) => { const v = st.p[i], ok = v >= q[1]; return `<div class="qrow ${ok ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small>
-          <button class="btn small ${st.c[i] ? 'ghost' : ''}" data-ev="${ev.id}" data-i="${i}" ${on && ok && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button></div>`; }).join('')}</div></div></div>`;
+          <button class="btn small ${st.c[i] ? 'ghost' : ''}" data-ev="${ev.id}" data-i="${i}" ${on && ok && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button></div>`; }).join('')}</div>
+        ${ev.shop && on ? `<div class="ev-shop"><div class="ev-shop-h"><b>活动商店</b><span class="tk">${ic('tickets')}${profile.tickets || 0} 乐园票</span>${ev.id === 'parkfest' ? '<button class="btn small" data-park>去玩乐园模式</button>' : ''}</div><div class="ev-shop-grid">${ev.shop.map((it, i) => { const used = (st.s || [])[i] || 0, left = it.limit - used, own = it.it.k === 'skin' && profile.skins.includes(it.it.id);
+          return `<div class="shop-it ${left <= 0 || own ? 'sold' : ''}"><div class="si-art">${rewardArt(it.it)}</div><b>${rewardLabel(it.it)}</b><small>${own ? '已拥有' : `剩 ${left} / ${it.limit}`}</small><button class="btn small" data-shop="${ev.id}" data-i="${i}" ${left > 0 && !own && (profile.tickets || 0) >= it.cost ? '' : 'disabled'}>${ic('tickets')}${it.cost}</button></div>`; }).join('')}</div></div>` : ''}</div></div>`;
     }
     box.innerHTML = html;
     for (const b2 of box.querySelectorAll('[data-story]')) b2.onclick = async () => {
       const r = await eco('claimStory', { n: +b2.dataset.story }); if (!r.ok) return toast(r.err);
       sfx.win(); const it = r.items[0]; toast(it.k === 'pilot' ? `「${S.pilot(it.id).name}」加入了反抗军！` : `获得机体「${S.WEAPONS[it.id].name}」！`, 3200);
     };
+    for (const b2 of box.querySelectorAll('[data-task]')) b2.onclick = async () => {
+      const r = await eco('claimTask', { id: b2.dataset.task, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
+      sfx.win(); showGain(r.items, E.TASKLINES[b2.dataset.task].name);
+    };
+    for (const b2 of box.querySelectorAll('[data-shop]')) b2.onclick = async () => {
+      const r = await eco('eventShop', { id: b2.dataset.shop, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
+      sfx.win(); showGain(r.items, '活动商店');
+    };
+    for (const b2 of box.querySelectorAll('[data-park]')) b2.onclick = () => { profile.mode = 'park'; profile.map = -1; saveProfile(); sendLoadout(); closeOv(); renderProfile(); toast('已切换到乐园模式'); };
     for (const b2 of box.querySelectorAll('[data-ev]')) b2.onclick = async () => {
       const r = await eco('claimEvent', { id: b2.dataset.ev, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
       sfx.win(); showGain(r.items, '活动奖励');
@@ -2827,11 +2986,23 @@
     const list = $('mailList');
     if (!list) return;
     $('mailAll').disabled = !unread;
-    list.innerHTML = box.length ? box.slice().reverse().map((m) => `<div class="mail ${m.got ? 'got' : ''}"><div class="mail-ico">${ic('mail')}</div><div class="mail-main">
-      <div class="mail-from">${esc(m.from)} · ${new Date(m.t).toLocaleDateString('zh-CN')}</div><b>${esc(m.title)}</b><p>${esc(m.body)}</p>
+    $('mailDelAll').disabled = !box.some((m) => m.got);
+    const now = Date.now();
+    list.innerHTML = box.length ? box.slice().reverse().map((m) => `<div class="mail ${m.got ? 'got' : ''}" data-mid="${m.id}"><div class="mail-ico">${ic('mail')}</div><div class="mail-main">
+      <div class="mail-from">${esc(m.from)} · ${new Date(m.t).toLocaleDateString('zh-CN')}${m.got ? '' : ` · <span class="mail-exp">${fmtLeft(m.expires - now)} 后过期</span>`}</div><b>${esc(m.title)}</b><p>${esc(m.body)}</p>
       <div class="mail-items">${m.items.map((it) => `<span>${rewardArt(it)}<em>${rewardLabel(it)}</em></span>`).join('')}</div></div>
-      <button class="btn small ${m.got ? 'ghost' : ''}" data-mail="${m.id}" ${m.got ? 'disabled' : ''}>${m.got ? '已领取' : '领取'}</button></div>`).join('') : '<p class="empty-note">信箱是空的</p>';
+      ${m.got ? `<button class="btn small ghost" data-del="${m.id}" title="删除">删除</button>` : `<button class="btn small" data-mail="${m.id}">领取</button>`}</div>`).join('') : '<p class="empty-note">信箱是空的</p>';
     for (const b2 of list.querySelectorAll('[data-mail]')) b2.onclick = async () => { const r = await eco('claimMail', { id: b2.dataset.mail }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '信箱'); };
+    const del = async (id, el) => { if (el) { el.classList.add('swiped'); await new Promise((res) => setTimeout(res, 220)); } const r = await eco('delMail', { id }); if (!r.ok) { if (el) el.classList.remove('swiped'); return toast(r.err); } renderMail(); };
+    for (const b2 of list.querySelectorAll('[data-del]')) b2.onclick = () => del(b2.dataset.del, b2.closest('.mail'));
+    // 往右（或往下）滑：删除领过的邮件
+    for (const el of list.querySelectorAll('.mail.got')) {
+      let sx = null, sy = 0, dx = 0;
+      el.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; sx = e.clientX; sy = e.clientY; dx = 0; el.style.transition = 'none'; });
+      el.addEventListener('pointermove', (e) => { if (sx == null) return; dx = Math.max(e.clientX - sx, (e.clientY - sy) * 0.9, 0); el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(Math.max(0.2, 1 - dx / 260)); });
+      const up = () => { if (sx == null) return; sx = null; el.style.transition = ''; if (dx > 110) del(el.dataset.mid, el); else { el.style.transform = ''; el.style.opacity = ''; } };
+      el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('pointerleave', up);
+    }
   }
   // ---------------- 更新公告：每个新版本第一次进大厅弹一次，右上角随时可看 ----------------
   function showNews(force) {
