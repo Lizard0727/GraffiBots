@@ -469,7 +469,7 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   const room = new Room('RK', null, { manual: true });
   room.settings = { mode: 'zone', map: 0, duration: 120, teamSize: 4, bots: true, ranked: true, bans: { pilots: ['blaze', 'kaka'], mechs: ['blade', 'blaster'] }, botPower: { lv: 8, bt: 1 } };
   const g = new Game(room, { manual: true });
-  ok([...g.players.values()].every((p) => !['blaze', 'kaka'].includes(p.pilot) && !['blade', 'blaster'].includes(p.weapon)) && [...g.players.values()].every((p) => p.lv === 8), '排位赛：AI 不会用被禁用的驾驶员 / 机体，等级跟着段位');
+  ok([...g.players.values()].every((p) => !['blaze', 'kaka'].includes(p.pilot) && !['blade', 'blaster'].includes(p.weapon)) && [...g.players.values()].every((p) => Math.abs(p.lv - 8) <= 2), '排位赛：AI 不会用被禁用的驾驶员 / 机体，等级跟着段位（按性格 ±2）');
 }
 {
   // 乐园模式：花车得分 + 打气球
@@ -498,6 +498,80 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   d4.g.kill(d4.B, d4.A);
   ok(d4.g.helpers.some((h) => h.kind === 'bento' && h.gift), '卡卡：击倒敌人掉落惊喜礼盒');
   void g;
+}
+
+// ---------------- 1.4.1：AI 性格 + 打字聊天 ----------------
+{
+  const GB = require('../public/bots.js');
+  // 段位越高，强手越多
+  const avgPow = (tier) => { let s = 0; for (let i = 0; i < 4000; i++) s += GB.persona(GB.roll(tier)).pow; return s / 4000; };
+  const pw = [null, 0, 2, 4, 6].map(avgPow);
+  ok(pw[1] < pw[2] && pw[2] < pw[3] && pw[3] < pw[4] && pw[0] > pw[1], `AI 实力：普通赛 ${pw[0].toFixed(2)}，青铜 ${pw[1].toFixed(2)} → 黄金 ${pw[2].toFixed(2)} → 钻石 ${pw[3].toFixed(2)} → 传奇 ${pw[4].toFixed(2)}`);
+  const seen = new Set(); for (let i = 0; i < 3000; i++) seen.add(GB.roll(null));
+  ok(GB.ORDER.every((id) => seen.has(id)), '普通赛 7 种性格都会出现：' + GB.ORDER.map((id) => GB.persona(id).name).join('、'));
+  const leg = new Set(); for (let i = 0; i < 3000; i++) leg.add(GB.roll(6));
+  ok(!leg.has('noob') && leg.has('god') && leg.has('pig'), '传奇段位：没有菜鸟，大神常见，偶尔还是有猪玩家');
+  // 两队实力差不多
+  let gapMax = 0;
+  for (let i = 0; i < 300; i++) {
+    const slots = [{ team: 1 }, { team: 1 }, { team: 1 }, { team: 2 }, { team: 2 }, { team: 2 }, { team: 2 }];
+    const ids = GB.assign(slots, 3, { 1: 1 }), pow = { 1: 1.2, 2: 0 };
+    slots.forEach((sl, k) => { pow[sl.team] += GB.persona(ids[k]).pow; });
+    gapMax = Math.max(gapMax, Math.abs(pow[1] - pow[2]));
+  }
+  ok(gapMax < 4.5, `分配性格时两队实力差距不会太大（最大差 ${gapMax.toFixed(1)}）`);
+  // 对局：名字像玩家、不是驾驶员名字；有性格；排位按段位
+  const room = new Room('P1', null, { manual: true });
+  room.settings = { mode: 'turf', map: 0, duration: 90, teamSize: 4, bots: true, ranked: true, rankTier: 6, botPower: { lv: 10, bt: 2 }, lang: 'en' };
+  const g = new Game(room, { manual: true });
+  const bots = [...g.players.values()].filter((p) => p.bot);
+  ok(bots.every((p) => p.persona && !S.PILOTS.some((P) => P.name === p.name)) && new Set(bots.map((p) => p.name)).size === bots.length, 'AI 用玩家风格的名字：' + bots.map((p) => p.name).join('、'));
+  ok(bots.some((p) => p.looks && Object.keys(p.looks).length), 'AI 也会穿皮肤 / 戴名片框');
+  while (!g.over) g.step();
+  const log = g.chatLog || [];
+  ok(log.length >= 3 && log.every((m) => typeof m.text === 'string' && m.text.length <= 60), `AI 会打字：一局 ${log.length} 句，例如「${log.slice(0, 3).map((m) => m.text || m.en).join('」「')}」`);
+  ok(log.every((m) => m.text === '' ? m.en && m.en.startsWith('*') : true), '英文打错字后补的「*改正」只给英文玩家看');
+  // 挂机 AI 真的会站着不动一阵
+  const r2 = new Room('P2', null, { manual: true });
+  r2.settings = { mode: 'turf', map: 0, duration: 60, teamSize: 2, bots: true, chat: false };
+  const g2 = new Game(r2, { manual: true }); g2.countdown = 0;
+  const afk = [...g2.players.values()][0]; afk.persona = 'afk'; afk.pst = { afk: { mode: 'load', until: 10, spin: 0 }, afkOn: true };
+  const x0 = afk.x; for (let i = 0; i < S.TICK * 5; i++) g2.step();
+  ok(Math.hypot(afk.x - x0) < 5 && afk.pst.afkOn, '挂机 AI：开局站着不动');
+  for (let i = 0; i < S.TICK * 9; i++) g2.step();
+  ok(!afk.pst.afkOn, '挂机 AI：过一会儿回来继续打');
+}
+{
+  // 真人打字：全部 / 队伍频道、限速、AI 被说是人机会回嘴
+  const { Hub } = require('../server.js');
+  const hub = new Hub(); const boxA = [], boxB = [];
+  const A = hub.connect({ send: (m) => boxA.push(m), sendRaw: (str) => boxA.push(JSON.parse(str)) });
+  const B2 = hub.connect({ send: (m) => boxB.push(m), sendRaw: (str) => boxB.push(JSON.parse(str)) });
+  hub.message(A, { t: 'hello', name: 'Alice', pilot: 'blaze', weapon: 'blaster' });
+  hub.message(B2, { t: 'hello', name: 'Bob', pilot: 'frost', weapon: 'blaster' });
+  hub.message(A, { t: 'create' }); hub.message(B2, { t: 'join', code: A.room.code });
+  hub.message(A, { t: 'settings', teamSize: 4, bots: true, mode: 'turf' });
+  hub.message(A, { t: 'start' });
+  const g = A.room.game; g.stop(); g.countdown = 0;
+  const chats = (box) => box.filter((m) => m.t === 'chat');
+  hub.message(A, { t: 'chat', text: '  大家好<script>  ', ch: 0 });
+  ok(chats(boxB).some((m) => m.text === '大家好script' && m.name === 'Alice'), '全部频道：别人看得到（去掉了 < >）');
+  const teamOfB = g.players.get(B2.id).team, teamOfA = g.players.get(A.id).team;
+  boxB.length = 0;
+  hub.message(A, { t: 'chat', text: '我去左边', ch: 1 });
+  ok(chats(boxB).some((m) => m.text === '我去左边') === (teamOfA === teamOfB), '队伍频道：只有队友看得到');
+  A.lastText = 0;
+  for (let i = 0; i < 8; i++) { A.lastText = 0; hub.message(A, { t: 'chat', text: 'spam' + i }); }
+  ok(boxA.some((m) => m.t === 'chatSlow') && chats(boxA).filter((m) => /^spam/.test(m.text)).length <= 5, '刷屏限速：10 秒最多 5 句');
+  // 说 AI 是人机：AI 回嘴（多试几次，有概率）
+  let replied = 0;
+  for (let k = 0; k < 12 && !replied; k++) {
+    A.chatTimes = []; A.lastText = 0; boxA.length = 0;
+    hub.message(A, { t: 'chat', text: '你们是人机吧', ch: 0 });
+    for (let i = 0; i < S.TICK * 6; i++) g.step();
+    replied = chats(boxA).filter((m) => g.players.get(m.id) && g.players.get(m.id).bot).length;
+  }
+  ok(replied > 0, '被说是人机：AI 会回一句（' + (g.chatLog || []).filter((m) => g.players.get(m.id) && g.players.get(m.id).bot).slice(-2).map((m) => m.text).join(' / ') + '）');
 }
 
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');

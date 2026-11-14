@@ -316,6 +316,17 @@
   <div id="cutin" class="cutin hidden"></div>
   <div id="cutinSide" class="cutin-side"></div>
 
+  <!-- ============ 1.4.1：打字聊天 ============ -->
+  <div id="chatLog" class="chat-log hidden" data-noi18n aria-live="polite"></div>
+  <form id="chatBox" class="chat-box hidden" autocomplete="off">
+    <div class="chat-row">
+      <button type="button" id="chatCh" class="chat-ch" title="Tab">全部</button>
+      <input id="chatInput" maxlength="60" placeholder="说点什么…（Enter 发送，Esc 取消）" enterkeyhint="send" autocomplete="off" spellcheck="false">
+      <button type="submit" class="chat-send">发送</button>
+      <button type="button" id="chatX" class="chat-x" aria-label="关闭">✕</button>
+    </div>
+    <div class="chat-quick" id="chatQuick"></div>
+  </form>
   <!-- ============ 触屏操作层 ============ -->
   <div id="touchUI" class="hidden">
     <div id="tStick" class="t-stick"><i></i></div>
@@ -386,6 +397,7 @@
   <script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"><\/script>')</script>
   <script src="shared.js"></script>
   <script src="economy.js"></script>
+  <script src="bots.js"></script>
   <script src="icons.js"></script>
   <script src="wall.js"></script>
   <script src="portraits.js"></script>

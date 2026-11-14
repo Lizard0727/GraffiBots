@@ -217,6 +217,7 @@
       <label class="set-row toggle"><span>全部静音（快捷键 M）</span><input type="checkbox" data-set="muted" ${c.muted ? 'checked' : ''}></label>
       <div class="set-row"><span>鼠标灵敏度</span><input type="range" min="20" max="300" data-set="sens" value="${Math.round(sens * 100)}"><output>${Math.round(sens * 100)}</output></div>
       <label class="set-row toggle"><span>屏幕震动</span><input type="checkbox" data-set="shake" ${shakeOn ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）</span><input type="checkbox" data-set="chat" ${store.get('chat', true) ? 'checked' : ''}></label>
       <label class="set-row"><span>语言 / Language</span><select data-set="lang"><option value="zh" ${window.GBI18N && GBI18N.lang === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${window.GBI18N && GBI18N.lang === 'en' ? 'selected' : ''}>English</option></select></label>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
       <div><div class="set-note" style="margin-bottom:6px">原创曲目试听：</div><div class="jukebox">${Object.entries(AU.TRACK_NAMES).map(([k, n]) => `<button data-track="${k}" class="${cur === k ? 'sel' : ''}">♪ ${n}</button>`).join('')}</div></div>
@@ -235,6 +236,7 @@
         cb.onchange = () => {
           if (cb.dataset.set === 'muted') AU.setMuted(cb.checked);
           else if (cb.dataset.set === 'hq') { hqOn = cb.checked; store.set('hq', hqOn); R3.setQuality(hqOn); }
+          else if (cb.dataset.set === 'chat') { store.set('chat', cb.checked); if (!cb.checked) $('chatLog').classList.add('hidden'); }
           else { shakeOn = cb.checked; store.set('shake', shakeOn); }
           renderSettings();
         };
@@ -421,7 +423,7 @@
     closeOv(); ensureName();
     rankBefore = { rp: profile.rank.rp, ti: E.rankTier(profile.rank.rp) };
     quick = { mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, bots: true, ranked: true, fair: false,
-      bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(D.ti) };
+      bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(D.ti), rankTier: D.ti, lang: window.GBI18N ? GBI18N.lang : 'zh' };
     $('playBtn').classList.add('busy');
     const go = () => send({ t: 'create' });
     if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
@@ -573,7 +575,7 @@
     if (UPDATE_LOCK && mustUpdate()) { checkUpdate(); return; }
     if (needPilot()) return;
     ensureName();
-    quick = { mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, bots: true };
+    quick = { mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, bots: true, lang: window.GBI18N ? GBI18N.lang : 'zh' };
     $('playBtn').classList.add('busy');
     const go = () => send({ t: 'create' });
     if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
@@ -792,6 +794,7 @@
     $('startBtn').onclick = () => send({ t: 'start' });
     $('resBack').onclick = () => {
       $('results').classList.add('hidden'); R3.clear();
+      $('chatLog').classList.add('hidden'); chatClose();
       if (quickRoom) { quickRoom = false; send({ t: 'leave' }); showScreen('title'); renderProfile(); }
       else if (room) { showScreen('room'); renderRoom(); } else showScreen('title');
     };
@@ -877,6 +880,7 @@
   function resetToTitle() {
     room = null; G = null; R3.clear();
     $('results').classList.add('hidden');
+    $('chatLog').classList.add('hidden'); chatClose();
     showScreen('title');
     menuMusic();
   }
@@ -1021,6 +1025,8 @@
         break;
       case 'end': if (TUT) break; if (m.early) { $('specBar').classList.add('hidden'); quickRoom = true; } showResults(m.result); break;
       case 'qc': if (G) G.chats.set(m.id, { k: m.k, t: performance.now() }); break;
+      case 'chat': chatAdd(m); break;
+      case 'chatSlow': toast('发得太快了，歇一下再说'); break;
       case 'pong': ping = Math.round(performance.now() - m.ts); break;
     }
   }
@@ -1075,6 +1081,7 @@
     if (!R3.build(G)) toast('你的浏览器不支持 WebGL，无法显示 3D 画面。请换用新版 Chrome / Edge / Firefox。', 8000);
     keys.clear(); mouse.down = false;
     $('results').classList.add('hidden');
+    chatReset();
     closeSettings();
     showScreen('game');
     AU.music('battle');
@@ -1455,6 +1462,61 @@
     G.bombs.set(e[1], { x: e[2], y: e[3], z: e[4], vx: e[5], vy: e[6], vz: e[7], team: e[8], landed: false, life: 0 });
   }
 
+  // ================= 1.4.1：打字聊天（Enter 打开，Tab 切换 全部 / 队伍，Esc 取消；手机点 💬） =================
+  const CHAT = { open: false, ch: 0 };
+  const chatOn = () => store.get('chat', true);
+  function chatAdd(m) {
+    if (!G && $('results').classList.contains('hidden')) return;
+    if (!chatOn() && m.id !== myId) return;
+    const text = window.GBI18N && GBI18N.lang === 'en' && m.en != null ? m.en : m.text;
+    if (!text) return;
+    const box = $('chatLog'), p = G && G.players.get(m.id);
+    const color = (G && G.colors[p ? p.team : m.team]) || '#fff';
+    const el = document.createElement('div');
+    el.className = 'cm' + (m.ch ? ' team' : '') + (m.id === myId ? ' me' : '');
+    el.innerHTML = `${m.ch ? `<i>[${esc(L('队伍'))}]</i> ` : ''}<b style="color:${color}"></b>：<span></span>`;
+    el.querySelector('b').textContent = m.name;
+    el.querySelector('span').textContent = text;
+    box.appendChild(el);
+    while (box.children.length > 8) box.firstChild.remove();
+    box.classList.remove('hidden');
+    setTimeout(() => el.classList.add('old'), 10000);
+    if (G) G.chats.set(m.id, { text: text.length > 18 ? text.slice(0, 17) + '…' : text, t: performance.now() + 1500 });
+    if (m.id !== myId) sfx.hover();
+  }
+  function chatReset() { $('chatLog').innerHTML = ''; $('chatLog').classList.toggle('hidden', !chatOn()); chatClose(); }
+  function chatOpen() {
+    if (!G || CHAT.open) return;
+    CHAT.open = true; keys.clear(); mouse.down = false;
+    $('chatBox').classList.remove('hidden'); $('chatLog').classList.add('open'); $('chatLog').classList.remove('hidden');
+    if (locked()) document.exitPointerLock();
+    chatCh();
+    setTimeout(() => $('chatInput').focus(), 0);
+  }
+  function chatClose(relock) {
+    if (!CHAT.open) return;
+    CHAT.open = false;
+    $('chatBox').classList.add('hidden'); $('chatLog').classList.remove('open'); $('chatInput').blur();
+    if (relock && G && !G.over && !TOP() && !TOUCH) lockPointer();
+  }
+  function chatCh() { $('chatCh').textContent = CHAT.ch ? '队伍' : '全部'; $('chatCh').classList.toggle('team', !!CHAT.ch); }
+  $('chatBox').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const t = $('chatInput').value.trim();
+    if (t) send({ t: 'chat', text: t.slice(0, S.CHAT_MAX), ch: CHAT.ch });
+    $('chatInput').value = '';
+    chatClose(true);
+  });
+  $('chatInput').addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); $('chatInput').value = ''; chatClose(true); }
+    else if (e.key === 'Tab') { e.preventDefault(); CHAT.ch ^= 1; chatCh(); }
+  });
+  $('chatCh').onclick = () => { CHAT.ch ^= 1; chatCh(); $('chatInput').focus(); };
+  $('chatX').onclick = () => { $('chatInput').value = ''; chatClose(true); };
+  $('chatQuick').innerHTML = S.QUICK_CHAT.map((q, i) => `<button type="button" data-qc="${i}">${q}</button>`).join('');
+  $('chatQuick').onclick = (e) => { const b = e.target.closest('[data-qc]'); if (b) { send({ t: 'chat', k: +b.dataset.qc }); chatClose(true); } };
+
   // ================= 输入 =================
   addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -1462,6 +1524,7 @@
     const k = e.code;
     if (k === 'Tab' || k === 'Space' || k.startsWith('Arrow')) e.preventDefault();
     if (e.repeat) return;
+    if ((k === 'Enter' || k === 'NumpadEnter') && !TUT) { e.preventDefault(); chatOpen(); return; }   // 打字聊天
     keys.add(k);
     if (k === 'KeyE') { G.qq++; G.edge = true; }   // 大招
     if (k === 'KeyR') { G.oq = (G.oq || 0) + 1; G.edge = true; }   // 超载技能
@@ -1491,7 +1554,7 @@
     if (locked()) { wasLocked = true; return; }
     if (!wasLocked) return;
     wasLocked = false; mouse.down = false; lastUnlock = performance.now();
-    if (G && !G.over && $('settingsDlg').classList.contains('hidden') && $('results').classList.contains('hidden')) openSettings();
+    if (G && !G.over && !CHAT.open && $('settingsDlg').classList.contains('hidden') && $('results').classList.contains('hidden')) openSettings();
   });
 
   // ================= 触屏操作 =================
@@ -1535,7 +1598,7 @@
         else if (k === 'ov') { G.oq = (G.oq || 0) + 1; G.edge = true; }
         else if (k === 'menu') openSettings();
         else if (k === 'board') TT.board = !TT.board;
-        else if (k === 'chat') send({ t: 'chat', k: (TT.chatK = ((TT.chatK || 0) + 1) % 4) });
+        else if (k === 'chat') { if (TUT) send({ t: 'chat', k: (TT.chatK = ((TT.chatK || 0) + 1) % 4) }); else chatOpen(); }
       } else if (e.clientX < innerWidth * 0.45) {
         rec.kind = 'stick';
         stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px';
@@ -2145,7 +2208,7 @@
       const col = G.colors[p.team];
       const hpMax = (self ? me.maxHp : p.maxHp) || 100, hp = Math.max(0, self ? me.hp : p.hp);
       const w = self ? 58 : 46, h = self ? 8 : 6, x0 = s.x - w / 2, y0 = s.y;
-      txt(self ? (foot ? '驾驶员' : '你') : p.name, s.x, y0 - 10, self ? 13 : 12, self ? '#fff' : col, 'center', 3);
+      if (self) txt(foot ? '驾驶员' : '你', s.x, y0 - 10, 13, '#fff', 'center', 3); else txt(p.name, s.x, y0 - 10, 12, col, 'center', 3, true);
       ctx.fillStyle = '#000c'; rr(ctx, x0 - 2, y0 - 2, w + 4, h + 4, 4); ctx.fill();
       ctx.fillStyle = self ? (hp / hpMax > 0.35 ? '#6dff8a' : '#ff5a6a') : enemy ? (hp / hpMax > 0.35 ? '#ff5a6a' : '#ff9a3a') : '#4fc3ff';
       rr(ctx, x0, y0, w * Math.min(1, hp / hpMax), h, 3); ctx.fill();
@@ -2174,6 +2237,7 @@
       if (ch && !self) {
         const age = now - ch.t;
         if (age > 2500) G.chats.delete(id);
+        else if (ch.text != null) txt(ch.text, s.x, y0 - 28, 14, '#fff', 'center', 4, true);
         else txt(S.QUICK_CHAT[ch.k], s.x, y0 - 28, 15, '#fff', 'center', 4);
       }
     }
@@ -2190,7 +2254,7 @@
       ctx.globalAlpha = 1;
     }
     const mc = G.chats.get(myId);
-    if (mc) { if (now - mc.t > 2500) G.chats.delete(myId); else txt(`你：${S.QUICK_CHAT[mc.k]}`, VW / 2, VH * 0.62, 16, '#fff', 'center', 4); }
+    if (mc) { if (now - mc.t > 2500) G.chats.delete(myId); else if (mc.text == null) txt(`你：${S.QUICK_CHAT[mc.k]}`, VW / 2, VH * 0.62, 16, '#fff', 'center', 4); }
     G.texts = G.texts.filter((t) => now - t.t < 1400);
     for (const t of G.texts) {
       const s = R3.project(t.x, t.y, t.z + (now - t.t) / 25);
@@ -2224,8 +2288,8 @@
     ctx.restore();
   }
   const L = (s) => (window.GBI18N ? window.GBI18N.tr(s) : s);   // 切到英文时翻译画布上的文字
-  function txt(s, x, y, size, color, align = 'center', stroke = 4) {
-    s = L(String(s));
+  function txt(s, x, y, size, color, align = 'center', stroke = 4, raw) {
+    s = raw ? String(s) : L(String(s));   // raw：玩家名字 / 聊天内容，不翻译
     ctx.font = `${size}px GBHead, "Microsoft YaHei", sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle';
     if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
     ctx.fillStyle = color; ctx.fillText(s, x, y);
@@ -2595,7 +2659,7 @@
     for (const t of teamOrder(myTeam)) {
       for (const p of rows.filter((q) => q.team === t)) {
         const sb = G.sb.get(p.id) || [0, 0, 0, 0];
-        txt((p.bot ? 'AI · ' : '') + p.name + (p.id === myId ? '（你）' : ''), cols[0], ry, 14, G.colors[t], 'left', 0);
+        txt(p.name + (p.id === myId ? L('（你）') : ''), cols[0], ry, 14, G.colors[t], 'left', 0, true);
         txt(S.WEAPONS[p.weapon].name, cols[1], ry, 13, '#ddd', 'left', 0);
         txt(String(sb[1]), cols[2], ry, 14, '#fff', 'left', 0);
         txt(String(sb[2]), cols[3], ry, 14, '#fff', 'left', 0);
@@ -2608,6 +2672,7 @@
 
   // ================= 结算 =================
   function showResults(r) {
+    chatClose();
     const meRow = r.players.find((p) => p.id === myId);
     const myTeam = meRow ? meRow.team : 1;
     const multi = (r.teams || 2) > 2;
@@ -2647,7 +2712,7 @@
     let html = `<tr><th style="text-align:left">驾驶员</th><th>机体</th><th>击毁</th><th>倒下</th><th>涂地</th>${objLabel !== '—' ? `<th>${objLabel}</th>` : ''}</tr>`;
     for (const t of r.place || [myTeam, 3 - myTeam]) {
       for (const p of r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a))) {
-        html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}">${esc(p.name)}${p.bot ? '<small class="aitag">AI</small>' : ''}${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
+        html += `<tr class="${p.id === myId ? 'me' : ''}"><td style="color:${cs[t]}"><span data-noi18n>${esc(p.name)}</span>${mvp && p.id === mvp.id ? '<span class="mvp">★MVP</span>' : ''}</td><td>${S.WEAPONS[p.weapon].name}</td><td>${p.kills}</td><td>${p.deaths}</td><td>${p.paint}</td>${objLabel !== '—' ? `<td>${p.obj}</td>` : ''}</tr>`;
       }
     }
     $('resTable').innerHTML = html;
@@ -3298,6 +3363,7 @@
     G = null; R3.clear(); touchShow(false);
     if (document.exitPointerLock && locked()) document.exitPointerLock();
     $('results').classList.add('hidden');
+    $('chatLog').classList.add('hidden'); chatClose();
     showScreen('title'); menuMusic();
     sendHello();
     if (!profile.tut) {

@@ -1301,5 +1301,13 @@ window.GB_EN = {
   "没有这个商品": "Item not found",
   "已经兑换完了": "Sold out",
   "没有这个任务": "Task not found",
-  "至少需要 3 位驾驶员和 3 台机体": "You need at least 3 pilots and 3 mechs"
+  "至少需要 3 位驾驶员和 3 台机体": "You need at least 3 pilots and 3 mechs",
+  "说点什么…（Enter 发送，Esc 取消）": "Say something… (Enter to send, Esc to cancel)",
+  "全部": "All",
+  "队伍": "Team",
+  "发送": "Send",
+  "发得太快了，歇一下再说": "You're typing too fast, slow down a bit",
+  "显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）": "Show chat (Enter to type, Tab switches All / Team)",
+  "1.4.1 更新礼包": "Update 1.4.1 gift",
+  "对战里可以打字聊天啦！按 Enter（手机点 💬）就能和队友、对手说话。排位赛的对手也按段位重新划分了水平。这份小礼物请收下！": "Text chat is here! Press Enter (or tap 💬 on phones) to talk to teammates and opponents. Ranked opponents are now matched to your tier more carefully. Please accept this small gift!"
 };

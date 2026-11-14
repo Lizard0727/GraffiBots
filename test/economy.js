@@ -3,6 +3,7 @@
 'use strict';
 const fs = require('fs'), os = require('os'), path = require('path');
 const S = require('../public/shared.js');
+const GB = require('../public/bots.js');
 const E = require('../public/economy.js');
 const { Hub, Room, Game, AccountStore } = require('../server.js');
 
@@ -127,7 +128,7 @@ function mkRoom(members, settings) {
 {
   const { g } = mkRoom([{ name: 'A', weapon: 'blaster', pilot: 'frost', power: { lv: 9, bt: 2 } }], { bots: true, teamSize: 2 });
   const bots = [...g.players.values()].filter((p) => p.bot);
-  ok(bots.length === 3 && bots.every((b) => b.lv === 9), 'AI 的等级跟着真人玩家的等级');
+  ok(bots.length === 3 && bots.every((b) => Math.abs(b.lv - 9) <= 2 && b.lv - 9 === GB.persona(b.persona).lv), 'AI 的等级跟着真人玩家的等级（按性格 ±2）');
 }
 
 // ---- 在线账号：开箱和升级都在服务器上，客户端改不了 ----

@@ -1,32 +1,18 @@
 {
-  "version": "1.4",
+  "version": "1.4.1",
   "date": "2026-11-14",
-  "title": "1.4 更新 · 乐园祭",
-  "en_title": "Update 1.4 · Park Fest",
+  "title": "1.4.1 更新 · 开麦了",
+  "en_title": "Update 1.4.1 · Chat Is Live",
   "page": "#updates",
   "force": true,
   "notes": [
-    "限时活动「乐园祭」",
-    "新机体组「袭击！特攻队」",
-    "夏日系列皮肤",
-    "新常驻角色与机体",
-    "排位赛",
-    "新兵之路",
-    "信箱",
-    "更多新内容",
-    "平衡调整",
+    "打字聊天",
+    "对手更像真人",
     "更新奖励"
   ],
   "en_notes": [
-    "Limited event: Park Fest",
-    "New mech squad: Strike Team",
-    "Summer skins",
-    "New standard pilot and mech",
-    "Ranked",
-    "Rookie Path",
-    "Mailbox",
-    "More",
-    "Balance changes",
+    "Text chat",
+    "Opponents feel more human",
     "Update rewards"
   ]
 }

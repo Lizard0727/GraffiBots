@@ -16,7 +16,7 @@ for (let m = 0; m < S.MAPS.length; m++) {
 for (const mode of S.MODE_ORDER) {
   for (let map = 0; map < S.MAPS.length; map++) {
     const room = new Room('TEST', null, { manual: true });
-    room.settings = { mode, map, duration: 180, teamSize: 4, bots: true };
+    room.settings = { mode, map, duration: 180, teamSize: 4, bots: true, personas: false };
     const g = new Game(room, { manual: true });
     let ticks = 0;
     const t0 = Date.now();

@@ -1,9 +1,9 @@
 // 涂鸦机兵 GraffiBots — 对局核心（Node 服务器与浏览器内置服务器共用）
 // 包含：对局模拟 Game、AI 机兵、房间 Room、消息处理 Hub
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./shared.js'), require('./economy.js'));
-  else root.GBCore = factory(root.GS, root.GE);
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (S, E) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./shared.js'), require('./economy.js'), require('./bots.js'));
+  else root.GBCore = factory(root.GS, root.GE, root.GBBots);
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (S, E, BOTS) {
 'use strict';
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (n) => Math.floor(Math.random() * n);
@@ -96,6 +96,136 @@ function floorLos(M, x0, y0, x1, y1, z0) {
 const BOT_NAMES = ['螺丝钉', '齿轮君', '电池仔', '喷漆王', '铁皮罐', '涂涂', '罐头侠', '霓虹', '闪电', '扳手', '像素', '火花', '弹簧', '芯片'];
 
 // =====================================================================
+// 1.4.1：聊天。AI 按性格打字（骂对手、甩锅、夸人、闲聊、回真人的话），有打字时间、会打错字
+// =====================================================================
+function usePersonaChat(g, st) { return !!st.bots && st.chat !== false && st.personas !== false && !g.tutorial; }
+// 每种风格更常用哪个频道（1 = 队伍，0 = 全部）
+const STYLE_TEAM = { toxic: 0.3, show: 0.4, lead: 0.9, noob: 0.6, nice: 0.5, chill: 0.5, afk: 0.2 };
+const FORCE_CH = { allyDied: 1, praise: 1, winning: 1, losing: 1, streakDeath: 1, endWin: 0, endLose: 0 };
+class BotChat {
+  constructor(g) {
+    this.g = g; this.t = 0; this.q = []; this.used = new Set(); this.gapUntil = 0; this.idleT = rand(30, 55); this.midDone = false;
+    for (const p of g.players.values())
+      if (p.bot && p.chatty && Math.random() < 0.3 + p.chatty * 0.3) this.say(p, 'start', { delay: rand(0.5, (g.countdown || 3) + 7) });
+  }
+  bots(filter) { return [...this.g.players.values()].filter((p) => p.bot && p.persona && (!filter || filter(p))); }
+  // 让 p 说一句：trigger 是场景，table 是台词表（B.LINES 或 B.REPLY）
+  say(p, trigger, o = {}) {
+    if (!p || !p.bot || !p.persona) return false;
+    const ps = p.pst || (p.pst = { streak: 0, deaths: 0 });
+    const chatty = p.chatty || (o.reply && Math.random() < 0.15 ? 0.2 : 0);
+    if (!chatty) return false;
+    ps.said = ps.said || 0;
+    if (!o.reply && !o.end) {
+      if (ps.said >= 2 + Math.round(chatty * 8)) return false;           // 一局说的话有上限
+      if (this.t < (ps.chatAt || -99) + 7 || this.t < this.gapUntil) return false;   // 别刷屏
+    }
+    if (ps.afkOn && !o.end && trigger !== 'afkBack') return false;       // 挂机的人不说话
+    const table = o.reply ? BOTS.REPLY : BOTS.LINES, T = table[trigger];
+    if (!T) return false;
+    let st = BOTS.style(p.persona), arr = T[st];
+    if (!arr || !arr.length) { if (st === 'afk' && trigger !== 'afkBack' && !o.end) return false; st = T.nice ? 'nice' : Object.keys(T)[0]; arr = T[st]; }
+    if (!arr || !arr.length) return false;
+    const fresh = arr.filter((l) => !this.used.has(l[0]) || l[0].length <= 3);   // 同一局不重复说一样的话（gg 之类的短句除外）
+    if (!fresh.length) return false;
+    const line = fresh[randInt(fresh.length)], h = BOTS.humanize(line[0], line[1]);
+    this.used.add(line[0]);
+    const ch = o.ch != null ? o.ch : FORCE_CH[trigger] != null ? FORCE_CH[trigger] : Math.random() < (STYLE_TEAM[st] || 0.5) ? 1 : 0;
+    const at = this.t + (o.delay || 0) + BOTS.typeTime(h.zh) * (o.end ? 0.5 : 1);
+    this.q.push({ at, p, zh: h.zh, en: h.en, ch, depth: o.depth || 0, style: st });
+    if (h.fix) this.q.push({ at: at + rand(0.8, 2), p, zh: h.zh, en: h.fix[1], ch, depth: 9, fix: true });
+    ps.said++; ps.chatAt = this.t; this.gapUntil = this.t + rand(1.2, 3);
+    // 活着打长句的菜鸟 / 普通玩家会停下来打字
+    if (p.alive && h.zh.length >= 6 && !['top', 'god', 'expert'].includes(p.persona) && Math.random() < 0.4) ps.typingUntil = at;
+    return true;
+  }
+  tick(dt) {
+    this.t += dt;
+    const g = this.g;
+    for (let i = 0; i < this.q.length; i++) {
+      const m = this.q[i];
+      if (m.at > this.t) continue;
+      this.q.splice(i--, 1);
+      this.deliver(m);
+    }
+    if (g.countdown > 0 || g.over) return;
+    // 闲聊
+    if ((this.idleT -= dt) <= 0) {
+      this.idleT = rand(25, 55);
+      const c = this.bots((p) => p.chatty > 0);
+      if (c.length) this.say(c[randInt(c.length)], 'idle');
+    }
+    // 打到一半：领先的一方提醒别浪，落后的一方着急
+    if (!this.midDone && g.time > g.duration * 0.5 && g.teams === 2) {
+      this.midDone = true;
+      const lead = g.leadTeam();
+      if (lead) for (const t of [1, 2]) { const c = this.bots((p) => p.team === t && p.chatty > 0); if (c.length && Math.random() < 0.6) this.say(c[randInt(c.length)], t === lead ? 'winning' : 'losing', { delay: rand(0, 6) }); }
+    }
+  }
+  deliver(m) {
+    const g = this.g;
+    if (!g.players.has(m.p.id)) return;
+    if (m.fix) g.sendChat(m.p, '', m.en, m.ch);   // 英文打错字后补一句「*正确的词」（中文玩家看不到这句）
+    else g.sendChat(m.p, m.zh, m.en, m.ch);
+    // 有时候别的 AI 会接话（只接一层）
+    if (!m.depth && !m.fix && (m.style === 'toxic' || m.style === 'show' || Math.random() < 0.25) && Math.random() < 0.3) this.react(m.p, m.zh, m.ch, 1);
+  }
+  // 有人说话（真人或 AI）：看得到这句话的 AI 可能回一句
+  react(from, text, ch, depth) {
+    const cls = BOTS.classify(text);
+    const cand = this.bots((p) => p !== from && (ch !== 1 || p.team === from.team) && !(p.pst && p.pst.afkOn));
+    if (!cand.length) return;
+    const chance = { bot: 0.85, insult: 0.6, hi: 0.55, gg: 0.6, praise: 0.5, help: 0.6, laugh: 0.3, ask: 0.5, other: 0.25 }[cls] * (depth ? 0.6 : 1);
+    if (Math.random() > chance) return;
+    const n = cls === 'bot' && Math.random() < 0.35 ? 2 : 1;
+    cand.sort((a, b) => (b.chatty || 0) * Math.random() - (a.chatty || 0) * Math.random());
+    // 回骂的时候对面的人更可能回嘴；夸奖 / 求助是队友回
+    for (const p of cand.slice(0, n)) this.say(p, cls, { reply: true, ch, depth, delay: rand(0.3, 1.4) });
+  }
+  onKill(by, t) {
+    const g = this.g;
+    if (by && by.bot && by.team !== t.team) {
+      const ps = by.pst || (by.pst = { streak: 0, deaths: 0 });
+      ps.streak = (ps.streak || 0) + 1;
+      if (ps.streak === 3 && Math.random() < 0.5) this.say(by, 'multi');
+      else if (Math.random() < 0.16) this.say(by, 'kill');
+    }
+    if (t.bot) {
+      const ps = t.pst || (t.pst = { streak: 0, deaths: 0 });
+      ps.streak = 0; ps.deaths = (ps.deaths || 0) + 1;
+      if (ps.deaths >= 3 && Math.random() < 0.4) { ps.deaths = 0; this.say(t, 'streakDeath', { delay: rand(0.5, 2) }); }
+      else if (Math.random() < 0.14) this.say(t, 'killed', { delay: rand(0.3, 1.5) });
+    }
+    if (by && by.team !== t.team) {
+      if (by.bot) by.pst.deaths = 0;
+      // 队友倒了：有人安慰、有人甩锅（真人倒下更容易被说）
+      const mates = this.bots((p) => p.team === t.team && p !== t);
+      if (mates.length && Math.random() < (t.bot ? 0.06 : 0.12)) this.say(mates[randInt(mates.length)], 'allyDied', { delay: rand(0.5, 2) });
+      // 队友（尤其是真人）打出好表现：夸一句
+      const streak = by.bot ? by.pst.streak : (by.hstreak = (by.hstreak || 0) + 1);
+      const fans = this.bots((p) => p.team === by.team && p !== by);
+      if (fans.length && Math.random() < (streak >= 3 ? 0.4 : by.bot ? 0.03 : 0.08)) this.say(fans[randInt(fans.length)], 'praise', { delay: rand(0.5, 2) });
+    }
+    if (!t.bot) t.hstreak = 0;
+  }
+  onEnd(winner) {
+    const g = this.g;
+    for (const p of this.bots()) {
+      if (Math.random() > (p.chatty ? 0.35 + p.chatty * 0.4 : 0.06)) continue;
+      const win = g.teams > 2 ? p.team === winner : p.team === winner;
+      if (!p.chatty) p.chatty = 0.1;
+      this.say(p, win ? 'endWin' : 'endLose', { end: true, delay: rand(0.1, 1.5) });
+    }
+    const due = this.q.slice(); this.q = [];
+    for (const m of due) {
+      const ms = Math.max(0, (m.at - this.t) * 1000);
+      if (g.room.manual) this.deliver(Object.assign(m, { depth: 9 }));
+      else setTimeout(() => this.deliver(Object.assign(m, { depth: 9 })), Math.min(ms, 2800));
+    }
+  }
+}
+
+// =====================================================================
 // 对局
 // =====================================================================
 class Game {
@@ -142,23 +272,36 @@ class Game {
     const botPw = this.fair ? FAIR : st.botPower || { lv: avgLv, bt: avgLv >= 9 ? 2 : avgLv >= 5 ? 1 : 0 };   // 排位赛：AI 强度跟着段位
     if (st.bots) {
       let bi = 0;
-      const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
-      // AI 机兵由驾驶员们驾驶：优先使用还没人选的驾驶员（名字就是驾驶员的名字）
+      // AI 机兵由驾驶员们驾驶：优先使用还没人选的驾驶员
       const taken = new Set([...this.players.values()].map((p) => p.pilot));
       const bannedP = new Set(this.bans.pilots || []), bannedM = new Set(this.bans.mechs || []);   // 排位赛被禁用的驾驶员 / 机体 AI 也不能选
       const mechPool = S.WEAPON_ORDER.filter((w) => !bannedM.has(w));
       const free = S.PILOTS.filter((pp) => !taken.has(pp.id) && !bannedP.has(pp.id)).sort(() => Math.random() - 0.5);
       const perTeam = this.teams > 2 ? teamCap : st.teamSize;
+      const slotList = [];
       for (let team = 1; team <= this.teams; team++)
-        while (slots[team] < perTeam && !(this.tutorial && team === 1)) {
-          bi++;
-          const pp = free.shift();
-          const okP = S.PILOTS.filter((x) => !bannedP.has(x.id)), pil = pp || okP[randInt(okP.length)] || S.PILOTS[0];
-          // 驾驶员和机体分开选：一半用擅长机体，一半随机
-          this.addPlayer(-bi, pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 && !bannedM.has(pil.weapon) ? pil.weapon : mechPool[randInt(mechPool.length)],
-            S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id, botPw);
-        }
+        for (let s = slots[team]; s < perTeam && !(this.tutorial && team === 1); s++) slotList.push({ team });
+      // 1.4.1：AI 性格（菜鸟 / 猪队友 / 挂机 / 不错 / 高手 / 顶尖 / 大神），排位赛按段位混合；名字像真人玩家
+      const usePersona = st.personas !== false && !this.tutorial;
+      const hTeams = {};
+      for (const p of this.players.values()) hTeams[p.team] = (hTeams[p.team] || 0) + 1;
+      const tier = this.ranked && Number.isInteger(st.rankTier) ? st.rankTier : null;
+      const personas = usePersona ? BOTS.assign(slotList, tier, hTeams) : slotList.map(() => 'decent');
+      const names = usePersona ? BOTS.nicks(slotList.length, st.lang) : BOT_NAMES.slice().sort(() => Math.random() - 0.5);
+      slotList.forEach(({ team }, i) => {
+        bi++;
+        const pp = free.shift();
+        const okP = S.PILOTS.filter((x) => !bannedP.has(x.id)), pil = pp || okP[randInt(okP.length)] || S.PILOTS[0];
+        const P = BOTS.persona(personas[i]);
+        const pw = usePersona && !this.fair ? Object.assign({}, botPw, { lv: clamp(botPw.lv + P.lv, 1, E.MAX_LV) }) : botPw;
+        // 驾驶员和机体分开选：一半用擅长机体，一半随机
+        const pl = this.addPlayer(-bi, usePersona ? names[i] : pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 && !bannedM.has(pil.weapon) ? pil.weapon : mechPool[randInt(mechPool.length)],
+          S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id, pw);
+        pl.persona = usePersona ? personas[i] : null;
+        if (usePersona) { pl.looks = BOTS.looks(S, pl.pilot, pl.persona, tier == null ? 2 : tier); pl.chatty = Math.random() < 0.7 ? P.chat * rand(0.4, 1.6) : 0; }
+      });
     }
+    this.chat = usePersonaChat(this, st) ? new BotChat(this) : null;
     this.initMode();
     if (this.mode === 'zone') {
       this.zoneCells = [];
@@ -200,6 +343,33 @@ class Game {
     return p;
   }
 
+  // 发一条聊天：ch 1 = 只发给同队的人
+  sendChat(p, text, en, ch) {
+    const m = { t: 'chat', id: p.id, name: p.name, team: p.team, text, ch: ch ? 1 : 0 };
+    if (en != null && en !== text) m.en = en;
+    (this.chatLog || (this.chatLog = [])).push(m);
+    if (this.chatLog.length > 80) this.chatLog.shift();
+    if (this.room.manual) return;
+    const str = JSON.stringify(m);
+    for (const c of this.room.members.values()) {
+      if (m.ch) { const q = this.players.get(c.id); if (!q || q.team !== p.team) continue; }
+      c.conn.sendRaw(str);
+    }
+  }
+  humanChat(id, text, ch) {
+    const p = this.players.get(id);
+    if (!p) return false;
+    this.sendChat(p, text, null, ch);
+    if (this.chat) this.chat.react(p, text, ch, 0);
+    return true;
+  }
+  // 现在哪一队领先（给 AI 聊天用）
+  leadTeam() {
+    const o = this.obj;
+    if (this.mode === 'turf' || !o.score) { const t = S.countTurf(this.grid, this.M); return t.a > t.b * 1.1 ? 1 : t.b > t.a * 1.1 ? 2 : 0; }
+    if (this.mode === 'zone' && o.count) return o.count[1] < o.count[2] ? 1 : o.count[2] < o.count[1] ? 2 : 0;
+    return o.score[1] > o.score[2] ? 1 : o.score[2] > o.score[1] ? 2 : 0;
+  }
   removePlayer(id) {
     const p = this.players.get(id);
     if (!p) return;
@@ -228,6 +398,7 @@ class Game {
       this.updateMode(dt);
       if (this.timeLeft <= 0) this.finish(null);
     }
+    if (this.chat) this.chat.tick(dt);
     if (!this.room.manual) this.sendSnapshot();
     else { this.diff = []; this.events = []; }
   }
@@ -856,6 +1027,7 @@ class Game {
   onTakedown(by, t) {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
+    if (this.chat && t) this.chat.onKill(by, t);
     if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 40, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
     if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.4);
     if (by.tal && by.tal.has('s4') && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + 15);
@@ -1602,6 +1774,7 @@ class Game {
       players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, ...p.stats })),
     };
     this.result = result;
+    if (this.chat) this.chat.onEnd(winner);
     if (this.room.manual) return;
     this.sendSnapshot();
     this.room.broadcast({ t: 'over', winner });
@@ -1640,19 +1813,29 @@ function botThink(g, p, dt) {
   const inp = p.input;
   if (!p.alive) { inp.f = false; inp.w = false; p.ai = null; return; }
   if (g.tutorial) { inp.mx = 0; inp.my = 0; inp.f = false; inp.w = false; return; }   // 训练靶：站着不动
-  const ai = p.ai || (p.ai = { goal: null, path: [], pi: 0, replan: 0, stuckT: 0, lastX: p.x, lastY: p.y, wob: rand(0, 6), strafe: 1, strafeT: 0, jumpT: rand(1, 4), react: rand(0.15, 0.35), seenT: 0, paintT: rand(0.5, 2) });
+  // 1.4.1：性格。挂机的站着不动；打字的停下来；菜鸟偶尔发呆
+  const P = BOTS.persona(p.persona);
+  const ps = p.pst || (p.pst = { streak: 0, deaths: 0 });
+  const idle = () => { inp.mx = 0; inp.my = 0; inp.f = false; inp.w = false; };
+  if (P.afk && afkIdle(g, p, ps)) { idle(); inp.a += dt * ps.afk.spin; return; }
+  if (g.chat && ps.typingUntil > g.chat.t) { idle(); return; }
+  if (ps.freezeT > 0) { ps.freezeT -= dt; idle(); return; }
+  if (P.freeze && Math.random() < P.freeze) ps.freezeT = rand(0.5, 1.5);
+  if (ps.noWheel == null) ps.noWheel = Math.random() < (P.noWheel || 0);
+  const ai = p.ai || (p.ai = { goal: null, path: [], pi: 0, replan: 0, stuckT: 0, lastX: p.x, lastY: p.y, wob: rand(0, 6), strafe: 1, strafeT: 0, jumpT: rand(1, 4), react: rand(P.react[0], P.react[1]), seenT: 0, paintT: rand(0.5, 2) });
   const W = S.WEAPONS[p.weapon];
   const SA = p.foot ? S.sidearm(p.pilot) : null;
   const range = p.foot ? SA.range : S.weaponRange(p.weapon);
   ai.replan -= dt;
 
-  let enemy = null, ed = Infinity;
+  let enemy = null, ed = Infinity, best = Infinity;
   for (const e of g.players.values()) {
     if (!e.alive || e.team === p.team) continue;
     const d = Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z);
     if (!botSees(g, p, e, d)) continue;
     const lobber = p.foot ? SA.kind === 'lob' || SA.ghost : p.weapon === 'mortar' || p.weapon === 'slinger';
-    if (d < range + 160 && d < ed && (lobber || S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18))) { enemy = e; ed = d; }
+    const sc = P.focus ? d * (0.55 + 0.45 * e.hp / g.maxHpOf(e)) : d;   // 高手 / 大神优先打残血
+    if (d < range + 160 && sc < best && (lobber || S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18))) { enemy = e; ed = d; best = sc; }
   }
   ai.seenT = enemy ? ai.seenT + dt : 0;
 
@@ -1684,7 +1867,7 @@ function botThink(g, p, dt) {
     // 弹出的驾驶员：没有危险时认准原来的目标，走到为止（不然每次换一个方向，就在原地走来走去）
     const threat = p.foot && [...g.players.values()].some((e) => e.alive && !e.out && e.team !== p.team && dist(e, p) < 450);
     const keep = p.foot && !threat && !ai.forceRandom && ai.goal && ai.goal.calm && !ai.goal.near && dist(p, ai.goal) > 40;
-    if (!keep) ai.goal = ai.forceRandom ? randomGoal(g, p) : p.foot ? fleeGoal(g, p) : chooseGoal(g, p);
+    if (!keep) ai.goal = ai.forceRandom || (!p.foot && P.wander && Math.random() < P.wander) ? randomGoal(g, p) : p.foot ? fleeGoal(g, p) : chooseGoal(g, p);
     ai.forceRandom = false;
     if (ai.goal.calm) ai.replan = ai.goal.near ? 0.4 : 1.6;   // 没有危险时认准一个目标走过去，不来回改主意
     ai.path = findPath(g.nav, p.x, p.y, ai.goal.x, ai.goal.y);
@@ -1722,15 +1905,15 @@ function botThink(g, p, dt) {
 
   // 近战机体从更远处就开始冲上去（不然只会等敌人走到脸上）
   const melee = !p.foot && (W.attack === 'punch' || p.weapon === 'roller' || p.weapon === 'bucket' || p.weapon === 'dozer' || p.weapon === 'flamer');
-  const engage = melee ? Math.max(range * 1.05, 300) : range * 1.05;
+  const engage = melee || P.chase ? Math.max(range * 1.05, 300) : range * 1.05;
   if (enemy && ed < engage && ai.seenT > ai.react) {
-    const lead = ed / 650;
-    aim = aimAt(p, enemy.x + enemy.vx * lead * 0.6, enemy.y + enemy.vy * lead * 0.6, enemy.z + 16);
-    aim.a += (Math.random() - 0.5) * 0.18; aim.pt += (Math.random() - 0.5) * 0.06;
+    const lead = ed / (P.trueLead ? (p.foot ? SA.speed : W.speed) || 650 : 650);   // 高手按真实弹速算提前量
+    aim = aimAt(p, enemy.x + enemy.vx * lead * P.lead, enemy.y + enemy.vy * lead * P.lead, enemy.z + 16);
+    aim.a += (Math.random() - 0.5) * P.aim; aim.pt += (Math.random() - 0.5) * P.aim / 3;
     inp.ad = ed;
     wantAtk = ed < range * 1.1;
     ai.strafeT -= dt;
-    if (ai.strafeT <= 0) { ai.strafeT = rand(0.4, 1.1); ai.strafe = Math.random() < 0.5 ? -1 : 1; }
+    if (ai.strafeT <= 0) { ai.strafeT = rand(P.strafe[0], P.strafe[1]); ai.strafe = (Math.random() < 0.5 ? -1 : 1) * P.strafeK / 0.8; }
     const ea = Math.atan2(enemy.y - p.y, enemy.x - p.x);
     if (p.foot) {
       // 驾驶员：拿近战武器的冲上去，其他的边退边打
@@ -1745,15 +1928,15 @@ function botThink(g, p, dt) {
       my = Math.sin(ea) * back + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.8;
     }
     if (g.mode === 'escort' && g.obj.tr.carrier === p.id) { const a2 = Math.atan2(ty - p.y, tx - p.x); mx = Math.cos(a2); my = Math.sin(a2); }
-    if (!p.foot && hpK < 0.3 && enemy.hp > p.hp) { mx = -Math.cos(ea); my = -Math.sin(ea); }   // 残血撤退
+    if (!p.foot && P.retreat && hpK < P.retreat && (P.smart || enemy.hp > p.hp)) { mx = -Math.cos(ea); my = -Math.sin(ea); }   // 残血撤退（猪队友和菜鸟不会撤）
     ai.jumpT -= dt;
-    if (ai.jumpT <= 0) { ai.jumpT = rand(1.2, 3.5); inp.j = true; }
+    if (ai.jumpT <= 0) { ai.jumpT = rand(P.jump[0], P.jump[1]); inp.j = true; }
   } else if (!p.foot) {
     // 没有敌人：边走边涂地
     ai.wob += dt * 2.2;
     aim.a += Math.sin(ai.wob) * 0.6;
     ai.paintT -= dt;
-    if (ai.paintT <= 0 && p.ammo > 2.2) { wantAtk = true; ai.paintT = rand(0.6, 1.6); inp.ad = rand(150, 320); }
+    if (ai.paintT <= 0 && p.ammo > 2.2) { wantAtk = true; ai.paintT = rand(0.6, 1.6) * P.paint; inp.ad = rand(150, 320); }
     if (g.mode === 'park' && p.ammo >= 1) {   // 乐园模式：射程内有气球就打
       for (const b of g.obj.balloons) {
         const d = Math.hypot(b.x - p.x, b.y - p.y);
@@ -1770,15 +1953,16 @@ function botThink(g, p, dt) {
   }
 
   let wheel = false;
-  if (!p.foot && !enemy && onOwn && (p.ammo < 1.5 || (dl > 260 && p.ammo < 2.8))) { wheel = true; wantAtk = false; }
+  if (!p.foot && !enemy && onOwn && (ps.noWheel ? p.ammo < 0.3 : p.ammo < 1.5 || (dl > 260 && p.ammo < 2.8))) { wheel = true; wantAtk = false; }   // 猪队友常常忘了补弹
   if (!p.foot && p.carry >= 3 && onOwn && !enemy) { wheel = true; wantAtk = false; }
+  if (P.smart && !p.foot && enemy && onOwn && hpK < 0.25 && enemy.hp > p.hp && !p.carry) { wheel = true; wantAtk = false; }   // 大神残血：变滚轮隐身溜走回血
 
   if (W.attack === 'charge' && !p.foot) {
     hold = wantAtk && p.ammo >= 1 && p.charge < (enemy ? 0.92 : 0.4);
     inp.f = hold;
   } else {
     inp.f = false;
-    if (wantAtk && p.ammo >= 1 && p.atkCd <= 0 && !p.burst && Math.random() < 0.5) inp.aq++;
+    if (wantAtk && p.ammo >= 1 && p.atkCd <= 0 && !p.burst && Math.random() < P.fire) inp.aq++;
   }
 
   inp.w = wheel;
@@ -1788,27 +1972,46 @@ function botThink(g, p, dt) {
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
     const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450 }[sp];
-    if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < 0.002) {
+    if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < (P.waste ? 0.015 : P.smart ? 0 : 0.002)) {   // 猪队友乱放大招
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
     }
   }
   // 超载：充满了就在交战时放
-  if (p.bt >= 1 && !p.ovUsed && p.ov >= S.OV_NEED && enemy && ed < 320 && Math.random() < 0.1) inp.oq++;
+  if (p.bt >= 1 && !p.ovUsed && p.ov >= S.OV_NEED && enemy && ed < 320 && Math.random() < P.ov) inp.oq++;
   // 驾驶员技能
-  if (p.skillUses > 0 && p.skillCd <= 0 && Math.random() < 0.04) {
+  if (p.skillUses > 0 && p.skillCd <= 0 && Math.random() < P.skill) {
     const sk = S.pilot(p.pilot).skill;
     const fight = enemy && ed < 300;
     const use = {
       rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
       turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
       rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
-    }[sk];
+    }[sk] || (P.waste && Math.random() < 0.3);
     if (use) {
       if (sk === 'dash' && enemy && !p.foot) { inp.mx = Math.cos(aim.a); inp.my = Math.sin(aim.a); }
       inp.gq++;
     }
   }
+}
+// 挂机：开局在「加载」/ 隔一阵发呆一会儿 / 整局挂机；被打的时候有时会回过神
+function afkIdle(g, p, ps) {
+  if (!ps.afk) {
+    const r = Math.random();
+    ps.afk = r < 0.35 ? { mode: 'load', until: rand(8, 25) } : r < 0.8 ? { mode: 'cycle', until: rand(3, 12) } : { mode: 'full', until: 1e9 };
+    ps.afk.spin = Math.random() < 0.5 ? 0 : rand(-0.6, 0.6); ps.afkOn = true;
+  }
+  const A = ps.afk;
+  if (ps.afkOn) {
+    if (g.time - p.lastHurt < 0.05 && Math.random() < 0.3) A.until = g.time;
+    if (g.time < A.until) return true;
+    ps.afkOn = false;
+    A.next = A.mode === 'cycle' ? g.time + rand(25, 60) : 1e9;
+    if (g.chat && Math.random() < 0.55) g.chat.say(p, 'afkBack', { delay: rand(0.5, 2) });
+    return false;
+  }
+  if (A.next && g.time >= A.next) { ps.afkOn = true; A.until = g.time + rand(6, 18); return true; }
+  return false;
 }
 // 弹出的驾驶员：躲开敌人，等新机体空投
 function fleeGoal(g, p) {
@@ -1989,10 +2192,12 @@ class Room {
       s.bans = { pilots: pick(m.bans.pilots, (id) => S.PILOTS.some((P) => P.id === id)), mechs: pick(m.bans.mechs, (id) => !!S.WEAPONS[id]) };
     }
     if (m.botPower && typeof m.botPower === 'object') s.botPower = { lv: Math.max(1, Math.min(11, m.botPower.lv | 0)), bt: Math.max(0, Math.min(2, m.botPower.bt | 0)) };
+    if (Number.isInteger(m.rankTier) && m.rankTier >= 0 && m.rankTier < E.RANK.tiers.length) s.rankTier = m.rankTier;   // AI 性格按段位混合
+    if (m.lang === 'zh' || m.lang === 'en') s.lang = m.lang;
     const host = this.members.get(this.hostId);
     if (s.ranked && host && host.rankTier != null) {   // 在线账号：按服务器记录的段位，客户端改不了
       if (host.canRanked === false) s.ranked = false;
-      else s.botPower = E.rankBotPower(host.rankTier);
+      else { s.botPower = E.rankBotPower(host.rankTier); s.rankTier = host.rankTier; }
     }
     if (s.ranked) { s.bots = true; s.teamSize = 4; s.fair = false; }
     if (typeof m.tutorial === 'boolean' && this.hub && this.hub.local) s.tutorial = m.tutorial;   // 只有浏览器里的本机服务器能开教程
@@ -2080,6 +2285,18 @@ function handle(hub, c, m) {
     case 'chat': {
       if (!r) return;
       const now = Date.now();
+      if (typeof m.text === 'string') {   // 1.4.1：打字聊天（全部 / 队伍），每 10 秒最多 5 句
+        const text = m.text.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, S.CHAT_MAX);
+        if (!text) return;
+        c.chatTimes = (c.chatTimes || []).filter((t) => now - t < 10000);
+        if (c.chatTimes.length >= 5 || now - (c.lastText || 0) < 600) return c.conn.send({ t: 'chatSlow' });
+        c.chatTimes.push(now); c.lastText = now;
+        const ch = m.ch === 1 ? 1 : 0;
+        if (r.game && r.game.humanChat(c.id, text, ch)) return;
+        const msg = { t: 'chat', id: c.id, name: c.name, team: c.team, text, ch };   // 房间里（还没开局）
+        for (const o of r.members.values()) if (!ch || o.team === c.team) o.conn.send(msg);
+        return;
+      }
       if (now - (c.lastChat || 0) < 800) return;
       c.lastChat = now;
       const k = m.k | 0;

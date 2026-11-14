@@ -14,7 +14,7 @@ Math.random = (() => { let s = 0x2545f491; return () => { s ^= s << 13; s ^= s >
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
   const room = new Room('BAL', null, { manual: true });
-  room.settings = { mode: modes[i % modes.length], map: i % S.MAPS.length, duration: 150, teamSize: 4, bots: true };
+  room.settings = { mode: modes[i % modes.length], map: i % S.MAPS.length, duration: 150, teamSize: 4, bots: true, personas: false };
   const g = new Game(room, { manual: true });
   for (const p of g.players.values()) {   // 随机搭配，等级统一
     p.pilot = S.PILOTS[Math.floor(Math.random() * S.PILOTS.length)].id;

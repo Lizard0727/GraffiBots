@@ -953,9 +953,32 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.4';
+  S.VERSION = '1.4.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.4.1', date: '2026-11-14', title: '1.4.1 更新 · 开麦了', en_title: 'Update 1.4.1 · Chat Is Live', sections: [
+      ['打字聊天', [
+        '对战中按 Enter 打字，Tab 切换「全部」和「队伍」频道，Esc 取消；手机点右上角的 💬，还能一键发快捷语',
+        '队伍频道只有队友看得到；说的话会显示在左边的聊天框，也会短暂出现在角色头顶',
+        '设置里可以关闭「显示聊天消息」；刷屏会被限速（10 秒最多 5 句）']],
+      ['对手更像真人', [
+        '对局里的 AI 机兵有了各自的水平和打法：有人枪法稳、走位飘，有人冲动乱放大招，也有人开局半天不动',
+        '普通赛里什么水平的人都可能遇到；排位赛段位越高，遇到的高手越多（队友和对手都是）',
+        'AI 也会打字：打招呼、报点、夸人、甩锅、嘴硬、回你的话，还会打错字',
+        'AI 换上了玩家风格的名字，也会穿皮肤、戴名片框；结算表不再标出谁是 AI']],
+      ['更新奖励', ['信箱里有一份 1.4.1 更新礼包：80 宝石 + 1500 金币 + 50 乐园票']],
+    ], en: [
+      ['Text chat', [
+        'Press Enter in a match to type, Tab to switch between All and Team, Esc to cancel; on phones tap 💬 at the top right, with one-tap quick phrases too',
+        'Team chat is only seen by your teammates; messages show in the chat box on the left and briefly above the speaker\'s head',
+        'You can turn off Show chat in Settings; spamming is rate-limited (5 messages per 10 seconds)']],
+      ['Opponents feel more human', [
+        'AI mechs in matches now have their own skill levels and playstyles: some have steady aim and slick movement, some charge in and waste their supers, and some stand still for a while at the start',
+        'Casual matches can put you against anyone; the higher your ranked tier, the more strong players you meet, on both teams',
+        'AI players type too: greetings, callouts, compliments, blaming teammates, comebacks and replies to you, typos included',
+        'AI players now use player-style names and wear skins and frames, and the results table no longer marks who is AI']],
+      ['Update rewards', ['A 1.4.1 update gift is waiting in your mailbox: 80 gems + 1,500 coins + 50 Park Tickets']],
+    ] },
     { v: '1.4', date: '2026-11-14', title: '1.4 更新 · 乐园祭', en_title: 'Update 1.4 · Park Fest', sections: [
       ['限时活动「乐园祭」', [
         '全新模式「乐园模式」：嘉年华花车沿环形路线巡游，光圈里人多的队伍每秒得分；打爆飘在空中的气球再得 3 分，先到 100 分获胜',
@@ -1148,5 +1171,6 @@
   ];
 
   S.QUICK_CHAT = ['这边！', '冲啊！', '好样的！', '需要支援！'];
+  S.CHAT_MAX = 60;   // 打字聊天每句最多 60 个字
   return S;
 });
