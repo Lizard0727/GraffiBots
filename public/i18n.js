@@ -21,6 +21,8 @@
     [/每局 (\d+) 次。/g, '$1 uses per match.'],
     [/发现新版本 ([\d.]+)（你正在玩的是 ([\d.]+)）/g, 'New version $1 is out (you have $2)'],
     [/^新版本 ([\d.]+)$/g, 'New: v$1'],
+    [/涂鸦机兵 ([\d.]+) 已经发布。你现在的版本 ([\d.]+) 需要更新到最新版本才能继续游玩。/g, 'GraffiBots $1 is out. Your version $2 must be updated before you can keep playing.'],
+    [/^([\d.]+) 新版本已发布$/g, 'Version $1 is out'],
     [/机兵(\d+)/g, 'Pilot$1'],
     [/被淘汰（第 (\d+) 名）/g, 'eliminated (#$1)'],
     [/第 (\d+) 局/g, 'Round $1'],

@@ -63,6 +63,9 @@
     SH.box = new T.BoxGeometry(1, 1, 1); SH.cyl = new T.CylinderGeometry(1, 1, 1, 14); SH.sph = new T.SphereGeometry(1, 12, 8); SH.sphL = new T.SphereGeometry(1, 8, 6);
     SH.cone = new T.ConeGeometry(1, 1, 12); SH.ring = new T.RingGeometry(0.86, 1, 56); SH.tube = new T.CylinderGeometry(1, 1, 1, 8, 1, true);
     SH.disc = new T.CircleGeometry(1, 40); SH.glowW = basic(0xffffff);
+    SH.sphH = new T.SphereGeometry(1, 22, 16); SH.cylH = new T.CylinderGeometry(1, 1, 1, 18);
+    SH.eyeW = basic(0xffffff); SH.pupil = basic(0x14101c); SH.blush = basic(0xff8aa8, { transparent: true, opacity: 0.55, depthWrite: false });
+    SH.mouth = basic(0x5a1a2a); SH.tongue = basic(0xff6a8a);
     return SH;
   }
   function part(g, m, sx, sy, sz, x, y, z) {
@@ -1362,34 +1365,21 @@
   const dyn = (o) => { o.userData.dyn = true; return o; };
 
   // =====================================================================
-  // 驾驶员（驾驶舱里的 3D 小人头）
+  // 驾驶员 3D 角色（1.3）：大头、短身、粗描边的卡通全身模型
+  // 坐标：脚底 y = 0，面朝 +x，+z 是右手边（拿武器的手）
+  // 层级：root → hips(腿) / torso → head、armL、armR(随身武器)
   // =====================================================================
-  function buildPilot(pilotId, headCosmetic, teamColor) {
-    const P = S.pilot(pilotId);
-    const g = new T.Group();
-    const skin = toon(P.skin), hair = toon(P.hair), hair2 = toon(P.hair2), acc = toon(P.accent);
-    const sph = SH.sphL;
+  const CH = { hip: 7.2, chest: 8, shoulder: 6.4, headY: 9.6, headR: 5.7 };
+  // 头发、帽子、配件（沿用原来驾驶舱小人头的造型，头的中心在 (0, 0.4, 0)，半径约 4.3）
+  function headDecor(g, P, headCosmetic, teamColor) {
+    const hair = toon(P.hair), hair2 = toon(P.hair2), acc = toon(P.accent);
+    const sph = SH.sph;
     const add = (o) => { g.add(o); return o; };
-    // 身体（驾驶服）+ 脖子
-    add(part(sph, toon(teamColor), 4.4, 3.2, 4.8, -0.6, -5.2, 0));
-    add(part(SH.cyl, skin, 1.4, 2.4, 1.4, 0, -3.2, 0));
-    // 头
-    add(part(SH.sph, skin, 4.2, 4.5, 4.2, 0, 0.4, 0));
-    // 眼睛（大大的动漫眼：白底 + 彩色虹膜 + 高光）
-    const happy = P.eyeShape === 'happy';
-    for (const z of [-1.5, 1.5]) {
-      if (happy) { add(part(sph, SH.dark, 0.4, 0.28, 0.9, 4.05, 0.3, z)); continue; }
-      add(part(sph, SH.white, 0.5, 1.25, 0.95, 3.75, 0.2, z));
-      add(part(sph, toon(P.eye), 0.45, 1.0, 0.72, 3.98, 0.05, z));
-      add(part(sph, SH.glowW, 0.2, 0.32, 0.3, 4.3, 0.55, z - 0.2));
-    }
-    // 头发主体
-    const cap = add(part(SH.sph, hair, 4.7, 4.5, 4.7, -0.7, 1.4, 0));
+    const cap = add(part(SH.sphH, hair, 4.75, 4.4, 4.75, -0.75, 1.5, 0));
     cap.scale.set(4.75, 4.4, 4.75);
-    // 刘海
     for (let i = -2; i <= 2; i++) {
-      const b = add(part(SH.cone, hair, 1.2, 3.2, 1.3, 3.2, 2.6 - Math.abs(i) * 0.2, i * 1.25));
-      b.rotation.z = Math.PI - 0.5; b.rotation.x = i * 0.12;
+      const b = add(part(SH.cone, hair, 1.25, 3.2, 1.35, 3.25, 2.75 - Math.abs(i) * 0.22, i * 1.2));
+      b.rotation.z = Math.PI - 0.55; b.rotation.x = i * 0.14;
     }
     switch (P.style) {
       case 'spiky':
@@ -1399,69 +1389,375 @@
         }
         break;
       case 'swept': {
-        const b = add(part(sph, hair, 1.6, 3.6, 2.4, 3.4, 0.6, 1.4)); b.rotation.x = -0.3;
+        const b = add(part(sph, hair, 1.6, 3.6, 2.4, 3.3, 0.9, 1.6)); b.rotation.x = -0.3;
         add(part(sph, hair, 2.2, 4, 1.4, -0.4, -2, -3.7)); add(part(sph, hair, 2.2, 4, 1.4, -0.4, -2, 3.7));
         break;
       }
       case 'twintail':
         for (const z of [-1, 1]) {
-          const t2 = add(part(sph, hair, 1.8, 5.4, 1.8, -1.2, -2.6, z * 5.6)); t2.rotation.x = -z * 0.35;
-          add(part(sph, acc, 0.9, 0.9, 0.9, -1.0, 2.2, z * 4.8));
+          const t2 = add(part(SH.sphH, hair, 1.9, 5.8, 1.9, -1.3, -2.8, z * 5.7)); t2.rotation.x = -z * 0.35;
+          add(part(sph, hair2, 1.2, 1.6, 1.2, -1.3, -7.6, z * 6.9));
+          add(part(sph, acc, 0.95, 0.95, 0.95, -1.0, 2.2, z * 4.8));
         }
         break;
       case 'dreads':
-        for (let i = 0; i < 7; i++) {
-          const a = (i / 6 - 0.5) * 2.4;
-          const d2 = add(part(SH.cyl, hair2, 0.55, 5.5, 0.55, -3.4 * Math.cos(a) - 0.6, -0.8, 3.4 * Math.sin(a))); d2.rotation.z = -0.25 * Math.cos(a); d2.rotation.x = 0.25 * Math.sin(a);
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 8 - 0.5) * 2.9;
+          const d2 = add(part(SH.cyl, hair2, 0.6, 6, 0.6, -3.4 * Math.cos(a) - 0.8, -1.2, 3.6 * Math.sin(a))); d2.rotation.z = -0.25 * Math.cos(a); d2.rotation.x = 0.25 * Math.sin(a);
+          add(part(sph, toon(P.accent), 0.7, 0.5, 0.7, -3.6 * Math.cos(a) - 0.8, -3.9, 3.8 * Math.sin(a)));
         }
         break;
       case 'hood': {
-        const h2 = add(part(sph, toon(0x2e2442), 5.4, 5.4, 5.4, -1.2, 1.0, 0)); h2.scale.set(5.3, 5.4, 5.6);
-        const rim = add(new T.Mesh(new T.TorusGeometry(4.6, 0.45, 6, 18), acc)); rim.rotation.y = Math.PI / 2; rim.position.set(1.8, 0.9, 0);
+        const h2 = add(part(SH.sphH, toon(0x2e2442), 5.4, 5.4, 5.4, -1.3, 1.0, 0)); h2.scale.set(5.2, 5.4, 5.6);
+        const rim = add(new T.Mesh(new T.TorusGeometry(4.6, 0.5, 6, 18), acc)); rim.rotation.y = Math.PI / 2; rim.position.set(1.7, 0.9, 0);
+        for (const z of [-1, 1]) add(part(SH.cone, toon(0x2e2442), 1.3, 2.4, 1.3, -1.6, 5.8, z * 2.6)).rotation.x = z * 0.4;   // 兜帽上的猫耳
         break;
       }
       case 'braid':
-        for (let i = 0; i < 5; i++) add(part(sph, hair, 1.3 - i * 0.08, 1.4, 1.3 - i * 0.08, 0.6 - i * 0.3, -1.5 - i * 2.2, 4.4));
-        add(part(sph, acc, 0.9, 0.7, 0.9, -0.6, -12.3, 4.4));
+        for (let i = 0; i < 6; i++) add(part(sph, hair, 1.35 - i * 0.08, 1.45, 1.35 - i * 0.08, 0.4 - i * 0.35, -1.5 - i * 2.1, 4.5));
+        add(part(sph, acc, 0.9, 0.7, 0.9, -1.8, -14.2, 4.5));
         break;
       case 'undercut': {
-        const sw = add(part(sph, hair, 3.4, 2.2, 4.6, 0.8, 3.6, 0.8)); sw.rotation.x = -0.25;
+        const sw = add(part(sph, hair, 3.4, 2.2, 4.6, 0.8, 3.7, 0.9)); sw.rotation.x = -0.28;
+        add(part(sph, hair2, 4.3, 2.4, 4.4, -0.9, -0.6, 0));
         break;
       }
       case 'chef':
-        add(part(SH.cyl, SH.white, 4.4, 4, 4.4, -0.4, 6, 0));
-        add(part(sph, SH.white, 5, 3.4, 5, -0.4, 9, 0));
+        add(part(SH.cylH, SH.white, 4.4, 4, 4.4, -0.4, 6, 0));
+        for (const [x, z] of [[0, 0], [-1.6, 2.2], [-1.6, -2.2], [1.4, 1.8], [1.4, -1.8]]) add(part(SH.sphH, SH.white, 2.6, 2.4, 2.6, x - 0.4, 9, z));
         break;
       case 'veteran':
-        add(part(sph, hair2, 3.6, 2.6, 3.8, 0.8, -1.9, 0));                    // 胡子
-        add(part(sph, SH.dark, 0.5, 1.4, 1.2, 4.1, 0.3, 1.5));                  // 眼罩
+        add(part(SH.sphH, hair2, 3.6, 2.7, 3.9, 0.9, -2.0, 0));                  // 胡子
+        add(part(sph, SH.dark, 0.5, 1.5, 1.3, 4.25, 0.5, 1.7));                  // 眼罩
+        { const st = add(part(SH.box, SH.dark, 0.25, 0.35, 9, 2.6, 1.6, 0)); st.rotation.x = -0.35; }
         break;
       case 'buns':
-        for (const z of [-3.2, 3.2]) add(part(sph, hair, 2.2, 2.2, 2.2, -0.8, 5.2, z));
+        for (const z of [-3.3, 3.3]) { add(part(SH.sphH, hair, 2.3, 2.3, 2.3, -0.8, 5.2, z)); add(part(SH.cylH, acc, 1.6, 0.6, 1.6, -0.8, 3.4, z * 0.94)); }
         break;
       case 'ponytail': {
-        const t2 = add(part(sph, hair, 1.8, 6, 1.8, -4.6, 0.6, 0)); t2.rotation.z = -1.0;
-        add(part(sph, acc, 1, 1, 1, -3.6, 3, 0));
+        const t2 = add(part(SH.sphH, hair, 1.9, 6.4, 1.9, -4.8, 0.2, 0)); t2.rotation.z = -1.0;
+        add(part(sph, acc, 1.05, 1.05, 1.05, -3.7, 2.9, 0));
         break;
       }
     }
-    // 驾驶员的标志配件
-    if (P.id === 'hex') { add(part(SH.box, toon(P.accent, { emissive: new T.Color(P.accent).multiplyScalar(0.5), transparent: true, opacity: 0.8 }), 0.6, 1.3, 4.6, 4.2, 0.3, 0)); }
-    if (P.id === 'gale') { const sc = add(new T.Mesh(new T.TorusGeometry(2.6, 0.9, 6, 14), acc)); sc.rotation.x = Math.PI / 2; sc.position.y = -3.4; }
+    if (P.id === 'hex') add(part(SH.box, toon(P.accent, { emissive: new T.Color(P.accent).multiplyScalar(0.5), transparent: true, opacity: 0.8 }), 0.6, 1.4, 5.2, 4.6, 0.4, 0));
     if (P.id === 'blaze' || P.id === 'aurora' || P.id === 'gale') {
-      for (const z of [-1.7, 1.7]) { const gg = add(new T.Mesh(new T.TorusGeometry(1.15, 0.45, 6, 12), SH.dark)); gg.rotation.y = Math.PI / 2 - 0.2; gg.position.set(2.6, 3.6, z); add(part(sph, toon(P.accent, { emissive: new T.Color(P.accent).multiplyScalar(0.4) }), 0.5, 1, 1, 2.7, 3.6, z)); }
+      const band = add(new T.Mesh(new T.TorusGeometry(4.45, 0.42, 6, 22), SH.dark)); band.rotation.x = Math.PI / 2; band.rotation.z = 0.35; band.position.y = 3.2;
+      for (const z of [-1.7, 1.7]) { const gg = add(new T.Mesh(new T.TorusGeometry(1.2, 0.48, 8, 14), SH.dark)); gg.rotation.y = Math.PI / 2 - 0.2; gg.position.set(2.7, 3.7, z); add(part(sph, toon(P.accent, { emissive: new T.Color(P.accent).multiplyScalar(0.4) }), 0.5, 1.05, 1.05, 2.8, 3.7, z)); }
     }
-    if (P.id === 'candy') for (const z of [-1, 1]) { const e = add(part(SH.cone, SH.white, 1.4, 2.6, 1.0, -0.4, 5.0, z * 2.5)); e.rotation.x = z * 0.35; }
-    if (P.id === 'titan') { const band = add(new T.Mesh(new T.TorusGeometry(4.45, 0.55, 6, 20), acc)); band.rotation.x = Math.PI / 2; band.rotation.z = 0.15; band.position.y = 2.2; }
-    // S1 新驾驶员：岚的红色贝雷帽、石磊的黄色安全帽、叶声的大耳机
-    if (P.id === 'flag') { const b = add(part(sph, acc, 4.9, 1.8, 4.9, -0.3, 5.0, 0.6)); b.rotation.z = 0.25; add(part(sph, SH.yellow, 0.7, 0.7, 0.7, 1.6, 5.4, -1.8)); }
-    if (P.id === 'hammer') { add(part(sph, SH.yellow, 4.9, 3.6, 4.9, -0.2, 4.4, 0)); add(part(SH.cyl, SH.yellow, 6.2, 0.5, 6.2, 0.4, 3.2, 0)); add(part(SH.box, toon(0xffffff), 1.4, 1, 1.4, 3.4, 5.2, 0)); }
-    if (P.id === 'han') { add(part(SH.box, toon(0x7af0ff, { emissive: new T.Color(0x3a8aa8), transparent: true, opacity: 0.75 }), 0.6, 1.1, 4.4, 4.2, 0.6, 0)); add(part(sph, SH.dark, 0.7, 0.9, 0.7, 0, 0.6, 4.4)); }
-    if (P.id === 'echo') for (const z of [-1, 1]) { add(part(SH.cyl, SH.dark, 1.9, 1.2, 1.9, 0, 1.4, z * 4.6)).rotation.x = Math.PI / 2; add(part(sph, acc, 1.2, 1.2, 0.6, 0, 1.4, z * 5.3)); if (z > 0) { const band = add(new T.Mesh(new T.TorusGeometry(4.6, 0.45, 6, 16, Math.PI), SH.dark)); band.rotation.y = Math.PI / 2; band.position.y = 1.6; } }
-    // 等级解锁的头部涂装，缩小后戴在驾驶员头上
-    const hc = new T.Group(); hc.position.set(-0.5, 4.2, 0); hc.scale.setScalar(0.42); g.add(hc);
-    buildHead(hc, headCosmetic, teamColor);
-    return bake(g, false);
+    if (P.id === 'candy') for (const z of [-1, 1]) { const e = add(part(SH.cone, SH.white, 1.4, 2.6, 1.0, -0.4, 5.0, z * 2.5)); e.rotation.x = z * 0.35; add(part(SH.cone, toon(0xff9ad0), 0.8, 1.6, 0.5, -0.3, 4.8, z * 2.55)).rotation.x = z * 0.35; }
+    if (P.id === 'titan') { const band = add(new T.Mesh(new T.TorusGeometry(4.5, 0.6, 6, 20), acc)); band.rotation.x = Math.PI / 2; band.rotation.z = 0.15; band.position.y = 2.2; }
+    if (P.id === 'flag') { const b = add(part(SH.sphH, acc, 4.9, 1.8, 4.9, -0.3, 5.0, 0.6)); b.rotation.z = 0.25; add(part(sph, SH.yellow, 0.75, 0.75, 0.75, 1.6, 5.4, -1.8)); }
+    if (P.id === 'hammer') { add(part(SH.sphH, SH.yellow, 4.95, 3.6, 4.95, -0.2, 4.4, 0)); add(part(SH.cylH, SH.yellow, 6.2, 0.5, 6.2, 0.4, 3.2, 0)); add(part(SH.box, toon(0xffffff), 1.4, 1, 1.4, 3.4, 5.2, 0)); }
+    if (P.id === 'han') { add(part(SH.box, toon(0x7af0ff, { emissive: new T.Color(0x3a8aa8), transparent: true, opacity: 0.75 }), 0.6, 1.2, 4.8, 4.5, 0.7, 0)); add(part(sph, SH.dark, 0.7, 0.9, 0.7, 0, 0.6, 4.5)); }
+    if (P.id === 'echo') for (const z of [-1, 1]) { add(part(SH.cylH, SH.dark, 1.9, 1.2, 1.9, 0, 1.4, z * 4.6)).rotation.x = Math.PI / 2; add(part(sph, acc, 1.2, 1.2, 0.6, 0, 1.4, z * 5.3)); if (z > 0) { const band = add(new T.Mesh(new T.TorusGeometry(4.6, 0.45, 6, 16, Math.PI), SH.dark)); band.rotation.y = Math.PI / 2; band.position.y = 1.6; } }
+    if (P.id === 'vet') { add(part(SH.sphH, toon(0x5a6a3a), 4.7, 1.9, 4.7, -0.2, 4.2, 0)); add(part(SH.box, toon(0x5a6a3a), 3, 0.4, 5, 3.4, 3.6, 0)); add(part(sph, SH.gold, 0.6, 0.6, 0.6, 3.6, 4.6, 0)); }
+    if (headCosmetic) { const hc = new T.Group(); hc.position.set(-0.5, 4.6, 0); hc.scale.setScalar(0.4); g.add(hc); buildHead(hc, headCosmetic, teamColor); }
+  }
+
+  // 脸：大眼睛（白底 + 虹膜 + 瞳孔 + 两个高光）、眉毛、鼻子、嘴、腮红、耳朵
+  function buildFace(g, P, R) {
+    const add = (o) => { g.add(o); return o; };
+    const skin = toon(P.skin), skinD = toon(new T.Color(P.skin).lerp(new T.Color(0x8a4a6a), 0.3));
+    const brow = toon(new T.Color(P.hair2).lerp(new T.Color(0x14101c), 0.35));
+    add(outlined(SH.sphH, skin, R * 0.98, R * 0.95, R, 0, 0, 0, 1.2));
+    for (const z of [-1, 1]) add(part(SH.sphH, skin, 1.0, 1.45, 0.75, -0.3, -0.2, z * R * 0.97));   // 耳朵
+    const S0 = P.eyeShape;
+    const eyeH = S0 === 'round' ? 2.0 : S0 === 'sharp' ? 1.5 : S0 === 'cool' || S0 === 'sleepy' ? 1.35 : 1.75, eyeW = S0 === 'round' ? 1.45 : 1.3;
+    const ez = 2.05, ex = R * 0.86;
+    for (const z of [-1, 1]) {
+      if (S0 === 'happy') {
+        const arc = add(new T.Mesh(new T.TorusGeometry(0.95, 0.28, 6, 12, Math.PI), SH.dark));
+        arc.rotation.y = Math.PI / 2; arc.position.set(ex + 0.55, 0.0, z * ez);
+        continue;
+      }
+      add(part(SH.sphH, SH.eyeW, 0.9, eyeH, eyeW, ex, 0.15, z * ez));
+      add(part(SH.sphH, toon(P.eye), 0.75, eyeH * 0.78, eyeW * 0.72, ex + 0.35, 0.0, z * (ez - 0.12)));
+      add(part(SH.sphH, SH.pupil, 0.6, eyeH * 0.42, eyeW * 0.38, ex + 0.62, -0.05, z * (ez - 0.14)));
+      add(part(SH.sph, SH.glowW, 0.3, 0.42, 0.38, ex + 0.85, eyeH * 0.32, z * (ez - 0.12) - 0.32));
+      add(part(SH.sph, SH.glowW, 0.22, 0.2, 0.2, ex + 0.85, -eyeH * 0.3, z * (ez - 0.12) + 0.3));
+      // 眼皮：冷淡 / 困倦的半闭眼，凶的上挑眼线
+      if (S0 === 'cool' || S0 === 'sleepy') { const lid = add(part(SH.sphH, skin, 1.0, eyeH * 0.62, eyeW * 1.12, ex + 0.1, eyeH * (S0 === 'sleepy' ? 0.52 : 0.62), z * ez)); lid.userData.lid = true; }
+      const line = add(part(SH.box, SH.dark, 0.35, 0.32, eyeW * 1.9, ex + 0.62, eyeH * (S0 === 'sleepy' ? 0.12 : S0 === 'cool' ? 0.28 : 0.86), z * ez));
+      line.rotation.x = z * (S0 === 'sharp' ? 0.32 : S0 === 'cool' ? 0.12 : -0.05);
+    }
+    // 眉毛
+    const bt = { sharp: 0.38, bold: 0.3, cool: 0.08, sleepy: -0.12, round: -0.22, happy: -0.2 }[S0] || 0;
+    for (const z of [-1, 1]) {
+      const b = add(part(SH.box, brow, 0.45, S0 === 'bold' ? 0.7 : 0.45, 1.7, R * 0.84 + 0.55, eyeH * 0.5 + 1.25, z * 2.0));
+      b.rotation.x = z * bt;
+    }
+    add(part(SH.sph, skinD, 0.4, 0.33, 0.42, R * 0.98, -1.05, 0));                     // 鼻子
+    for (const z of [-1, 1]) add(part(SH.sph, SH.blush, 0.3, 0.55, 0.95, R * 0.86, -1.25, z * 3.05));   // 腮红
+    // 嘴
+    const my = -2.25, mx = R * 0.9;
+    switch (P.mouth) {
+      case 'grin': {   // 咧嘴大笑：张开的 D 形嘴 + 上排牙 + 舌头
+        const m = add(part(SH.sphH, SH.mouth, 0.55, 1.15, 1.65, mx, my - 0.15, 0)); m.userData.mouth = true;
+        add(part(SH.box, SH.eyeW, 0.5, 0.42, 2.4, mx + 0.32, my + 0.55, 0));
+        add(part(SH.sph, SH.tongue, 0.35, 0.4, 0.9, mx + 0.3, my - 0.75, 0));
+        break;
+      }
+      case 'open': {
+        add(part(SH.sphH, SH.mouth, 0.55, 1.05, 1.25, mx, my, 0));
+        add(part(SH.sph, SH.tongue, 0.4, 0.45, 0.8, mx + 0.25, my - 0.45, 0));
+        break;
+      }
+      case 'smirk': { const m = add(new T.Mesh(new T.TorusGeometry(0.95, 0.2, 6, 10, Math.PI * 0.75), SH.dark)); m.rotation.y = Math.PI / 2; m.rotation.x = Math.PI + 0.35; m.position.set(mx + 0.25, my + 0.55, 0.45); break; }
+      case 'smile': { const m = add(new T.Mesh(new T.TorusGeometry(1.0, 0.2, 6, 12, Math.PI), SH.dark)); m.rotation.y = Math.PI / 2; m.rotation.x = Math.PI; m.position.set(mx + 0.25, my + 0.6, 0); break; }
+      default: add(part(SH.box, SH.dark, 0.3, 0.26, 1.3, mx + 0.25, my + 0.1, 0));
+    }
+  }
+
+  // 每套衣服：上衣、袖子、裤子、鞋子、额外细节
+  const OUTFITS = {
+    jacket:   { top: '#e8382f', inner: '#f4efe6', pants: '#2a2d3a', shoes: '#e8382f', sleeve: 'long', open: true },
+    coat:     { top: '#e6eef8', inner: '#3a4a66', pants: '#2c3448', shoes: '#3a4a66', sleeve: 'long', coat: true },
+    idol:     { top: '#ff6ec4', inner: '#ffffff', pants: '#ffe1f2', shoes: '#ffffff', sleeve: 'short', skirt: '#ff9ad6' },
+    tank:     { top: '#3a3d48', inner: '#3a3d48', pants: '#5a6a3a', shoes: '#2a221c', sleeve: 'none', buff: true },
+    hoodie:   { top: '#3a2c55', inner: '#2a2040', pants: '#1f1b2a', shoes: '#8a6cff', sleeve: 'long', pocket: true },
+    engineer: { top: '#f4efe6', inner: '#2bb8a8', pants: '#2bb8a8', shoes: '#ffb21f', sleeve: 'short', overall: true },
+    aviator:  { top: '#8a5a34', inner: '#f4e6c8', pants: '#3a3226', shoes: '#4a3020', sleeve: 'long', fur: true },
+    hacker:   { top: '#1d1f2c', inner: '#7af0ff', pants: '#2a2d3a', shoes: '#7af0ff', sleeve: 'long', neon: true },
+    chefcoat: { top: '#ffffff', inner: '#ffffff', pants: '#3a3d48', shoes: '#2a2d3a', sleeve: 'long', chef: true, wide: true },
+    military: { top: '#5a6a3a', inner: '#7a8a52', pants: '#4a5530', shoes: '#2a221c', sleeve: 'long', medals: true },
+    kid:      { top: '#ffd23f', inner: '#ff7ab8', pants: '#5a8cff', shoes: '#ff7ab8', sleeve: 'short', backpack: true },
+    rebel:    { top: '#5b5e68', inner: '#2a2d36', pants: '#2a2d36', shoes: '#ff5a36', sleeve: 'long', scarf: '#ff5a36' },
+    worker:   { top: '#ff8a1f', inner: '#3a4a66', pants: '#3a4a66', shoes: '#4a3020', sleeve: 'long', vest: true },
+    dj:       { top: '#1fd6ee', inner: '#1d1f2c', pants: '#1d1f2c', shoes: '#ff3ea5', sleeve: 'long', chain: true },
+    security: { top: '#23252f', inner: '#3a3d48', pants: '#23252f', shoes: '#14151d', sleeve: 'long', armor: true },
+  };
+
+  // 随身武器模型：枪口朝 +x，握把在原点
+  function buildSidearm(g, pid, P, teamColor) {
+    const add = (o) => { g.add(o); return o; };
+    const dk = toon(0x2a2d3a), acc = toon(P.accent), tc = toon(teamColor), gl = (c) => basic(c);
+    switch (pid) {
+      case 'blaze': case 'flag': {
+        add(outlined(rbox(4.2, 1.7, 1.1, 0.5), pid === 'flag' ? toon(0xff8a1f) : acc, 1, 1, 1, 1.7, 0.7, 0));
+        add(part(SH.box, dk, 1.1, 2.4, 1, 0, -0.5, 0));
+        if (pid === 'flag') add(part(SH.cylH, dk, 1.1, 1.4, 1.1, 4.2, 0.8, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.sph, gl(pid === 'flag' ? 0xffe600 : 0xffb21f), 0.5, 0.5, 0.5, 4.0 + (pid === 'flag' ? 0.8 : 0), 0.8, 0));
+        break;
+      }
+      case 'frost': {
+        add(outlined(rbox(5, 1.6, 1.1, 0.5), toon(0xdfe8f4), 1, 1, 1, 1.8, 0.6, 0));
+        add(part(SH.cylH, dk, 0.4, 5, 0.4, 6.2, 0.9, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.cylH, toon(0x7ac8ff), 0.6, 2.4, 0.6, 2.4, 2.0, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.box, dk, 1, 2.2, 0.9, 0, -0.5, 0)); add(part(SH.box, toon(0xdfe8f4), 2.4, 1.3, 0.9, -1.6, 0.4, 0));
+        break;
+      }
+      case 'candy': {
+        add(outlined(SH.sphH, acc, 2.4, 1.7, 1.7, 1.8, 0.8, 0));
+        add(part(SH.cone, toon(0xffe600), 1.4, 2.4, 1.4, 4.4, 0.8, 0)).rotation.z = -Math.PI / 2;
+        add(part(SH.box, dk, 1, 2.2, 0.9, 0, -0.5, 0));
+        add(part(SH.sph, gl(0xffffff), 0.6, 0.6, 0.6, 1.8, 2.3, 0));
+        break;
+      }
+      case 'raven':
+        for (const k of [-1, 0, 1]) { const d = add(part(SH.cone, toon(0x6a4cc8), 0.35, 4.2, 0.35, 2.2, 0.4 + k * 0.5, k * 0.5)); d.rotation.z = -Math.PI / 2 + k * 0.2; add(part(SH.cone, gl(0x2a1f3a), 0.5, 1.0, 0.18, 0.4, 0.4 + k * 0.5, k * 0.5)).rotation.z = -Math.PI / 2; }
+        break;
+      case 'aurora': {
+        add(outlined(rbox(4.6, 2.2, 1.4, 0.5), toon(0xffb21f), 1, 1, 1, 1.8, 0.7, 0));
+        add(part(SH.cylH, dk, 0.5, 1.6, 0.5, 4.7, 0.6, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.box, dk, 1.1, 2.6, 1, 0, -0.7, 0)); add(part(SH.box, toon(0x2bb8a8), 1.2, 1.8, 1.1, 2.2, -0.9, 0));
+        break;
+      }
+      case 'gale': {
+        add(part(SH.box, toon(0x8a5a34), 5, 0.9, 0.9, 1.6, 0.4, 0));
+        const bow = add(new T.Mesh(new T.TorusGeometry(2.8, 0.32, 6, 16, Math.PI * 0.8), acc)); bow.rotation.y = Math.PI / 2; bow.rotation.x = Math.PI / 2 + 0; bow.position.set(3.6, 0.4, 0); bow.rotation.z = Math.PI * 0.6;
+        add(part(SH.cylH, toon(0xf4efe6), 0.2, 5.4, 0.2, 2.6, 1.0, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.cone, gl(0x9cff2e), 0.35, 0.9, 0.35, 5.5, 1.0, 0)).rotation.z = -Math.PI / 2;
+        break;
+      }
+      case 'hex': {
+        add(outlined(rbox(3.6, 2, 1.3, 0.5), toon(0x2a2d3a), 1, 1, 1, 1.4, 0.7, 0));
+        for (const z of [-0.35, 0.35]) add(part(SH.box, toon(0xcfd4e0), 1.4, 0.25, 0.25, 3.8, 0.9, z));
+        add(part(SH.sph, gl(0x7af0ff), 0.6, 0.6, 0.6, 4.4, 0.9, 0));
+        add(part(SH.box, gl(0x7af0ff), 2.4, 0.2, 1.35, 1.4, 1.4, 0));
+        add(part(SH.box, dk, 1, 2.2, 0.9, 0, -0.5, 0));
+        break;
+      }
+      case 'chef': {
+        add(part(SH.cylH, dk, 0.45, 4, 0.45, 2, 0, 0)).rotation.z = Math.PI / 2;
+        const pan = add(outlined(SH.cylH, toon(0x3a3d48), 3, 0.6, 3, 6.4, 0, 0)); pan.rotation.x = Math.PI / 2;
+        add(part(SH.cylH, toon(0x1b1c26), 2.4, 0.2, 2.4, 6.4, 0, 0.35)).rotation.x = Math.PI / 2;
+        break;
+      }
+      case 'vet': {
+        add(outlined(SH.sphH, toon(0x5a7a3a), 1.5, 1.7, 1.5, 0.8, 1.0, 0));
+        add(part(SH.cylH, dk, 0.7, 0.8, 0.7, 0.8, 2.8, 0));
+        add(new T.Mesh(new T.TorusGeometry(0.5, 0.12, 6, 10), SH.gold)).position.set(1.4, 3.0, 0);
+        break;
+      }
+      case 'yuzu': {
+        add(outlined(rbox(2.6, 1.6, 1.6, 0.5), toon(0xffd23f), 1, 1, 1, 0.8, 0.4, 0));
+        add(part(SH.cylH, dk, 0.15, 2.2, 0.15, 0.8, 2.2, 0.4));
+        add(part(SH.sph, gl(0xff3ea5), 0.35, 0.35, 0.35, 0.8, 3.3, 0.4));
+        break;
+      }
+      case 'echo': {
+        add(outlined(rbox(3.2, 3, 2, 0.6), toon(0x1d1f2c), 1, 1, 1, 1.4, 0.8, 0));
+        add(part(SH.cylH, acc, 1.1, 0.4, 1.1, 3.05, 0.8, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.cylH, gl(0xff3ea5), 0.5, 0.45, 0.5, 3.15, 0.8, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.box, gl(0x1fd6ee), 2.8, 0.25, 2.05, 1.4, -0.5, 0));
+        break;
+      }
+      case 'han': {
+        add(part(SH.cylH, dk, 0.55, 7, 0.55, 3, 0, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.cylH, toon(0x3a3d48), 0.75, 1.8, 0.75, 0, 0, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.sph, gl(0x7af0ff), 0.85, 0.85, 0.85, 6.6, 0, 0));
+        break;
+      }
+      case 'hammer': {
+        add(part(SH.cylH, toon(0x8a5a34), 0.5, 7.5, 0.5, 3.2, 0, 0)).rotation.z = Math.PI / 2;
+        add(outlined(rbox(2.4, 4.2, 2.4, 0.5), toon(0x5b5e68), 1, 1, 1, 6.6, 0.4, 0));
+        add(part(SH.box, SH.yellow, 2.5, 0.6, 2.5, 6.6, -0.6, 0));
+        break;
+      }
+      default: { // 通用手枪
+        add(outlined(rbox(4, 1.6, 1.1, 0.5), tc, 1, 1, 1, 1.6, 0.7, 0));
+        add(part(SH.box, dk, 1.1, 2.4, 1, 0, -0.5, 0));
+      }
+    }
+  }
+
+  // opts.bust：只要上半身（驾驶舱里）
+  function buildChar(pilotId, teamColor, headCosmetic, opts = {}) {
+    shared();
+    const P = S.pilot(pilotId), pid = P.id;
+    const O = OUTFITS[P.outfit] || OUTFITS.jacket;
+    const A = S.sidearm(pid);
+    const mats = new Map();
+    const M = (c) => { const k = String(c); if (!mats.has(k)) mats.set(k, toon(c)); return mats.get(k); };
+    const skin = M(P.skin), top = M(O.top), inner = M(O.inner), pants = M(O.pants), shoes = M(O.shoes), team = M(teamColor), acc = M(P.accent);
+    const root = new T.Group();
+    const W0 = O.wide ? 1.18 : O.buff ? 1.1 : 1;
+    // ---- 腿 ----
+    const hips = dyn(new T.Group()); hips.position.y = CH.hip; root.add(hips);
+    hips.add(outlined(SH.sphH, pants, 2.9 * W0, 2.1, 3.5 * W0, 0, 0.2, 0, 1));
+    const legs = [];
+    for (const side of [-1, 1]) {
+      const lg = dyn(new T.Group()); lg.position.set(0, 0, side * 1.75 * W0); hips.add(lg);
+      lg.add(outlined(SH.cylH, pants, 1.25, 4.6, 1.25, 0, -2.6, 0, 1));
+      lg.add(part(SH.cylH, team, 1.3, 0.6, 1.3, 0, -4.3, 0));
+      lg.add(outlined(rbox(4.2, 2, 2.6, 0.9), shoes, 1, 1, 1, 0.7, -5.6, 0, 1));
+      lg.add(part(SH.box, M('#f4efe6'), 4.3, 0.5, 2.7, 0.7, -6.4, 0));
+      legs.push(lg);
+    }
+    if (opts.bust) hips.visible = false;
+    // ---- 身体 ----
+    const torso = dyn(new T.Group()); torso.position.y = CH.hip + 0.4; root.add(torso);
+    const tb = new T.Group(); torso.add(tb);
+    const TA = (o) => { tb.add(o); return o; };
+    TA(outlined(SH.sphH, top, 3.2 * W0, 4.2, 3.9 * W0, 0, 3.6, 0, 1.1));
+    if (O.skirt) { const sk = TA(outlined(SH.cone, M(O.skirt), 4.4, 3.2, 4.8, 0, 0.4, 0, 1)); sk.rotation.x = 0; TA(part(SH.cylH, M('#ffffff'), 4.5, 0.4, 4.9, 0, -1.1, 0)); }
+    if (O.coat) { TA(outlined(SH.cone, top, 4.0, 5.4, 4.5, -0.3, -0.4, 0, 1)); TA(part(SH.box, inner, 0.4, 7, 1.0, 3.25, 2.4, 0)); }
+    if (O.open) { TA(part(SH.box, inner, 0.6, 5.4, 2.6, 2.75, 3.2, 0)); for (const z of [-1, 1]) TA(part(SH.box, top, 1.2, 1.4, 1.6, 2.6, 6.6, z * 1.8)).rotation.x = z * 0.4; }
+    if (O.overall) { TA(part(SH.box, inner, 0.7, 3.6, 4.2, 2.75, 2.0, 0)); for (const z of [-1, 1]) TA(part(SH.box, inner, 0.6, 3.6, 0.8, 2.4, 5.2, z * 1.5)); TA(part(SH.box, M('#ffb21f'), 0.8, 0.8, 0.8, 3.1, 3.2, 0)); }
+    if (O.fur) TA(part(SH.sphH, inner, 3.4, 1.4, 4.0, 0.3, 7.1, 0));
+    if (O.neon) for (const z of [-1, 1]) TA(part(SH.box, basic(O.inner), 0.3, 4.6, 0.3, 3.1, 3.4, z * 1.4));
+    if (O.chef) { for (let i = 0; i < 3; i++) for (const z of [-0.9, 0.9]) TA(part(SH.sph, M('#3a3d48'), 0.35, 0.35, 0.35, 3.75 * W0, 5.2 - i * 1.4, z)); TA(part(SH.box, M('#f4efe6'), 0.5, 3.6, 4.4, 3.4, 0.8, 0)); TA(part(SH.box, M('#ff5a36'), 3.6, 0.9, 4.4 * W0, 0.2, 7.0, 0)); }
+    if (O.medals) { TA(part(SH.box, inner, 0.5, 1.2, 1.4, 3.2, 5.6, -1.4)); for (let i = 0; i < 3; i++) TA(part(SH.sph, i ? M('#ff3e6c') : SH.gold, 0.45, 0.45, 0.25, 3.3, 4.4, -0.8 - i * 0.7)); TA(part(SH.box, M('#3a2a1c'), 3.4, 0.7, 4.2, 0, 1.0, 0)); }
+    if (O.backpack) { TA(outlined(rbox(2.6, 4, 3.6, 1), inner, 1, 1, 1, -3.4, 3.8, 0, 1)); }
+    if (O.scarf) { TA(new T.Mesh(new T.TorusGeometry(2.4, 0.9, 8, 16), M(O.scarf))).rotation.x = Math.PI / 2; tb.children[tb.children.length - 1].position.set(0.3, 7.0, 0); TA(part(SH.box, M(O.scarf), 0.8, 3.6, 1.4, -2.6, 5, 1.4)).rotation.x = 0.3; }
+    if (O.vest) { for (const y of [2.2, 4.4]) TA(part(SH.cylH, SH.yellow, 3.3, 0.5, 4.0, 0, y, 0)); }
+    if (O.chain) { const ch = TA(new T.Mesh(new T.TorusGeometry(2.0, 0.22, 6, 18), SH.gold)); ch.rotation.y = Math.PI / 2; ch.rotation.z = 0.25; ch.position.set(2.2, 5.6, 0); TA(part(SH.box, SH.gold, 0.4, 1.0, 1.0, 3.6, 3.8, 0)); }
+    if (O.armor) { TA(outlined(rbox(1.4, 4.4, 4.8, 0.5), M('#3a3d48'), 1, 1, 1, 2.8, 3.6, 0, 1)); TA(part(SH.box, basic(0x7af0ff), 0.3, 0.4, 2.4, 3.55, 4.6, 0)); }
+    if (O.pocket) TA(part(SH.box, inner, 0.5, 1.6, 3.0, 3.0, 1.6, 0));
+    // 队伍色：腰带 + 胸前徽章
+    TA(part(SH.cylH, team, 3.15 * W0, 0.9, 3.8 * W0, 0, 0.9, 0));
+    TA(part(SH.sph, team, 0.4, 1.0, 1.0, 3.0 * W0, 4.9, O.open ? 1.6 : -1.6));
+    TA(part(SH.cylH, skin, 1.3, 1.6, 1.3, 0, 8.2, 0));
+    // ---- 头 ----
+    const headG = dyn(new T.Group()); headG.position.y = CH.headY + 4.3; torso.add(headG);
+    buildFace(headG, P, CH.headR);
+    const deco = new T.Group(); const k = CH.headR / 4.3; deco.scale.setScalar(k); deco.position.set(0, -0.4 * k, 0); headG.add(deco);
+    headDecor(deco, P, headCosmetic, teamColor);
+    // ---- 手臂 ----
+    const arms = [];
+    const sleeve = O.sleeve === 'none' ? skin : top;
+    for (const side of [-1, 1]) {
+      const arm = dyn(new T.Group()); arm.position.set(0, CH.shoulder + 0.4, side * 3.9 * W0); torso.add(arm);
+      arm.add(outlined(SH.sphH, sleeve, 1.5 * (O.buff ? 1.2 : 1), 1.5, 1.5 * (O.buff ? 1.2 : 1), 0, -0.3, 0, 1));
+      arm.add(outlined(SH.cylH, O.sleeve === 'long' ? sleeve : skin, 1.05 * (O.buff ? 1.3 : 1), 4.4, 1.05 * (O.buff ? 1.3 : 1), 0, -2.6, 0, 1));
+      if (O.sleeve === 'short') arm.add(part(SH.cylH, sleeve, 1.3, 1.6, 1.3, 0, -1.2, 0));
+      if (O.sleeve === 'long') arm.add(part(SH.cylH, O.fur ? inner : team, 1.2, 0.6, 1.2, 0, -4.4, 0));
+      const big = pid === 'titan';
+      arm.add(outlined(SH.sphH, big ? acc : skin, big ? 2.1 : 1.3, big ? 2.1 : 1.3, big ? 2.1 : 1.3, 0, -5.4, 0, 1));
+      if (big) arm.add(part(SH.box, M('#ffffff'), 0.5, 1.2, 2.6, 1.6, -5.4, 0));
+      arms.push(arm);
+    }
+    // 随身武器放在右手；凌焰双枪，左手也有一把
+    const prop = dyn(new T.Group()); prop.position.set(0, -5.4, 0); prop.rotation.z = -Math.PI / 2; arms[1].add(prop);
+    if (pid !== 'titan') buildSidearm(prop, pid, P, teamColor);
+    let propL = null;
+    if (pid === 'blaze') { propL = dyn(new T.Group()); propL.position.set(0, -5.4, 0); propL.rotation.z = -Math.PI / 2; arms[0].add(propL); buildSidearm(propL, pid, P, teamColor); }
+    // 小柚的迷你无人机跟在肩膀旁边
+    let drone = null;
+    if (pid === 'yuzu' && !opts.bust) {
+      drone = dyn(new T.Group()); drone.position.set(-2, 27, -6); root.add(drone);
+      drone.add(outlined(SH.sphH, M('#ffd23f'), 2.2, 1.4, 2.2, 0, 0, 0, 1));
+      drone.add(part(SH.sph, basic(0x7af0ff), 0.9, 0.7, 0.9, 1.6, -0.2, 0));
+      for (const [x, z] of [[2, 2], [2, -2], [-2, 2], [-2, -2]]) { drone.add(part(SH.cylH, M('#2a2d3a'), 0.2, 0.8, 0.2, x, 0.6, z)); drone.add(part(SH.cylH, basic(0xffffff, { transparent: true, opacity: 0.5 }), 1.4, 0.1, 1.4, x, 1.0, z)); }
+      bake(drone);
+    }
+    for (const g of [hips, ...legs, tb, ...arms, prop, headG]) bake(g, !opts.bust);
+    if (propL) bake(propL, true);
+    return { root, hips, legs, torso, head: headG, arms, prop, propL, drone, kind: A.kind, pid, phase: 0, recoil: 0, swing: 0, lastAmmo: 3, idleT: Math.random() * 6, face: null };
+  }
+
+  // 驾驶舱里的小人：同一个角色模型的上半身
+  function buildPilot(pilotId, headCosmetic, teamColor) {
+    const c = buildChar(pilotId, teamColor, headCosmetic, { bust: true });
+    const g = new T.Group();
+    c.root.scale.setScalar(0.62); c.root.position.y = -(CH.headY + 4.3 + CH.hip + 0.4) * 0.62 + 0.6;
+    c.arms[0].rotation.z = 0.9; c.arms[1].rotation.z = 0.9; c.arms[0].rotation.x = -0.25; c.arms[1].rotation.x = 0.25;
+    c.prop.visible = false; if (c.propL) c.propL.visible = false;
+    g.add(c.root);
+    return g;
+  }
+
+  // 角色动画：st = 玩家状态（x, y, vx, vy, a 朝向, ammo, flags），dt 秒
+  // mode：'game'（游戏里）/ 'show'（展示台，没有移动时做待机动作）
+  function animateChar(c, st, dt, sp, opts = {}) {
+    c.idleT += dt;
+    const aimA = st.a;
+    c.face = c.face == null ? aimA : c.face + wrapA(aimA - c.face) * Math.min(1, dt * 16);
+    const moveA = Math.atan2(st.vy || 0, st.vx || 0);
+    c.phase += (Math.PI * 2 * sp * dt) / 26;
+    const sw = Math.min(1, sp / 140);
+    // 开火：弹药减少 = 刚开过一次火
+    const am = st.ammo == null ? 3 : st.ammo;
+    if (am < c.lastAmmo - 0.2 || opts.fire) { c.recoil = 1; c.swing = 1; }
+    c.lastAmmo = am;
+    c.recoil = Math.max(0, c.recoil - dt * 7); c.swing = Math.max(0, c.swing - dt * 4.2);
+    // 腿朝移动方向，身体朝瞄准方向
+    const back = sp > 20 && Math.cos(wrapA(moveA - c.face)) < -0.2 ? -1 : 1;
+    c.legs[0].rotation.z = Math.sin(c.phase) * 0.85 * sw * back; c.legs[1].rotation.z = -Math.sin(c.phase) * 0.85 * sw * back;
+    const bob = Math.abs(Math.sin(c.phase)) * 0.9 * sw;
+    const breathe = Math.sin(c.idleT * 2.4) * 0.12 * (1 - sw);
+    c.torso.position.y = CH.hip + 0.4 + bob + breathe;
+    c.hips.position.y = CH.hip + bob * 0.6;
+    c.torso.rotation.z = -0.12 * sw - (c.kind === 'melee' ? c.swing * 0.3 : 0);
+    c.torso.rotation.y = c.kind === 'melee' ? Math.sin(c.swing * Math.PI) * 0.7 : 0;
+    c.head.rotation.z = 0.08 * sw + Math.sin(c.idleT * 1.3) * 0.04;
+    c.head.rotation.x = Math.sin(c.idleT * 0.9) * 0.06 * (1 - sw);
+    // 手臂：枪 = 右手举起瞄准；近战 = 举在身侧，攻击时横扫；抛投 = 攻击时甩臂
+    const L = c.arms[0], R = c.arms[1];
+    const swingL = Math.sin(c.phase) * 0.7 * sw;
+    if (c.kind === 'gun') {
+      R.rotation.z = 1.45 - c.recoil * 0.35; R.rotation.x = -0.12;
+      if (c.propL) { L.rotation.z = 1.45 - c.recoil * 0.25; L.rotation.x = 0.12; } else { L.rotation.z = -swingL + 0.1; L.rotation.x = 0.15; }
+    } else if (c.kind === 'melee') {
+      const s = c.swing;
+      R.rotation.z = 0.9 + Math.sin(s * Math.PI) * 0.9; R.rotation.x = -0.5 + s * 1.4;
+      if (c.pid === 'titan') { L.rotation.z = 1.1 + Math.sin((1 - s) * Math.PI) * 0.5; L.rotation.x = 0.4; } else { L.rotation.z = -swingL + 0.1; L.rotation.x = 0.15; }
+    } else {
+      R.rotation.z = c.swing > 0 ? 2.6 - (1 - c.swing) * 2.2 : 0.4 - swingL; R.rotation.x = -0.2;
+      L.rotation.z = -swingL + 0.2; L.rotation.x = 0.2;
+    }
+    if (c.drone) { c.drone.position.y = 27 + Math.sin(c.idleT * 3) * 1.2; c.drone.rotation.y = c.idleT * 0.8; }
   }
 
   // =====================================================================
@@ -1569,18 +1865,7 @@
     if (weapon === 'fist') { arm.add(outlined(rbox(10, 10, 10, 3.5), bodyMat, 1, 1, 1, 11, -1, 0)); for (let i = 0; i < 4; i++) arm.add(part(s.box, light, 1.6, 2, 2, 16.2, 2.6 - i * 2.4, 0)); }
     // ---- 弹出后的驾驶员（步行） ----
     const foot = dyn(new T.Group()); root.add(foot); foot.visible = false;
-    const fp = buildPilot(pilotId, head, color); fp.scale.setScalar(1.25); fp.position.y = 17; foot.add(fp);
-    const flegs = [];
-    for (const side of [-1, 1]) {
-      const lg = dyn(new T.Group()); lg.position.set(0, 9, side * 2.6); foot.add(lg);
-      lg.add(part(s.box, joint, 2.6, 9, 2.6, 0, -4.5, 0));
-      lg.add(part(s.box, light, 4, 2, 3, 0.8, -8.6, 0));
-      flegs.push(lg);
-    }
-    const gun = dyn(new T.Group()); gun.position.set(3, 12, 5); foot.add(gun);
-    gun.add(part(s.box, toon(0x2a2d3a), 7, 2.4, 2, 3, 0, 0)); gun.add(part(s.box, toon(color), 2.4, 3.4, 2.2, 0.5, -1.6, 0));
-    for (const g2 of flegs) bake(g2, true);
-    bake(gun, true);
+    const fchar = buildChar(pilotId, color, head); fchar.root.scale.setScalar(1.45); foot.add(fchar.root);
     // ---- 滚轮形态 ----
     const wheel = dyn(new T.Group()); wheel.position.y = 14; root.add(wheel);
     const wheelTilt = dyn(new T.Group()); wheel.add(wheelTilt);
@@ -1602,7 +1887,7 @@
     for (const g of [lower, lean, wpnMount, wpn, arm, spinG]) bake(g);
     for (const L of legs) { bake(L.hip); bake(L.knee); bake(L.ankle); }
     return {
-      root, body, hips, lower, upper, lean, legs, flames, foot, flegs, fpilot: fp, color, fxAcc: 0, stepPh: 0, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat, lightMat: light,
+      root, body, hips, lower, upper, lean, legs, flames, foot, fchar, color, fxAcc: 0, stepPh: 0, wheel, wheelTilt, spinG, wpn, wpnMount, arm, pilot, tankFill, bodyMat, lightMat: light,
       fadeMats: [wheelMat, hubMat, spokeMat, tireMat, treadMat], shield, ud: wpn.userData,
       // 动画状态
       punch: 0, punchV: 0, spin: 0, moveA: 0, phase: 0, legYaw: 0, face: null, zs: null, lvx: 0, lvy: 0, avx: 0, avy: 0,
@@ -1664,10 +1949,7 @@
       b.body.visible = false; b.wheel.visible = false;
       b.face = b.face == null ? st.a : b.face + wrapA(st.a - b.face) * Math.min(1, dt * 16);
       b.root.rotation.y = -b.face;
-      b.phase += (Math.PI * 2 * sp * dt) / 22;
-      const sw = Math.min(1, sp / 150);
-      b.flegs[0].rotation.z = Math.sin(b.phase) * 0.8 * sw; b.flegs[1].rotation.z = -Math.sin(b.phase) * 0.8 * sw;
-      b.fpilot.position.y = 17 + Math.abs(Math.sin(b.phase)) * 1.2 * sw;
+      animateChar(b.fchar, st, dt, sp);
       return;
     }
     if (wheel) {
@@ -1956,6 +2238,90 @@
     PV.r.render(PV.scene, PV.cam);
   }
 
+  // ---------------- 驾驶员展示台：转台上的全身 3D 角色（待机 → 走两步 → 开火） ----------------
+  const CP = { yaw: -0.5 };
+  function cpInit() {
+    if (CP.r) return true;
+    if (!T) return false;
+    try {
+      CP.canvas = document.createElement('canvas'); CP.canvas.className = 'cp-canvas';
+      CP.r = new T.WebGLRenderer({ canvas: CP.canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+    } catch (e) { CP.r = null; return false; }
+    CP.scene = new T.Scene();
+    CP.scene.add(new T.HemisphereLight(0xeef0ff, 0x4a3a5a, 0.62));
+    const sun = new T.DirectionalLight(0xfff2e0, 0.62); sun.position.set(90, 110, 40); CP.scene.add(sun);
+    const back = new T.DirectionalLight(0x9fb4ff, 0.3); back.position.set(-70, 50, -80); CP.scene.add(back);
+    const disc = new T.Mesh(new T.CylinderGeometry(15, 16, 1.6, 40), new T.MeshLambertMaterial({ color: 0x2a2440 })); disc.position.y = -0.8; CP.scene.add(disc); CP.disc = disc;
+    CP.ring = new T.Mesh(new T.RingGeometry(13.5, 15.2, 48), new T.MeshBasicMaterial({ color: 0xffdf2e, transparent: true, opacity: 0.85 })); CP.ring.rotation.x = -Math.PI / 2; CP.ring.position.y = 0.05; CP.scene.add(CP.ring);
+    CP.cam = new T.PerspectiveCamera(28, 1, 1, 600);
+    const c = CP.canvas; c.style.touchAction = 'none';
+    c.addEventListener('pointerdown', (e) => { CP.drag = { x: e.clientX, yaw: CP.yaw }; try { c.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ } });
+    c.addEventListener('pointermove', (e) => { if (CP.drag) CP.yaw = CP.drag.yaw + (e.clientX - CP.drag.x) * 0.012; });
+    const up = () => { CP.drag = null; };
+    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+    return true;
+  }
+  function cpModel(pilotId, color) {
+    const key = pilotId + '|' + color;
+    if (CP.key === key) return;
+    if (CP.ch) CP.scene.remove(CP.ch.root);
+    CP.ch = buildChar(pilotId, color, null);
+    CP.scene.add(CP.ch.root); CP.key = key; CP.t0 = performance.now();
+    CP.ring.material.color.set(S.pilot(pilotId).accent);
+  }
+  function cpSize(w, h) {
+    CP.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); CP.r.setSize(w, h, false);
+    CP.cam.aspect = w / Math.max(1, h); CP.cam.updateProjectionMatrix();
+    const far = h > w * 1.15 ? 84 : 74;
+    CP.cam.position.set(far * 0.8, 22, far * 0.6); CP.cam.lookAt(0, 14.5, 0);
+    CP.w = w; CP.h = h;
+  }
+  function charPreview(host, pilotId, color) {
+    if (!cpInit()) return false;
+    shared();
+    if (CP.host !== host) { host.appendChild(CP.canvas); CP.host = host; }
+    cpModel(pilotId, color || S.pilot(pilotId).accent);
+    cpSize(host.clientWidth || 220, host.clientHeight || 260);
+    return true;
+  }
+  function charFrame(now, dt) {
+    if (!CP.r || !CP.ch || !CP.host || !CP.canvas.isConnected || CP.canvas.offsetParent === null) return;
+    if (CP.host.clientWidth !== CP.w || CP.host.clientHeight !== CP.h) cpSize(CP.host.clientWidth || 220, CP.host.clientHeight || 260);
+    const t = (now - (CP.t0 || 0)) / 1000, ph = t % 7.5;
+    if (!CP.drag) CP.yaw += dt * 0.3;
+    const face = CP.yaw;
+    let sp = 0, fire = false;
+    if (ph > 2.6 && ph < 4.4) sp = 120;
+    if (ph > 4.8 && ph < 7) fire = Math.floor((ph - 4.8) / 0.7) !== Math.floor((ph - 4.8 - dt) / 0.7);
+    animateChar(CP.ch, { a: face, vx: Math.cos(face) * sp, vy: Math.sin(face) * sp }, dt, sp, { fire });
+    CP.ch.root.rotation.y = -face;
+    CP.r.render(CP.scene, CP.cam);
+  }
+  // 拍一张角色照（展示用，结果缓存）
+  const CSHOTS = new Map();
+  function charShot(pilotId, color, w = 360, h = 440, stage = true) {
+    const key = [pilotId, color, w, h, stage].join('|');
+    if (CSHOTS.has(key)) return CSHOTS.get(key);
+    if (!cpInit()) return '';
+    shared();
+    const keep = { host: CP.host, key: CP.key, ch: CP.ch };
+    if (CP.ch) CP.scene.remove(CP.ch.root);
+    const ch = buildChar(pilotId, color || S.pilot(pilotId).accent, null);
+    animateChar(ch, { a: 0, vx: 0, vy: 0 }, 0.016, 0);
+    ch.root.rotation.y = -0.3;
+    CP.scene.add(ch.root); CP.ring.material.color.set(S.pilot(pilotId).accent);
+    CP.disc.visible = CP.ring.visible = stage;
+    cpSize(w, h); CP.r.setPixelRatio(1); CP.r.setSize(w, h, false);
+    CP.r.render(CP.scene, CP.cam);
+    const url = CP.canvas.toDataURL('image/png');
+    CP.disc.visible = CP.ring.visible = true;
+    CP.scene.remove(ch.root);
+    if (keep.ch) { CP.scene.add(keep.ch.root); CP.ring.material.color.set(S.pilot(keep.key.split('|')[0]).accent); }
+    CP.w = 0;
+    CSHOTS.set(key, url);
+    return url;
+  }
+
   const _v = new T.Vector3(), _up = new T.Vector3(0, 1, 0), _q = new T.Quaternion();
   function placeTube(m, x0, y0, z0, x1, y1, z1, w) {
     _v.set(x1 - x0, z1 - z0, y1 - y0);
@@ -2168,7 +2534,7 @@
   window.GB3D = {
     get ok() { return init(); },
     get scene() { return scene; },
-    build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, setQuality,
+    build, paintCell, burst, emit, setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, setQuality,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();

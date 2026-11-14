@@ -312,7 +312,7 @@ class Game {
 
     // 装填：攻击过程中不装填；己方涂料上的滚轮形态装填更快
     if (!p.burst && p.rollT <= 0 && !(p.charge > 0)) {
-      const rt = p.foot ? S.PISTOL.reload : W.reload;
+      const rt = p.foot ? S.sidearm(p.pilot).reload : W.reload;
       let rk = (p.rushT > 0 ? 2 : 1) * (wheel && own ? 1.6 : 1) * (p.tal.has('a2') ? 1.12 : 1);
       if (this.nearPilot(p, 'echo', 180)) rk *= 1.15;   // 叶声被动：节拍同步
       p.ammo = Math.min(S.AMMO, p.ammo + (dt / rt) * rk);
@@ -327,7 +327,7 @@ class Game {
     p.firing = firing;
 
     // 隐身：草丛 / 己方涂料里的滚轮 / 墨雾；攻击后 0.9 秒内会暴露（墨雾除外）
-    const recentAtk = this.time - p.lastAtk < 0.9;
+    const recentAtk = this.time - p.lastAtk < 0.9 && p.quietAtk !== p.lastAtk;   // 夜鸢的飞镖不暴露
     p.hidden = (p.smokeT > 0 || ((inBush || (wheel && own)) && !recentAtk)) && !(p.revealT > 0);
 
     if (inp.qq !== p.lastQq) {
@@ -367,13 +367,14 @@ class Game {
     let pulse = false;
     if (inp.aq !== p.lastAq) { p.lastAq = inp.aq; pulse = true; }
     if (p.silenceT > 0) { p.charge = 0; return false; }
-    if (p.burst) { this.stepBurst(p, W, dt); return true; }
+    if (p.burst) { this.stepBurst(p, p.foot ? S.sidearm(p.pilot) : W, dt); return true; }
     if (p.rollT > 0) this.stepRoll(p, W, dt);
     if (p.foot) {
-      if ((inp.f || pulse) && p.atkCd <= 0 && p.ammo >= 1) {
-        const P = S.PISTOL;
-        p.ammo -= 1; p.atkCd = P.atkCd; p.lastAtk = this.time; p.dmgMul = 1;
-        this.spawnProj(p, inp.a + (Math.random() - 0.5) * 0.04, inp.pt, P.speed, P.range, P.dmg, P.splat, P.trail, P.size);
+      const A = S.sidearm(p.pilot);
+      if ((inp.f || pulse) && p.atkCd <= 0 && p.ammo >= A.cost) {
+        p.ammo -= A.cost; p.atkCd = A.atkCd; p.lastAtk = this.time; p.dmgMul = 1;
+        p.quietAtk = A.quiet ? this.time : -1;
+        this.fireSidearm(p, A, inp);
         return true;
       }
       return false;
@@ -411,12 +412,55 @@ class Game {
     return p.rollT > 0;
   }
   takeOverdrive(p) { p.dmgMul = p.odN > 0 ? 1.4 : 1; if (p.odN > 0) p.odN--; }
+  // 驾驶员的随身武器（S.SIDEARMS）
+  fireSidearm(p, A, inp) {
+    const fl = { ghost: A.ghost, fx: A.fx };
+    if (A.kind === 'melee') return this.footMelee(p, A);
+    if (A.kind === 'lob') {
+      const d = clamp(inp.ad || 180, 60, A.range);
+      const sh = this.spawnShellRet(p, p.x + Math.cos(inp.a) * d, p.y + Math.sin(inp.a) * d, A.dmg, A.r, A.T);
+      if (sh) sh.foot = true;
+      return;
+    }
+    if (A.shots > 1) { p.burst = { n: A.shots, t: 0, aim: null, fl }; this.stepBurst(p, A, 0); return; }
+    const aim = A.homing ? this.autoAim(p, A) : null;
+    const n = A.pellets || 1;
+    for (let i = 0; i < n; i++) {
+      const off = n > 1 ? (i / (n - 1) - 0.5) * A.arc : 0;
+      this.spawnProj(p, (aim ? aim.a : inp.a) + off + (Math.random() - 0.5) * A.spread, aim ? aim.pt : inp.pt, A.speed, A.range, A.dmg, A.splat, A.trail, A.size, null, fl);
+    }
+  }
+  footMelee(p, A) {
+    const a = p.input.a;
+    this.knock(p, Math.cos(a), Math.sin(a), A.lunge || 120, 0);
+    const fx = p.x + Math.cos(a) * 22, fy = p.y + Math.sin(a) * 22;
+    this.paint(fx, fy, p.z, 18, p.team, p);
+    let hit = 0;
+    for (const t of this.players.values()) {
+      if (!t.alive || t.team === p.team) continue;
+      const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
+      if (d > A.range + (t.foot ? S.PILOT_R : S.R) + 6 || Math.abs(t.z - p.z) > 34) continue;
+      let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+      if (Math.abs(da) > A.arc / 2) continue;
+      this.hurt(t, A.dmg, p, dx, dy, A.kb / (A.dmg * 1.8), 80);
+      this.sideFx(t, A.fx);
+      hit++;
+    }
+    if (hit && A.heal) { p.hp = Math.min(this.maxHpOf(p), p.hp + A.heal * hit); this.ev(['heal', p.id, A.heal * hit]); }
+    this.pushBall(p, fx, fy, A.range, 600);
+    this.ev(['pu', p.id, r2(a), A.range, 1]);
+  }
+  sideFx(t, fx) {
+    if (!fx || !t.alive) return;
+    if (fx.slow) t.slowT = Math.max(t.slowT, fx.slow);
+    if (fx.reveal) t.revealT = Math.max(t.revealT || 0, fx.reveal);
+  }
   stepBurst(p, W, dt) {
     const b = p.burst;
     b.t -= dt;
     while (b.t <= 0 && b.n > 0) {
       const ya = b.aim ? b.aim.a : p.input.a, pa = b.aim ? b.aim.pt : p.input.pt;
-      this.spawnProj(p, ya + (Math.random() - 0.5) * W.spread, pa + (Math.random() - 0.5) * W.spread * 0.4, W.speed, W.range, W.dmg, W.splat, W.trail, W.size);
+      this.spawnProj(p, ya + (Math.random() - 0.5) * W.spread, pa + (Math.random() - 0.5) * W.spread * 0.4, W.speed, W.range, W.dmg, W.splat, W.trail, W.size, null, b.fl);
       b.n--; b.t += W.interval;
     }
     if (b.n <= 0) p.burst = null;
@@ -479,7 +523,7 @@ class Game {
     const x = o.x + d.x * (o.r || 0), y = o.y + d.y * (o.r || 0), z = o.z + d.z * (o.r || 0);
     if (S.insideAt(this.M, x, y, z)) { this.paint(o.x, o.y, o.z - 10, splat * 0.7, p.team, p); return; }
     const pr = { id: this.nextId++, x0: x, y0: y, z0: z, x, y, z, vx: d.x * speed, vy: d.y * speed, vz: d.z * speed, ts: range / speed, t: 0, team: p.team, owner: p.id,
-      dmg: dmg * (origin ? 1 : p.dmgMul || 1), splat, trail, size, acc: 0, range, ghost: !!(fl && fl.ghost), kb: (fl && fl.kb) || 1 };
+      dmg: dmg * (origin ? 1 : p.dmgMul || 1), splat, trail, size, acc: 0, range, ghost: !!(fl && fl.ghost), kb: (fl && fl.kb) || 1, fx: (fl && fl.fx) || null };
     this.projs.push(pr);
     this.ev(['pj', pr.id, r1(x), r1(y), r1(z), r1(pr.vx), r1(pr.vy), r1(pr.vz), r2(pr.ts), p.team, size, p.id, pr.ghost ? 1 : 0]);
     return pr;
@@ -490,7 +534,7 @@ class Game {
     x1 = clamp(x1, 10, S.W - 10); y1 = clamp(y1, 10, S.H - 10);
     let z1 = this.top(x1, y1);
     if (this.M.solid[Math.floor(y1 / S.CELL) * S.GW + Math.floor(x1 / S.CELL)]) z1 = S.LEVEL_H[3];
-    const sh = { id: this.nextId++, x0: p.x, y0: p.y, z0: p.z + S.MUZZLE + 6, x1, y1, z1, T, t: 0, team: p.team, owner: p.id, dmg, r };
+    const sh = { id: this.nextId++, x0: p.x, y0: p.y, z0: p.z + (p.foot ? 18 : S.MUZZLE + 6), x1, y1, z1, T, t: 0, team: p.team, owner: p.id, dmg, r };
     this.shells.push(sh);
     this.ev(['lb', sh.id, r1(sh.x0), r1(sh.y0), r1(sh.z0), r1(x1), r1(y1), r1(z1), r2(T), p.team]);
   }
@@ -1070,6 +1114,7 @@ class Game {
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
           this.hurt(victim, pr.dmg * (far ? 1.18 : 1), owner, pr.vx, pr.vy, pr.kb);
+          if (pr.fx) this.sideFx(victim, pr.fx);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
         }
@@ -1464,7 +1509,8 @@ function botThink(g, p, dt) {
   if (g.tutorial) { inp.mx = 0; inp.my = 0; inp.f = false; inp.w = false; return; }   // 训练靶：站着不动
   const ai = p.ai || (p.ai = { goal: null, path: [], pi: 0, replan: 0, stuckT: 0, lastX: p.x, lastY: p.y, wob: rand(0, 6), strafe: 1, strafeT: 0, jumpT: rand(1, 4), react: rand(0.15, 0.35), seenT: 0, paintT: rand(0.5, 2) });
   const W = S.WEAPONS[p.weapon];
-  const range = p.foot ? S.PISTOL.range : S.weaponRange(p.weapon);
+  const SA = p.foot ? S.sidearm(p.pilot) : null;
+  const range = p.foot ? SA.range : S.weaponRange(p.weapon);
   ai.replan -= dt;
 
   let enemy = null, ed = Infinity;
@@ -1472,7 +1518,7 @@ function botThink(g, p, dt) {
     if (!e.alive || e.team === p.team) continue;
     const d = Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z);
     if (!botSees(g, p, e, d)) continue;
-    const lobber = p.weapon === 'mortar' && !p.foot;
+    const lobber = p.foot ? SA.kind === 'lob' || SA.ghost : p.weapon === 'mortar';
     if (d < range + 160 && d < ed && (lobber || S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18))) { enemy = e; ed = d; }
   }
   ai.seenT = enemy ? ai.seenT + dt : 0;
@@ -1554,8 +1600,9 @@ function botThink(g, p, dt) {
     if (ai.strafeT <= 0) { ai.strafeT = rand(0.4, 1.1); ai.strafe = Math.random() < 0.5 ? -1 : 1; }
     const ea = Math.atan2(enemy.y - p.y, enemy.x - p.x);
     if (p.foot) {
-      // 驾驶员：边退边打
-      mx = -Math.cos(ea) * 0.7 + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.6; my = -Math.sin(ea) * 0.7 + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.6;
+      // 驾驶员：拿近战武器的冲上去，其他的边退边打
+      if (SA.kind === 'melee' && (hpK > 0.45 || ed < 90)) { mx = Math.cos(ea) + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.3; my = Math.sin(ea) + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.3; }
+      else { mx = -Math.cos(ea) * 0.7 + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.6; my = -Math.sin(ea) * 0.7 + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.6; }
     } else if (melee) { mx = Math.cos(ea) + Math.cos(ea + Math.PI / 2) * ai.strafe * 0.35; my = Math.sin(ea) + Math.sin(ea + Math.PI / 2) * ai.strafe * 0.35; }
     else if (p.weapon === 'charger') { mx = Math.cos(ea + Math.PI / 2) * ai.strafe * 0.5; my = Math.sin(ea + Math.PI / 2) * ai.strafe * 0.5; }
     else {

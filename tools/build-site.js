@@ -29,11 +29,18 @@ const notes = S.PATCH_NOTES.map((n) => ({ v: n.v, date: n.date, title: n.title, 
 const latest = notes[0];
 const NEW_MAPS = 3;   // 本次更新新增的地图数（排在 S.MAPS 最后）
 const seasonP = new Set(E.SEASON_PILOTS || []), questP = new Set(E.QUEST_ONLY || []);
-const pilots = Object.values(S.PILOTS).map((p) => ({
-  id: p.id, name: p.name, en: tr(p.name), title: p.title, en_title: tr(p.title), accent: p.accent,
-  tag: seasonP.has(p.id) ? 'season' : questP.has(p.id) ? 'quest' : '',
-  svg: pctx.window.GP.portrait(p, { bust: true, cls: 'pt' }).replace(/\s*\n\s*/g, ''),
-}));
+// 驾驶员：有 3D 渲染图（site/img/pilots/<id>.png，由 tools/render-pilots.js 生成）就用 3D 图，否则用立绘 SVG
+const pilots = Object.values(S.PILOTS).map((p) => {
+  const img = `img/pilots/${p.id}.png`, has3d = fs.existsSync(path.join(SITE, img));
+  const A = S.sidearm(p.id);
+  return {
+    id: p.id, name: p.name, en: tr(p.name), title: p.title, en_title: tr(p.title), accent: p.accent,
+    side: A.name, en_side: tr(A.name),
+    tag: seasonP.has(p.id) ? 'season' : questP.has(p.id) ? 'quest' : '',
+    img: has3d ? img : null,
+    svg: has3d ? null : pctx.window.GP.portrait(p, { bust: true, cls: 'pt' }).replace(/\s*\n\s*/g, ''),
+  };
+});
 const mechs = Object.entries(S.WEAPONS).map(([id, w]) => ({ id, name: w.name, en: tr(w.name), role: w.role, en_role: tr(w.role), hp: w.hp, range: w.range || 0,
   tag: (E.SEASON_MECHS || []).includes(id) ? 'season' : questP.has(id) ? 'quest' : '' }));
 const modes = Object.entries(S.MODES).map(([id, m]) => ({ id, name: m.name, en: tr(m.name), desc: m.desc, en_desc: tr(m.desc), isNew: !!m.isNew }));
@@ -56,17 +63,22 @@ const data = {
   season: { name: E.SEASON && E.SEASON.name, ends: E.SEASON && E.SEASON.end },
   counts: { pilots: pilots.length, mechs: mechs.length, maps: maps.length, modes: modes.length, skins: (S.SKINS || []).length, talents: (S.TALENTS || []).length },
   notes, pilots, mechs, modes, maps, downloads,
+  // 最新版本的截图（换版本时改这里）
   shots: [
-    { img: 'img/metro.jpg', map: '地铁中转站', mode: '涂地大战' },
-    { img: 'img/nightmarket.jpg', map: '夜市长街', mode: '抢占据点' },
-    { img: 'img/grayhq.jpg', map: '灰石总部', mode: '逃亡圈 · 四队' },
-  ].map((s) => ({ ...s, en_map: tr(s.map), en_mode: tr(s.mode) })),
+    { img: 'img/v13-lineup.jpg', cap: '15 位驾驶员的 3D 模型', en_cap: '3D models for all 15 pilots', sub: '1.3 新内容', en_sub: 'New in 1.3' },
+    { img: 'img/v13-detail.jpg', cap: '驾驶员 3D 展示台', en_cap: '3D pilot showcase', sub: '「驾驶员」界面', en_sub: 'Pilots screen' },
+    { img: 'img/v13-foot.jpg', cap: '每位驾驶员的随身武器', en_cap: 'Every pilot\'s own sidearm', sub: '机体被打爆后使用', en_sub: 'Used after ejecting' },
+  ],
 };
 
 // ---- 写文件 ----
 const js = `// 由 tools/build-site.js 生成，不要手改（改 public/shared.js 里的版本号和更新公告）\nwindow.GB_SITE = ${JSON.stringify(data)};\n`;
 fs.writeFileSync(path.join(SITE, 'data.js'), js);
-fs.writeFileSync(path.join(SITE, 'version.json'), JSON.stringify({ version: S.VERSION, date: latest.date, title: latest.title, en_title: latest.en_title, page: '#updates' }, null, 2) + '\n');
+// 游戏读取这个文件判断有没有新版本；force: true = 下载版必须更新才能继续玩
+fs.writeFileSync(path.join(SITE, 'version.json'), JSON.stringify({
+  version: S.VERSION, date: latest.date, title: latest.title, en_title: latest.en_title, page: '#updates', force: true,
+  notes: latest.sections.map((x) => x[0]), en_notes: latest.en.map((x) => x[0]),
+}, null, 2) + '\n');
 fs.mkdirSync(path.join(SITE, 'fonts'), { recursive: true });
 for (const f of ['huangyou.woff2', 'bangers.woff2', 'marker.woff2', 'FONTS-LICENSE.txt']) fs.copyFileSync(path.join(PUB, 'fonts', f), path.join(SITE, 'fonts', f));
 fs.copyFileSync(path.join(PUB, 'icon-192.png'), path.join(SITE, 'img', 'icon.png'));
@@ -89,6 +101,7 @@ if (argv.includes('--artifact')) {
   const cfg = { play: opt('--play') || 'https://claude.ai/artifact/FuL4mh2DHsZpsNnfMNP3m7', home: opt('--home') || 'https://lizard0727.github.io/GraffiBots/' };
   data.downloads = data.downloads.map((d) => ({ ...d, have: false }));
   for (const s of data.shots) s.img = 'data:image/jpeg;base64,' + b64(path.join(SITE, s.img));
+  for (const p of data.pilots) if (p.img) p.img = 'data:image/png;base64,' + b64(path.join(SITE, p.img));
   html = html.replace(/url\('fonts\/([^']+)'\)/g, (m, f) => `url('data:font/woff2;base64,${b64(path.join(SITE, 'fonts', f))}')`)
     .replace('<script src="data.js"></script>', () => `<script>window.GB_SITE = ${JSON.stringify(data)}; window.GB_SITE_CFG = ${JSON.stringify(cfg)};</script>`)
     .replace(/<!doctype html>\n?/i, '').replace(/<html[^>]*>\n?/, '').replace(/<\/html>\s*$/, '')

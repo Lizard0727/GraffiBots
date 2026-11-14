@@ -1278,3 +1278,31 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
 .upd-banner .btn { white-space: nowrap; }
 .upd-banner .link-btn { white-space: nowrap; }
 .upd-banner .link-btn { color: #fff; font-size: 12px; }
+
+/* 1.3：驾驶员详情里的 3D 角色展示台 */
+.sel-detail .det-show { display: flex; gap: 12px; align-items: center; justify-content: center; }
+.sel-detail .det-show .det-art { width: 120px; flex: 0 0 auto; }
+.det-3d { position: relative; width: 170px; height: 210px; flex: 0 0 auto; border-radius: 14px; border: 3px solid var(--ink, #000); background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--pc, #ffdf2e) 45%, #2a2440), #1a1626 75%); box-shadow: 4px 5px 0 #0007; overflow: hidden; cursor: grab; }
+.det-3d canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.det-3d small { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-size: 11px; color: #fff; opacity: .75; pointer-events: none; z-index: 1; text-shadow: 1px 1px 0 #000; }
+@media (max-width: 700px) { .det-3d { width: 140px; height: 175px; } .sel-detail .det-show .det-art { width: 96px; } }
+
+/* 1.3：强制更新页（下载版） */
+.upd-gate { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: radial-gradient(circle at 20% 15%, #ff3ea533, transparent 40%), radial-gradient(circle at 85% 85%, #1fd6ee2e, transparent 42%), repeating-linear-gradient(45deg, #1a1b26 0 22px, #181923 22px 44px); overflow-y: auto; }
+.ug-card { position: relative; width: min(560px, 100%); background: var(--paper, #fff6e3); color: var(--ink, #141018); border: 4px solid var(--ink, #141018); border-radius: 18px 22px 16px 20px; padding: 30px 28px 22px; box-shadow: 8px 10px 0 #000a; transform: rotate(-0.6deg); }
+.ug-tag { position: absolute; top: -18px; left: 22px; background: #ff5a36; color: #fff; border: 3px solid var(--ink, #141018); padding: 4px 14px; font: 18px var(--head, sans-serif); transform: rotate(-3deg); box-shadow: 3px 3px 0 #000a; }
+.ug-card h2 { margin: 6px 0 4px; font: 34px/1.15 var(--head, sans-serif); }
+.ug-ver { display: flex; align-items: center; gap: 14px; margin: 6px 0 12px; font: 40px/1 var(--num, sans-serif); letter-spacing: 1px; }
+.ug-old { color: #8a8290; text-decoration: line-through; text-decoration-thickness: 3px; }
+.ug-new { background: var(--ny, #ffe600); padding: 4px 10px 0; border: 3px solid var(--ink, #141018); border-radius: 8px; box-shadow: 3px 3px 0 #ff3ea5; }
+.ug-ver b { font-size: 26px; }
+.ug-text { margin: 0 0 10px; font-size: 15px; line-height: 1.6; }
+.ug-notes { margin: 0 0 16px; padding-left: 1.2em; font-size: 14px; line-height: 1.6; color: #3a3240; }
+.ug-notes:empty { display: none; }
+.ug-btns { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.ug-btns .btn.big { text-align: center; text-decoration: none; }
+.ug-btns .btn.ghost { color: #5c5560; border-color: #c9bfae; }
+.ug-steps { margin: 16px 0 6px; padding-left: 1.3em; font-size: 13px; color: #5c5560; }
+.ug-foot { display: block; font-size: 12px; color: #7a7280; }
+@media (max-height: 520px) { .ug-card { padding: 20px 20px 14px; } .ug-card h2 { font-size: 26px; } .ug-ver { font-size: 30px; margin: 2px 0 6px; } .ug-steps, .ug-notes { display: none; } }

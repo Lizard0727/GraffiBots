@@ -2,6 +2,7 @@ package com.graffibots.app;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -56,7 +57,12 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                return !"appassets.androidplatform.net".equals(u.getHost());
+                if ("appassets.androidplatform.net".equals(u.getHost())) return false;
+                // 官网等外部链接（例如「去官网下载新版本」）用手机浏览器打开
+                if ("https".equals(u.getScheme()) || "http".equals(u.getScheme())) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { /* 没有浏览器 */ }
+                }
+                return true;
             }
         });
         setContentView(web);

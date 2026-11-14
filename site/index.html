@@ -138,7 +138,11 @@ b.new { color: var(--ny); font-weight: 800; }
 .roster { display: grid; grid-auto-flow: column; grid-auto-columns: 168px; gap: 16px; overflow-x: auto; padding: 6px 2px 18px; scroll-snap-type: x proximity; scrollbar-color: var(--seam) transparent; }
 .pc { scroll-snap-align: start; background: var(--wall); border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; position: relative; box-shadow: 4px 5px 0 #0007; }
 .pc .art { aspect-ratio: 1; background: var(--wall-3); }
-.pc .art svg { display: block; width: 100%; height: 100%; }
+.pc .art svg, .pc .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pc .art { aspect-ratio: 9 / 11; }
+.pc .art { overflow: hidden; }
+.pc .art img { transform: scale(1.3); transform-origin: 50% 62%; }
+.pc em { display: block; font-style: normal; font-size: 12px; color: var(--ny); margin-top: 3px; }
 .pc .meta { padding: 9px 12px 12px; border-top: 3px solid var(--acc, var(--ny)); }
 .pc b { display: block; font: 21px/1.15 var(--f-head); }
 .pc span { font-size: 12px; color: var(--dust); }
@@ -324,8 +328,8 @@ footer a { color: var(--dust); }
       dl_btn: (v) => `下载 v${v}`, facts: ['位驾驶员', '台机兵', '张地图', '种玩法'],
       poster_tag: '最新版本', poster_go: '看看更新了什么 →', updated: (d) => `${d} 更新`,
       all_notes: '完整更新日志 →', more_items: (n) => `还有 ${n} 项 →`,
-      roster_h: '驾驶员与机兵', roster_p: '驾驶员和机兵分开选：每位驾驶员有自己的技能、被动和超载，坐进哪台机兵都行。机兵被打爆后驾驶员会弹出，还能继续战斗。',
-      season: '赛季', quest: '任务', th_mech: '机兵', th_role: '定位', th_hp: '生命', th_range: '射程',
+      roster_h: '驾驶员与机兵', roster_p: '驾驶员和机兵分开选：每位驾驶员有自己的技能、被动、超载和 3D 模型，坐进哪台机兵都行。机兵被打爆后驾驶员会弹出，拿出自己的专属武器继续战斗。',
+      season: '赛季', quest: '任务', side: '弹出武器', th_mech: '机兵', th_role: '定位', th_hp: '生命', th_range: '射程',
       modes_h: '玩法', modes_p: '每种玩法都有 4 对 4 的快速对战，也可以开房间和朋友打。', maps_h: '地图',
       dl_h: '下载与开始', dl_lede: (v, d) => `当前版本 ${v}，${d} 发布。每次更新都会先发在这里。`,
       dl: {
@@ -347,8 +351,8 @@ footer a { color: var(--dust); }
       dl_btn: (v) => `Download v${v}`, facts: ['pilots', 'mechs', 'maps', 'modes'],
       poster_tag: 'Latest version', poster_go: 'See what changed →', updated: (d) => `Updated ${d}`,
       all_notes: 'Full patch notes →', more_items: (n) => `${n} more →`,
-      roster_h: 'Pilots & mechs', roster_p: 'Pick a pilot and a mech separately: every pilot has their own skill, passive and overload, and can drive any mech. When a mech is destroyed the pilot ejects and keeps fighting.',
-      season: 'SEASON', quest: 'QUEST', th_mech: 'Mech', th_role: 'Role', th_hp: 'HP', th_range: 'Range',
+      roster_h: 'Pilots & mechs', roster_p: 'Pick a pilot and a mech separately: every pilot has their own skill, passive, overload and 3D model, and can drive any mech. When a mech is destroyed the pilot ejects and keeps fighting with their own sidearm.',
+      season: 'SEASON', quest: 'QUEST', side: 'Sidearm', th_mech: 'Mech', th_role: 'Role', th_hp: 'HP', th_range: 'Range',
       modes_h: 'Modes', modes_p: 'Every mode has 4v4 quick matches, or open a room and play with friends.', maps_h: 'Maps',
       dl_h: 'Download & play', dl_lede: (v, d) => `Current version ${v}, released ${d}. Every update is posted here first.`,
       dl: {
@@ -396,14 +400,14 @@ footer a { color: var(--dust); }
     const N = D.notes[0], secs = notesOf(N);
     $('latestTitle').textContent = (lang === 'en' ? N.en_title : N.title);
     $('latestLede').textContent = secs.map((s) => s[0]).join(lang === 'en' ? ' · ' : ' · ');
-    $('shots').innerHTML = D.shots.map((s) => `<figure class="shot"><img src="${esc(s.img)}" alt="${esc(lang === 'en' ? s.en_map : s.map)}" loading="lazy" width="1280" height="720"><figcaption><b>${esc(lang === 'en' ? s.en_map : s.map)}</b><span>${esc(lang === 'en' ? s.en_mode : s.mode)}</span></figcaption></figure>`).join('');
+    $('shots').innerHTML = D.shots.map((s) => `<figure class="shot"><img src="${esc(s.img)}" alt="${esc(L(s, 'cap'))}" loading="lazy" width="1280" height="720"><figcaption><b>${esc(L(s, 'cap'))}</b><span>${esc(L(s, 'sub'))}</span></figcaption></figure>`).join('');
     const rest = secs.slice(1), lens = rest.map((x) => x[1].length), big = rest.length % 2 ? lens.indexOf(Math.max(...lens)) : -1;
     $('hl').innerHTML = rest.map(([h, items], i) => {
       const show = items.slice(0, 3);
       return `<section class="${i === big ? 'big' : ''}"><h3>${esc(h)}</h3><ul>${show.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul>${items.length > 3 ? `<a class="more" href="#${vid(N.v)}">${esc(t('more_items')(items.length - 3))}</a>` : ''}</section>`;
     }).join('');
     // 驾驶员 / 机兵
-    $('roster').innerHTML = D.pilots.map((p) => `<article class="pc" style="--acc:${esc(p.accent)}"><div class="art">${p.svg}</div>${p.tag ? `<span class="sticker ${p.tag}">${esc(t(p.tag))}</span>` : ''}<div class="meta"><b>${esc(nm(p))}</b><span>${esc(L(p, 'title'))}</span></div></article>`).join('');
+    $('roster').innerHTML = D.pilots.map((p) => `<article class="pc" style="--acc:${esc(p.accent)}"><div class="art">${p.img ? `<img src="${esc(p.img)}" alt="${esc(nm(p))}" loading="lazy" width="360" height="440">` : p.svg}</div>${p.tag ? `<span class="sticker ${p.tag}">${esc(t(p.tag))}</span>` : ''}<div class="meta"><b>${esc(nm(p))}</b><span>${esc(L(p, 'title'))}</span><em>${esc(t('side'))} · ${esc(L(p, 'side'))}</em></div></article>`).join('');
     const maxHp = Math.max(...D.mechs.map((m) => m.hp)), maxR = Math.max(...D.mechs.map((m) => m.range));
     $('mechRows').innerHTML = D.mechs.map((m) => `<tr><td>${esc(nm(m))}${m.tag ? `<span class="sticker ${m.tag}">${esc(t(m.tag))}</span>` : ''}</td><td>${esc(L(m, 'role'))}</td><td class="num">${m.hp}<i class="bar" style="width:${Math.round(m.hp / maxHp * 60)}px"></i></td><td class="num">${m.range || '—'}${m.range ? `<i class="bar r" style="width:${Math.round(m.range / maxR * 60)}px"></i>` : ''}</td></tr>`).join('');
     // 玩法 / 地图

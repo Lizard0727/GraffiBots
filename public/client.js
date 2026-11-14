@@ -355,16 +355,19 @@
     const P = S.pilot(viewPilot || profile.pilot), d = $('pilotDetail');
     d.style.setProperty('--pc', P.accent);
     const rec = S.WEAPONS[P.weapon], sk = S.SKILLS[P.skill];
-    d.innerHTML = `<div class="det-art">${GP.portrait(P)}</div>
+    const wsP = (profile.wear && profile.wear.pilot || {})[P.id];
+    d.innerHTML = `<div class="det-show"><div class="det-art">${GP.portrait(P)}</div><div class="det-3d" id="pilot3d"><small>3D · 拖动旋转</small></div></div>
       <h3>${P.name}<small>「${P.code}」</small></h3><div class="ttl">${P.title}</div>
       <blockquote>“${P.line}”</blockquote>
       <div class="abil"><b>${ic('skill', P.accent)}技能 · ${sk.name}</b><p>${sk.desc} 每局 ${S.SKILL_USES} 次。</p></div>
       <div class="abil"><b>${ic('passive', P.accent)}被动 · ${P.passive.name}</b><p>${P.passive.desc}</p></div>
+      <div class="abil"><b>${ic('pilot', P.accent)}弹出武器 · ${S.sidearm(P.id).name}</b><p>${S.sidearm(P.id).desc} 机体被打爆、驾驶员弹出后使用。</p></div>
       <div class="abil ovl ${(profile.pilots[P.id] || {}).bt >= 1 ? '' : 'locked'}"><b>${ic('super', '#b78cff')}超载 · ${S.OVERLOADS[P.id].name}<small>${(profile.pilots[P.id] || {}).bt >= 1 ? 'R 键 · 每局 1 次' : '突破 I 解锁'}</small></b><p>${S.OVERLOADS[P.id].desc} 打出 ${S.OV_NEED} 点伤害充满，持续 ${S.OV_TIME} 秒（突破 II 后 ${S.OV_TIME + 2} 秒，效果更强）。</p></div>
       ${upgradeHtml(P)}
       <p class="bio">${P.bio}</p>
       ${!E.hasPilot(profile, P.id) ? '' : profile.weapon === P.weapon ? `<small class="okline">✓ 正在使用擅长机体「${rec.name}」</small>` : E.hasMech(profile, P.weapon) ? `<button class="btn small" id="recWpn">换上擅长机体「${rec.name}」</button>` : `<small class="okline dim">擅长机体「${rec.name}」还没拥有</small>`}`;
     bindUpgrade(P);
+    if (R3 && R3.charPreview) R3.charPreview($('pilot3d'), wsP && E.hasPilot(profile, P.id) ? P.id + '@' + wsP : P.id, P.accent);
     const b = $('recWpn');
     if (b) b.onclick = () => { profile.weapon = P.weapon; saveProfile(); sendLoadout(); renderWeaponLists(); renderPilots(); renderProfile(); sfx.click(); };
   }
@@ -471,6 +474,7 @@
   // 「对战」：建一个只有自己的房间，AI 补满后立刻开打
   let quick = null, quickRoom = false;
   function quickPlay() {
+    if (UPDATE_LOCK && mustUpdate()) { checkUpdate(); return; }
     if (needPilot()) return;
     ensureName();
     quick = { mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, bots: true };
@@ -1123,7 +1127,7 @@
       case 'lb': G.shells.set(e[1], { x0: e[2], y0: e[3], z0: e[4], x1: e[5], y1: e[6], z1: e[7], T: e[8], team: e[9], t0: now, r: 54 }); if (!silent && nearMe(e[2], e[3], 500)) sfx.throw(); break;
       case 'pu': {
         const p = G.players.get(e[1]);
-        if (p) { G.fx.push({ k: 'ring', x: p.x + Math.cos(e[2]) * 34, y: p.y + Math.sin(e[2]) * 34, z: (p.z || 0) + 14, r: 34, color: G.colors[p.team], t0: now, dur: 220 }); if (!silent && nearMe(p.x, p.y, 400)) sfx.hit(); }
+        if (p) { const rr = e[4] ? e[3] * 0.7 : 34, off = e[4] ? e[3] * 0.6 : 34; G.fx.push({ k: 'ring', x: p.x + Math.cos(e[2]) * off, y: p.y + Math.sin(e[2]) * off, z: (p.z || 0) + (e[4] ? 8 : 14), r: rr, color: G.colors[p.team], t0: now, dur: 200 }); if (!silent && nearMe(p.x, p.y, 400)) sfx.hit(); }
         break;
       }
       case 'qk':
@@ -1396,7 +1400,7 @@
     // 点一下：自动瞄准最近的敌人
     const autoAim = (superMode) => {
       const me = G.me; if (!me) return;
-      const range = superMode ? superRange(me) : (me.flags & 512 ? S.PISTOL.range : S.weaponRange(me.weapon));
+      const range = superMode ? superRange(me) : (me.flags & 512 ? S.sidearm(me.pilot).range : S.weaponRange(me.weapon));
       const t = autoTarget(range + 60);
       if (t) { G.aimLock = t.id; G.aimLockUntil = performance.now() + 300; G.aimPt = { x: t.x, y: t.y }; }
       TT.keepUntil = performance.now() + 300;
@@ -1512,7 +1516,13 @@
       else Object.assign(base, { kind: 'circle', len: sp === 'storm' ? 260 : sp === 'bubble' ? 170 : 60 });
       base.color = '#ffdf2e'; G.aimShow = base; return;
     }
-    if (foot) Object.assign(base, { kind: 'line', len: S.PISTOL.range, w: 8 });
+    if (foot) {
+      const A = S.sidearm(me.pilot);
+      if (A.kind === 'melee') Object.assign(base, { kind: 'fan', len: A.range + 14, arc: A.arc });
+      else if (A.kind === 'lob') { const dd = clamp(d, 60, A.range), tx = me.px + Math.cos(a) * dd, ty = me.py + Math.sin(a) * dd; Object.assign(base, { kind: 'line', len: dd, w: 4, tx, ty, tz: Math.min(150, S.topAt(G.M, tx, ty)), tr: A.r }); }
+      else if (A.pellets > 1) Object.assign(base, { kind: 'fan', len: A.range, arc: A.arc + 0.1 });
+      else Object.assign(base, { kind: 'line', len: A.range, w: 8 });
+    }
     else switch (W.attack) {
       case 'burst': Object.assign(base, { kind: 'line', len: W.range, w: 16 }); break;
       case 'fan': Object.assign(base, { kind: 'fan', len: W.range, arc: W.arc + 0.1 }); break;
@@ -1678,7 +1688,7 @@
     if (!me) return;
     // 瞄准：电脑用鼠标在地面上的位置；手机用攻击摇杆
     const alive = me.flags & 1;
-    const range = me.flags & 512 ? S.PISTOL.range : S.weaponRange(me.weapon);
+    const range = me.flags & 512 ? S.sidearm(me.pilot).range : S.weaponRange(me.weapon);
     if (TT.on) {
       if (TT.aiming) {
         // 屏幕上推 = 朝敌方前进方向，右推 = 屏幕右侧
@@ -1773,6 +1783,7 @@
     } else if (!$('title').classList.contains('hidden')) {
       menuBg(now);
       if (PV_OK) R3.previewFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
+      if (R3.charFrame) R3.charFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
       loop.last = now;
     }
   }
@@ -2014,7 +2025,7 @@
       }
       if (!TOP() && self) continue;
       const foot = p.flags & 512;
-      const s = R3.project(px, py, pz + (foot ? 34 : 52));
+      const s = R3.project(px, py, pz + (foot ? 52 : 52));
       if (!s) continue;
       const col = G.colors[p.team];
       const hpMax = (self ? me.maxHp : p.maxHp) || 100, hp = Math.max(0, self ? me.hp : p.hp);
@@ -2314,7 +2325,7 @@
           txt(key, x, y + r + 16, 11, '#9a9db5', 'center', 3);
         };
         const am = me.ammo == null ? 3 : me.ammo;
-        ring(bx, by, 40, am / 3, '#ffae2e', foot ? '手枪' : W.short, '左键 · ' + Math.floor(am) + '/3');
+        ring(bx, by, 40, am / 3, '#ffae2e', foot ? S.sidearm(me.pilot).name : W.short, '左键 · ' + Math.floor(am) + '/3');
         const spk = foot ? 0 : Math.min(1, me.sp / W.spNeed);
         ring(bx - 104, by + 6, 32, spk, '#ffdf2e', foot ? '—' : '大招', 'E / 右键', spk >= 1 && !foot, !!foot);
         const sk = S.SKILLS[P.skill], uses = me.skUses == null ? 3 : me.skUses;
@@ -2836,18 +2847,44 @@
   // 用 node server.js 开的服：官网就在同一台服务器的 /site/；离线版 / 单文件版 / 安卓版：去 config.js 里填的官网查
   const siteUrl = () => (window.GB_ARTIFACT ? '' : /^https?:$/.test(location.protocol) && !FILE_MODE ? location.origin + '/site/' : window.GB_SITE_URL || '');
   const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+  // 下载版（离线 HTML、单文件版、安卓 App、静态网页）：官网有新版本时必须更新才能继续玩
+  const mustUpdate = () => FILE_MODE && !window.GB_ARTIFACT;
+  let UPDATE_LOCK = null;
   function checkUpdate() {
     const base = siteUrl();
     if (!base) return;
     fetch(base + 'version.json', { cache: 'no-store' }).then((r) => r.json()).then((v) => {
-      if (!v || !v.version || !newer(v.version, S.VERSION) || store.get('updLater', '') === v.version) return;
+      if (!v || !v.version || !newer(v.version, S.VERSION)) return;
+      if (mustUpdate() && v.force !== false) { showGate(v, base); return; }
+      if (store.get('updLater', '') === v.version) return;
       $('updText').textContent = `新版本 ${v.version}`;
       $('updBanner').title = `发现新版本 ${v.version}（你正在玩的是 ${S.VERSION}）`;
       $('updGo').href = base + (v.page || '#updates');
       $('updLater').onclick = () => { store.set('updLater', v.version); $('updBanner').classList.add('hidden'); };
       $('updBanner').classList.remove('hidden');
-    }).catch(() => {});
+    }).catch(() => { /* 没联网：没法确认，先让玩家继续玩 */ });
   }
+  function showGate(v, base) {
+    UPDATE_LOCK = v;
+    if (G) return;   // 对局中先不打断，回到大厅后的下一次检查再弹出
+    const en = window.GBI18N && GBI18N.lang === 'en';
+    $('ugOld').textContent = S.VERSION; $('ugNew').textContent = v.version;
+    $('ugTitle').textContent = en ? (v.en_title || `Version ${v.version} is out`) : (v.title || `${v.version} 新版本已发布`);
+    $('ugText').textContent = `涂鸦机兵 ${v.version} 已经发布。你现在的版本 ${S.VERSION} 需要更新到最新版本才能继续游玩。`;
+    const notes = (en ? v.en_notes : v.notes) || [];
+    $('ugNotes').innerHTML = '';
+    for (const n of notes.slice(0, 6)) { const li = document.createElement('li'); li.textContent = n; if (en) li.setAttribute('data-noi18n', ''); $('ugNotes').appendChild(li); }
+    const url = base + '#download';
+    $('ugGo').href = url;
+    $('ugGo').onclick = (e) => { if (/[?&]app=1/.test(location.search)) { e.preventDefault(); location.href = url; } };   // 安卓 App：交给手机浏览器打开
+    $('ugRetry').onclick = () => location.reload();
+    $('updBanner').classList.add('hidden');
+    $('updGate').classList.remove('hidden');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  // 回到游戏 / 每 10 分钟再检查一次
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && profile) checkUpdate(); });
+  setInterval(() => { if (profile && !G) checkUpdate(); }, 10 * 60 * 1000);
   // ---------------- 限时购买 ----------------
   function renderOffers() {
     const row = $('offerRow');

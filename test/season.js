@@ -358,5 +358,54 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   g.stop();
 }
 
+// ---- 1.3：驾驶员弹出后的随身武器 ----
+{
+  const ids = S.PILOTS.map((P) => P.id);
+  ok(ids.every((id) => S.SIDEARMS[id]), `${ids.length} 位驾驶员都有自己的随身武器`);
+  ok(new Set(ids.map((id) => S.SIDEARMS[id].name)).size === ids.length, '随身武器名字各不相同');
+  // 强度：每秒伤害（受弹药限制）都远低于任何机体
+  const sideDps = (A) => (A.dmg * (A.shots || 1) * (A.pellets || 1)) / (A.reload * (A.cost || 1));
+  const mechDps = (W) => ({ burst: W.shots * W.dmg, fan: W.pellets * W.dmg, flick: W.pellets * W.dmg, charge: W.dmg, lob: W.dmg, punch: W.dmg }[W.attack] || W.dmg) / W.reload;
+  const maxSide = Math.max(...ids.map((id) => sideDps(S.sidearm(id))));
+  const minMech = Math.min(...Object.values(S.WEAPONS).map(mechDps));
+  ok(maxSide < minMech, `最强随身武器每秒 ${maxSide.toFixed(1)} 伤害，低于最弱机体的 ${minMech.toFixed(1)}`);
+  for (const id of ids) {
+    const A = S.sidearm(id);
+    const dist = A.kind === 'melee' ? 40 : Math.min(150, A.range - 40);
+    const { g, A: me, B, run, events } = duel({ pilot: id }, { pilot: 'blaze' }, { dist });
+    g.wreck(me, null); me.invulnT = 0; me.rebuildT = 99; B.invulnT = 0;
+    me.input.ad = dist;
+    const hp0 = B.hp;
+    let slowed = false, revealed = false;
+    for (let i = 0; i < 2; i++) { fire(me); for (let k = 0; k < (A.atkCd + 0.5) * S.TICK; k++) { run(1 / S.TICK); slowed = slowed || B.slowT > 0; revealed = revealed || B.revealT > 0; } }
+    const dealt = hp0 - B.hp;
+    ok(me.foot && dealt > 0 && dealt < 60, `${S.pilot(id).name}「${A.name}」（${A.kind}）弹出后能打中 ${Math.round(dealt)} 点`);
+    if (A.fx && A.fx.slow) ok(slowed, `　${A.name}：命中后减速`);
+    if (A.fx && A.fx.reveal) ok(revealed, `　${A.name}：命中后暴露`);
+    if (A.heal) ok(events.some((e) => e[0] === 'heal' && e[1] === me.id), `　${A.name}：打中回血`);
+  }
+  {
+    // 叶声的口袋音箱穿墙
+    const { g, A: me, B, run } = duel({ pilot: 'echo' }, {}, { dist: 120 });
+    g.wreck(me, null); me.rebuildT = 99; me.invulnT = 0; B.invulnT = 0;
+    const cx = Math.floor((me.x + 60) / S.CELL), cy = Math.floor(me.y / S.CELL);
+    for (let dy = -3; dy <= 3; dy++) { const i = (cy + dy) * S.GW + cx; g.M.solid[i] = 1; g.M.top[i] = 999; }
+    const hp0 = B.hp; fire(me); run(0.8);
+    ok(B.hp < hp0, `口袋音箱：音波穿墙命中 ${Math.round(hp0 - B.hp)} 点`);
+  }
+  {
+    // 夜鸢在草丛里扔飞镖不暴露；凌焰开枪会暴露
+    for (const [pid, want] of [['raven', true], ['blaze', false]]) {
+      const { g, A: me, run } = duel({ pilot: pid }, {}, { dist: 200 });
+      g.wreck(me, null); me.rebuildT = 99;
+      me.smokeT = 5; fire(me); run(0.2);
+      const cx = Math.floor(me.x / S.CELL), cy = Math.floor(me.y / S.CELL);
+      g.M.bush = g.M.bush || new Uint8Array(S.GW * S.GH);
+      me.smokeT = 0; g.M.bush[cy * S.GW + cx] = 1; run(0.1);
+      ok(me.hidden === want, `${S.pilot(pid).name}：草丛里刚开过火 ${want ? '仍然隐身' : '会暴露'}`);
+    }
+  }
+}
+
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');
 process.exit(failed ? 1 : 0);

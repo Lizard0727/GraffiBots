@@ -250,6 +250,27 @@
   S.REBUILD = 6;            // 新机体重建时间（秒），驾驶员活下来就在原地空投新机体
   S.KO_RESPAWN = 4;         // 驾驶员被击倒后回基地复活的时间
   S.PISTOL = { range: 260, dmg: 13, speed: 620, reload: 0.85, atkCd: 0.32, size: 5, splat: 12, trail: 0 };
+  // 1.3：每位驾驶员弹出后用自己的随身武器（都比机体弱得多）
+  //   kind: gun 子弹 / melee 近身挥击 / lob 抛投；shots 连发、pellets 散射、cost 每发弹药、quiet 草丛里开火不暴露、
+  //   homing 自动锁定、ghost 穿墙、fx.slow 减速秒数、fx.reveal 暴露秒数、heal 命中回血
+  S.SIDEARMS = {
+    blaze:  { name: '火花双枪', desc: '一次连开 2 枪，近中距离压制。', kind: 'gun', shots: 2, interval: 0.08, dmg: 8, range: 240, speed: 640, spread: 0.06, reload: 0.8, atkCd: 0.36 },
+    frost:  { name: '袖珍狙击枪', desc: '射程最远、单发伤害高，但开火很慢。', kind: 'gun', dmg: 22, range: 380, speed: 1150, reload: 1.15, atkCd: 0.7, size: 4, splat: 10 },
+    candy:  { name: '彩带喷枪', desc: '一次喷出 3 道彩带，近距离很难躲。', kind: 'gun', pellets: 3, arc: 0.42, dmg: 6, range: 200, speed: 560, reload: 0.8, atkCd: 0.38, splat: 14 },
+    titan:  { name: '涂料拳套', desc: '近身连拳，把敌人打飞。', kind: 'melee', dmg: 16, range: 46, arc: 1.8, kb: 140, lunge: 140, reload: 0.75, atkCd: 0.38 },
+    raven:  { name: '墨汁飞镖', desc: '在草丛和墨雾里投掷不会暴露自己。', kind: 'gun', dmg: 11, range: 290, speed: 760, quiet: true, reload: 0.85, atkCd: 0.34, size: 4 },
+    aurora: { name: '铆钉枪', desc: '射速很快，每发只用半格弹药。', kind: 'gun', dmg: 6, range: 230, speed: 700, cost: 0.5, spread: 0.08, reload: 0.9, atkCd: 0.16, size: 4 },
+    gale:   { name: '疾风弩', desc: '箭矢飞得很快，装填也最快。', kind: 'gun', dmg: 12, range: 300, speed: 1000, reload: 0.7, atkCd: 0.3, size: 4 },
+    hex:    { name: '电击枪', desc: '射程短，命中后让敌人减速 0.8 秒。', kind: 'gun', dmg: 9, range: 210, speed: 800, fx: { slow: 0.8 }, reload: 0.9, atkCd: 0.4 },
+    chef:   { name: '平底锅', desc: '近身拍击，每次打中给自己回 4 点生命。', kind: 'melee', dmg: 15, range: 44, arc: 2.0, kb: 180, lunge: 120, heal: 4, reload: 0.75, atkCd: 0.42 },
+    vet:    { name: '手雷', desc: '抛出一颗会越过墙的小手雷，小范围爆炸。', kind: 'lob', dmg: 18, r: 46, range: 250, T: 0.6, reload: 1.2, atkCd: 0.8 },
+    yuzu:   { name: '迷你无人机', desc: '小无人机自动锁定准星附近的敌人。', kind: 'gun', homing: true, dmg: 8, range: 260, speed: 600, reload: 0.85, atkCd: 0.34, size: 5 },
+    flag:   { name: '信号枪', desc: '打中的敌人会暴露 2.5 秒，全队都能看见。', kind: 'gun', dmg: 10, range: 270, speed: 700, fx: { reveal: 2.5 }, reload: 0.85, atkCd: 0.35 },
+    hammer: { name: '钉锤', desc: '挥得慢，但一锤很重，能把人砸退。', kind: 'melee', dmg: 20, range: 50, arc: 1.6, kb: 200, lunge: 100, reload: 0.95, atkCd: 0.62 },
+    echo:   { name: '口袋音箱', desc: '短距离音波，可以穿过墙壁。', kind: 'gun', ghost: true, dmg: 9, range: 180, speed: 520, reload: 0.85, atkCd: 0.4, size: 7 },
+    han:    { name: '警用电棍', desc: '近身电击，命中让敌人减速 0.6 秒。', kind: 'melee', dmg: 14, range: 44, arc: 1.5, kb: 110, lunge: 130, fx: { slow: 0.6 }, reload: 0.75, atkCd: 0.38 },
+  };
+  S.sidearm = (pid) => Object.assign({ kind: 'gun', size: 5, splat: 12, trail: 0, cost: 1, spread: 0.04 }, S.PISTOL, S.SIDEARMS[String(pid || '').split('@')[0]] || {});
   S.BUSH_DETECT = 90;       // 草丛里的敌人在这个距离内会被看见
 
   // ---------------- 奖杯之路（解锁头部涂装） ----------------
@@ -879,9 +900,40 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.2';
+  S.VERSION = '1.3';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.3', date: '2026-11-14', title: '1.3 更新 · 驾驶员出击', en_title: 'Update 1.3 · Pilots Unleashed', sections: [
+      ['全新 3D 驾驶员模型', [
+        '15 位驾驶员都有了精致的全身 3D 模型：大头卡通造型，专属的服装、发型、表情和配件',
+        '弹出后在战场上奔跑、瞄准、开火、挥击都有专属动作；驾驶舱里坐着的也是同一个角色',
+        '「驾驶员」界面新增 3D 展示台，可以拖动旋转，官网的角色介绍也换成了 3D 模型']],
+      ['驾驶员专属随身武器', [
+        '机体被打爆后，每位驾驶员会拿出自己的武器，不再是统一的手枪（强度都远低于机体）',
+        '凌焰「火花双枪」、白夜「袖珍狙击枪」、雷豹「涂料拳套」、包大福「平底锅」、秦岳「手雷」、叶声「口袋音箱」、韩冰「警用电棍」等 15 种',
+        '电击枪、警用电棍会减速，信号枪会暴露敌人，平底锅打中回血，口袋音箱能穿墙，夜鸢的飞镖在草丛里扔不会暴露',
+        '「驾驶员」详情里可以查看每个人的弹出武器']],
+      ['下载版必须更新', [
+        '离线 HTML、单文件版和安卓版：官网发布新版本后，旧版本会显示更新页面，更新到最新版本才能继续游玩',
+        '更新页面会列出新版本的内容，点「去官网下载新版本」直接打开官网下载页',
+        '没联网时无法检查新版本，可以继续玩']],
+      ['更新奖励', ['信箱里有一份 1.3 更新礼包：100 宝石 + 角色宝箱 + 2000 金币']],
+    ], en: [
+      ['All-new 3D pilot models', [
+        'All 15 pilots now have detailed full-body 3D models: big-head cartoon style with their own outfits, hair, expressions and gear',
+        'Ejected pilots run, aim, shoot and swing with their own animations, and the pilot in the cockpit is the same character',
+        'The Pilots screen has a new 3D showcase you can drag to rotate, and the website roster now shows the 3D models']],
+      ['Pilot sidearms', [
+        'When your mech is destroyed, each pilot pulls out their own weapon instead of the same pistol (all far weaker than a mech)',
+        '15 in total, including Blaze\'s Spark Twins, Frost\'s Pocket Sniper, Titan\'s Paint Knuckles, Bao\'s Frying Pan, Qin\'s Grenade, Echo\'s Pocket Speaker and Han\'s Stun Baton',
+        'The Taser and Stun Baton slow, the Flare Pistol reveals, the Frying Pan heals on hit, the Pocket Speaker goes through walls, and Raven\'s darts don\'t reveal her in bushes',
+        'Check every pilot\'s sidearm in their Pilots screen details']],
+      ['Downloaded versions must update', [
+        'Offline HTML, single-file and Android versions: once a new version is released on the website, older versions show an update screen and must update before you can keep playing',
+        'The update screen lists what\'s new, and “Download the new version” opens the website download page',
+        'Without an internet connection the game can\'t check for updates, so you can keep playing']],
+      ['Update rewards', ['A 1.3 update gift is waiting in your mailbox: 100 gems + Hero Chest + 2,000 coins']],
+    ] },
     { v: '1.2', date: '2026-11-14', title: '1.2 更新 · 地下战线', en_title: 'Update 1.2 · Underground Front', sections: [
       ['新地图 ×3', ['「地铁中转站」：午夜的地下站台，上下两层，柱子后面最好埋伏', '「灰石总部」：两座办公塔居高临下，喷泉广场挡住中路视线', '「夜市长街」：灯笼下的小吃摊窄巷，摊位顶棚可以站人']],
       ['平衡调整（根据 900 局 AI 对战数据）', [
