@@ -27,7 +27,7 @@ vm.runInContext(fs.readFileSync(path.join(PUB, 'portraits.js'), 'utf8'), pctx);
 const trSecs = (secs) => secs.map(([h, items]) => [tr(h), items.map(tr)]);
 const notes = S.PATCH_NOTES.map((n) => ({ v: n.v, date: n.date, title: n.title, en_title: n.en_title || tr(n.title), sections: n.sections, en: n.en || trSecs(n.sections) }));
 const latest = notes[0];
-const NEW_MAPS = 3;   // 本次更新新增的地图数（排在 S.MAPS 最后）
+const NEW_MAPS = 2;   // 本次更新新增的地图数（排在 S.MAPS 最后）
 const seasonP = new Set(E.SEASON_PILOTS || []), questP = new Set(E.QUEST_ONLY || []);
 // 驾驶员：有 3D 渲染图（site/img/pilots/<id>.png，由 tools/render-pilots.js 生成）就用 3D 图，否则用立绘 SVG
 const pilots = Object.values(S.PILOTS).map((p) => {

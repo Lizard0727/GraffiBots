@@ -6,7 +6,7 @@ const { Game, Room } = require('../server.js');
 
 let failed = 0;
 // 出生点 / 终点 / 据点不应落在墙里
-for (let m = 0; m < S.MAPS.length; m++) {
+for (let m = 0; m < S.MAP_N; m++) {
   const M = S.buildMap(m);
   const pts = [S.goalFor(1, m), S.goalFor(2, m), { x: S.W / 2, y: S.H / 2 }];
   for (const t of [1, 2]) for (let s = 0; s < 4; s++) pts.push(S.spawnPoint(t, s));
@@ -14,7 +14,7 @@ for (let m = 0; m < S.MAPS.length; m++) {
 }
 
 for (const mode of S.MODE_ORDER) {
-  for (let map = 0; map < S.MAPS.length; map++) {
+  for (let map = 0; map < S.MAP_N; map++) {
     const room = new Room('TEST', null, { manual: true });
     room.settings = { mode, map, duration: 180, teamSize: 4, bots: true, personas: false };
     const g = new Game(room, { manual: true });

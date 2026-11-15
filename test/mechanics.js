@@ -12,7 +12,7 @@ const add = (k) => { count[k] = (count[k] || 0) + 1; };
 // 每局把 8 个 AI 的驾驶员 / 机体轮换成指定组合，保证 11 位驾驶员和 7 种机体都上场
 for (let round = 0; round < 6; round++) {
   const room = new Room('MECH', null, { manual: true });
-  room.settings = { mode: S.MODE_ORDER[round % 5], map: round % S.MAPS.length, duration: 150, teamSize: 4, bots: true, personas: false };
+  room.settings = { mode: S.MODE_ORDER[round % 5], map: round % S.MAP_N, duration: 150, teamSize: 4, bots: true, personas: false };
   const g = new Game(room, { manual: true });
   let k = round * 8;
   for (const p of g.players.values()) {

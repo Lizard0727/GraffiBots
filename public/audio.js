@@ -171,6 +171,60 @@
     },
   };
 
+  // 1.6 新曲目
+  // 大厅：「晚风喷漆」G 大调 88 BPM，轻松的切分律动
+  TRACKS.lobby2 = {
+    bpm: 88, swing: 0.16,
+    chords: [
+      { root: 43, pad: [59, 62, 67] }, { root: 40, pad: [59, 64, 67] }, { root: 36, pad: [60, 64, 67] }, { root: 38, pad: [57, 62, 66] },
+      { root: 43, pad: [59, 62, 67] }, { root: 47, pad: [59, 62, 66] }, { root: 36, pad: [60, 64, 69] }, { root: 38, pad: [57, 62, 66] },
+    ],
+    kick: 'x......x..x.....', snare: '....x.......x...', hat: '.x.x.x.x.x.x.xox',
+    bass: nums('0 . . 7 . . 12 . 0 . 10 . 7 . 5 .'), bassType: 'triangle', bassVol: 0.3,
+    lead: [
+      'B5 . . A5 . G5 . . D5 . . . E5 . G5 .', 'G5 . . . E5 . D5 . B4 . . . . . . .',
+      'C6 . . B5 . A5 . . G5 . . . E5 . G5 .', 'F#5 . . . A5 . . . D5 . . . . . . .',
+      'B5 . D6 . B5 . A5 . G5 . . . A5 . B5 .', 'D6 . . . B5 . . . F#5 . A5 . . . . .',
+      'E6 . . D6 . C6 . . A5 . . . C6 . E6 .', 'D6 . . . . . A5 . F#5 . . . . . . .',
+    ].map(melody),
+    leadType: 'triangle', leadVol: 0.08, leadCut: 2600, padVol: 0.03, arp: true, arpVol: 0.022,
+    drumVol: { k: 0.5, s: 0.16, h: 0.05 },
+  };
+  // 搜刮撤离：「暗巷搜刮」D 小调 100 BPM，低沉紧张，旋律很少
+  TRACKS.loot = {
+    bpm: 100, swing: 0,
+    chords: [
+      { root: 38, pad: [50, 53, 57] }, { root: 38, pad: [50, 53, 57] }, { root: 34, pad: [50, 53, 58] }, { root: 36, pad: [48, 52, 55] },
+      { root: 38, pad: [50, 53, 57] }, { root: 41, pad: [53, 57, 60] }, { root: 34, pad: [50, 53, 58] }, { root: 37, pad: [49, 52, 57] },
+    ],
+    kick: 'x.......x..x....', snare: '........x.......', hat: '..x...x...x...x.',
+    bass: nums('0 . . 0 . . 0 . 0 . . 0 . 1 . .'), bassType: 'sawtooth', bassVol: 0.28,
+    lead: [
+      '. . . . . . . . A4 . . . . . . .', '. . . . . . . . . . . . F4 . E4 .',
+      '. . . . . . . . D5 . . . . . . .', '. . . . . . . . . . . . C#5 . . .',
+      '. . . . A4 . . . . . F4 . . . . .', '. . . . . . . . C5 . . . A4 . . .',
+      '. . . . . . . . Bb4 . . . . . A4 .', '. . . . . . . . . . . . E4 . . .',
+    ].map(melody),
+    leadType: 'sine', leadVol: 0.09, leadCut: 1600, padVol: 0.04, arp: false,
+    drumVol: { k: 0.6, s: 0.14, h: 0.045 },
+  };
+  // 撤离点开放之后：「撤离倒数」D 小调 156 BPM，急促
+  TRACKS.extract = {
+    bpm: 156, swing: 0,
+    chords: [
+      { root: 38, pad: [62, 65, 69] }, { root: 46, pad: [62, 65, 70] }, { root: 36, pad: [60, 64, 67] }, { root: 45, pad: [61, 64, 69] },
+    ],
+    kick: 'x...x...x...x...', snare: '....x.......x.x.', hat: 'x.xxx.xxx.xxx.xo',
+    fill: { snare: '....x...xxx.XXXX' },
+    bass: nums('0 0 12 0 0 12 0 12 0 0 12 0 7 12 10 12'), bassType: 'sawtooth', bassVol: 0.22,
+    lead: [
+      'D6 . . D6 . . F6 . . E6 . . D6 . A5 .', 'D6 . . D6 . . F6 . . G6 . . F6 . E6 .',
+      'E6 . . E6 . . G6 . . F6 . . E6 . C6 .', 'C#6 . . . E6 . . . A6 . . . G6 . E6 .',
+    ].map(melody),
+    leadType: 'square', leadVol: 0.05, leadCut: 3400, padVol: 0.02, arp: true, arpVol: 0.03,
+    drumVol: { k: 0.72, s: 0.28, h: 0.06 },
+  };
+
   // ---------- 调度器 ----------
   let cur = null;
   function startTrack(name) {
@@ -274,6 +328,21 @@
     lose() { arp([440, 392, 330, 262], 0.15, 0.3, 'triangle', 0.05); },
     click() { tone(720, 0.04, 'square', 0.025); },
     hover() { if (rl('hover', 50)) tone(1100, 0.025, 'sine', 0.015); },
+    // 1.6 新音效
+    loot(r) {   // 捡到物资：品质越高越亮
+      if (!rl('loot', 60)) return;
+      if (r >= 5) { arp([784, 988, 1175, 1568, 1976], 0.06, 0.3, 'triangle', 0.06); tone(392, 0.6, 'sawtooth', 0.03, 2, 0.05); noise(0.5, 0.03, 3000, 'bandpass', 0.1, 8000); }
+      else if (r >= 4) { arp([659, 880, 1175, 1318], 0.06, 0.22, 'triangle', 0.055); noise(0.3, 0.025, 2500, 'bandpass', 0.05, 6000); }
+      else if (r >= 3) arp([784, 1046, 1318], 0.05, 0.14, 'triangle', 0.05);
+      else if (r >= 2) arp([880, 1175], 0.05, 0.1, 'triangle', 0.045);
+      else tone(1100, 0.07, 'triangle', 0.04, 1.3);
+    },
+    bagFull() { if (rl('bag', 900)) { tone(220, 0.1, 'square', 0.04); tone(196, 0.14, 'square', 0.04, 0, 0.12); } },
+    siren() { for (let i = 0; i < 3; i++) { tone(660, 0.35, 'sawtooth', 0.035, 1.5, i * 0.4); } },
+    extracted() { arp([523, 659, 784, 1046, 1318, 1568], 0.08, 0.3, 'square', 0.05); tone(784, 1.2, 'triangle', 0.05, 0, 0.5); noise(0.8, 0.03, 1500, 'bandpass', 0.4, 6000); },
+    coin() { tone(1568, 0.06, 'square', 0.04); tone(2093, 0.12, 'square', 0.035, 0, 0.06); },
+    hitConfirm() { if (rl('hc', 45)) { tone(1500, 0.035, 'square', 0.03, 0.7); noise(0.03, 0.03, 4000, 'highpass'); } },
+    killConfirm() { tone(392, 0.08, 'square', 0.06, 1.5); tone(784, 0.16, 'triangle', 0.06, 0, 0.07); noise(0.25, 0.05, 600, 'lowpass', 0, 120); },
   };
 
   // ---------- 接口 ----------
@@ -285,7 +354,7 @@
   A.setSfx = (v) => { cfg.sfx = v; applyVol(); save(); };
   A.toggleMute = () => { cfg.muted = !cfg.muted; applyVol(); save(); return cfg.muted; };
   A.setMuted = (m) => { cfg.muted = m; applyVol(); save(); };
-  A.TRACK_NAMES = { menu: '霓虹喷漆街', battle: '涂装突击', final: '倒数冲刺' };
+  A.TRACK_NAMES = { menu: '霓虹喷漆街', lobby2: '晚风喷漆', battle: '涂装突击', final: '倒数冲刺', loot: '暗巷搜刮', extract: '撤离倒数' };
   addEventListener('pointerdown', A.resume); addEventListener('keydown', A.resume);
   window.GBAudio = A;
 })();

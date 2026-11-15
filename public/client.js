@@ -217,6 +217,9 @@
       <label class="set-row toggle"><span>全部静音（快捷键 M）</span><input type="checkbox" data-set="muted" ${c.muted ? 'checked' : ''}></label>
       <div class="set-row"><span>鼠标灵敏度</span><input type="range" min="20" max="300" data-set="sens" value="${Math.round(sens * 100)}"><output>${Math.round(sens * 100)}</output></div>
       <label class="set-row toggle"><span>屏幕震动</span><input type="checkbox" data-set="shake" ${shakeOn ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>瞄准辅助（鼠标附近的敌人会把准星吸过去一点）</span><input type="checkbox" data-set="aimAssist" ${store.get('aimAssist', true) ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>帧率太低时自动切换流畅画质</span><input type="checkbox" data-set="autoQ" ${store.get('autoQ', true) ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>显示帧率</span><input type="checkbox" data-set="showFps" ${store.get('showFps', false) ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）</span><input type="checkbox" data-set="chat" ${store.get('chat', true) ? 'checked' : ''}></label>
       <label class="set-row"><span>语言 / Language</span><select data-set="lang"><option value="zh" ${window.GBI18N && GBI18N.lang === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${window.GBI18N && GBI18N.lang === 'en' ? 'selected' : ''}>English</option></select></label>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
@@ -237,6 +240,7 @@
           if (cb.dataset.set === 'muted') AU.setMuted(cb.checked);
           else if (cb.dataset.set === 'hq') { hqOn = cb.checked; store.set('hq', hqOn); R3.setQuality(hqOn); }
           else if (cb.dataset.set === 'chat') { store.set('chat', cb.checked); if (!cb.checked) $('chatLog').classList.add('hidden'); }
+          else if (['aimAssist', 'autoQ', 'showFps'].includes(cb.dataset.set)) store.set(cb.dataset.set, cb.checked);
           else { shakeOn = cb.checked; store.set('shake', shakeOn); }
           renderSettings();
         };
@@ -252,7 +256,9 @@
   }
   function openSettings() { renderSettings(); $('dlgClose').textContent = G && !G.over ? '继续对战' : '关闭'; $('settingsDlg').classList.remove('hidden'); }
   function closeSettings() { $('settingsDlg').classList.add('hidden'); if (G && !G.over) lockPointer(); }
-  function menuMusic() { if (!G) AU.music('menu'); setTimeout(updateNowPlaying, 100); }
+  const perf = { n: 0, acc: 0, fps: 0, low: 0, done: false };
+  let lobbyTrack = Math.random() < 0.5 ? 'menu' : 'lobby2';   // 1.6：大厅两首曲子轮流放
+  function menuMusic() { if (!G) { const cur = AU.current(); if (cur !== 'menu' && cur !== 'lobby2') { lobbyTrack = lobbyTrack === 'menu' ? 'lobby2' : 'menu'; AU.music(lobbyTrack); } } setTimeout(updateNowPlaying, 100); }
   // ================= 大厅 =================
   const MODE_ICON = { park: 'park', turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery', elim: 'elim', escape4: 'escape', escape8: 'escape' };
   const MODE_COL = { turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'],
@@ -295,6 +301,7 @@
     $('heroLoadout').innerHTML = `<span class="pill mech">${ic('mech')}${W.name}</span><span class="pill">${ic('super')}大招 · ${sp.name}</span><span class="pill">${ic('skill', P.accent)}技能 · ${sk.name}</span><span class="pill">${ic('passive', P.accent)}被动 · ${P.passive.name}</span>${(profile.pilots[P.id] || {}).bt >= 1 ? `<span class="pill ovp">${ic('super', '#b78cff')}超载 · ${S.OVERLOADS[P.id].name}</span>` : ''}${profile.tal.map((id) => `<span class="pill tal">${ic('star')}${S.talent(id).name}</span>`).join('')}`;
     $('title').style.setProperty('--pc', P.accent);
     renderModeCard();
+    renderLootChip();
     mountPreview();
   }
   function renderModeCard() {
@@ -324,6 +331,8 @@
     if (name === 'mechs') renderWeaponLists();
     if (name === 'pilots') renderPilots();
     if (name === 'hero') renderHero();
+    if (name === 'loot') renderLoot();
+    if (name === 'stash') renderStash();
     if (name === 'chests') { renderChests(); const r = $('offerRow'); if (r) r.dataset.slot = ''; renderOffers(); }
     if (name === 'talents') renderTalents();
     if (name === 'pass') { renderPass(); if (!store.get('seenS' + E.SEASON.id, false)) { store.set('seenS' + E.SEASON.id, true); playSeasonIntro(); } }
@@ -434,6 +443,110 @@
     if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
     setTimeout(() => { $('playBtn').classList.remove('busy'); if (quick) { quick = null; toast('没有连上服务器，请稍后再试'); } }, 4000);
   }
+  // ================= 1.6：搜刮撤离（大厅设置 / 仓库 / 军需处） =================
+  const LOOTCFG = { map: -1, risk: 'normal', squad: 3, fill: true };
+  try { Object.assign(LOOTCFG, store.get('lootCfg', {})); } catch (e) { /* ignore */ }
+  const LOOT_SHAPE = {   // 物资图标：几笔简单的涂鸦形状
+    scrap: '<path d="M12 30l8-14 10 6 6-10 8 12-6 10H18z" />', can: '<rect x="18" y="12" width="20" height="30" rx="5"/><rect x="22" y="7" width="12" height="6" rx="2"/>',
+    battery: '<rect x="14" y="16" width="28" height="22" rx="4"/><rect x="22" y="11" width="4" height="5"/><rect x="31" y="11" width="4" height="5"/>',
+    cable: '<circle cx="28" cy="28" r="14" fill="none" stroke-width="6"/><circle cx="28" cy="28" r="5"/>', neon: '<rect x="10" y="22" width="36" height="10" rx="5"/><rect x="6" y="24" width="4" height="6"/><rect x="46" y="24" width="4" height="6"/>',
+    circuit: '<rect x="12" y="12" width="32" height="32" rx="3"/><path d="M18 22h10v8h10M18 36h6" fill="none" stroke-width="3" stroke="#000a"/>', toolbox: '<rect x="10" y="20" width="36" height="22" rx="3"/><path d="M21 20v-6h14v6" fill="none" stroke-width="4"/>',
+    spray: '<rect x="20" y="18" width="16" height="26" rx="4"/><rect x="24" y="10" width="8" height="8" rx="2"/><circle cx="40" cy="12" r="2"/><circle cx="44" cy="16" r="2"/>',
+    engine: '<rect x="10" y="16" width="36" height="24" rx="4"/><circle cx="22" cy="28" r="6" fill="#000a"/><circle cx="36" cy="28" r="6" fill="#000a"/>', drive: '<rect x="12" y="14" width="32" height="28" rx="4"/><circle cx="28" cy="28" r="7" fill="#000a"/>',
+    rarepaint: '<path d="M14 40c0-10 8-12 14-24 6 12 14 14 14 24a14 8 0 0 1-28 0z"/>', optic: '<rect x="8" y="22" width="40" height="12" rx="6"/><circle cx="16" cy="28" r="7"/><circle cx="40" cy="28" r="7"/>',
+    qchip: '<rect x="16" y="16" width="24" height="24" rx="3"/><path d="M10 20h6M10 28h6M10 36h6M40 20h6M40 28h6M40 36h6M20 10v6M28 10v6M36 10v6M20 40v6M28 40v6M36 40v6" stroke-width="3" fill="none"/>',
+    proto: '<path d="M14 12h28l4 10-4 22H14l-4-22z"/><path d="M28 16v24" stroke-width="3" stroke="#000a"/>', radio: '<rect x="10" y="18" width="36" height="24" rx="5"/><circle cx="22" cy="30" r="6" fill="#000a"/><path d="M30 12l12 6" stroke-width="3" fill="none"/>',
+    cell: '<rect x="12" y="12" width="14" height="32" rx="4"/><rect x="30" y="12" width="14" height="32" rx="4"/>',
+    goldcan: '<rect x="18" y="12" width="20" height="30" rx="5"/><rect x="22" y="7" width="12" height="6" rx="2"/><path d="M22 22l6 6 6-6" stroke="#fff" stroke-width="3" fill="none"/>',
+    reactor: '<circle cx="28" cy="28" r="16"/><circle cx="28" cy="28" r="6" fill="#fff"/><path d="M28 12v8M28 36v8M12 28h8M36 28h8" stroke="#000a" stroke-width="3"/>', files: '<rect x="12" y="10" width="28" height="36" rx="2"/><path d="M18 20h16M18 27h16M18 34h10" stroke="#000a" stroke-width="3"/>',
+  };
+  function lootIcon(k, cls) {
+    const I = S.LOOT.items[k], c = S.LOOT.rare[I ? I.r : 1].c;
+    return `<span class="li r${I ? I.r : 1} ${cls || ''}" style="--rc:${c}" title="${I ? I.name : k}"><svg viewBox="0 0 56 56" fill="${c}" stroke="${c}">${LOOT_SHAPE[k] || '<circle cx="28" cy="28" r="14"/>'}</svg></span>`;
+  }
+  const fmtV = (v) => Math.round(v).toLocaleString('en-US');
+  function renderLootChip() { const t = $('lootChipTxt'); if (t) t.textContent = `仓库价值 ${fmtV(E.stashValue(profile))}`; }
+  function renderLoot() {
+    renderLootChip();
+    const box = $('lootBody'); if (!box) return;
+    const R = profile.lootRec || {}, maps = S.MAPS.map((m, i) => [m, i]).filter(([m]) => m.loot);
+    const party = room && room.players ? room.players.length : 1;
+    const board = E.lootBoard(profile), myRank = board.findIndex((r) => r.me) + 1;
+    const gearOn = new Set(profile.gearOn || []);
+    box.innerHTML = `<div class="lb-main">
+      <div class="lb-maps">${[[{ name: '随机地图', desc: '两张超大地图随机选一张' }, -1], ...maps].map(([m, i]) => `<button class="lb-map ${LOOTCFG.map === i ? 'sel' : ''}" data-map="${i}"><b>${m.name}</b><small>${m.desc}</small>${i >= 0 ? `<i class="lb-mapart m${i - S.MAP_N}"></i>` : '<i class="lb-mapart rnd">?</i>'}</button>`).join('')}</div>
+      <div class="lb-opts">
+        <div class="lb-opt"><span>难度</span>${['normal', 'high'].map((r) => `<button class="${LOOTCFG.risk === r ? 'sel' : ''} ${r}" data-risk="${r}"><b>${S.LOOT.risks[r].name}</b><small>${S.LOOT.risks[r].desc}</small></button>`).join('')}</div>
+        <div class="lb-opt"><span>小队人数</span>${[1, 2, 3, 4].map((n) => `<button class="sq ${LOOTCFG.squad === n ? 'sel' : ''}" data-squad="${n}" ${n < party ? 'disabled' : ''}>${n} 人</button>`).join('')}<label class="lb-fill"><input type="checkbox" id="lootFill" ${LOOTCFG.fill ? 'checked' : ''}> AI 队友补位</label></div>
+        <div class="lb-opt gear ${LOOTCFG.risk === 'high' ? '' : 'off'}"><span>带入装备</span>${Object.entries(S.LOOT.gear).map(([g, G]) => { const n = (profile.gear || {})[g] || 0; return `<button class="${gearOn.has(g) && n ? 'sel' : ''}" data-gear="${g}" ${n ? '' : 'disabled'}><b>${G.name} ×${n}</b><small>${G.desc}</small></button>`; }).join('')}<small class="lb-note">${LOOTCFG.risk === 'high' ? '高危行动阵亡时，带入的装备会丢失' : '装备只能带进高危行动'}</small></div>
+      </div>
+      <button class="btn big lb-go" id="lootGo">开始行动</button>
+    </div>
+    <aside class="lb-side">
+      <button class="lb-stash" id="lootStash"><b>仓库</b><span>${fmtV(E.stashValue(profile))}</span><small>${Object.values(profile.stash || {}).reduce((a, b) => a + b, 0)} 件物资 · 点击进入</small></button>
+      <div class="lb-rec"><div><small>行动</small><b>${R.runs || 0}</b></div><div><small>撤离成功</small><b>${R.ex || 0}</b></div><div><small>最高单次</small><b>${fmtV(R.best || 0)}</b></div><div><small>累计价值</small><b>${fmtV(R.total || 0)}</b></div></div>
+      <div class="lb-board"><h4>本周最佳撤离排行<small>你排第 ${myRank} 名</small></h4>${board.slice(0, 10).map((r, i) => `<div class="${r.me ? 'me' : ''}"><i>${i + 1}</i><b data-noi18n>${esc(r.name)}</b><span>${fmtV(r.v)}</span></div>`).join('')}${myRank > 10 ? `<div class="me"><i>${myRank}</i><b data-noi18n>${esc(profile.name || '你')}</b><span>${fmtV(R.wbest || 0)}</span></div>` : ''}</div>
+      <button class="lb-task" data-tl="loot">搜刮行动任务线 ›</button>
+    </aside>`;
+    const save = () => { store.set('lootCfg', LOOTCFG); renderLoot(); sfx.click(); };
+    for (const b of box.querySelectorAll('[data-map]')) b.onclick = () => { LOOTCFG.map = +b.dataset.map; save(); };
+    for (const b of box.querySelectorAll('[data-risk]')) b.onclick = () => { LOOTCFG.risk = b.dataset.risk; save(); };
+    for (const b of box.querySelectorAll('[data-squad]')) b.onclick = () => { LOOTCFG.squad = +b.dataset.squad; save(); };
+    $('lootFill').onchange = (e) => { LOOTCFG.fill = e.target.checked; save(); };
+    for (const b of box.querySelectorAll('[data-gear]')) b.onclick = async () => {
+      const on = new Set(profile.gearOn || []); if (on.has(b.dataset.gear)) on.delete(b.dataset.gear); else on.add(b.dataset.gear);
+      const r = await eco('setGear', { on: [...on] }); if (!r.ok) return toast(r.err); renderLoot(); sfx.click();
+    };
+    $('lootStash').onclick = () => { STASH.from = 'loot'; STASH.tab = 'stash'; openOv('stash'); sfx.click(); };
+    box.querySelector('[data-tl]').onclick = () => { EVSEL.tab = 'task'; EVSEL.id = 'tl:loot'; openOv('events'); };
+    $('lootGo').onclick = () => launchLoot();
+  }
+  function launchLoot() {
+    if (UPDATE_LOCK && mustUpdate()) { checkUpdate(); return; }
+    if (needPilot()) return;
+    ensureName(); closeOv();
+    if (room && room.players && room.players.length > 1) {   // 组队房间：房主切到搜刮撤离，小队人数 = 房间人数
+      if (!isHostNow()) return toast('只有房主可以开始行动');
+      send({ t: 'settings', mode: 'loot', map: LOOTCFG.map, squad: Math.max(room.players.length, LOOTCFG.squad), risk: LOOTCFG.risk, fill: LOOTCFG.fill, bots: true });
+      setTimeout(() => send({ t: 'start' }), 120);
+      return;
+    }
+    quick = { mode: 'loot', map: LOOTCFG.map, teamSize: 4, duration: S.LOOT.duration, bots: true, squad: LOOTCFG.squad, risk: LOOTCFG.risk, fill: LOOTCFG.fill, lang: window.GBI18N ? GBI18N.lang : 'zh' };
+    $('playBtn').classList.add('busy');
+    const go = () => send({ t: 'create' });
+    if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
+    setTimeout(() => { $('playBtn').classList.remove('busy'); if (quick) { quick = null; toast('没有连上服务器，请稍后再试'); } }, 4000);
+  }
+  const isHostNow = () => !!(room && room.hostId === myId);
+  // ---------------- 仓库 / 军需处 ----------------
+  const STASH = { tab: 'stash', sel: null, from: null };
+  function renderStash() {
+    const box = $('stashBody'); if (!box) return;
+    const st = profile.stash || {};
+    const keys = S.LOOT_KEYS.filter((k) => st[k]).sort((a, b) => S.LOOT.items[b].r - S.LOOT.items[a].r || S.LOOT.items[b].v - S.LOOT.items[a].v);
+    if (STASH.sel && !st[STASH.sel]) STASH.sel = null;
+    const sel = STASH.sel || keys[0], I = sel && S.LOOT.items[sel];
+    let html = `<nav class="st-tabs">${[['stash', '仓库'], ['shop', '军需处']].map(([k, n]) => `<button data-st="${k}" class="${STASH.tab === k ? 'sel' : ''}">${n}</button>`).join('')}<span class="st-val">仓库总价值 <b>${fmtV(E.stashValue(profile))}</b></span></nav>`;
+    if (STASH.tab === 'stash') {
+      html += `<div class="st-wrap"><div class="st-grid">${keys.length ? keys.map((k) => `<button class="st-cell ${k === sel ? 'sel' : ''}" data-k="${k}">${lootIcon(k)}<b>${S.LOOT.items[k].name}</b><em>×${st[k]}</em></button>`).join('') : '<p class="st-empty">仓库还是空的。去「搜刮撤离」带点东西回来吧！</p>'}</div>
+        ${I ? `<aside class="st-detail" style="--rc:${S.LOOT.rare[I.r].c}">${lootIcon(sel, 'big')}<h3>${I.name}</h3><small class="rr">${S.LOOT.rare[I.r].name} · 占 ${I.size} 格</small>
+          <div class="st-kv"><div><small>价值</small><b>${fmtV(I.v)}</b></div><div><small>持有</small><b>${st[sel]}</b></div><div><small>卖出单价</small><b>${E.sellPrice(sel)} 金币</b></div></div>
+          <div class="st-acts"><button class="btn" data-sell="1">卖出 1 件</button><button class="btn ghost" data-sell="${st[sel]}">全部卖出（${fmtV(E.sellPrice(sel) * st[sel])} 金币）</button>
+          ${I.ex ? `<button class="btn ex" data-ex="1">兑换：${Object.entries(I.ex).map(([k, n]) => `${E.CUR[k].name} ×${n}`).join(' + ')}</button>` : ''}</div></aside>` : ''}</div>
+        ${keys.length ? `<div class="st-bulk"><button class="btn ghost" id="sellAll">一键卖出普通 / 优良 / 稀有物资</button><small>史诗和传说物资不会被一键卖出</small></div>` : ''}`;
+    } else {
+      html += `<div class="st-shop">${Object.entries(S.LOOT.gear).map(([g, G]) => `<div class="gear-card"><div class="g-ico g-${g}"></div><h3>${G.name}</h3><p>${G.desc}</p><small>持有 ${(profile.gear || {})[g] || 0}</small><button class="btn" data-buy="${g}" ${profile.coins < G.price ? 'disabled' : ''}>${ic('coins')}${G.price}</button></div>`).join('')}</div>
+        <p class="st-note">装备只能带进「高危行动」：成功撤离会保留，阵亡就会丢失。在搜刮撤离界面选择要带的装备。</p>`;
+    }
+    box.innerHTML = html;
+    for (const b of box.querySelectorAll('[data-st]')) b.onclick = () => { STASH.tab = b.dataset.st; renderStash(); sfx.click(); };
+    for (const b of box.querySelectorAll('[data-k]')) b.onclick = () => { STASH.sel = b.dataset.k; renderStash(); sfx.click(); };
+    for (const b of box.querySelectorAll('[data-sell]')) b.onclick = async () => { const r = await eco('sellLoot', { k: sel, n: +b.dataset.sell }); if (!r.ok) return toast(r.err); sfx.coin(); toast(`卖出获得 ${r.items[0].n} 金币`); renderStash(); };
+    const ex = box.querySelector('[data-ex]'); if (ex) ex.onclick = async () => { const r = await eco('exLoot', { k: sel }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '兑换成功'); renderStash(); };
+    const sa = $('sellAll'); if (sa) sa.onclick = async () => { const r = await eco('sellAll', { maxR: 3 }); if (!r.ok) return toast(r.err); sfx.pick(); toast(`卖出获得 ${r.items[0].n} 金币`); renderStash(); };
+    for (const b of box.querySelectorAll('[data-buy]')) b.onclick = async () => { const r = await eco('buyGear', { g: b.dataset.buy }); if (!r.ok) return toast(r.err); sfx.pick(); toast(`买到「${S.LOOT.gear[b.dataset.buy].name}」`); renderStash(); };
+  }
+
   // ---------------- 驾驶员选择 ----------------
   const pilotOrder = () => S.PILOTS.slice().sort((a, b) => E.hasPilot(profile, b.id) - E.hasPilot(profile, a.id));
   function renderPilots() {
@@ -694,7 +807,7 @@
     }
     const mb = $('homeMapList');
     mb.innerHTML = '';
-    for (let i = -1; i < S.MAPS.length; i++) {
+    for (let i = -1; i < S.MAP_N; i++) {
       const el = document.createElement('button');
       el.className = 'mapcard' + (profile.map === i ? ' sel' : '');
       el.innerHTML = i < 0 ? '<div class="rnd">?</div><b>随机地图</b>' : `${S.MAPS[i].isNew ? '<span class="new-badge">NEW</span>' : ''}<canvas width="120" height="80"></canvas><b>${S.MAPS[i].name}</b>`;
@@ -866,7 +979,7 @@
     // 模式
     const ml = $('modeList');
     ml.innerHTML = '';
-    for (const id of S.MODE_ORDER) {
+    for (const id of [...S.MODE_ORDER, 'loot']) {
       const m = S.MODES[id];
       const el = document.createElement('button');
       el.className = 'mcard' + (room.settings.mode === id ? ' sel' : '');
@@ -876,7 +989,7 @@
     }
     const mp = $('mapList');
     mp.innerHTML = '';
-    for (let i = -1; i < S.MAPS.length; i++) {
+    for (let i = -1; i < S.MAP_N; i++) {
       const el = document.createElement('button');
       el.className = 'mapcard' + (room.settings.map === i ? ' sel' : '');
       el.innerHTML = `<canvas></canvas>${i < 0 ? '随机地图' : S.MAPS[i].name}`;
@@ -939,6 +1052,7 @@
     for (const btn of document.querySelectorAll('[data-close]')) btn.onclick = closeOv;
     // 1.5：角色页面入口——返回、大厅里的头像 / 角色名 / 机体、展示台（点一下，不是拖动）
     $('hpBack').onclick = () => { if (HERO.from) openOv(HERO.from); else closeOv(); sfx.click(); };
+    $('stashBack').onclick = () => { if (STASH.from) openOv(STASH.from); else closeOv(); STASH.from = null; sfx.click(); };
     $('heroPortrait').onclick = () => { if (profile.pilot) { openHero('pilot', profile.pilot); sfx.click(); } };
     $('heroPilot').onclick = (e) => { if (profile.pilot && !e.target.closest('button')) { openHero('pilot', profile.pilot); sfx.click(); } };
     $('heroLoadout').onclick = (e) => { const pl = e.target.closest('.pill'); if (!pl || !profile.pilot) return; if (pl.classList.contains('tal')) { openOv('talents'); return; } if (pl.classList.contains('mech') || /大招/.test(pl.textContent)) openHero('mech', profile.weapon); else openHero('pilot', profile.pilot); sfx.click(); };
@@ -1154,6 +1268,7 @@
         break;
       case 'err': toast(m.msg); break;
       case 'start': startGame(m); break;
+      case 'bag': if (G && G.loot) { const before = G.bag.items.length; G.bag = { items: m.items || [], cap: m.cap || S.LOOT.bag, gear: m.gear || [] }; if (G.bag.items.length < before) G.bagFlash = performance.now(); } break;
       case 's': onSnap(m); break;
       case 'over':
         if (G) {
@@ -1211,6 +1326,12 @@
     }
     G.me = G.players.get(myId) || null;
     if (G.me) Object.assign(G.me, { px: 0, py: 0, pz: 0, pvx: 0, pvy: 0, pvz: 0, onGround: true, sm: 1 });
+    // 1.6：搜刮撤离——地上的物资、自己的背包
+    G.loot = m.mode === 'loot';
+    if (G.loot) {
+      G.items = new Map((m.loot || []).map((a) => [a[0], { k: a[1], x: a[2], y: a[3], z: a[4] }]));
+      G.bag = { items: [], cap: S.LOOT.bag, gear: [] }; G.risk = m.risk || 'normal'; G.pops = []; G.exDone = null;
+    }
     G.ps = null; G.camDip = 0; G.camDipV = 0;
     view.yaw = G.me && G.me.team === 2 && teams === 2 ? Math.PI : 0; view.pitch = -0.12;
     G.shades = colors.map((c, t) => (t ? [0, 0.12, -0.12].map((k) => shade(c, k)) : null));
@@ -1224,7 +1345,7 @@
     chatReset();
     closeSettings();
     showScreen('game');
-    AU.music('battle');
+    AU.music(m.mode === 'loot' ? 'loot' : 'battle');
     lockPointer();
     touchShow(true);
     document.body.classList.toggle('topcam', TOP());
@@ -1279,6 +1400,7 @@
       }
     }
     if (m.sb) for (const r of m.sb) G.sb.set(r[0], r);
+    if (m.lt && G.loot) G.items = new Map(m.lt.map((a) => [a[0], { k: a[1], x: a[2], y: a[3], z: a[4] }]));
     if (m.rv) G.rv = m.rv;
     G.snaps.push({ t: st, pm, o: m.o, d: m.d, e: m.e, h: m.h || [], done: false });
     while (G.snaps.length > 120) { const s = G.snaps.shift(); if (!s.done) consume(s, true); }
@@ -1323,7 +1445,7 @@
           const tx = e[1] === myId && G.me ? G.me.px : t.x, ty = e[1] === myId && G.me ? G.me.py : t.y, tz = (e[1] === myId && G.me ? G.me.pz : t.z) || 0;
           R3.emit(tx, ty, tz + 18, e[3] ? '#bef6ff' : '#ffffff', e[4] > 30 ? 8 : 4, 200, 0.8, { sys: 'pg', size: 8, life: 0.2, grav: 0, drag: 5 });
         }
-        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; sfx.hit(); if (e[4] > 40) G.shake = Math.max(G.shake, 3); }
+        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; G.hitPulse = 1; sfx.hit(); sfx.hitConfirm(); if (e[4] > 40) G.shake = Math.max(G.shake, 3); else if (e[4] > 15) G.shake = Math.max(G.shake, 1.2); }
         // 伤害数字：只显示和自己有关的
         if (t && e[4] > 0 && !silent && (e[2] === myId || e[1] === myId)) G.dmgTexts.push({ id: e[1], dx: (Math.random() - 0.5) * 24, text: String(e[4]), color: e[1] === myId ? '#ff5a6a' : '#fff', t: now });
         break;
@@ -1391,7 +1513,7 @@
         G.fx.push({ k: 'ring', x: e[3], y: e[4], z: e[5] || 0, r: 60, color: G.colors[by ? by.team : 3 - v.team], t0: now, dur: 450 });
         G.feed.unshift({ by, v, t: now }); if (G.feed.length > 5) G.feed.pop();
         if (silent) break;
-        if (e[1] === myId && e[2] !== myId) { bigText(`击倒 ${v.name}！`); sfx.kill(); }
+        if (e[1] === myId && e[2] !== myId) { bigText(`击倒 ${v.name}！`); sfx.kill(); sfx.killConfirm(); G.shake = Math.max(G.shake, 6); G.killFlash = performance.now(); }
         if (e[2] === myId) { G.killer = by && by !== v ? by : null; sfx.die(); }
         if (nearMe(e[3], e[4], 500)) G.shake = Math.max(G.shake, 5);
         break;
@@ -1434,6 +1556,26 @@
       }
       case 'fz': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0 }); break;
       case 'fg': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0, fog: 1 }); if (!silent && nearMe(e[1], e[2], 500)) sfx.boom(); break;
+      case 'lt+': if (G.loot) G.items.set(e[1], { k: e[2], x: e[3], y: e[4], z: e[5] }); break;
+      case 'lt-': {
+        if (!G.loot) break;
+        const it = G.items.get(e[1]); G.items.delete(e[1]);
+        if (e[2] === myId && !silent) {
+          const I = S.LOOT.items[e[3]];
+          G.pops.push({ k: e[3], t: performance.now() });
+          if (I) sfx.loot(I.r);
+          if (it && I && I.r >= 4 && R3.burst) R3.burst(it.x, it.y, (it.z || 0) + 10, S.LOOT.rare[I.r].c, 18);
+        }
+        break;
+      }
+      case 'exo': if (!silent) { announce('撤离点已开放！', '#5ee36a'); sfx.siren(); } break;
+      case 'exd': {
+        const p = G.players.get(e[1]);
+        if (e[1] === myId) { G.exDone = { v: e[2], t: performance.now() }; if (!silent) sfx.extracted(); }
+        else if (p && !silent && G.me && p.team === G.me.team) { G.feed.unshift({ t: performance.now(), text: `${p.name} 成功撤离（${fmtV(e[2])}）`, color: '#5ee36a' }); if (G.feed.length > 5) G.feed.pop(); }
+        break;
+      }
+      case 'kit': if (e[1] === myId && !silent) { sfx.pick(); announce('急救包生效 +60', '#5ee36a'); } break;
       case 'bp': {   // 乐园模式：气球被打爆
         const BC = ['#ff3ea5', '#1fd6ee', '#ffd23f', '#9cff2e', '#ff8a1f', '#b06bff'], c = BC[e[1] % BC.length];
         R3.burst(e[3], e[4], e[5] + 10, c, 26, 220, 0.4);
@@ -2022,6 +2164,16 @@
       if (r && r.dz < -0.05) {
         const pz = me.pz + 12, t = (pz - r.z) / r.dz;
         G.aimPt = { x: r.x + r.dx * t, y: r.y + r.dy * t };
+        // 1.6：瞄准辅助——鼠标附近（70 以内）有看得见的敌人，准星往他身上靠一点
+        if (store.get('aimAssist', true) && alive) {
+          let best = null, bd = 70;
+          for (const q of G.players.values()) {
+            if (q.id === myId || q.team === me.team || !(q.flags & 1) || (q.flags & 4)) continue;
+            const d = Math.hypot(q.x - G.aimPt.x, q.y - G.aimPt.y), dm = Math.hypot(q.x - me.px, q.y - me.py);
+            if (d < bd && dm < range + 60) { bd = d; best = q; }
+          }
+          if (best) { const k = 0.4 * (1 - bd / 70); G.aimPt.x += (best.x - G.aimPt.x) * k; G.aimPt.y += (best.y - G.aimPt.y) * k; }
+        }
       }
     }
     if (G.aimPt && alive) {
@@ -2224,7 +2376,8 @@
       if (G.prevTl > 60 && tl <= 60) { announce('剩余 1 分钟！', '#ffdf2e', true); sfx.warn(); }
       if (G.prevTl > 30 && tl <= 30) { announce('最后 30 秒！', '#ff5a6a', true); sfx.warn(); }
       if (tl <= 10 && tl > 0 && Math.ceil(tl) !== Math.ceil(G.prevTl)) sfx.tick();
-      if (tl <= 30) AU.music('final');
+      if (G.loot) { const ex = (G.obj && G.obj[0]) || []; let open = false; for (let i = 2; i < ex.length; i += 3) if (ex[i] <= 0) open = true; if (open || tl <= 60) AU.music('extract'); }
+      else if (tl <= 30) AU.music('final');
       G.prevTl = tl;
     }
     // 倒计时音效
@@ -2259,6 +2412,7 @@
     G.missiles = G.missiles.filter((m) => now - m.t0 < m.dur);
     G.shake = Math.max(0, G.shake - dt * 30);
     G.hitMark = Math.max(0, G.hitMark - dt);
+    G.hitPulse = Math.max(0, (G.hitPulse || 0) - dt * 7);
     G.dmgFlash = Math.max(0, G.dmgFlash - dt);
     for (const p of G.players.values()) p.flash = Math.max(0, p.flash - dt);
   }
@@ -2412,7 +2566,56 @@
     } else if (G.mode === 'soccer') marker(o[0], o[1], 70, '', '#fff', '●');
     else if (G.mode === 'zone') { const Z = S.ZONE, C = S.CELL; marker((Z.x0 + Z.x1) * C / 2, (Z.y0 + Z.y1) * C / 2, 40, o[0] ? '' : '据点', o[0] ? G.colors[o[0]] : '#fff', '▣'); }
     else if (G.mode === 'battery' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '充电站', G.colors[myTeam], '⚡'); }
+    else if (G.loot && o[0]) {
+      const ex = o[0];
+      for (let i = 0; i < ex.length; i += 3) marker(ex[i], ex[i + 1], 60, ex[i + 2] <= 0 ? '撤离点' : `${ex[i + 2]} 秒后开放`, ex[i + 2] <= 0 ? '#5ee36a' : '#9aa0a8', '⬆');
+    }
     else if (G.mode === 'park') marker(o[2], o[3], 80, o[4] ? (o[4] === myTeam ? '花车 · 我方' : '花车 · 敌方') : '花车', o[4] ? G.colors[o[4]] : '#fff', '★');
+  }
+
+  // 1.6：搜刮撤离 HUD——背包、撤离读条、捡到东西的提示、撤离成功 / 阵亡
+  function drawLootHud(o, me, cx) {
+    const now = performance.now(), bags = o[1] || [];
+    let mine = null;
+    for (let i = 0; i < bags.length; i += 6) if (bags[i] === myId) mine = bags.slice(i, i + 6);
+    // 背包条：每格一个方块，颜色 = 物资品质
+    const cap = G.bag.cap || S.LOOT.bag, items = G.bag.items || [];
+    const sz = TOUCH ? 15 : 19, gap = 3, w = cap * (sz + gap) - gap, x0 = 16, y0 = VH - (TOUCH ? 190 : 150);
+    ctx.fillStyle = '#000b'; rr(ctx, x0 - 8, y0 - 26, Math.max(w, 200) + 16, sz + 36, 10); ctx.fill();
+    const val = S.lootValue(items), used = S.lootSlots(items);
+    txt(`背包 ${used}/${cap}`, x0, y0 - 13, 13, used >= cap ? '#ff8a5a' : '#fff', 'left', 3);
+    txt(`价值 ${fmtV(val)}`, x0 + Math.max(w, 200), y0 - 13, 14, '#ffd23f', 'right', 3);
+    let slot = 0;
+    for (const k of items) {
+      const I = S.LOOT.items[k]; if (!I) continue;
+      ctx.fillStyle = S.LOOT.rare[I.r].c;
+      rr(ctx, x0 + slot * (sz + gap), y0, I.size * (sz + gap) - gap, sz, 4); ctx.fill();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+      slot += I.size;
+    }
+    for (; slot < cap; slot++) { ctx.strokeStyle = '#ffffff33'; ctx.lineWidth = 1.5; rr(ctx, x0 + slot * (sz + gap), y0, sz, sz, 4); ctx.stroke(); }
+    if (G.bag.gear && G.bag.gear.length) txt('装备：' + G.bag.gear.map((g) => S.LOOT.gear[g].name).join(' · '), x0, y0 + sz + 14, 11, '#b78cff', 'left', 3);
+    // 捡到东西：右侧飘出物资名
+    G.pops = G.pops.filter((p) => now - p.t < 2200);
+    G.pops.forEach((p, i) => {
+      const I = S.LOOT.items[p.k], k = (now - p.t) / 2200;
+      ctx.globalAlpha = Math.min(1, (1 - k) * 3);
+      txt(`+ ${I.name}（${S.LOOT.rare[I.r].name} · ${fmtV(I.v)}）`, x0, y0 - 44 - i * 22 - k * 10, 15, S.LOOT.rare[I.r].c, 'left', 4);
+      ctx.globalAlpha = 1;
+    });
+    // 撤离读条
+    if (mine && mine[4] > 0 && !mine[5]) {
+      const k = Math.min(1, mine[4] / 10 / S.LOOT.extTime), r = 46, yy = VH * 0.62;
+      ctx.lineWidth = 9; ctx.strokeStyle = '#000a'; ctx.beginPath(); ctx.arc(cx, yy, r, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#5ee36a'; ctx.beginPath(); ctx.arc(cx, yy, r, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke();
+      txt((S.LOOT.extTime * (1 - k)).toFixed(1), cx, yy, 24, '#fff', 'center', 4);
+      txt('撤离中…离开圈子或挨打会中断', cx, yy + r + 20, 14, '#5ee36a', 'center', 3);
+    }
+    if (G.exDone) {
+      const k = (now - G.exDone.t) / 1000;
+      txt('成 功 撤 离 ！', cx, VH * 0.32, 52, '#5ee36a', 'center', 7);
+      txt(`带出物资价值 ${fmtV(G.exDone.v)}${k > 2 ? ' · 正在观战队友' : ''}`, cx, VH * 0.32 + 48, 20, '#fff', 'center', 4);
+    }
   }
   // ================= HUD =================
   // 喷漆色块（边缘不规则的圆）
@@ -2460,6 +2663,21 @@
     const myTeam = me ? me.team : 1, otherTeam = 3 - myTeam;
     const small = VW < 820;
 
+    // 1.6：击倒敌人时屏幕边缘亮一下
+    if (G.killFlash && now - G.killFlash < 220) {
+      const k = 1 - (now - G.killFlash) / 220;
+      const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.3, VW / 2, VH / 2, Math.max(VW, VH) * 0.7);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, `rgba(255,236,120,${0.45 * k})`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+    }
+    // 1.6：帧率（设置里打开）+ 帧率太低时自动换成流畅画质
+    { const pn = performance.now(); perf.n++; perf.acc += Math.min(0.5, (pn - (perf.last || pn)) / 1000); perf.last = pn; }
+    if (perf.acc >= 1) {
+      perf.fps = Math.round(perf.n / perf.acc); perf.n = 0; perf.acc = 0;
+      perf.low = perf.fps < 38 ? perf.low + 1 : 0;
+      if (perf.low >= 5 && hqOn && store.get('autoQ', true) && !perf.done) { perf.done = true; hqOn = false; store.set('hq', false); R3.setQuality(false); toast('画面有点卡，已自动换成流畅画质（可以在设置里改回来）', 4200); }
+    }
+    if (store.get('showFps', false)) txt(`${perf.fps || '--'} FPS`, 12, 32, 12, perf.fps >= 50 ? '#5ee36a' : perf.fps >= 30 ? '#ffd23f' : '#ff5a5a', 'left', 3);
     // 受伤 / 踩敌方涂料
     if (me && alive) {
       const ground = me.onGround ? S.cellAt(G.grid, me.px, me.py) : 0;
@@ -2526,7 +2744,16 @@
         else if (foot) txt('🔧', x + 11, y + 11, 11, '#fff', 'center', 0);
       });
     };
-    if (G.teams > 2) {
+    if (G.loot) {
+      const ex = (G.obj && G.obj[0]) || [], opens = [];
+      for (let i = 0; i < ex.length; i += 3) opens.push(ex[i + 2]);
+      const nOpen = opens.filter((t) => t <= 0).length, next = opens.filter((t) => t > 0).sort((a, b) => a - b)[0];
+      splat(cx - 160, 33, 86, 20, '#141018', 3); splat(cx + 160, 33, 86, 20, '#141018', 5);
+      let squads = 0; const seen = new Set();
+      for (const p of G.players.values()) if (!p.npc && (p.flags & 1) && !seen.has(p.team)) { seen.add(p.team); squads++; }
+      txt(`剩余小队 ${squads} · ${G.risk === 'high' ? '高危' : '普通'}`, cx - 160, 34, 15, G.risk === 'high' ? '#ff5a5a' : '#fff', 'center', 3);
+      txt(nOpen ? `撤离点开放 ${nOpen} 个` + (next ? ` · 下一个 ${next} 秒` : '') : `撤离点 ${next || 0} 秒后开放`, cx + 160, 34, 15, nOpen ? '#5ee36a' : '#fff', 'center', 3);
+    } else if (G.teams > 2) {
       const ob = G.obj || [];
       splat(cx - 150, 33, 76, 20, '#141018', 3); splat(cx + 150, 33, 76, 20, '#141018', 5);
       txt(`存活 ${ob[8] || 0} 队 · ${ob[9] || 0} 人`, cx - 150, 34, 16, '#fff', 'center', 3);
@@ -2546,7 +2773,8 @@
       txt(`第 ${o[2]} 局`, cx, py, 14, '#fff', 'center', 3);
       if (o[3] > 0) txt('下一局马上开始…', cx, VH * 0.3, 26, '#ffdf2e', 'center', 5);
     }
-    if (G.teams > 2 && o) {
+    if (G.loot && o) drawLootHud(o, me, cx);
+    if (G.teams > 2 && o && !G.loot) {
       const ph = o[6], stg = ph === 2 ? '最终圈' : ph === 1 ? '毒圈正在收缩' : `安全区（${o[7]} 秒后收缩）`;
       txt(stg, cx, py, 14, ph === 1 ? '#ff8a5a' : '#fff', 'center', 3);
       if (me && G.me && Math.hypot(G.me.px - o[0], G.me.py - o[1]) > o[2] && (me.flags & 1)) txt('⚠ 你在毒圈外！快回安全区', cx, VH * 0.26, 24, '#ff5a36', 'center', 5);
@@ -2618,6 +2846,7 @@
       ctx.globalAlpha = Math.min(1, (5000 - age) / 600);
       const right = VW - 14;
       ctx.font = '900 14px "Microsoft YaHei", sans-serif';
+      if (f.text) { const tw = ctx.measureText(f.text).width; ctx.fillStyle = '#000a'; rr(ctx, right - tw - 16, fy - 12, tw + 16, 24, 8); ctx.fill(); txt(f.text, right - 8, fy, 14, f.color || '#fff', 'right', 0, true); ctx.globalAlpha = 1; fy += 28; continue; }
       const vName = f.v.name, bName = f.by && f.by !== f.v ? f.by.name : '';
       const wv = ctx.measureText(vName).width, wb = ctx.measureText(bName).width;
       const total = wv + wb + (bName ? 40 : 30);
@@ -2685,7 +2914,17 @@
     if (o && G.mode === 'park') { ctx.fillStyle = o[4] ? G.colors[o[4]] : '#fff'; ctx.beginPath(); ctx.arc(mx + o[2] * ms, my + o[3] * ms, Math.max(4, S.PARK.r * ms), 0, 7); ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1; const f = o[5] || []; ctx.fillStyle = '#ffd23f'; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
     if (o && G.mode === 'soccer') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && G.mode === 'battery') { ctx.fillStyle = '#b8ff3a'; const f = o[2]; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
-    if (o && G.teams > 2) {
+    if (o && G.loot) {   // 小地图：撤离点（绿 = 开放）+ 史诗 / 传说物资
+      const ex = o[0] || [];
+      for (let i = 0; i < ex.length; i += 3) {
+        const open = ex[i + 2] <= 0;
+        ctx.fillStyle = open ? '#5ee36a' : '#777'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(mx + ex[i] * ms, my + ex[i + 1] * ms, open ? 6 : 4, 0, 7); ctx.fill(); ctx.stroke();
+        if (open) { ctx.strokeStyle = '#5ee36a'; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(now / 200); ctx.beginPath(); ctx.arc(mx + ex[i] * ms, my + ex[i + 1] * ms, 10, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+      }
+      for (const it of G.items.values()) { const I = S.LOOT.items[it.k]; if (!I || I.r < 4) continue; ctx.fillStyle = S.LOOT.rare[I.r].c; ctx.fillRect(mx + it.x * ms - 1.5, my + it.y * ms - 1.5, 3, 3); }
+    }
+    if (o && G.teams > 2 && !G.loot) {
       ctx.save(); ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + o[3] * ms, my + o[4] * ms, o[5] * ms, 0, 7); ctx.stroke();
       ctx.strokeStyle = '#ff5a36'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, o[2] * ms, 0, 7); ctx.stroke();
@@ -2779,7 +3018,7 @@
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(chx, chy, 2.2, 0, 7); ctx.fill();
     if (G.hitMark > 0) {
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-      const d1 = 7, d2 = 15;
+      const pu = G.hitPulse || 0, d1 = 7 + pu * 4, d2 = 15 + pu * 7;   // 1.6：命中时准星张开一下
       ctx.beginPath();
       for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { ctx.moveTo(chx + sx * d1, chy + sy * d1); ctx.lineTo(chx + sx * d2, chy + sy * d2); }
       ctx.stroke();
@@ -2826,13 +3065,15 @@
     setTimeout(menuMusic, 2500);
     $('results').classList.remove('hidden');
     showScreen('game');
-    const won = r.winner === myTeam, draw = !r.winner;
+    const LR = r.mode === 'loot' && r.loot ? (r.loot.players[myId] || { ex: false, items: [] }) : null;   // 1.6：搜刮撤离
+    const won = LR ? LR.ex : r.winner === myTeam, draw = !LR && !r.winner;
     const title = $('resTitle');
     const rank = r.place && meRow ? r.place.indexOf(myTeam) + 1 : 0;
     title.textContent = rank ? (rank === 1 ? '大 吉 大 利 ！' : `第 ${rank} 名`) : !meRow ? `${tName(r.winner) || '平局'} 胜利` : draw ? '平 局' : won ? '胜 利 ！' : '惜 败 …';
     title.style.color = draw ? '#fff' : cs[r.winner];
+    if (LR) { title.textContent = !meRow ? '行动结束' : LR.ex ? '成 功 撤 离 ！' : '撤 离 失 败'; title.style.color = LR.ex ? '#5ee36a' : '#ff5a5a'; }
     const reason = { ko: '提前决胜', time: '时间到', turf: '比分相同，按涂地面积判定' }[r.reason] || '';
-    $('resSub').textContent = `${S.MODES[r.mode].name} · ${S.MAPS[r.map].name} · ${reason}`;
+    $('resSub').textContent = LR ? `${S.MODES.loot.name} · ${S.LOOT.risks[r.loot.risk].name} · ${S.MAPS[r.map].name}` : `${S.MODES[r.mode].name} · ${S.MAPS[r.map].name} · ${reason}`;
     const A = $('resA'), B = $('resB');
     A.parentElement.classList.toggle('hidden', multi);
     A.style.background = cs[myTeam]; B.style.background = cs[3 - myTeam];
@@ -2845,22 +3086,26 @@
     else if (r.rounds) score = `回合　${r.rounds[myTeam]} : ${r.rounds[3 - myTeam]}`;
     else if (r.mode === 'zone') score = `剩余倒计时　${r.count[myTeam]} : ${r.count[3 - myTeam]}`;
     else if (r.mode !== 'turf') score = `比分　${r.score[myTeam]} : ${r.score[3 - myTeam]}`;
+    if (LR) score = LR.ex ? `带出物资价值 ${fmtV(S.lootValue(LR.items))}` : '阵亡或没来得及撤离：这局搜到的物资全部丢失';
     $('resScore').textContent = score;
     // MVP
     const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
     const mvp = S.mvpOf(r);
-    const objLabel = { escort: '得分', battery: '电池' }[r.mode] || '—';
+    const objLabel = { escort: '得分', battery: '电池', loot: '带出' }[r.mode] || '—';
+    const lootOf = (p) => (r.loot && r.loot.players[p.id]) || null;
     $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
     // 1.5：数据卡片——每队一张卡，每人一行：头像、名字、机体、击毁 / 倒下 / 涂地条，MVP 金色标记
     const maxPaint = Math.max(1, ...r.players.map((p) => p.paint)), maxK = Math.max(1, ...r.players.map((p) => p.kills));
     const looksOf = (id) => (LAST_LOOKS && LAST_LOOKS.get(id)) || null;
     const faceOf = (p) => { const L = looksOf(p.id); return GP.portrait(S.pilot(L && L.pskin ? p.pilot + '@' + L.pskin : p.pilot), { face: true }); };
     let html = '';
-    for (const t of r.place || [myTeam, 3 - myTeam]) {
+    const teamList = r.place || (LR ? [myTeam, ...[1, 2, 3, 4].filter((t) => t !== myTeam)] : [myTeam, 3 - myTeam]);
+    for (const t of teamList) {
       const ps = r.players.filter((q) => q.team === t).sort((a, b) => val(b) - val(a));
       if (!ps.length) continue;
       const tk = ps.reduce((a, b) => a + b.kills, 0), win = r.winner === t;
-      const tag = r.place ? `第 ${r.place.indexOf(t) + 1} 名` : !r.winner ? '平局' : win ? '胜利' : '失败';
+      const tv = LR ? ps.reduce((a, p) => { const L = lootOf(p); return a + (L && L.ex ? S.lootValue(L.items) : 0); }, 0) : 0;
+      const tag = LR ? (tv ? `带出 ${fmtV(tv)}` : '全军覆没') : r.place ? `第 ${r.place.indexOf(t) + 1} 名` : !r.winner ? '平局' : win ? '胜利' : '失败';
       html += `<div class="r-team ${win ? 'win' : ''} ${t === myTeam ? 'mine' : ''}" style="--tc:${cs[t]}"><div class="rt-head"><b>${t === myTeam ? '我方' : multi ? tName(t) : '对方'}</b><span class="rt-tag">${tag}</span><small>击毁 ${tk}${!multi ? ` · 涂地 ${(r.turf[t - 1] * 100).toFixed(1)}%` : ''}</small></div>`;
       for (const p of ps) {
         const isM = mvp && p.id === mvp.id;
@@ -2869,7 +3114,7 @@
           <div class="rt-stats"><span class="st k" title="击毁"><i>击毁</i><b>${p.kills}</b><em style="width:${Math.round(p.kills / maxK * 100)}%"></em></span>
           <span class="st d" title="倒下"><i>倒下</i><b>${p.deaths}</b></span>
           <span class="st p" title="涂地"><i>涂地</i><b>${p.paint}</b><em style="width:${Math.round(p.paint / maxPaint * 100)}%"></em></span>
-          ${objLabel !== '—' ? `<span class="st o"><i>${objLabel}</i><b>${p.obj}</b></span>` : ''}</div>
+          ${objLabel !== '—' ? `<span class="st o"><i>${objLabel}</i><b>${LR ? (lootOf(p) && lootOf(p).ex ? fmtV(S.lootValue(lootOf(p).items)) : p.deaths ? '阵亡' : '未撤离') : p.obj}</b></span>` : ''}</div>
           ${isM ? '<span class="mvp">★ MVP</span>' : p.id === myId ? '<span class="you">你</span>' : ''}</div>`;
       }
       html += '</div>';
@@ -2879,7 +3124,12 @@
     const showTeam = meRow ? myTeam : r.winner;
     const crew = r.players.filter((q) => q.team === showTeam).sort((a, b) => (mvp && a.id === mvp.id ? -1 : mvp && b.id === mvp.id ? 1 : a.id === myId ? -1 : b.id === myId ? 1 : val(b) - val(a))).slice(0, 4);
     const stageOk = R3.teamShow && R3.teamShow($('resStage'), crew.map((p) => { const L = looksOf(p.id); return { pilot: L && L.pskin ? p.pilot + '@' + L.pskin : p.pilot, color: cs[p.team], mvp: !!(mvp && p.id === mvp.id) }; }), meRow ? won || rank === 1 : true);
-    $('resStage').classList.toggle('lose', !!meRow && !won && rank !== 1);
+    // 搜刮撤离：带出来的物资 / 丢掉的装备
+    if (LR && meRow) {
+      const lost = LR.ex ? [] : (r.loot.risk === 'high' ? LR.gear || [] : []);
+      $('resTable').insertAdjacentHTML('afterbegin', `<div class="r-loot ${LR.ex ? 'ok' : 'fail'}"><h4>${LR.ex ? `带出的物资 · ${LR.items.length} 件（已存入仓库）` : '物资全部丢失'}</h4><div class="r-items">${LR.ex ? LR.items.map((k) => lootIcon(k)).join('') : '<span class="r-none">下次记得早点去撤离点</span>'}</div>${lost.length ? `<p class="r-lost">高危行动阵亡，丢失装备：${lost.map((g) => S.LOOT.gear[g].name).join('、')}</p>` : ''}</div>`);
+    }
+    $('resStage').classList.toggle('lose', !!meRow && !won && (LR || rank !== 1));
     $('resStage').classList.toggle('no3d', !stageOk);
     RES_CREW = crew;
     $('resLabels').innerHTML = crew.map((p) => `<div class="r-lab ${mvp && p.id === mvp.id ? 'mvp' : ''} ${p.id === myId ? 'me' : ''}" style="--tc:${cs[p.team]}">${mvp && p.id === mvp.id ? '<span class="crown">★ MVP</span>' : ''}<b>${esc(p.name)}</b><small>${p.kills} 击毁 · ${p.paint} 涂地</small>${stageOk ? '' : `<div class="r-face2">${faceOf(p)}</div>`}</div>`).join('');
@@ -2962,12 +3212,12 @@
     const cb = ecoWait.get(m.req);
     if (cb) { ecoWait.delete(m.req); cb(m); }
   }
-  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); renderTalents(); renderPass(); renderShop(); renderEvents(); renderMail(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); if (HERO.open) renderHero(); sendLoadout(); }
+  function afterEco() { renderProfile(); renderPilots(); renderWallet(); renderChests(); renderTalents(); renderPass(); renderShop(); renderEvents(); renderMail(); if (!$('ov-mechs').classList.contains('hidden')) renderWeaponLists(); if (HERO.open) renderHero(); if (!$('ov-loot').classList.contains('hidden')) renderLoot(); if (!$('ov-stash').classList.contains('hidden')) renderStash(); renderLootChip(); sendLoadout(); }
   const fmtN = (n) => (n >= 100000 ? Math.floor(n / 1000) + 'k' : String(n));
   const cur = (k, n, cls) => `<span class="cur cur-${k} ${cls || ''}">${ic(k)}<b>${fmtN(n)}</b></span>`;
   function renderWallet() {
     const html = ['coins', 'gems', 'parts', 'crystals'].map((k) => cur(k, profile[k] || 0)).join('');
-    for (const id of ['wallet', 'wallet2', 'wallet3', 'wallet4']) { const el = $(id); if (el) el.innerHTML = html; }
+    for (const id of ['wallet', 'wallet2', 'wallet3', 'wallet4', 'wallet5', 'wallet6']) { const el = $(id); if (el) el.innerHTML = html; }
     const n = Object.values(profile.chests || {}).reduce((a, b) => a + b, 0), badge = $('chestBadge');
     if (badge) { badge.textContent = n; badge.classList.toggle('hidden', !n); }
     const t = $('sideChestTxt'); if (t) t.textContent = n ? `有 ${n} 个宝箱没开` : '商店 · 兑换';
@@ -3028,6 +3278,58 @@
     if (it.k === 'skin') return skinArt(S.skin(it.id), true);
     return ic(it.k);
   }
+
+  // 1.6：通行证滑动特效——惯性拖动 + 两头的弹性回弹、靠近中间的等级放大发光、背景视差、领取时奖励飞出
+  function passFxFrame(tr) {
+    const mid = tr.scrollLeft + tr.clientWidth / 2;
+    for (const c of tr.querySelectorAll('.pt-col')) {
+      const d = Math.min(1, Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid) / (tr.clientWidth * 0.5));
+      c.style.setProperty('--near', (1 - d).toFixed(3));
+    }
+    const wrap = tr.closest('.pass-track-wrap'); if (wrap) wrap.style.setProperty('--px', (-tr.scrollLeft * 0.25).toFixed(1) + 'px');
+  }
+  function setupPassFx(tr) {
+    if (tr.dataset.fx) return;
+    tr.dataset.fx = 1;
+    tr.style.scrollBehavior = 'auto';
+    let drag = null, vel = 0, raf = 0, over = 0;
+    const setOver = (v) => { over = v; tr.style.transform = v ? `translateX(${v}px)` : ''; };
+    const glide = () => {
+      raf = 0;
+      if (Math.abs(vel) > 0.3 && !drag) {
+        const before = tr.scrollLeft;
+        tr.scrollLeft -= vel; vel *= 0.94;
+        if (tr.scrollLeft === before) { setOver(Math.max(-60, Math.min(60, over + vel * 0.6))); vel *= 0.5; }   // 撞到两头：弹一下
+        raf = requestAnimationFrame(glide);
+      } else if (over && !drag) { setOver(Math.abs(over) < 0.5 ? 0 : over * 0.8); raf = requestAnimationFrame(glide); }
+      passFxFrame(tr);
+    };
+    tr.addEventListener('scroll', () => passFxFrame(tr), { passive: true });
+    tr.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') return; drag = { x: e.clientX, sl: tr.scrollLeft, lx: e.clientX, t: performance.now(), moved: 0 }; vel = 0; delete tr.dataset.dragged; });
+    addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x; drag.moved = Math.max(drag.moved, Math.abs(dx));
+      const want = drag.sl - dx, maxS = tr.scrollWidth - tr.clientWidth;
+      tr.scrollLeft = want;
+      setOver(want < 0 ? Math.min(80, -want * 0.35) : want > maxS ? -Math.min(80, (want - maxS) * 0.35) : 0);
+      const now = performance.now(); vel = (e.clientX - drag.lx) / Math.max(8, now - drag.t) * 16; drag.lx = e.clientX; drag.t = now;
+      if (drag.moved > 6) tr.dataset.dragged = 1;
+      passFxFrame(tr);
+    });
+    addEventListener('pointerup', () => { if (!drag) return; drag = null; if (!raf) raf = requestAnimationFrame(glide); setTimeout(() => delete tr.dataset.dragged, 30); });
+    tr.addEventListener('wheel', (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); vel -= e.deltaY * 0.12; if (!raf) raf = requestAnimationFrame(glide); } }, { passive: false });
+  }
+  function passFly(art) {
+    if (!art) return;
+    const r = art.getBoundingClientRect(), w = $('wallet') && $('wallet').offsetParent ? $('wallet') : document.querySelector('.ov:not(.hidden) .wallet') || document.querySelector('.pass-lv');
+    const to = w ? w.getBoundingClientRect() : { left: innerWidth - 120, top: 20, width: 80, height: 30 };
+    const fly = art.cloneNode(true); fly.className = 'pass-fly';
+    Object.assign(fly.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    document.body.appendChild(fly);
+    for (let i = 0; i < 10; i++) { const sp = document.createElement('i'); sp.className = 'pass-spark'; sp.style.left = r.left + r.width / 2 + 'px'; sp.style.top = r.top + r.height / 2 + 'px'; sp.style.setProperty('--a', (i / 10 * 360) + 'deg'); document.body.appendChild(sp); setTimeout(() => sp.remove(), 700); }
+    requestAnimationFrame(() => { fly.style.transform = `translate(${to.left + to.width / 2 - r.left - r.width / 2}px, ${to.top + to.height / 2 - r.top - r.height / 2}px) scale(.3) rotate(25deg)`; fly.style.opacity = '0.2'; });
+    setTimeout(() => fly.remove(), 700);
+  }
   function renderPass() {
     const lv = E.passLevel(profile), ps = profile.pass, max = E.PASS.tiers * E.PASS.xpPer;
     const inTier = ps.xp >= max ? E.PASS.xpPer : ps.xp % E.PASS.xpPer;
@@ -3061,12 +3363,21 @@
       tr.appendChild(col);
     }
     for (const b of tr.querySelectorAll('.pt-cell.can')) b.onclick = async () => {
+      if (tr.dataset.dragged) return;
+      const art = b.querySelector('.pt-art');
       const r = await eco('claimPass', { tier: +b.dataset.t, prem: b.dataset.p === '1' });
       if (!r.ok) return toast(r.err);
-      sfx.pick(); showGain(r.items, '通行证奖励');
+      passFly(art); sfx.pick(); setTimeout(() => showGain(r.items, '通行证奖励'), 420);
     };
+    // 进度线：走到当前等级
+    const fill = document.createElement('div'); fill.className = 'pt-progress';
+    tr.prepend(fill);
+    const cols = tr.querySelectorAll('.pt-col'), lastReached = cols[Math.max(0, Math.min(cols.length, lv) - 1)];
+    requestAnimationFrame(() => { fill.style.width = (lv ? lastReached.offsetLeft + lastReached.offsetWidth / 2 : 0) + 'px'; fill.style.setProperty('--w', tr.scrollWidth + 'px'); });
+    setupPassFx(tr);
     const nx = tr.querySelector('.pt-col.next') || tr.lastElementChild;
-    if (nx && !tr.dataset.scrolled) { tr.dataset.scrolled = 1; setTimeout(() => { tr.scrollLeft = Math.max(0, nx.offsetLeft - 160); }, 50); }
+    if (nx && !tr.dataset.scrolled) { tr.dataset.scrolled = 1; setTimeout(() => { tr.scrollLeft = Math.max(0, nx.offsetLeft - tr.clientWidth / 2 + nx.offsetWidth / 2); passFxFrame(tr); }, 50); }
+    else passFxFrame(tr);
     // 任务
     const d = E.dayIndex(), wk = E.weekIndex();
     const dp = profile.q.d === d ? profile.q.dp : [0, 0, 0], wp = profile.q.w === wk ? profile.q.wp : [0, 0, 0, 0];
@@ -3169,59 +3480,91 @@
     for (const id of E.TASKLINE_ORDER) { const L = E.TASKLINES[id], st = (profile.tl || {})[id]; if (st) L.steps.forEach((q, i) => { if (st.p[i] >= q[1] && !st.c[i]) can++; }); }
     return can;
   }
+  const EVSEL = { tab: 'limited', id: null };   // 1.6：活动界面——当前分页（任务 / 限时活动）和选中的活动
+  // 1.6：活动界面——左边是可以往下滑的活动列表（分「限时活动 / 任务」两页），右边一次显示一个活动的完整页面
+  function evEntries(now) {
+    const out = { limited: [], task: [] };
+    for (const ev of E.EVENTS) {
+      const on = now >= ev.start && now < ev.end, soon = now < ev.start;
+      if (!on && !soon && now > ev.end + 3 * 86400e3) continue;
+      const st = profile.ev[ev.id] || { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) };
+      const can = on && ev.quests.some((q, i) => st.p[i] >= q[1] && !st.c[i]);
+      out.limited.push({ id: 'ev:' + ev.id, name: ev.name, color: ev.color, sub: on ? `还剩 ${fmtLeft(ev.end - now)}` : soon ? `${fmtLeft(ev.start - now)} 后开始` : '已结束', can, off: !on });
+    }
+    const done = E.STORY.steps.filter((st, i) => profile.story.p[i] >= st[1]).length;
+    out.task.push({ id: 'story', name: E.STORY.name, color: S.pilot('han').accent, sub: `${done} / ${E.STORY.steps.length} 完成`, can: E.STORY.rewards.some(([n]) => done >= n && !profile.story.c.includes(n)) });
+    for (const id of E.TASKLINE_ORDER) {
+      const L = E.TASKLINES[id], st = E.taskState(profile, id);
+      if (id === 'rookie' && st.c.every(Boolean)) continue;
+      const nd = st.c.filter(Boolean).length;
+      out.task.push({ id: 'tl:' + id, name: L.name, color: L.color, sub: `${nd} / ${L.steps.length} 已领`, can: L.steps.some((q, i) => st.p[i] >= q[1] && !st.c[i]), isNew: id === 'loot' });
+    }
+    return out;
+  }
   function renderEvents() {
     const b = $('evBadge'); if (b) b.classList.toggle('hidden', !evProgress());
     const box = $('evList');
     if (!box) return;
-    const now = Date.now();
-    let html = '';
-    // 任务线：叛将档案
-    const done = E.STORY.steps.filter((st, i) => profile.story.p[i] >= st[1]).length, H = S.pilot('han');
-    html += `<div class="ev-card story" style="--ec:${H.accent}"><div class="ev-art">${GP.portrait(H)}</div><div class="ev-main">
-      <div class="ev-tag">任务线 · 永久</div><h3>${E.STORY.name}</h3><p>${E.STORY.desc}</p>
-      <div class="ev-quests">${E.STORY.steps.map((q, i) => { const v = profile.story.p[i]; return `<div class="qrow ${v >= q[1] ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small></div>`; }).join('')}</div>
-      <div class="ev-rewards">${E.STORY.rewards.map(([n, it]) => { const got = profile.story.c.includes(n), can = done >= n && !got; const nm = it.k === 'pilot' ? `驾驶员「${S.pilot(it.id).name}」` : `机体「${S.WEAPONS[it.id].name}」`;
-        return `<button class="btn small ${got ? 'ghost' : ''}" data-story="${n}" ${can ? '' : 'disabled'}>完成 ${n} 个：${nm}${got ? ' ✓' : ''}</button>`; }).join('')}</div></div></div>`;
-    // 任务线：新兵之路 / 袭击！特攻队（每完成一个任务领一次奖励）
-    for (const id of E.TASKLINE_ORDER) {
-      const L = E.TASKLINES[id], st = (profile.tl || {})[id] || { p: L.steps.map(() => 0), c: L.steps.map(() => false) };
-      if (id === 'rookie' && st.c.every(Boolean)) continue;   // 新兵之路全部领完就不再显示
-      const art = id === 'strike' ? `<div class="ev-art chest">${GI.chestArt('strike')}</div>` : `<div class="ev-art chest">${GI.chestArt('starter')}</div>`;
-      html += `<div class="ev-card story" style="--ec:${L.color}">${art}<div class="ev-main">
-        <div class="ev-tag">任务线 · 永久</div><h3>${L.name}</h3><p>${L.desc}</p>
-        <div class="ev-quests">${L.steps.map((q, i) => { const v = st.p[i], ok = v >= q[1]; return `<div class="qrow ${ok ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small>
-          <button class="btn small ${st.c[i] ? 'ghost' : ''}" data-task="${id}" data-i="${i}" ${ok && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button></div>`; }).join('')}</div></div></div>`;
-    }
-    for (const ev of E.EVENTS) {
-      const on = now >= ev.start && now < ev.end, soon = now < ev.start, st = profile.ev[ev.id] || { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) };
-      if (!on && !soon && now > ev.end + 3 * 86400e3) continue;   // 结束 3 天以上的活动不再显示
-      html += `<div class="ev-card ${on ? '' : 'off'}" style="--ec:${ev.color}"><div class="ev-main">
-        <div class="ev-tag">${on ? `限时活动 · 还剩 ${fmtLeft(ev.end - now)}` : soon ? `即将开始 · ${fmtLeft(ev.start - now)} 后` : '已结束'}</div><h3>${ev.name}</h3><p>${ev.desc}</p>
-        <div class="ev-quests">${ev.quests.map((q, i) => { const v = st.p[i], ok = v >= q[1]; return `<div class="qrow ${ok ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small>
-          <button class="btn small ${st.c[i] ? 'ghost' : ''}" data-ev="${ev.id}" data-i="${i}" ${on && ok && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button></div>`; }).join('')}</div>
-        ${ev.shop && on ? `<div class="ev-shop"><div class="ev-shop-h"><b>活动商店</b><span class="tk">${ic('tickets')}${profile.tickets || 0} 乐园票</span>${ev.id === 'parkfest' ? '<button class="btn small" data-park>去玩乐园模式</button>' : ''}</div><div class="ev-shop-grid">${ev.shop.map((it, i) => { const used = (st.s || [])[i] || 0, left = it.limit - used, own = it.it.k === 'skin' && profile.skins.includes(it.it.id);
-          return `<div class="shop-it ${left <= 0 || own ? 'sold' : ''}"><div class="si-art">${rewardArt(it.it)}</div><b>${rewardLabel(it.it)}</b><small>${own ? '已拥有' : `剩 ${left} / ${it.limit}`}</small><button class="btn small" data-shop="${ev.id}" data-i="${i}" ${left > 0 && !own && (profile.tickets || 0) >= it.cost ? '' : 'disabled'}>${ic('tickets')}${it.cost}</button></div>`; }).join('')}</div></div>` : ''}</div></div>`;
-    }
-    box.innerHTML = html;
-    for (const b2 of box.querySelectorAll('[data-story]')) b2.onclick = async () => {
+    const now = Date.now(), ent = evEntries(now);
+    if (!ent[EVSEL.tab].length) EVSEL.tab = EVSEL.tab === 'limited' ? 'task' : 'limited';
+    const list = ent[EVSEL.tab];
+    if (!list.some((e) => e.id === EVSEL.id)) EVSEL.id = (list.find((e) => e.can) || list[0] || {}).id;
+    $('evTabs').innerHTML = [['limited', '限时活动'], ['task', '任务']].map(([k, n]) => `<button data-evtab="${k}" class="${EVSEL.tab === k ? 'sel' : ''}">${n}${ent[k].some((e) => e.can) ? '<em class="dot"></em>' : ''}</button>`).join('');
+    box.innerHTML = list.map((e) => `<button class="ev-item ${e.id === EVSEL.id ? 'sel' : ''} ${e.off ? 'off' : ''}" data-evsel="${e.id}" style="--ec:${e.color}"><i class="ei-bar"></i><div><h3>${e.name}</h3><small>${e.sub}</small></div>${e.can ? '<em class="ei-can">!</em>' : e.isNew ? '<em class="ei-new">新</em>' : ''}</button>`).join('');
+    $('evPage').innerHTML = evPageHtml(EVSEL.id, now);
+    $('evPage').scrollTop = 0;
+    for (const b2 of $('evTabs').querySelectorAll('[data-evtab]')) b2.onclick = () => { EVSEL.tab = b2.dataset.evtab; EVSEL.id = null; renderEvents(); sfx.click(); };
+    for (const b2 of box.querySelectorAll('[data-evsel]')) b2.onclick = () => { EVSEL.id = b2.dataset.evsel; renderEvents(); sfx.click(); };
+    const pg = $('evPage');
+    for (const b2 of pg.querySelectorAll('[data-story]')) b2.onclick = async () => {
       const r = await eco('claimStory', { n: +b2.dataset.story }); if (!r.ok) return toast(r.err);
       sfx.win(); const it = r.items[0]; toast(it.k === 'pilot' ? `「${S.pilot(it.id).name}」加入了反抗军！` : `获得机体「${S.WEAPONS[it.id].name}」！`, 3200);
     };
-    for (const b2 of box.querySelectorAll('[data-task]')) b2.onclick = async () => {
+    for (const b2 of pg.querySelectorAll('[data-task]')) b2.onclick = async () => {
       const r = await eco('claimTask', { id: b2.dataset.task, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
       sfx.win(); showGain(r.items, E.TASKLINES[b2.dataset.task].name);
     };
-    for (const b2 of box.querySelectorAll('[data-shop]')) b2.onclick = async () => {
+    for (const b2 of pg.querySelectorAll('[data-shop]')) b2.onclick = async () => {
       const r = await eco('eventShop', { id: b2.dataset.shop, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
       sfx.win(); showGain(r.items, '活动商店');
     };
-    for (const b2 of box.querySelectorAll('[data-park]')) b2.onclick = () => { profile.mode = 'park'; profile.map = -1; saveProfile(); sendLoadout(); closeOv(); renderProfile(); toast('已切换到乐园模式'); };
-    for (const b2 of box.querySelectorAll('[data-ev]')) b2.onclick = async () => {
+    for (const b2 of pg.querySelectorAll('[data-park]')) b2.onclick = () => { profile.mode = 'park'; profile.map = -1; saveProfile(); sendLoadout(); closeOv(); renderProfile(); toast('已切换到乐园模式'); };
+    for (const b2 of pg.querySelectorAll('[data-goloot]')) b2.onclick = () => openOv('loot');
+    for (const b2 of pg.querySelectorAll('[data-ev]')) b2.onclick = async () => {
       const r = await eco('claimEvent', { id: b2.dataset.ev, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
       sfx.win(); showGain(r.items, '活动奖励');
     };
   }
+  function evPageHtml(id, now) {
+    if (!id) return '<p class="empty-note">暂时没有活动</p>';
+    const qrow = (q, v, btn) => `<div class="qrow ${v >= q[1] ? 'done' : ''}"><div><b>${E.statName(q[0], q[1])}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small>${btn || ''}</div>`;
+    const banner = (color, tag, title, desc, art) => `<div class="ev-banner" style="--ec:${color}"><div class="eb-text"><span class="ev-tag">${tag}</span><h2>${title}</h2><p>${desc}</p></div>${art ? `<div class="eb-art">${art}</div>` : ''}</div>`;
+    if (id === 'story') {
+      const done = E.STORY.steps.filter((st, i) => profile.story.p[i] >= st[1]).length, H = S.pilot('han');
+      return banner(H.accent, '任务线 · 永久', E.STORY.name, E.STORY.desc, GP.portrait(H)) +
+        `<div class="ev-sec"><h4>任务</h4><div class="ev-quests">${E.STORY.steps.map((q, i) => qrow(q, profile.story.p[i])).join('')}</div></div>
+        <div class="ev-sec"><h4>奖励</h4><div class="ev-rewards">${E.STORY.rewards.map(([n, it]) => { const got = profile.story.c.includes(n), can = done >= n && !got; const nm = it.k === 'pilot' ? `驾驶员「${S.pilot(it.id).name}」` : `机体「${S.WEAPONS[it.id].name}」`;
+          return `<button class="btn small ${got ? 'ghost' : ''}" data-story="${n}" ${can ? '' : 'disabled'}>完成 ${n} 个：${nm}${got ? ' ✓' : ''}</button>`; }).join('')}</div></div>`;
+    }
+    if (id.startsWith('tl:')) {
+      const tid = id.slice(3), L = E.TASKLINES[tid], st = E.taskState(profile, tid);
+      const art = tid === 'loot' ? '<div class="eb-loot">⛏</div>' : GI.chestArt(tid === 'strike' ? 'strike' : 'starter');
+      return banner(L.color, '任务线 · 永久', L.name, L.desc, art) +
+        `<div class="ev-sec"><h4>任务<small>每完成一个就能领一次奖励</small></h4><div class="ev-quests">${L.steps.map((q, i) => qrow(q, st.p[i], `<button class="btn small ${st.c[i] ? 'ghost' : ''}" data-task="${tid}" data-i="${i}" ${st.p[i] >= q[1] && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button>`)).join('')}</div></div>
+        ${tid === 'loot' ? '<button class="btn big ev-go" data-goloot>去搜刮撤离</button>' : ''}`;
+    }
+    const ev = E.EVENTS.find((x) => 'ev:' + x.id === id);
+    if (!ev) return '';
+    const on = now >= ev.start && now < ev.end, soon = now < ev.start, st = profile.ev[ev.id] || { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) };
+    return banner(ev.color, on ? `限时活动 · 还剩 ${fmtLeft(ev.end - now)}` : soon ? `即将开始 · ${fmtLeft(ev.start - now)} 后` : '已结束', ev.name, ev.desc, ev.id === 'parkfest' ? '<div class="eb-loot">🎡</div>' : '') +
+      `<div class="ev-sec"><h4>活动任务</h4><div class="ev-quests">${ev.quests.map((q, i) => qrow(q, st.p[i], `<button class="btn small ${st.c[i] ? 'ghost' : ''}" data-ev="${ev.id}" data-i="${i}" ${on && st.p[i] >= q[1] && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button>`)).join('')}</div></div>
+      ${ev.shop && on ? `<div class="ev-sec ev-shop"><div class="ev-shop-h"><h4>活动商店</h4><span class="tk">${ic('tickets')}${profile.tickets || 0} 乐园票</span>${ev.id === 'parkfest' ? '<button class="btn small" data-park>去玩乐园模式</button>' : ''}</div><div class="ev-shop-grid">${ev.shop.map((it, i) => { const used = (st.s || [])[i] || 0, left = it.limit - used, own = it.it.k === 'skin' && profile.skins.includes(it.it.id);
+        return `<div class="shop-it ${left <= 0 || own ? 'sold' : ''}"><div class="si-art">${rewardArt(it.it)}</div><b>${rewardLabel(it.it)}</b><small>${own ? '已拥有' : `剩 ${left} / ${it.limit}`}</small><button class="btn small" data-shop="${ev.id}" data-i="${i}" ${left > 0 && !own && (profile.tickets || 0) >= it.cost ? '' : 'disabled'}>${ic('tickets')}${it.cost}</button></div>`; }).join('')}</div></div>` : ''}`;
+  }
+
   // ---------------- 信箱 ----------------
+  // 1.6：信箱——左边信件列表（可以往下滑），右边看信、领取；只有往右滑才是删除
+  let MAILSEL = null;
   function renderMail() {
     const box = E.mailbox(profile), unread = box.filter((m) => !m.got).length;
     const b = $('mailBadge'); if (b) { b.textContent = unread; b.classList.toggle('hidden', !unread); }
@@ -3229,23 +3572,34 @@
     if (!list) return;
     $('mailAll').disabled = !unread;
     $('mailDelAll').disabled = !box.some((m) => m.got);
-    const now = Date.now();
-    list.innerHTML = box.length ? box.slice().reverse().map((m) => `<div class="mail ${m.got ? 'got' : ''}" data-mid="${m.id}"><div class="mail-ico">${ic('mail')}</div><div class="mail-main">
-      <div class="mail-from">${esc(m.from)} · ${new Date(m.t).toLocaleDateString('zh-CN')}${m.got ? '' : ` · <span class="mail-exp">${fmtLeft(m.expires - now)} 后过期</span>`}</div><b>${esc(m.title)}</b><p>${esc(m.body)}</p>
-      <div class="mail-items">${m.items.map((it) => `<span>${rewardArt(it)}<em>${rewardLabel(it)}</em></span>`).join('')}</div></div>
-      ${m.got ? `<button class="btn small ghost" data-del="${m.id}" title="删除">删除</button>` : `<button class="btn small" data-mail="${m.id}">领取</button>`}</div>`).join('') : '<p class="empty-note">信箱是空的</p>';
-    for (const b2 of list.querySelectorAll('[data-mail]')) b2.onclick = async () => { const r = await eco('claimMail', { id: b2.dataset.mail }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '信箱'); };
+    const now = Date.now(), mails = box.slice().reverse();
+    if (!mails.some((m) => m.id === MAILSEL)) MAILSEL = (mails.find((m) => !m.got) || mails[0] || {}).id || null;
+    list.innerHTML = mails.length ? mails.map((m) => `<div class="mail ${m.got ? 'got' : 'new'} ${m.id === MAILSEL ? 'sel' : ''}" data-mid="${m.id}"><div class="mail-ico">${ic('mail')}${m.got ? '' : '<em></em>'}</div><div class="mail-main">
+      <b>${esc(m.title)}</b><div class="mail-from">${esc(m.from)} · ${new Date(m.t).toLocaleDateString('zh-CN')}</div>${m.got ? '<small class="mail-st">已领取</small>' : `<small class="mail-exp">${fmtLeft(m.expires - now)} 后过期</small>`}</div></div>`).join('') : '<p class="empty-note">信箱是空的</p>';
+    const m = mails.find((x) => x.id === MAILSEL);
+    $('mailRead').innerHTML = m ? `<div class="mr-card ${m.got ? 'got' : ''}"><div class="mr-head"><h3>${esc(m.title)}</h3><small>${esc(m.from)} · ${new Date(m.t).toLocaleString('zh-CN')}</small></div>
+      <p class="mr-body">${esc(m.body)}</p><h4>附件</h4><div class="mail-items">${m.items.map((it) => `<span>${rewardArt(it)}<em>${rewardLabel(it)}</em></span>`).join('')}</div>
+      <div class="mr-acts">${m.got ? `<button class="btn ghost" data-del="${m.id}">删除这封邮件</button>` : `<button class="btn big" data-mail="${m.id}">领取附件</button><small class="mail-exp">${fmtLeft(m.expires - now)} 后过期，过期会自动删除</small>`}</div></div>` : '<p class="empty-note">选择左边的邮件查看</p>';
+    for (const el of list.querySelectorAll('[data-mid]')) el.onclick = () => { if (el.dataset.swiped) return; MAILSEL = el.dataset.mid; renderMail(); sfx.click(); };
+    for (const b2 of $('mailRead').querySelectorAll('[data-mail]')) b2.onclick = async () => { const r = await eco('claimMail', { id: b2.dataset.mail }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '信箱'); };
     const del = async (id, el) => { if (el) { el.classList.add('swiped'); await new Promise((res) => setTimeout(res, 220)); } const r = await eco('delMail', { id }); if (!r.ok) { if (el) el.classList.remove('swiped'); return toast(r.err); } renderMail(); };
-    for (const b2 of list.querySelectorAll('[data-del]')) b2.onclick = () => del(b2.dataset.del, b2.closest('.mail'));
-    // 往右（或往下）滑：删除领过的邮件
+    for (const b2 of $('mailRead').querySelectorAll('[data-del]')) b2.onclick = () => del(b2.dataset.del, list.querySelector(`[data-mid="${b2.dataset.del}"]`));
+    // 领过的邮件：往右滑删除（上下滑动是滚动列表，不会误删）
     for (const el of list.querySelectorAll('.mail.got')) {
-      let sx = null, sy = 0, dx = 0;
-      el.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; sx = e.clientX; sy = e.clientY; dx = 0; el.style.transition = 'none'; });
-      el.addEventListener('pointermove', (e) => { if (sx == null) return; dx = Math.max(e.clientX - sx, (e.clientY - sy) * 0.9, 0); el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(Math.max(0.2, 1 - dx / 260)); });
-      const up = () => { if (sx == null) return; sx = null; el.style.transition = ''; if (dx > 110) del(el.dataset.mid, el); else { el.style.transform = ''; el.style.opacity = ''; } };
+      let sx = null, sy = 0, dx = 0, horiz = null;
+      el.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; dx = 0; horiz = null; el.style.transition = 'none'; delete el.dataset.swiped; });
+      el.addEventListener('pointermove', (e) => {
+        if (sx == null) return;
+        const mx = e.clientX - sx, my = e.clientY - sy;
+        if (horiz == null && Math.hypot(mx, my) > 8) horiz = Math.abs(mx) > Math.abs(my) * 1.4;
+        if (!horiz) return;
+        dx = Math.max(0, mx); el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(Math.max(0.2, 1 - dx / 260));
+      });
+      const up = () => { if (sx == null) return; sx = null; el.style.transition = ''; if (horiz && dx > 110) { el.dataset.swiped = '1'; del(el.dataset.mid, el); } else { el.style.transform = ''; el.style.opacity = ''; if (horiz && dx > 8) el.dataset.swiped = '1'; } };
       el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('pointerleave', up);
     }
   }
+
   // ---------------- 更新公告：每个新版本第一次进大厅弹一次，右上角随时可看 ----------------
   function showNews(force) {
     const N = S.PATCH_NOTES[0], en = window.GBI18N && GBI18N.lang === 'en' && N.en;

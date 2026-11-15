@@ -6,7 +6,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const S = {};
-  const CELL = 16, GW = 120, GH = 80;
+  const CELL = 16;
+  let GW = 120, GH = 80;   // 1.6：地图尺寸跟着当前地图变（超大地图 240×160），用 S.useDims 切换
   Object.assign(S, {
     CELL, GW, GH, W: GW * CELL, H: GH * CELL,
     TICK: 30,          // 服务器模拟频率
@@ -418,11 +419,48 @@
     elim: { name: '生死之战', short: '生死', desc: '只有一条命：机体被打爆不会重建，驾驶员也倒下就出局。先把对面全队消灭赢一局，三局两胜。', original: true, oneLife: true, isNew: true },
     escape4: { name: '逃亡圈 · 四队', short: '逃亡', desc: '4 队 × 2 人分散空降。灰色毒圈不断缩小，捡空投箱变强，只有一条命，最后活下来的队伍获胜。', original: true, oneLife: true, teams: 4, size: 2, isNew: true },
     park: { name: '乐园模式', short: '乐园', desc: '嘉年华花车沿着环形路线巡游：花车光圈里人多的队伍每秒得 1 分，打爆飘着的气球再得 3 分。先到 100 分获胜。', original: true, isNew: true },
+    loot: { name: '搜刮撤离', short: '撤离', desc: '超大地图上搜刮物资、和其他小队争夺，在撤离点读条 10 秒成功撤离，带出来的物资存进仓库。只有一条命，阵亡或没来得及撤离，这局搜到的东西全部丢失。', original: true, oneLife: true, teams: 4, size: 3, isNew: true },
     escape8: { name: '逃亡圈 · 单人', short: '单人逃亡', desc: '8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。', original: true, oneLife: true, teams: 8, size: 1, isNew: true },
   };
   S.MODE_ORDER = ['park', 'turf', 'zone', 'escort', 'soccer', 'battery', 'elim', 'escape4', 'escape8'];
   S.teamsOf = (mode) => (S.MODES[mode] && S.MODES[mode].teams) || 2;
   S.isEscape = (mode) => mode === 'escape4' || mode === 'escape8';
+  // ---------------- 1.6：搜刮撤离 ----------------
+  //   物资 5 种品质；size = 占几格背包；v = 价值（卖给仓库得 v/10 金币）；ex = 可以兑换的特殊奖励
+  S.LOOT = {
+    duration: 420, bag: 10, pickR: 28, extTime: 10, extR: 70, opens: [180, 230, 280, 330], guardTeam: 5,
+    rare: [null, { name: '普通', c: '#c9ccd4' }, { name: '优良', c: '#5ee36a' }, { name: '稀有', c: '#4fb8ff' }, { name: '史诗', c: '#b78cff' }, { name: '传说', c: '#ffc531' }],
+    items: {
+      scrap: { name: '废旧零件', r: 1, size: 1, v: 60 }, can: { name: '空涂料罐', r: 1, size: 1, v: 80 }, battery: { name: '旧电池', r: 1, size: 1, v: 100 }, cable: { name: '电缆卷', r: 1, size: 2, v: 160 },
+      neon: { name: '霓虹灯管', r: 2, size: 1, v: 240 }, circuit: { name: '电路板', r: 2, size: 1, v: 280 }, toolbox: { name: '工具箱', r: 2, size: 2, v: 420 }, spray: { name: '专业喷枪', r: 2, size: 1, v: 320 },
+      engine: { name: '机甲引擎', r: 3, size: 2, v: 800 }, drive: { name: '加密硬盘', r: 3, size: 1, v: 700 }, rarepaint: { name: '限定喷漆', r: 3, size: 1, v: 650 }, optic: { name: '狙击镜', r: 3, size: 1, v: 720 },
+      qchip: { name: '量子芯片', r: 4, size: 1, v: 1600 }, proto: { name: '原型装甲', r: 4, size: 3, v: 2600 }, radio: { name: '古董收音机', r: 4, size: 2, v: 1900 }, cell: { name: '能量电池组', r: 4, size: 2, v: 2000 },
+      goldcan: { name: '黄金涂鸦罐', r: 5, size: 1, v: 4500, ex: { gems: 40 } }, reactor: { name: '核心反应堆', r: 5, size: 4, v: 9000, ex: { crystals: 1, gems: 60 } }, files: { name: '灰城机密档案', r: 5, size: 1, v: 6000, ex: { crystals: 1 } },
+    },
+    // 物资点品质 → 各品质的权重
+    tiers: { 1: [0, 70, 25, 5, 0, 0], 2: [0, 40, 40, 17, 3, 0], 3: [0, 0, 35, 40, 22, 3], 5: [0, 0, 0, 0, 50, 50] },
+    // 军需处：用金币买的装备，只能带进「高危」行动，阵亡会丢
+    gear: {
+      armor: { name: '战术护甲', price: 600, desc: '机体生命 +25%' },
+      pack: { name: '扩容背包', price: 400, desc: '背包 +6 格' },
+      kit: { name: '急救包', price: 200, desc: '生命低于 30% 时自动回复 60 生命（一次）' },
+    },
+    risks: { normal: { name: '普通行动', desc: '阵亡只丢这局搜到的物资' }, high: { name: '高危行动', desc: '物资更多、品质更高，可以带装备进场，但阵亡时装备也会丢' } },
+  };
+  S.lootItem = (k) => S.LOOT.items[k];
+  S.LOOT_KEYS = Object.keys(S.LOOT.items);
+  S.lootValue = (items) => (items || []).reduce((a, k) => a + ((S.LOOT.items[k] || {}).v || 0), 0);
+  S.lootSlots = (items) => (items || []).reduce((a, k) => a + ((S.LOOT.items[k] || {}).size || 1), 0);
+  // 按物资点品质抽一件物资（高危：30% 概率升一档）
+  S.rollLoot = (tier, high, rnd) => {
+    rnd = rnd || Math.random;
+    const w = S.LOOT.tiers[tier] || S.LOOT.tiers[1], tot = w.reduce((a, b) => a + b, 0);
+    let x = rnd() * tot, r = 1;
+    for (let i = 1; i < w.length; i++) { x -= w[i]; if (x < 0) { r = i; break; } }
+    if (high && r < 5 && rnd() < 0.3) r++;
+    const pool = S.LOOT_KEYS.filter((k) => S.LOOT.items[k].r === r);
+    return pool[Math.floor(rnd() * pool.length)];
+  };
   // 多队模式的涂料颜色（第 1–8 队）
   S.TEAM8 = [null, '#ff3ea5', '#1fd6ee', '#ffdf2e', '#9cff2e', '#ff8a1f', '#8c5cff', '#ff3b52', '#3a6dff'];
   S.TEAM8_NAMES = [null, '粉队', '青队', '黄队', '绿队', '橙队', '紫队', '红队', '蓝队'];
@@ -561,13 +599,149 @@
       bush: [[44, 26, 6, 3], [44, 51, 6, 3], [22, 12, 4, 6], [6, 32, 4, 8], [30, 64, 8, 3]],
     },
   ];
+  S.MAP_N = S.MAPS.length;   // 普通地图数量（之后追加的是搜刮撤离用的超大地图）
+  // ---------------- 1.6：地图尺寸切换 ----------------
+  const DIM_HOOKS = [];
+  S.onDims = (f) => { DIM_HOOKS.push(f); f(); };
+  S.useDims = (gw, gh) => {
+    if (gw === GW && gh === GH) return;
+    GW = gw; GH = gh; S.GW = gw; S.GH = gh; S.W = gw * CELL; S.H = gh * CELL;
+    for (const f of DIM_HOOKS) f();
+  };
+  S.mapDims = (i) => { const m = S.MAPS[i] || S.MAPS[0]; return [m.gw || 120, m.gh || 80]; };
+  S.useMap = (M) => { if (M && M.gw) S.useDims(M.gw, M.gh); };
+  S.isLootMap = (i) => !!(S.MAPS[i] && S.MAPS[i].loot);
+  // ---------------- 1.6：搜刮撤离的超大地图（按种子生成，保证全图连通） ----------------
+  function genLootMap(seed, theme) {
+    let st = seed >>> 0;
+    const R = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    const RI = (a, b) => a + Math.floor(R() * (b - a + 1));
+    const gw = 240, gh = 160, cx = gw / 2, cy = gh / 2;
+    const rects = [], stairs = [], bush = [], pads = [];
+    const occ = new Uint8Array(gw * gh);   // 已经放了东西（含留白通道）
+    const keep = [];                       // 不能放东西的区域：出生点、撤离点、中心
+    const free = (x, y, w, h, m = 1) => {
+      if (x < 2 || y < 2 || x + w > gw - 2 || y + h > gh - 2) return false;
+      for (const k of keep) if (x < k[0] + k[2] && x + w > k[0] && y < k[1] + k[3] && y + h > k[1]) return false;
+      for (let j = y - m; j < y + h + m; j++) for (let i = x - m; i < x + w + m; i++) if (i >= 0 && j >= 0 && i < gw && j < gh && occ[j * gw + i]) return false;
+      return true;
+    };
+    const mark = (x, y, w, h) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i >= 0 && j >= 0 && i < gw && j < gh) occ[j * gw + i] = 1; };
+    const add = (x, y, w, h, l) => { rects.push([x, y, w, h, l]); mark(x, y, w, h); };
+    // 四个角是四支小队的出生点，四条边中间是撤离点（第 3 分钟起陆续开放），中间是危险区
+    const spawns = [[14, 14], [gw - 14, 14], [14, gh - 14], [gw - 14, gh - 14]];
+    const extract = [[cx, 9], [gw - 9, cy], [cx, gh - 9], [9, cy]];
+    for (const [x, y] of spawns) keep.push([x - 9, y - 9, 18, 18]);
+    for (const [x, y] of extract) keep.push([x - 7, y - 7, 14, 14]);
+    const spots = [], guards = [];
+    // ===== 中心危险区 =====
+    if (theme === 'harbor') {
+      // 货轮：一块长长的高台甲板，两头有楼梯；甲板上是金色物资，周围有守卫
+      const sx = cx - 22, sy = cy - 7;
+      add(sx, sy, 44, 14, 2);
+      add(sx + 16, sy + 4, 4, 6, 3); add(sx + 26, sy + 4, 4, 6, 3);   // 船舱
+      stairs.push([sx - 7, sy + 2, 7, 3, 'E', 2], [sx + 44, sy + 9, 7, 3, 'W', 2]);
+      mark(sx - 7, sy + 2, 7, 3); mark(sx + 44, sy + 9, 7, 3);
+      keep.push([sx - 12, sy - 6, 68, 26]);
+      for (const [x, y] of [[sx + 6, sy + 7], [sx + 23, sy + 7], [sx + 38, sy + 7]]) spots.push([x, y, 5, 2]);
+      for (const [x, y] of [[sx - 4, sy - 4], [sx + 48, sy + 17], [sx + 22, sy - 4], [sx + 22, sy + 17]]) guards.push([x, y, 0]);
+      // 两座吊臂（高墙）
+      add(sx + 8, sy - 10, 2, 6, 3); add(sx + 34, sy + 18, 2, 6, 3);
+    } else {
+      // 反应堆大厅：中间一圈矮台围着反应堆（高墙），四个方向有楼梯和弹跳板
+      add(cx - 4, cy - 4, 8, 8, 3);
+      for (const [x, y, w, h] of [[cx - 16, cy - 16, 32, 6], [cx - 16, cy + 10, 32, 6], [cx - 16, cy - 10, 6, 20], [cx + 10, cy - 10, 6, 20]]) add(x, y, w, h, 2);
+      stairs.push([cx - 3, cy - 23, 3, 7, 'S', 2], [cx, cy + 16, 3, 7, 'N', 2]);
+      mark(cx - 3, cy - 23, 3, 7); mark(cx, cy + 16, 3, 7);
+      pads.push([cx - 24, cy - 1, 0], [cx + 22, cy - 1, 180]);
+      keep.push([cx - 28, cy - 26, 56, 52]);
+      for (const [x, y] of [[cx - 13, cy - 13], [cx + 12, cy - 13], [cx - 13, cy + 12], [cx + 12, cy + 12], [cx - 7, cy]]) spots.push([x, y, 5, 2]);
+      for (const [x, y] of [[cx - 8, cy - 8], [cx + 8, cy + 8], [cx + 8, cy - 8], [cx - 8, cy + 8]]) guards.push([x, y, 0]);
+    }
+    // ===== 建筑群 =====
+    // 仓库 / 实验室：四面墙、每面留门（3 格宽），里面放物资
+    const nRooms = theme === 'harbor' ? 9 : 16;
+    for (let k = 0, tries = 0; k < nRooms && tries < 600; tries++) {
+      const w = RI(theme === 'harbor' ? 14 : 12, theme === 'harbor' ? 22 : 18), h = RI(10, 15), x = RI(4, gw - w - 4), y = RI(4, gh - h - 4);
+      if (!free(x, y, w, h, 3)) continue;
+      k++;
+      const l = 3, dTop = RI(2, w - 5), dBot = RI(2, w - 5), dL = RI(2, h - 5), dR = RI(2, h - 5);
+      add(x, y, dTop, 1, l); add(x + dTop + 3, y, w - dTop - 3, 1, l);
+      add(x, y + h - 1, dBot, 1, l); add(x + dBot + 3, y + h - 1, w - dBot - 3, 1, l);
+      add(x, y + 1, 1, dL, l); add(x, y + dL + 4, 1, h - dL - 5, l);
+      add(x + w - 1, y + 1, 1, dR, l); add(x + w - 1, y + dR + 4, 1, h - dR - 5, l);
+      mark(x, y, w, h);
+      // 房间里：一两个货架（矮台）+ 物资点
+      add(x + 3, y + 3, 2, h - 6, 1);
+      const tier = Math.hypot(x + w / 2 - cx, y + h / 2 - cy) < 60 ? 3 : 2;
+      spots.push([x + Math.floor(w / 2) + 1, y + Math.floor(h / 2), tier, 3]);
+      if (R() < 0.5) spots.push([x + w - 4, y + 3, tier, 1]);
+    }
+    // 集装箱 / 机柜：散落的方块（矮台 / 高台 / 墙），形成掩体和小巷
+    const nBox = theme === 'harbor' ? 150 : 110;
+    for (let k = 0, tries = 0; k < nBox && tries < 4000; tries++) {
+      const horiz = R() < 0.5, w = horiz ? RI(5, 8) : RI(2, 3), h = horiz ? RI(2, 3) : RI(5, 8);
+      const x = RI(3, gw - w - 3), y = RI(3, gh - h - 3);
+      if (!free(x, y, w, h, 2)) continue;
+      k++;
+      const r = R(), l = r < 0.45 ? 1 : r < 0.75 ? 2 : 3;
+      add(x, y, w, h, l);
+      if (R() < 0.18) spots.push([horiz ? x + RI(0, w - 1) : x + w + 1, horiz ? y + h + 1 : y + RI(0, h - 1), Math.hypot(x - cx, y - cy) < 50 ? 3 : 1, 1]);
+    }
+    // 草丛 + 弹跳板
+    for (let k = 0, tries = 0; k < 34 && tries < 2000; tries++) {
+      const w = RI(3, 7), h = RI(3, 6), x = RI(3, gw - w - 3), y = RI(3, gh - h - 3);
+      if (!free(x, y, w, h, 1)) continue;
+      k++; bush.push([x, y, w, h]); mark(x, y, w, h);
+    }
+    for (let k = 0, tries = 0; k < 8 && tries < 800; tries++) {
+      const x = RI(6, gw - 8), y = RI(6, gh - 8);
+      if (!free(x, y, 2, 2, 2)) continue;
+      k++; pads.push([x, y, Math.round(Math.atan2(cy - y, cx - x) * 180 / Math.PI)]); mark(x, y, 2, 2);
+    }
+    // 野外零散物资：越靠中间品质越高
+    for (let k = 0, tries = 0; k < 70 && tries < 3000; tries++) {
+      const x = RI(4, gw - 5), y = RI(4, gh - 5);
+      if (!free(x, y, 1, 1, 1)) continue;
+      const d = Math.hypot(x - cx, y - cy) / Math.hypot(cx, cy);
+      spots.push([x, y, d < 0.3 ? 3 : d < 0.6 ? 2 : 1, 1]); k++;
+    }
+    // ===== 连通性：被高墙围死的空地填成墙 =====
+    const wall = new Uint8Array(gw * gh);
+    for (const [x, y, w, h, l] of rects) if (l === 3) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) wall[j * gw + i] = 1;
+    const seen = new Uint8Array(gw * gh), q = [spawns[0][1] * gw + spawns[0][0]];
+    seen[q[0]] = 1;
+    while (q.length) {
+      const c = q.pop(), x0 = c % gw, y0 = (c / gw) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = x0 + dx, y = y0 + dy, n = y * gw + x;
+        if (x < 0 || y < 0 || x >= gw || y >= gh || seen[n] || wall[n]) continue;
+        seen[n] = 1; q.push(n);
+      }
+    }
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+      if (wall[y * gw + x] || seen[y * gw + x]) continue;
+      let w = 1; while (x + w < gw && !wall[y * gw + x + w] && !seen[y * gw + x + w]) w++;
+      rects.push([x, y, w, 1, 3]); for (let i = 0; i < w; i++) wall[y * gw + x + i] = 1;
+      x += w - 1;
+    }
+    const okSpot = (s2) => !wall[s2[1] * gw + s2[0]];
+    return { rects, stairs, bush, pads, gw, gh, nomirror: true, loot: { spawns, extract, spots: spots.filter(okSpot), guards } };
+  }
+  const LOOT_DEFS = [
+    { name: '废弃港口', desc: '超大地图：集装箱迷宫和废弃仓库，中央的货轮甲板上有金色物资，但有守卫看守。', sky: 2, seed: 7341, theme: 'harbor', isNew: true },
+    { name: '地下研究所', desc: '超大地图：一间间实验室和走廊，中央反应堆大厅藏着最值钱的东西，守卫重重。', sky: 8, seed: 9127, theme: 'lab', isNew: true },
+  ];
+  for (const d of LOOT_DEFS) S.MAPS.push(Object.assign({ goalX: 24 }, d, genLootMap(d.seed, d.theme)));
   const DIR_FLIP = { E: 'W', W: 'E', N: 'S', S: 'N' };
-  const mirror = (r) => [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3]];
+  const mirror0 = (r) => [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3]];
   S.PAD = { v: 560, push: 360 };
   S.STAIR_LV = 4;   // 楼梯格的样式编号
   // M = { top: 每格顶面高度, solid: 高墙, lv: 样式（0 地面 1 矮台 2 高台 3 高墙 4 楼梯）, pad: 弹跳板方向+1, rects, stairs, pads, bush }
   S.buildMap = function (mapIdx) {
     const m = S.MAPS[mapIdx];
+    S.useDims(m.gw || 120, m.gh || 80);
+    const mirror = m.nomirror ? (r) => r.slice(0, 4) : mirror0;
     const lv = new Uint8Array(GW * GH), top = new Float32Array(GW * GH);
     const rects = [];
     const put = (i, l, h) => { if (h > top[i]) { top[i] = h; lv[i] = l; } };
@@ -585,7 +759,7 @@
     const stairs = [];
     for (const st of m.stairs || []) {
       const [x, y, w, h, dir, to, from] = st;
-      for (const [rx, ry, rw, rh, d] of [[x, y, w, h, dir], mirror(st).concat(DIR_FLIP[dir])]) {
+      for (const [rx, ry, rw, rh, d] of m.nomirror ? [[x, y, w, h, dir]] : [[x, y, w, h, dir], mirror(st).concat(DIR_FLIP[dir])]) {
         stairs.push([rx, ry, rw, rh, d, to]);
         const h0 = S.LEVEL_H[from || 0], h1 = S.LEVEL_H[to];
         for (let j = ry; j < ry + rh; j++)
@@ -604,7 +778,7 @@
     // 弹跳板（只放在地面上）
     const pad = new Uint8Array(GW * GH), pads = [];
     for (const [x, y, ang] of m.pads || []) {
-      for (const [px, py, a] of [[x, y, ang], [GW - x - 2, GH - y - 2, ang + 180]]) {
+      for (const [px, py, a] of m.nomirror ? [[x, y, ang]] : [[x, y, ang], [GW - x - 2, GH - y - 2, ang + 180]]) {
         pads.push([px, py, ((a % 360) + 360) % 360]);
         const code = 1 + Math.round(((((a % 360) + 360) % 360) / 360) * 250) % 251;
         for (let j = py; j < py + 2; j++) for (let i = px; i < px + 2; i++) if (S.inBounds(i, j) && top[j * GW + i] === 0) pad[j * GW + i] = code;
@@ -613,14 +787,14 @@
     // 草丛：只长在地面上，进去之后敌人看不见你（靠得很近或你攻击时会暴露）
     const bush = new Uint8Array(GW * GH), bushes = [];
     for (const r of m.bush || []) {
-      for (const rr of [r, mirror(r)]) {
+      for (const rr of m.nomirror ? [r] : [r, mirror(r)]) {
         bushes.push(rr);
         for (let j = rr[1]; j < rr[1] + rr[3]; j++)
           for (let i = rr[0]; i < rr[0] + rr[2]; i++)
             if (i >= 0 && i < GW && j >= 0 && j < GH && !top[j * GW + i] && !pad[j * GW + i]) bush[j * GW + i] = 1;
       }
     }
-    return { top, solid, lv, rects, stairs, pad, pads, bush, bushes };
+    return { top, solid, lv, rects, stairs, pad, pads, bush, bushes, gw: GW, gh: GH, loot: m.loot || null };
   };
   S.padAngle = (code) => ((code - 1) / 250) * Math.PI * 2;
   S.padAt = (M, x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return S.inBounds(cx, cy) ? M.pad[cy * GW + cx] : 0; };
@@ -716,9 +890,9 @@
   S.PHYS = {
     walk: { acc: 2800, brake: 3800, coast: 3300 },        // 双足行走：抓地好，几乎即按即走、即松即停
     wheelOwn: { acc: 1500, brake: 1000, coast: 260 },     // 己方涂料上的滚轮：滑溜、惯性大
-    wheelDry: { acc: 700, brake: 1100, coast: 900 },      // 无涂料地面上的滚轮
+    wheelDry: { acc: 820, brake: 1150, coast: 900 },      // 无涂料地面上的滚轮（1.6：起步更跟手）
     sticky: { acc: 520, brake: 2600, coast: 2600 },       // 敌方涂料：又黏又慢
-    air: { acc: 520, brake: 620, coast: 90 },             // 空中：保留动量，少量空中控制
+    air: { acc: 640, brake: 700, coast: 90 },             // 空中：保留动量，少量空中控制（1.6：空中转向更灵）
     kbGround: 7.5, kbAir: 1.2,                            // 击退速度的衰减（地面摩擦 / 空气阻力）
     coyote: 0.11,                                         // 走出平台边缘后仍可起跳的宽限时间
     jumpBuffer: 0.13,                                     // 落地前提前按跳的缓冲时间
@@ -916,6 +1090,12 @@
     if (!me) return null;
     const won = result.winner === me.team, draw = !result.winner, mvp = S.mvpOf(result);
     const isMvp = !!(mvp && mvp.id === pid);
+    if (result.mode === 'loot') {   // 1.6：搜刮撤离——撤离成功才有物资；奖杯按是否撤离
+      const L = (result.loot && result.loot.players[pid]) || { ex: false, items: [] };
+      const v = L.ex ? S.lootValue(L.items) : 0;
+      return { xp: 60 + me.kills * 12 + (L.ex ? 80 + Math.min(120, Math.floor(v / 100)) : 0), trophies: L.ex ? 6 : -2, won: L.ex, draw: false, mvp: isMvp, kills: me.kills, paint: me.paint, mode: 'loot',
+        loot: { ex: !!L.ex, items: L.ex ? L.items.slice(0, 40) : [], v, risk: result.loot ? result.loot.risk : 'normal', gear: L.gear || [] } };
+    }
     // 逃亡圈按名次：四队 +10/+5/0/−3，单人 +10/+7/+4/+2/0/−2/−3/−4
     if (result.place) {
       const rank = result.place.indexOf(me.team) + 1, n = result.place.length;
@@ -953,9 +1133,76 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.5.1';
+  S.VERSION = '1.6';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.6', date: '2026-11-15', title: '1.6 更新 · 搜刮撤离', en_title: 'Update 1.6 · Extraction', sections: [
+      ['全新玩法「搜刮撤离」', [
+        '两张超大地图（普通地图的 4 倍大）：「废弃港口」集装箱迷宫 + 中央货轮，「地下研究所」实验室走廊 + 中央反应堆大厅',
+        '四支小队从四个角出发搜刮物资；小队人数跟着组队人数（1–4 人），可以用 AI 队友补位',
+        '物资分 5 种品质（普通 / 优良 / 稀有 / 史诗 / 传说），越靠中间越值钱；传说物资有光柱，但中间有中立守卫看守',
+        '背包有格子上限，满了捡到更值钱的东西会自动换掉最不值钱的；阵亡时整个背包掉在地上，谁都能捡',
+        '撤离点第 3 分钟起陆续开放，站进去读条 10 秒成功撤离（挨打会倒退）；只有一条命，阵亡或没来得及撤离就全丢',
+        '普通行动：阵亡只丢这局搜到的；高危行动：物资更多更好，可以带装备进场，但阵亡装备也会丢']],
+      ['仓库与军需处', [
+        '带出来的物资存进仓库：卖掉换金币（价值的 1/10），传说物资可以兑换宝石和能量结晶',
+        '军需处用金币买高危行动的装备：战术护甲（生命 +25%）、扩容背包（+6 格）、急救包（残血自动回 60）',
+        '搜刮记录（行动次数、撤离成功、最高单次、累计价值）和本周最佳撤离排行',
+        '新任务线「搜刮行动」：7 个任务，奖励宝石、金币、特攻队补给箱、能量结晶和金色空投']],
+      ['活动界面', [
+        '改成一个活动一个页面：左边是可以往下滑的活动列表，分「限时活动」和「任务」两页，右边是带大横幅的活动详情',
+        '有奖励可领的活动在列表里有红点']],
+      ['信箱', [
+        '改成左边信件列表、右边看信；列表可以正常往下滑动',
+        '只有往右滑才会删除领过的邮件，上下滑动不会再误删']],
+      ['通行证', [
+        '更霓虹的配色，彩色进度线一直走到你当前的等级',
+        '拖动有惯性，拖到两头会弹回来；靠近中间的等级会放大发光，背景跟着视差移动',
+        '领取奖励时，奖励会带着火花飞出去']],
+      ['帧数与操作手感', [
+        '单人模式下，画面卡的时候游戏节奏不再变慢（模拟按真实时间补帧）',
+        '涂料贴图只上传改动的部分，超大地图上也不卡；地上的物资用实例化渲染',
+        '帧率太低时自动换成流畅画质；设置里可以显示帧率',
+        '新增瞄准辅助（鼠标附近的敌人会把准星吸过去一点，可以在设置里关）',
+        '命中时准星张开、有清脆的命中音，击倒敌人时屏幕边缘闪一下；空中转向和滚轮起步更跟手']],
+      ['新音乐与音效', [
+        '三首原创新曲：大厅「晚风喷漆」（和「霓虹喷漆街」轮流播放）、搜刮撤离「暗巷搜刮」、撤离点开放后的「撤离倒数」',
+        '新音效：按品质不同的捡物资音、撤离点开放警报、成功撤离、卖出金币、命中确认、击倒确认']],
+      ['更新奖励', ['信箱里有一份 1.6 更新礼包：150 宝石 + 2000 金币 + 军用箱']],
+    ], en: [
+      ['New mode: Extraction', [
+        'Two giant maps (4× a normal map): Abandoned Harbor, a container maze around a cargo ship, and Underground Lab, labs and corridors around a reactor hall',
+        'Four squads start in the four corners and loot the map; squad size matches your party (1–4 players), with optional AI teammates',
+        'Loot comes in 5 rarities (Common / Uncommon / Rare / Epic / Legendary) and gets better toward the middle; legendary loot shines with a light beam, but neutral guards protect the center',
+        'Your backpack has limited slots: when it is full, picking up something more valuable swaps out the least valuable item. If you die, your whole backpack drops for anyone to grab',
+        'Extraction points open from minute 3; hold one for 10 seconds to escape (taking damage sets you back). One life only: die or miss extraction and you lose it all',
+        'Normal Run: dying only loses what you found. High-Risk Run: more and better loot, and you can bring gear, but you lose that gear if you die']],
+      ['Warehouse & Quartermaster', [
+        'Extracted loot goes to your warehouse: sell it for coins (1/10 of its value) or trade legendary items for gems and power crystals',
+        'Buy High-Risk gear with coins at the Quartermaster: Tactical Armor (+25% HP), Big Backpack (+6 slots) and Med Kit (auto-heals 60 at low HP)',
+        'Extraction records (runs, successful extractions, best run, total value) and a weekly best-extraction leaderboard',
+        'New quest line Operation Scavenge: 7 quests rewarding gems, coins, a Strike Team chest, a power crystal and a golden airdrop']],
+      ['Events screen', [
+        'One page per event: a scrollable list on the left with Limited and Quests tabs, and the event page with a big banner on the right',
+        'Events with rewards to claim get a red dot in the list']],
+      ['Mailbox', [
+        'Mail list on the left, reading pane on the right; the list now scrolls normally',
+        'Only a swipe to the right deletes claimed mail, so scrolling up and down never deletes anything by accident']],
+      ['Season pass', [
+        'Brighter neon colors, with a rainbow progress line running up to your current tier',
+        'Dragging has momentum and bounces back at both ends; tiers near the center grow and glow, and the background scrolls with parallax',
+        'Claimed rewards fly off with a burst of sparks']],
+      ['Frame rate & controls', [
+        'In single-player, the game no longer slows down when frames drop (the simulation catches up in real time)',
+        'Only the changed part of the paint texture is uploaded, so giant maps stay smooth; loot on the ground uses instanced rendering',
+        'Quality drops automatically if the frame rate stays low, and Settings can show an FPS counter',
+        'New aim assist: enemies near your mouse pull the crosshair slightly toward them (can be turned off in Settings)',
+        'The crosshair kicks open with a crisp sound when you hit, the screen edges flash on a knockout, and air steering and roller starts feel snappier']],
+      ['New music & sound', [
+        'Three new original tracks: lobby theme Evening Spray (alternates with Neon Spray Street), Back Alley Loot for Extraction, and Extraction Countdown once extraction opens',
+        'New sounds: rarity-based loot pickups, the extraction siren, successful extraction, selling for coins, hit confirm and knockout confirm']],
+      ['Update rewards', ['A 1.6 update gift is waiting in your mailbox: 150 gems + 2,000 coins + a military chest']],
+    ] },
     { v: '1.5.1', date: '2026-11-14', title: '1.5.1 更新 · 全新结算', en_title: 'Update 1.5.1 · New Results Screen', sections: [
       ['结算画面', [
         '比赛结束后，我方全队的 3D 角色站上结算台：赢了轮流跳起来庆祝、漫天彩纸，MVP 站在中间先来一整套展示；输了全队垂头丧气，背景下起小雨',

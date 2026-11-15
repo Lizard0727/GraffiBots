@@ -65,7 +65,8 @@
         { it: RW('gems', 50), cost: 80, limit: 5 }, { it: RW('crystals', 1), cost: 150, limit: 2 }, { it: RW('coins', 800), cost: 60, limit: 5 }] },
   ];
   E.EVENT_STAT = { play: '完成 {n} 局对战', win: '赢 {n} 局', kills: '击毁 / 击倒 {n} 次', paint: '涂地 {n} 格', elim: '玩 {n} 局生死之战', escape: '玩 {n} 局逃亡圈', top3: '逃亡圈进入前三名 {n} 次', crates: '逃亡圈捡 {n} 个空投箱',
-    park: '玩 {n} 局乐园模式', parkwin: '乐园模式赢 {n} 局', balloons: '打爆 {n} 个气球', float: '在花车光圈里累计 {n} 秒', ranked: '玩 {n} 局排位赛', lvl: '账号升到 {n} 级' };
+    park: '玩 {n} 局乐园模式', parkwin: '乐园模式赢 {n} 局', balloons: '打爆 {n} 个气球', float: '在花车光圈里累计 {n} 秒', ranked: '玩 {n} 局排位赛', lvl: '账号升到 {n} 级',
+    lootex: '搜刮撤离成功撤离 {n} 次', lootv: '累计撤离价值 {n} 的物资', lootgold: '带出 {n} 件传说物资', loothi: '高危行动成功撤离 {n} 次', loot: '玩 {n} 局搜刮撤离' };
   E.statName = (k, n) => E.EVENT_STAT[k].replace('{n}', n);
   E.activeEvents = (now) => E.EVENTS.filter((ev) => (now || Date.now()) >= ev.start && (now || Date.now()) < ev.end);
   // ---------------- 任务线：叛将档案（永久） ----------------
@@ -79,7 +80,9 @@
     rookie: { name: '新兵之路', desc: '刚加入反抗军？跟着任务走，很快就能凑齐 3 位驾驶员、3 台机体，参加排位赛！', color: '#9cff2e',
       steps: [['play', 1, RW('gems', 100)], ['win', 1, RC('starter')], ['play', 3, RW('gems', 150)], ['kills', 10, RC('starter')], ['lvl', 3, RC('hero')], ['ranked', 1, RW('gems', 200)]] },
   };
-  E.TASKLINE_ORDER = ['rookie', 'strike'];
+  E.TASKLINES.loot = { name: '搜刮行动', desc: '灰城外围发现了大量废弃物资！进入超大地图搜刮、和其他小队争夺，活着撤离才算数。', color: '#ffb000',
+    steps: [['loot', 1, RW('gems', 60)], ['lootex', 1, RW('coins', 1000)], ['lootv', 8000, RW('gems', 120)], ['lootex', 5, RC('strike')], ['lootgold', 1, RW('gems', 150)], ['loothi', 1, RW('crystals', 1)], ['lootv', 60000, RC('airdrop')]] };
+  E.TASKLINE_ORDER = ['rookie', 'loot', 'strike'];
   // ---------------- 排位赛：段位、分数、段位奖励 ----------------
   E.RANK = {
     need: { pilots: 3, mechs: 3 },   // 至少拥有 3 位驾驶员和 3 台机体
@@ -139,6 +142,7 @@
   // ---------------- 信箱（系统邮件：版本补偿 / 活动礼包） ----------------
   E.MAILS = [
     { id: 'v15', t: Date.UTC(2026, 10, 14, 4), from: '灰城反抗军指挥部', title: '1.5 更新礼包', body: '1.5 版本上线啦：点驾驶员和机体就能进入全新的角色页面，画面更精致，所有角色和机体都重新调整了平衡。这份更新礼包请收下！', items: [RW('gems', 150), RC('hero'), RW('coins', 1500)] },
+    { id: 'v16', t: Date.UTC(2026, 10, 15, 2), from: '灰城反抗军指挥部', title: '1.6 更新礼包', body: '全新玩法「搜刮撤离」上线！进入两张超大地图搜刮物资、和其他小队争夺，活着撤离就能把物资带回仓库。送你几件装备，去高危行动碰碰运气吧！', items: [RW('gems', 150), RW('coins', 2000), RC('military')] },
     { id: 'v141', t: Date.UTC(2026, 10, 14, 3), from: '灰城反抗军指挥部', title: '1.4.1 更新礼包', body: '对战里可以打字聊天啦！按 Enter（手机点 💬）就能和队友、对手说话。排位赛的对手也按段位重新划分了水平。这份小礼物请收下！', items: [RW('gems', 80), RW('coins', 1500), RW('tickets', 50)] },
     { id: 'v14', t: Date.UTC(2026, 10, 14, 2), from: '灰城反抗军指挥部', title: '1.4 更新礼包', body: '乐园祭开幕啦！新模式「乐园模式」、袭击！特攻队、夏日皮肤和排位赛都上线了。这份更新礼包请收下！', items: [RW('gems', 200), RC('strike'), RW('tickets', 100)] },
     { id: 'v131', t: Date.UTC(2026, 10, 14, 1), from: '灰城反抗军指挥部', title: '1.3.1 更新礼包', body: '官网正式上线啦！在「驾驶员」里选中角色，看看他们的 3D 展示动作。这份小礼物请收下！', items: [RW('gems', 50), RW('coins', 1000)] },
@@ -235,7 +239,7 @@
       trophies: 0, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0, day: 0, dayWin: 0,
       talents: [], tal: [], tpBonus: 0,
       pass: { s: 1, xp: 0, prem: false, cf: [], cp: [] }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
-      skins: [], wear: {}, mailGot: [], mailDel: [], ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
+      skins: [], wear: {}, mailGot: [], mailDel: [], stash: {}, gear: {}, gearOn: [], lootRec: { runs: 0, ex: 0, best: 0, total: 0, gold: 0, wk: 0, wbest: 0 }, ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
       tl: {}, rank: { rp: 0, best: 0, got: [], n: 0 }, streak: 0, bestStreak: 0,
     }, E.START);
   };
@@ -271,6 +275,11 @@
       o.q = { d: int(p.q.d, 0, 1e7), dp: arr(p.q.dp, 3, 1e6), w: int(p.q.w, 0, 1e7), wp: arr(p.q.wp, 4, 1e7) };
     }
     o.skins = Array.isArray(p.skins) ? [...new Set(p.skins.filter((id) => S.skin(id)))] : [];
+    // 1.6：仓库 / 装备 / 搜刮记录
+    o.stash = {}; if (p.stash && typeof p.stash === 'object') for (const k of S.LOOT_KEYS) { const n = int(p.stash[k], 0, 9999); if (n) o.stash[k] = n; }
+    o.gear = {}; if (p.gear && typeof p.gear === 'object') for (const g of Object.keys(S.LOOT.gear)) { const n = int(p.gear[g], 0, 99); if (n) o.gear[g] = n; }
+    o.gearOn = Array.isArray(p.gearOn) ? [...new Set(p.gearOn.filter((g) => o.gear[g] > 0))] : [];
+    if (p.lootRec && typeof p.lootRec === 'object') for (const k of Object.keys(o.lootRec)) o.lootRec[k] = int(p.lootRec[k], 0, 1e9);
     o.mailGot = Array.isArray(p.mailGot) ? [...new Set(p.mailGot.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
     o.mailDel = Array.isArray(p.mailDel) ? [...new Set(p.mailDel.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
     o.ev = {};
@@ -320,7 +329,21 @@
   E.tpFree = (o) => E.tpTotal(o) - E.tpSpent(o);
   E.hasPilot = (o, id) => !!(o.pilots && o.pilots[id]);
   E.hasMech = (o, id) => !!(o.mechs && o.mechs.includes(id));
-  E.power = (o, id) => { const q = o.pilots && o.pilots[id]; return Object.assign(q ? { lv: q.lv, bt: q.bt } : { lv: 1, bt: 0 }, { tal: (o.tal || []).slice(0, S.TALENT_SLOTS) }); };
+  E.power = (o, id) => { const q = o.pilots && o.pilots[id]; return Object.assign(q ? { lv: q.lv, bt: q.bt } : { lv: 1, bt: 0 }, { tal: (o.tal || []).slice(0, S.TALENT_SLOTS), gear: (o.gearOn || []).filter((g) => (o.gear || {})[g] > 0) }); };
+  // 1.6：仓库价值 + 每周最佳撤离排行（同一周里固定的一批对手成绩）
+  E.stashValue = (o) => Object.entries(o.stash || {}).reduce((a, [k, n]) => a + (S.LOOT.items[k] ? S.LOOT.items[k].v * n : 0), 0);
+  E.sellPrice = (k) => Math.floor(((S.LOOT.items[k] || {}).v || 0) / 10);
+  E.lootBoard = (o, now) => {
+    const wk = E.weekIndex(now);
+    let st = (wk * 2654435761) >>> 0;
+    const R = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    const NAMES = ['今晚吃涂料', 'xXSniperXx', '摸鱼专业户', 'Kiwi', '喷漆小王子', 'ZeroLag', '奶茶三分糖', 'Tofu', '涂鸦大王', 'ghost404', '老六', 'paintgod', '夜猫子', 'Blitz', '熬夜冠军', 'momo233', '稳住别浪', 'Nova', '一只咸鱼', 'Ace'];
+    const rows = NAMES.map((n) => ({ name: n, v: Math.round((3000 + Math.pow(R(), 2.2) * 42000) / 10) * 10 }));
+    const mine = o.lootRec && o.lootRec.wk === wk ? o.lootRec.wbest : 0;
+    rows.push({ name: o.name || '你', v: mine, me: true });
+    rows.sort((a, b) => b.v - a.v);
+    return rows;
+  };
   E.dayIndex = (now) => Math.floor(((now || Date.now()) + 8 * 3600e3) / 86400e3);   // 按北京时间换天
 
   // ---------------- 宝箱概率（给界面显示） ----------------
@@ -527,6 +550,45 @@
         if (!n) return no('没有可以删除的邮件');
         return { ok: true, items: [], deleted: n };
       }
+      case 'sellLoot': {   // 1.6：仓库卖物资（价值的 1/10 换金币）
+        const k = a.k, n = Math.max(1, a.n | 0);
+        if (!S.LOOT.items[k]) return no('没有这种物资');
+        if ((o.stash[k] || 0) < n) return no('仓库里没有这么多');
+        o.stash[k] -= n; if (!o.stash[k]) delete o.stash[k];
+        const it = { k: 'coins', n: E.sellPrice(k) * n };
+        grant(o, [it]);
+        return { ok: true, items: [it] };
+      }
+      case 'sellAll': {   // 一键卖出：只卖普通 / 优良 / 稀有，史诗和传说留着
+        let c = 0;
+        for (const [k, n] of Object.entries(o.stash)) if (S.LOOT.items[k].r <= (a.maxR | 0 || 3)) { c += E.sellPrice(k) * n; delete o.stash[k]; }
+        if (!c) return no('没有可以卖的物资');
+        const it = { k: 'coins', n: c };
+        grant(o, [it]);
+        return { ok: true, items: [it] };
+      }
+      case 'exLoot': {   // 传说物资兑换宝石 / 能量结晶
+        const I = S.LOOT.items[a.k];
+        if (!I || !I.ex) return no('这件物资不能兑换');
+        if (!o.stash[a.k]) return no('仓库里没有');
+        o.stash[a.k]--; if (!o.stash[a.k]) delete o.stash[a.k];
+        const its = Object.entries(I.ex).map(([k, n]) => ({ k, n }));
+        grant(o, its);
+        return { ok: true, items: its };
+      }
+      case 'buyGear': {   // 军需处：金币买装备
+        const G = S.LOOT.gear[a.g];
+        if (!G) return no('没有这件装备');
+        if ((o.gear[a.g] || 0) >= 99) return no('已经满了');
+        if (o.coins < G.price) return no(`金币不够（需要 ${G.price}）`);
+        o.coins -= G.price; o.gear[a.g] = (o.gear[a.g] || 0) + 1;
+        return { ok: true, items: [], spent: { coins: G.price } };
+      }
+      case 'setGear': {   // 选择带进高危行动的装备
+        const on = Array.isArray(a.on) ? [...new Set(a.on.filter((g) => S.LOOT.gear[g] && o.gear[g] > 0))] : [];
+        o.gearOn = on;
+        return { ok: true, items: [] };
+      }
       case 'eventShop': {
         const ev = E.activeEvents(a.now).find((x) => x.id === a.id), i = a.i | 0;
         if (!ev || !ev.shop) return no('活动已经结束了');
@@ -593,10 +655,27 @@
       o.rank.best = Math.max(o.rank.best || 0, t1);
       rankInfo = { rp0, rp1, d: rp1 - rp0, t0, t1 };
     }
+    // 1.6：搜刮撤离——撤离成功：物资进仓库；高危行动阵亡：带进去的装备丢失
+    let lootInfo = null;
+    if (rw.mode === 'loot' && rw.loot) {
+      const L = rw.loot, R2 = o.lootRec, wk = E.weekIndex(now);
+      R2.runs++;
+      if (R2.wk !== wk) { R2.wk = wk; R2.wbest = 0; }
+      const lost = [];
+      if (L.ex) {
+        for (const k of L.items) if (S.LOOT.items[k]) o.stash[k] = Math.min(9999, (o.stash[k] || 0) + 1);
+        R2.ex++; R2.total += L.v; R2.best = Math.max(R2.best, L.v); R2.wbest = Math.max(R2.wbest, L.v);
+        R2.gold += L.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r === 5).length;
+      } else if (L.risk === 'high') {
+        for (const g of L.gear || []) if (o.gear[g] > 0) { o.gear[g]--; lost.push(g); if (!o.gear[g]) { delete o.gear[g]; o.gearOn = o.gearOn.filter((x) => x !== g); } }
+      }
+      lootInfo = { ex: L.ex, v: L.v, items: L.items, lost };
+    }
     // 乐园祭：乐园模式每局给乐园票
     for (const ev of evs) if (park && ev.ticketsPerPark) items.push({ k: 'tickets', n: ev.ticketsPerPark + (rw.won ? ev.ticketsWin || 0 : 0), why: ev.name });
     const gainS = { play: 1, win: rw.won ? 1 : 0, kills: rw.kills, paint: rw.paint, elim: rw.mode === 'elim' ? 1 : 0, escape: esc ? 1 : 0, top3: esc && rw.rank && rw.rank <= 3 ? 1 : 0, crates: rw.cubes || 0,
-      park: park ? 1 : 0, parkwin: park && rw.won ? 1 : 0, balloons: rw.balloons || 0, float: rw.float || 0, ranked: rw.ranked ? 1 : 0 };
+      park: park ? 1 : 0, parkwin: park && rw.won ? 1 : 0, balloons: rw.balloons || 0, float: rw.float || 0, ranked: rw.ranked ? 1 : 0,
+      loot: rw.mode === 'loot' ? 1 : 0, lootex: lootInfo && lootInfo.ex ? 1 : 0, lootv: lootInfo && lootInfo.ex ? lootInfo.v : 0, lootgold: lootInfo && lootInfo.ex ? lootInfo.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r === 5).length : 0, loothi: lootInfo && lootInfo.ex && rw.loot.risk === 'high' ? 1 : 0 };
     for (const ev of evs) {
       const st = o.ev[ev.id] || (o.ev[ev.id] = { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) });
       ev.quests.forEach((q, i) => { st.p[i] = Math.min(q[1], st.p[i] + (gainS[q[0]] || 0)); });
@@ -622,7 +701,7 @@
     if (ups > 0) items.push({ k: 'coins', n: E.LEVELUP.coins * ups, why: '账号升级' }, { k: 'gems', n: E.LEVELUP.gems * ups, why: '账号升级' });
     grant(o, items);
     E.syncLevelTasks(o);
-    return { items: E.merge(items), lvBefore, trBefore, lvUps: ups, passBefore, passAfter: E.passLevel(o), quests: done, rank: rankInfo, streak: o.streak };
+    return { items: E.merge(items), lvBefore, trBefore, lvUps: ups, passBefore, passAfter: E.passLevel(o), quests: done, rank: rankInfo, streak: o.streak, loot: lootInfo };
   };
   return E;
 });

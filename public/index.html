@@ -110,6 +110,7 @@
     </div>
 
     <div class="home-right">
+      <button class="loot-chip" id="lootChip" data-ov="loot"><span class="lc-ico">⛏</span><div><small>新玩法 · 超大地图</small><b>搜刮撤离</b><span id="lootChipTxt">仓库价值 0</span></div></button>
       <button class="rank-chip" id="rankChip" data-ov="ranked"><span class="rk-badge" id="rankBadge"></span><div><small>排位赛</small><b id="rankName">青铜</b><span id="rankRp">0 分</span></div></button>
       <button class="mode-card" id="modeCard" data-ov="modes">
         <span id="modeIcon" class="mode-ico"></span>
@@ -136,6 +137,15 @@
       <div class="ov-body">
         <div id="weaponList" class="mech-grid wide"></div>
       </div>
+    </section>
+    <!-- 1.6：搜刮撤离 -->
+    <section id="ov-loot" class="ov hidden loot-ov">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>搜刮撤离</h2><small>超大地图搜刮物资、和其他小队争夺，在撤离点读条 10 秒撤离，物资存进仓库</small><div class="wallet in-ov" id="wallet5"></div></header>
+      <div class="ov-body"><div id="lootBody" class="loot-body"></div></div>
+    </section>
+    <section id="ov-stash" class="ov hidden loot-ov">
+      <header class="ov-head"><button class="back" id="stashBack" data-icon="back">返回</button><h2>仓库</h2><small>撤离带出的物资都在这里：卖掉换金币、传说物资兑换宝石和能量结晶；军需处买高危行动用的装备</small><div class="wallet in-ov" id="wallet6"></div></header>
+      <div class="ov-body"><div id="stashBody" class="stash-body"></div></div>
     </section>
     <!-- 1.5：角色 / 机体页面（点头像进入） -->
     <section id="ov-hero" class="ov hidden hero-page">
@@ -205,11 +215,11 @@
     </section>
     <section id="ov-events" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>活动</h2><small>限时活动和任务线，完成任务领奖励</small></header>
-      <div class="ov-body"><div class="ev-list" id="evList"></div></div>
+      <div class="ov-body ev-body"><div class="ev-layout"><aside class="ev-nav"><div class="ev-tabs" id="evTabs"></div><div class="ev-items" id="evList"></div></aside><div class="ev-page" id="evPage"></div></div></div>
     </section>
     <section id="ov-mail" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>信箱</h2><small>版本补偿和活动礼包会发到这里。没领取的奖励 3 天后自动删除；领过的邮件可以往右滑掉</small><button class="btn ghost small" id="mailDelAll">删除已领取</button><button class="btn" id="mailAll">全部领取</button></header>
-      <div class="ov-body narrow"><div id="mailList"></div></div>
+      <div class="ov-body ml-body"><div class="ml-layout"><aside class="ml-list" id="mailList"></aside><div class="ml-read" id="mailRead"></div></div></div>
     </section>
     <section id="ov-talents" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>天赋树</h2><small>账号每升 1 级得 1 点天赋点。点亮后可以装上，每局最多带 3 个</small><div class="tal-top" id="talTop"></div></header>

@@ -144,7 +144,7 @@ class AccountStore {
     const now = Date.now();
     if (now - (c.lastEco || 0) < 150) return reply({ ok: false, err: '操作太快了' });
     c.lastEco = now;
-    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, i: m.i, pilot: m.pilot, id: m.id, tier: m.tier, prem: m.prem, now: Date.now() }, cryptoRand);
+    const r = E.apply(acc.profile, String(m.op || ''), { chest: m.chest, what: m.what, n: m.n, i: m.i, pilot: m.pilot, id: m.id, tier: m.tier, prem: m.prem, k: m.k, g: m.g, on: m.on, maxR: m.maxR, now: Date.now() }, cryptoRand);
     if (r.ok) { this.syncConn(c, acc); this.save(); }
     reply(Object.assign({}, r, { profile: this.publicProfile(acc) }));
   }

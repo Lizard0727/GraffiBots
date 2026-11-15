@@ -2,15 +2,24 @@
 // 运行：node test/maps.js
 'use strict';
 const S = require('../public/shared.js');
-const { GW, GH, CELL } = S;
+const { CELL } = S;
 let failed = 0;
 const ok = (c, msg) => { if (!c) { console.log('✗ ' + msg); failed++; } return c; };
 
 for (let mi = 0; mi < S.MAPS.length; mi++) {
-  const M = S.buildMap(mi), name = S.MAPS[mi].name;
+  const M = S.buildMap(mi), name = S.MAPS[mi].name, GW = S.GW, GH = S.GH;
   const at = (x, y) => S.topAt(M, x, y);
   const clearAround = (x, y, r) => { for (let dy = -r; dy <= r; dy += 4) for (let dx = -r; dx <= r; dx += 4) if (at(x + dx, y + dy) > 0) return false; return true; };
   let good = true;
+  if (M.loot) {   // 1.6：搜刮撤离地图——出生点、撤离点、物资点不被挡，守卫站在空地上
+    const L = M.loot, C = CELL;
+    for (const [x, y] of L.spawns) good &= ok(clearAround(x * C, y * C, 40), `${name}：出生点 (${x},${y}) 被挡住`);
+    for (const [x, y] of L.extract) good &= ok(clearAround(x * C, y * C, 50), `${name}：撤离点 (${x},${y}) 被挡住`);
+    good &= ok(L.spots.length >= 80 && L.spots.every(([x, y]) => !M.solid[y * GW + x]), `${name}：物资点 ${L.spots.length} 个，不能在墙里`);
+    good &= ok(L.spots.filter((p) => p[2] >= 3).length >= 10, `${name}：高级物资点太少`);
+    good &= ok(L.guards.every(([x, y]) => !M.solid[y * GW + x]), `${name}：守卫站在墙里`);
+    good &= ok(S.GW === 240 && S.GH === 160, `${name}：超大地图尺寸 ${S.GW}×${S.GH}`);
+  } else {
   for (const t of [1, 2]) for (let s = 0; s < 4; s++) { const p = S.spawnPoint(t, s); good &= ok(clearAround(p.x, p.y, 20) && !S.collideTest(M, p.x, p.y, 0), `${name}：出生点 ${t}-${s} 被挡住`); }
   for (const t of [1, 2]) { const g = S.goalFor(t, mi); good &= ok(clearAround(g.x, g.y, 14), `${name}：护送终点被挡住`); }
   good &= ok(clearAround(S.W / 2, S.H / 2, 40), `${name}：地图中心（宝物 / 足球出生点）被挡住`);
@@ -19,9 +28,10 @@ for (let mi = 0; mi < S.MAPS.length; mi++) {
   let zs = 0, zn = 0;
   for (let y = S.ZONE.y0; y < S.ZONE.y1; y++) for (let x = S.ZONE.x0; x < S.ZONE.x1; x++) { zn++; if (!M.solid[y * GW + x]) zs++; }
   good &= ok(zs / zn > 0.85, `${name}：据点里墙太多（可涂 ${(zs / zn * 100).toFixed(0)}%）`);
+  }
   // 连通性：允许跳上 80 以内的高差（滚轮跳）
   const seen = new Uint8Array(GW * GH);
-  const sp = S.spawnPoint(1, 0), q = [Math.floor(sp.y / CELL) * GW + Math.floor(sp.x / CELL)];
+  const sp = M.loot ? { x: M.loot.spawns[0][0] * CELL, y: M.loot.spawns[0][1] * CELL } : S.spawnPoint(1, 0), q = [Math.floor(sp.y / CELL) * GW + Math.floor(sp.x / CELL)];
   seen[q[0]] = 1;
   while (q.length) {
     const c = q.pop(), cx = c % GW, cy = (c / GW) | 0;

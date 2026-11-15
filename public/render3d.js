@@ -401,6 +401,29 @@
       if ((i * 31) % 7 === 0) { x.fillStyle = sh[1]; x.beginPath(); x.arc(ox - 3 * PK, oy - 3 * PK, 4 * PK, 0, 6.2832); x.fill(); }
     }
     W.dirty = true;
+    // 1.6：记下改动范围，只把这一块传给显卡（超大地图整张贴图很大，每帧整张上传很卡）
+    const r = 14 * PK, x0 = Math.max(0, Math.floor(cx * C - r)), y0 = Math.max(0, Math.floor(cy * C - r)), x1 = Math.ceil((cx + 1) * C + r), y1 = Math.ceil((cy + 1) * C + r);
+    const d = W.dr || (W.dr = [1e9, 1e9, -1, -1]);
+    if (x0 < d[0]) d[0] = x0; if (y0 < d[1]) d[1] = y0; if (x1 > d[2]) d[2] = x1; if (y1 > d[3]) d[3] = y1;
+  }
+  // 把改动的那一块涂料贴图上传（第一次 / 改动太大时整张上传）
+  function flushSurface() {
+    const tex = W.surfTex, d = W.dr, cv = W.surf;
+    W.dirty = false;
+    const props = renderer.properties.get(tex), glt = props && props.__webglTexture;
+    if (!glt || !d || d[2] < 0 || (d[2] - d[0]) * (d[3] - d[1]) > cv.width * cv.height * 0.5) { tex.needsUpdate = true; W.dr = null; return; }
+    const x0 = d[0], y0 = d[1], w = Math.min(cv.width, d[2]) - x0, h = Math.min(cv.height, d[3]) - y0;
+    W.dr = null;
+    if (w <= 0 || h <= 0) return;
+    try {
+      const gl = renderer.getContext();
+      renderer.state.bindTexture(gl.TEXTURE_2D, glt);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, tex.flipY);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, tex.premultiplyAlpha);
+      const img = W.sctx.getImageData(x0, y0, w, h);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, tex.flipY ? cv.height - y0 - h : y0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      if (tex.generateMipmaps && tex.minFilter !== T.LinearFilter && tex.minFilter !== T.NearestFilter) gl.generateMipmap(gl.TEXTURE_2D);
+    } catch (e) { tex.needsUpdate = true; }
   }
 
   function buildFloor() {
@@ -966,6 +989,22 @@
       g.add(part(SH.box, lambert(0xffd23f), 13, 10.4, 3, 0, 5, 0)); g.add(part(SH.sph, lambert(0xffd23f), 3, 2, 3, 0, 11, 0));
       return g;
     });
+    if (G.mode === 'loot') {
+      // 1.6：地上的物资——发光的小箱子（颜色 = 品质），史诗 / 传说加一道光柱；撤离点 = 地面光圈 + 信号灯
+      // 用实例化网格：每种品质一次绘制（几百件物资也不卡）
+      W.lootInst = [null];
+      const CAP = 600, boxG = new T.BoxGeometry(1, 1, 1);
+      for (let r = 1; r <= 5; r++) {
+        const c = S.LOOT.rare[r].c;
+        const im = new T.InstancedMesh(boxG, lambert(c, { emissive: new T.Color(c).multiplyScalar(r >= 4 ? 0.6 : 0.35) }), CAP);
+        im.count = 0; im.frustumCulled = false; scene.add(im);
+        const bm = r >= 4 ? new T.InstancedMesh(new T.CylinderGeometry(1, 1, 1, 8, 1, true), basic(c, { transparent: true, opacity: 0.3, depthWrite: false, blending: T.AdditiveBlending }), CAP) : null;
+        if (bm) { bm.count = 0; bm.frustumCulled = false; scene.add(bm); }
+        W.lootInst.push({ im, bm, s: 7 + r * 0.7 });
+      }
+      W.lootM = new T.Matrix4(); W.lootQ = new T.Quaternion(); W.lootE = new T.Euler(); W.lootV = new T.Vector3(); W.lootSc = new T.Vector3();
+      W.exZones = null;
+    }
     if (G.mode === 'park') {
       // 气球：每个颜色随 id 变化
       P.balloon = pool(() => {
@@ -2762,7 +2801,7 @@
       else { g.userData.rotor.rotation.y = now / 30; g.position.y = z + Math.sin(now / 200) * 2; }
     }
     // 逃亡圈：毒圈是一圈半透明的灰色涂料墙，下一个安全区画在地上
-    if ((G.teams || 2) > 2 && G.obj) {
+    if ((G.teams || 2) > 2 && G.obj && G.mode !== 'loot') {
       const o = G.obj;
       if (!W.circle) {
         W.circle = part(SH.tube, basic(0xff5a36, { transparent: true, opacity: 0.22, side: T.DoubleSide, depthWrite: false }), 1, 220, 1, 0, 110, 0);
@@ -2876,6 +2915,42 @@
         g.userData.mat.color.set(BC[f[i] % BC.length]);
       }
     }
+    if (G.mode === 'loot') {
+      const o = G.obj;
+      if (G.items && W.lootInst) {
+        const L = W.lootInst, M4 = W.lootM, Q = W.lootQ, E3 = W.lootE, V = W.lootV, SC = W.lootSc;
+        for (let r = 1; r <= 5; r++) { L[r].im.count = 0; if (L[r].bm) L[r].bm.count = 0; }
+        for (const it of G.items.values()) {
+          const I = S.LOOT.items[it.k]; if (!I) continue;
+          const slot = L[I.r], n = slot.im.count;
+          if (n >= 600) continue;
+          V.set(it.x, (it.z || 0) + 7 + Math.sin(now / 400 + it.x) * 1.5, it.y);
+          Q.setFromEuler(E3.set(0, now / 900 + it.y, 0)); SC.set(slot.s, slot.s * 0.85, slot.s);
+          slot.im.setMatrixAt(n, M4.compose(V, Q, SC)); slot.im.count = n + 1;
+          if (slot.bm) { V.set(it.x, (it.z || 0) + (I.r === 5 ? 90 : 60), it.y); Q.identity(); SC.set(I.r === 5 ? 3.2 : 2.2, I.r === 5 ? 180 : 120, I.r === 5 ? 3.2 : 2.2); slot.bm.setMatrixAt(slot.bm.count, M4.compose(V, Q, SC)); slot.bm.count++; }
+        }
+        for (let r = 1; r <= 5; r++) { L[r].im.instanceMatrix.needsUpdate = true; if (L[r].bm) L[r].bm.instanceMatrix.needsUpdate = true; }
+      }
+      if (o && o[0] && !W.exZones) {
+        W.exZones = [];
+        for (let i = 0; i < o[0].length; i += 3) {
+          const x = o[0][i], y = o[0][i + 1], z = S.topAt(W.M, x, y);
+          const ringM = basic(0x9aa0a8, { transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false });
+          const ring = new T.Mesh(new T.RingGeometry(S.LOOT.extR - 6, S.LOOT.extR, 48), ringM); ring.rotation.x = -Math.PI / 2; ring.position.set(x, z + 1.5, y);
+          const discM = basic(0x5ee36a, { transparent: true, opacity: 0.0, depthWrite: false }); const disc = new T.Mesh(new T.CircleGeometry(S.LOOT.extR - 6, 40), discM); disc.rotation.x = -Math.PI / 2; disc.position.set(x, z + 1.2, y);
+          const beacon = part(SH.cyl, basic(0x5ee36a, { transparent: true, opacity: 0.0, depthWrite: false, blending: T.AdditiveBlending }), 10, 260, 10, x, z + 130, y);
+          const pole = part(SH.cyl, toon(0x2a2d3a), 2.5, 46, 2.5, x, z + 23, y); const lamp = part(SH.sph, basic(0x9aa0a8), 5, 5, 5, x, z + 48, y);
+          scene.add(ring, disc, beacon, pole, lamp);
+          W.exZones.push({ ringM, discM, beacon, lamp });
+        }
+      }
+      if (o && o[0] && W.exZones) W.exZones.forEach((z, j) => {
+        const open = o[0][j * 3 + 2] <= 0, c = open ? 0x5ee36a : 0x9aa0a8;
+        z.ringM.color.set(c); z.lamp.material.color.set(open ? 0x5ee36a : (Math.floor(now / 500) % 2 ? 0xffd23f : 0x9aa0a8));
+        z.discM.opacity = open ? 0.14 + 0.06 * Math.sin(now / 250) : 0;
+        z.beacon.material.opacity = open ? 0.22 + 0.08 * Math.sin(now / 300) : 0;
+      });
+    }
     if (G.mode === 'zone' && o && W.zoneMat) {
       const owner = o[0];
       const c = owner ? cs[owner] : '#ffffff';
@@ -2981,7 +3056,7 @@
   }
   function render(G, now, dt, myId) {
     if (!W || W.G !== G) return;
-    if (W.dirty) { W.surfTex.needsUpdate = true; W.dirty = false; }
+    if (W.dirty) flushSurface();
     syncBots(G, now, dt, myId);
     syncWorld(G, now, dt);
     stepAmbient(dt, now);

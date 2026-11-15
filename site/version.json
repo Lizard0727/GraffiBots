@@ -1,14 +1,28 @@
 {
-  "version": "1.5.1",
-  "date": "2026-11-14",
-  "title": "1.5.1 更新 · 全新结算",
-  "en_title": "Update 1.5.1 · New Results Screen",
+  "version": "1.6",
+  "date": "2026-11-15",
+  "title": "1.6 更新 · 搜刮撤离",
+  "en_title": "Update 1.6 · Extraction",
   "page": "#updates",
   "force": true,
   "notes": [
-    "结算画面"
+    "全新玩法「搜刮撤离」",
+    "仓库与军需处",
+    "活动界面",
+    "信箱",
+    "通行证",
+    "帧数与操作手感",
+    "新音乐与音效",
+    "更新奖励"
   ],
   "en_notes": [
-    "Results screen"
+    "New mode: Extraction",
+    "Warehouse & Quartermaster",
+    "Events screen",
+    "Mailbox",
+    "Season pass",
+    "Frame rate & controls",
+    "New music & sound",
+    "Update rewards"
   ]
 }
