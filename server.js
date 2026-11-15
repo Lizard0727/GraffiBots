@@ -8,6 +8,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { Game, Room, Hub, findPath, buildNav } = require('./public/core.js');
 const hub = new Hub();
+if (process.env.GB_DEBUG === '1') hub.debug = true;   // 测试用：允许 dbgFinish 直接结束对局
 hub.accounts = null;   // 启动服务器时挂上账号系统（见文件末尾）
 
 const PORT = Number(process.env.PORT) || 3000;

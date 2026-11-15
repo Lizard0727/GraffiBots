@@ -506,11 +506,18 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   // 段位越高，强手越多
   const avgPow = (tier) => { let s = 0; for (let i = 0; i < 4000; i++) s += GB.persona(GB.roll(tier)).pow; return s / 4000; };
   const pw = [null, 0, 2, 4, 6].map(avgPow);
-  ok(pw[1] < pw[2] && pw[2] < pw[3] && pw[3] < pw[4] && pw[0] > pw[1], `AI 实力：普通赛 ${pw[0].toFixed(2)}，青铜 ${pw[1].toFixed(2)} → 黄金 ${pw[2].toFixed(2)} → 钻石 ${pw[3].toFixed(2)} → 传奇 ${pw[4].toFixed(2)}`);
+  ok(pw[1] < pw[2] && pw[2] < pw[3] && pw[3] < pw[4], `AI 实力：普通赛 ${pw[0].toFixed(2)}，青铜 ${pw[1].toFixed(2)} → 黄金 ${pw[2].toFixed(2)} → 钻石 ${pw[3].toFixed(2)} → 传奇 ${pw[4].toFixed(2)}`);
   const seen = new Set(); for (let i = 0; i < 3000; i++) seen.add(GB.roll(null));
   ok(GB.ORDER.every((id) => seen.has(id)), '普通赛 7 种性格都会出现：' + GB.ORDER.map((id) => GB.persona(id).name).join('、'));
-  const leg = new Set(); for (let i = 0; i < 3000; i++) leg.add(GB.roll(6));
-  ok(!leg.has('noob') && leg.has('god') && leg.has('pig'), '传奇段位：没有菜鸟，大神常见，偶尔还是有猪玩家');
+  // 1.7：「不错」「菜鸟」最常见；等级越高「高手」越多；挂机 / 顶尖 / 大神少见
+  const share = (w) => { const t = w.reduce((a, b) => a + b, 0); const o = {}; GB.ORDER.forEach((id, i) => { o[id] = w[i] / t; }); return o; };
+  const lo = share(GB.mix(null, 1)), hi = share(GB.mix(null, 11)), mid = share(GB.mix(null, 6));
+  const top2 = (o) => Object.keys(o).sort((a, b) => o[b] - o[a]).slice(0, 2).sort().join(',');
+  ok(top2(lo) === 'decent,noob' && top2(mid) === 'decent,noob', `普通赛最常见的是不错和菜鸟（Lv1 ${top2(lo)}，Lv6 ${top2(mid)}）`);
+  ok(lo.expert < mid.expert && mid.expert < hi.expert, `等级越高高手越多：${(lo.expert * 100).toFixed(0)}% → ${(mid.expert * 100).toFixed(0)}% → ${(hi.expert * 100).toFixed(0)}%`);
+  const rare = (o) => o.afk + o.top + o.god;
+  ok(rare(lo) < 0.1 && rare(hi) < 0.13 && rare(share(GB.mix(0))) < 0.08, `挂机 + 顶尖 + 大神少见：Lv1 ${(rare(lo) * 100).toFixed(0)}%，满级 ${(rare(hi) * 100).toFixed(0)}%，青铜 ${(rare(share(GB.mix(0))) * 100).toFixed(0)}%`);
+  ok(GB.ORDER.every((id) => share(GB.mix(6))[id] < share(GB.mix(6)).expert || id === 'expert') && share(GB.mix(6)).god < 0.12, '传奇段位：高手最多，大神依然少见');
   // 两队实力差不多
   let gapMax = 0;
   for (let i = 0; i < 300; i++) {

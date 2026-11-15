@@ -1133,9 +1133,54 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.6';
+  S.VERSION = '1.7';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.7', date: '2026-11-15', title: '1.7 更新 · 开黑', en_title: 'Update 1.7 · Squad Up', sections: [
+      ['好友系统', [
+        '大厅右上角新增「好友」：每个人都有一个 6 位好友码，把它发给朋友，对方输入后发出好友申请，同意后就成为好友',
+        '好友列表显示在线状态：绿色 = 在大厅，青色 = 组队中，橙色 = 对战中；还能看到对方的驾驶员、奖杯和段位',
+        '有新的好友申请或邀请时，好友按钮上会出现红点；对方不在线时申请会保存下来，等他上线自动送达']],
+      ['组队开黑', [
+        '在好友列表点「邀请」，好友会收到弹窗邀请，点「加入」就进到你的队伍；也可以对在大厅的好友点「申请加入」',
+        '大厅中间的队伍栏显示所有队员和他们选的驾驶员 / 机体，空位点一下就能邀请；队长有皇冠，可以请人出队',
+        '队长选模式和地图，队员会看到「队长选择」；队长点「开战」全队一起进入对战，打完回到大厅时队伍还在',
+        '最多 4 人一队']],
+      ['所有模式都能组队', [
+        '涂鸦争夺、点位占领、生死之战、逃亡圈、乐园模式、搜刮撤离都可以组队，队友一定分在同一边',
+        '排位赛也能组队：所有队员都必须满足排位条件，按队伍里最高的段位匹配对手；每个人分别结算排位分',
+        '排位的禁用规则对队员同样有效：选了被禁的驾驶员或机体会自动换掉',
+        '人数不够时用 AI 队友补满；4 人组队时自动开 4v4，搜刮撤离的小队人数也会跟着队伍人数走']],
+      ['单排', [
+        '不组队也完全没问题：直接点「开战」就是单排，系统会给你匹配 AI 队友和对手']],
+      ['AI 对手调整', [
+        '最常遇到的是「不错」和「菜鸟」水平的玩家',
+        '普通赛按你的等级、排位赛按段位：越高，遇到「高手」的概率越大（满级约 26%，传奇段位约 43%）',
+        '「挂机」「操作顶尖」「大神」变得少见：普通赛加起来不到 12%，青铜段位只有 6%']],
+      ['更新奖励', ['信箱里有一份 1.7 更新礼包：100 宝石 + 1500 金币 + 军用箱']],
+    ], en: [
+      ['Friends', [
+        'New Friends button at the top right of the lobby. Everyone has a 6-character friend code: share yours, your friend enters it to send a request, and once accepted you are friends',
+        'The friend list shows who is online: green = in the lobby, cyan = in a party, orange = in a match. You can also see their pilot, trophies and rank',
+        'A red dot on the Friends button means a new request or invite. Requests to offline players are kept and delivered when they come online']],
+      ['Party play', [
+        'Tap Invite in your friend list and your friend gets a pop-up invite; they tap Join to enter your party. You can also ask to join a friend who is in the lobby',
+        'The party bar in the middle of the lobby shows every member with their pilot and mech. Tap an empty slot to invite someone. The leader has a crown and can remove members',
+        'The leader picks the mode and map, and members see "Leader\'s pick". When the leader taps Play the whole party jumps in together, and the party stays together when you return to the lobby',
+        'Up to 4 players per party']],
+      ['Parties in every mode', [
+        'Turf War, Zone Control, Elimination, Escape Circle, Park and Extraction all support parties, and party members are always on the same team',
+        'Ranked works too: every member must meet the ranked requirements, matchmaking uses the highest rank in the party, and each player gets their own ranked points',
+        'Ranked bans apply to party members too: a banned pilot or mech is swapped out automatically',
+        'Empty slots are filled with AI teammates. A 4-player party automatically plays 4v4, and Extraction squads match your party size']],
+      ['Solo play', [
+        'No party? No problem: just tap Play to queue solo and you get AI teammates and opponents']],
+      ['AI opponent changes', [
+        'Decent and Rookie players are now the ones you meet most often',
+        'Your level (normal matches) or rank (Ranked) decides how many Experts show up: the higher you are, the more Experts you meet (about 26% at max level, 43% at Legend)',
+        'AFK, Mechanical and Godlike players are now rare: under 12% combined in normal matches, and just 6% in Bronze']],
+      ['Update rewards', ['There is an Update 1.7 gift in your mailbox: 100 gems + 1500 coins + a Military Crate']],
+    ] },
     { v: '1.6', date: '2026-11-15', title: '1.6 更新 · 搜刮撤离', en_title: 'Update 1.6 · Extraction', sections: [
       ['全新玩法「搜刮撤离」', [
         '两张超大地图（普通地图的 4 倍大）：「废弃港口」集装箱迷宫 + 中央货轮，「地下研究所」实验室走廊 + 中央反应堆大厅',

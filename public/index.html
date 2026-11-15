@@ -83,6 +83,7 @@
       <div class="top-gap"></div>
       <div class="upd-banner hidden" id="updBanner"><b id="updText">发现新版本</b><a class="btn small" id="updGo" target="_blank" rel="noopener">去官网下载</a><button class="link-btn" id="updLater">以后再说</button></div>
       <div id="connStatus" class="conn">正在连接服务器…</div>
+      <button class="icon-btn has-badge" data-ov="friends" title="好友" data-icon="team"><em class="badge hidden" id="friendBadge">0</em></button>
       <button class="icon-btn has-badge" data-ov="events" title="活动" data-icon="event"><em class="badge hidden" id="evBadge">!</em></button>
       <button class="icon-btn has-badge" data-ov="mail" title="信箱" data-icon="mail"><em class="badge hidden" id="mailBadge">0</em></button>
       <button class="icon-btn" id="newsBtn" title="更新公告" data-icon="news"></button>
@@ -103,6 +104,7 @@
     <div class="home-stage">
       <div id="preview" class="pv-host"></div>
       <div id="heroPortrait" class="hero-portrait"></div>
+      <div id="partyBar" class="party-bar" data-noi18n></div>
       <div class="hero-plate">
         <div id="heroPilot" class="hero-pilot"></div>
         <div id="heroLoadout" class="loadout-pills"></div>
@@ -137,6 +139,11 @@
       <div class="ov-body">
         <div id="weaponList" class="mech-grid wide"></div>
       </div>
+    </section>
+    <!-- 1.7：好友 -->
+    <section id="ov-friends" class="ov hidden">
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>好友</h2><small>把好友码发给朋友，加好友之后可以随时邀请一起开黑——任何模式都可以组队，剩下的位置 AI 补上</small></header>
+      <div class="ov-body"><div id="friendsBody" class="fr-body"></div></div>
     </section>
     <!-- 1.6：搜刮撤离 -->
     <section id="ov-loot" class="ov hidden loot-ov">
@@ -344,6 +351,9 @@
   <div id="vsSplash" class="vs-splash hidden"></div>
   <div id="cutin" class="cutin hidden"></div>
   <div id="cutinSide" class="cutin-side"></div>
+
+  <!-- ============ 1.7：好友邀请弹窗 ============ -->
+  <div id="invPop" class="inv-pop hidden"></div>
 
   <!-- ============ 1.4.1：打字聊天 ============ -->
   <div id="chatLog" class="chat-log hidden" data-noi18n aria-live="polite"></div>

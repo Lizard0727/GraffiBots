@@ -1,6 +1,6 @@
 // 1.4.1：AI 机兵的「玩家性格」+ 打字聊天
 //   性格：菜鸟 / 猪队友 / 挂机 / 不错 / 高手 / 操作顶尖 / 大神 —— 反应、瞄准、走位、决策都不一样
-//   普通赛混着出；排位赛段位越高，高手、顶尖、大神越多（队友和对手都一样）
+//   最常见的是「不错」和「菜鸟」；普通赛按玩家等级、排位赛按段位，越高「高手」越多；挂机、顶尖、大神少见（队友和对手都一样）
 //   AI 用玩家风格的名字、会穿皮肤、会打字（骂对手、甩锅、夸人、闲聊、回你的话），中英双语
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -25,22 +25,30 @@
     god:    { name: '大神', en: 'Godlike', react: [0.05, 0.12], aim: 0.05, lead: 1, fire: 0.88, paint: 0.7, trueLead: true, strafe: [0.25, 0.7], strafeK: 1, jump: [0.8, 2.2], retreat: 0.3, skill: 0.08, ov: 0.35, lv: 2, wander: 0, focus: true, smart: true, pow: 2.4, chat: 0.3, skin: 0.7, styles: { chill: 3, lead: 3, show: 1, toxic: 1 } },
   };
   B.ORDER = ['noob', 'pig', 'afk', 'decent', 'expert', 'top', 'god'];
-  // 权重：普通赛 + 排位赛 7 个段位（青铜 → 传奇）
+  // 权重（顺序同 ORDER：菜鸟 猪 挂机 不错 高手 顶尖 大神）
+  //   1.7：「不错」和「菜鸟」最常见；等级 / 段位越高，「高手」越多；挂机、操作顶尖、大神一直都比较少见
+  //   普通赛：按真人玩家的平均等级在 low（Lv1）和 high（满级）之间插值；排位赛：按段位
   B.MIX = {
-    normal: [16, 9, 5, 34, 20, 9, 7],
+    low:  [36, 8, 3, 40, 9, 2, 2],
+    high: [20, 6, 3, 36, 26, 5, 4],
     rank: [
-      [26, 14, 7, 35, 12, 4, 2],    // 青铜
-      [18, 12, 6, 38, 17, 6, 3],    // 白银
-      [10, 10, 5, 37, 24, 9, 5],    // 黄金
-      [5, 7, 4, 32, 31, 13, 8],     // 铂金
-      [2, 5, 3, 25, 35, 18, 12],    // 钻石
-      [1, 3, 2, 17, 37, 22, 18],    // 大师
-      [0, 2, 1, 10, 35, 26, 26],    // 传奇
+      [34, 9, 3, 42, 9, 2, 1],      // 青铜
+      [28, 8, 3, 42, 14, 3, 2],     // 白银
+      [22, 7, 3, 40, 21, 4, 3],     // 黄金
+      [16, 6, 2, 38, 28, 6, 4],     // 铂金
+      [11, 5, 2, 35, 34, 8, 5],     // 钻石
+      [7, 4, 2, 31, 39, 10, 7],     // 大师
+      [4, 3, 1, 27, 43, 12, 10],    // 传奇
     ],
   };
-  B.mix = (tier) => (tier == null || tier < 0 ? B.MIX.normal : B.MIX.rank[Math.min(B.MIX.rank.length - 1, tier | 0)]);
-  B.roll = (tier) => {
-    const w = B.mix(tier), tot = w.reduce((a, b) => a + b, 0);
+  B.MAX_LV = 11;
+  B.mix = (tier, lv) => {
+    if (tier != null && tier >= 0) return B.MIX.rank[Math.min(B.MIX.rank.length - 1, tier | 0)];
+    const k = Math.max(0, Math.min(1, ((lv || 1) - 1) / (B.MAX_LV - 1)));
+    return B.MIX.low.map((a, i) => a + (B.MIX.high[i] - a) * k);
+  };
+  B.roll = (tier, lv) => {
+    const w = B.mix(tier, lv), tot = w.reduce((a, b) => a + b, 0);
     let r = Math.random() * tot;
     for (let i = 0; i < w.length; i++) { r -= w[i]; if (r < 0) return B.ORDER[i]; }
     return 'decent';
@@ -48,10 +56,10 @@
   B.persona = (id) => B.PERSONAS[id] || B.PERSONAS.decent;
   // 给一局里所有 AI 分配性格；两队实力差太多就重新抽（最多 4 次），不会一边全是大神
   //   slots: [{team}]，humans: {team: 人数}
-  B.assign = (slots, tier, humans) => {
+  B.assign = (slots, tier, humans, lv) => {
     let best = null, bestGap = Infinity;
     for (let k = 0; k < 5; k++) {
-      const ids = slots.map(() => B.roll(tier));
+      const ids = slots.map(() => B.roll(tier, lv));
       const pow = {};
       for (const t in humans) pow[t] = (pow[t] || 0) + humans[t] * 1.2;
       slots.forEach((s, i) => { pow[s.team] = (pow[s.team] || 0) + B.persona(ids[i]).pow; });

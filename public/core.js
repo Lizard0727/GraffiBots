@@ -272,7 +272,7 @@ class Game {
     const FAIR = { lv: E.FAIR_LV, bt: E.FAIR_BT };
     const humans = [];
     for (const c of room.members.values()) {
-      const team = this.teams > 2 ? c.gTeam : c.team;
+      const team = this.teams > 2 ? c.gTeam : st.party ? 1 : c.team;   // 1.7：组队（好友开黑）时队友都在同一边
       if (slots[team] >= teamCap) continue;
       const pw = this.fair ? FAIR : c.power || { lv: 1, bt: 0 };
       humans.push(pw);
@@ -289,7 +289,7 @@ class Game {
       const bannedP = new Set(this.bans.pilots || []), bannedM = new Set(this.bans.mechs || []);   // 排位赛被禁用的驾驶员 / 机体 AI 也不能选
       const mechPool = S.WEAPON_ORDER.filter((w) => !bannedM.has(w));
       const free = S.PILOTS.filter((pp) => !taken.has(pp.id) && !bannedP.has(pp.id)).sort(() => Math.random() - 0.5);
-      const perTeam = this.teams > 2 ? teamCap : st.teamSize;
+      const perTeam = this.teams > 2 ? teamCap : Math.max(st.teamSize, st.party ? slots[1] : 0);
       const slotList = [];
       for (let team = 1; team <= this.teams; team++)
         for (let s = slots[team]; s < perTeam && !(this.tutorial && team === 1) && !(this.loot && team === 1 && st.fill === false); s++) slotList.push({ team });   // 搜刮撤离：可以关掉 AI 队友
@@ -298,7 +298,7 @@ class Game {
       const hTeams = {};
       for (const p of this.players.values()) hTeams[p.team] = (hTeams[p.team] || 0) + 1;
       const tier = this.ranked && Number.isInteger(st.rankTier) ? st.rankTier : null;
-      const personas = usePersona ? BOTS.assign(slotList, tier, hTeams) : slotList.map(() => 'decent');
+      const personas = usePersona ? BOTS.assign(slotList, tier, hTeams, avgLv) : slotList.map(() => 'decent');
       const names = usePersona ? BOTS.nicks(slotList.length, st.lang) : BOT_NAMES.slice().sort(() => Math.random() - 0.5);
       slotList.forEach(({ team }, i) => {
         bi++;
@@ -2388,7 +2388,7 @@ class Room {
   lobbyInfo() {
     return {
       code: this.code, hostId: this.hostId, state: this.state, settings: this.settings, colorSet: this.colorSet,
-      players: [...this.members.values()].map((c) => ({ id: c.id, name: c.name, team: c.team, weapon: c.weapon, head: c.head, pilot: c.pilot, level: c.level, lv: c.power ? c.power.lv : 1 })),
+      players: [...this.members.values()].map((c) => ({ id: c.id, name: c.name, team: c.team, weapon: c.weapon, head: c.head, pilot: c.pilot, level: c.level, lv: c.power ? c.power.lv : 1, fid: c.fid || null, rk: c.rk || null, looks: c.looks || null })),
     };
   }
   broadcastLobby() { this.broadcast({ t: 'lobby', room: this.lobbyInfo() }); }
@@ -2408,12 +2408,15 @@ class Room {
     if (Number.isInteger(m.teamSize) && m.teamSize >= 1 && m.teamSize <= 4) s.teamSize = m.teamSize;
     if (typeof m.bots === 'boolean') s.bots = m.bots;
     if (typeof m.fair === 'boolean') s.fair = m.fair;
+    if (typeof m.party === 'boolean') s.party = m.party;   // 1.7：好友组队（队友同一边，剩下的位置 AI 补）
     // 排位赛：禁用名单 + AI 强度（单排房间，由客户端在禁用阶段决定）
     if (typeof m.ranked === 'boolean') s.ranked = m.ranked;
     if (m.bans && typeof m.bans === 'object') {
       const pick = (arr, ok) => (Array.isArray(arr) ? [...new Set(arr.filter(ok))].slice(0, 4) : []);
       s.bans = { pilots: pick(m.bans.pilots, (id) => S.PILOTS.some((P) => P.id === id)), mechs: pick(m.bans.mechs, (id) => !!S.WEAPONS[id]) };
     }
+    if (m.botPower === null) delete s.botPower;
+    if (m.rankTier === null) delete s.rankTier;
     if (m.botPower && typeof m.botPower === 'object') s.botPower = { lv: Math.max(1, Math.min(11, m.botPower.lv | 0)), bt: Math.max(0, Math.min(2, m.botPower.bt | 0)) };
     if (Number.isInteger(m.rankTier) && m.rankTier >= 0 && m.rankTier < E.RANK.tiers.length) s.rankTier = m.rankTier;   // AI 性格按段位混合
     if (m.lang === 'zh' || m.lang === 'en') s.lang = m.lang;
@@ -2462,6 +2465,7 @@ function setProfile(c, m) {
     for (const k of ['pskin', 'paint', 'fx', 'frame', 'avatar']) { const K = S.skin(m.looks[k]); if (K && (k === 'pskin' ? K.kind === 'pilot' && K.pilot === c.pilot : K.kind === { paint: 'mech', fx: 'fx', frame: 'frame', avatar: 'avatar' }[k])) L[k] = K.id; }
     c.looks = L;
   }
+  if (m.rk && typeof m.rk === 'object') c.rk = { tier: clamp(m.rk.tier | 0, 0, 6), ok: !!m.rk.ok };   // 1.7：组队排位要知道每个人的段位
   if (m.power && typeof m.power === 'object') c.power = { lv: clamp(m.power.lv | 0 || 1, 1, E.MAX_LV), bt: clamp(m.power.bt | 0, 0, 2), tal: cleanTal(m.power.tal), gear: Array.isArray(m.power.gear) ? [...new Set(m.power.gear.filter((g) => S.LOOT.gear[g]))] : [] };
 }
 
@@ -2505,7 +2509,7 @@ function handle(hub, c, m) {
       c.team = t; r.broadcastLobby();
       break;
     }
-    case 'loadout': if (!c.acct) setProfile(c, m); if (r) r.broadcastLobby(); break;   // 在线账号的出战配置以服务器资料为准（saveProfile）
+    case 'loadout': if (!c.acct) setProfile(c, m); else if (m.rk && typeof m.rk === 'object') c.rk = { tier: c.rankTier != null ? c.rankTier : clamp(m.rk.tier | 0, 0, 6), ok: c.canRanked != null ? c.canRanked : !!m.rk.ok }; if (r) r.broadcastLobby(); break;   // 在线账号的出战配置以服务器资料为准（saveProfile）
     case 'settings': if (r && r.hostId === c.id && r.state === 'lobby') r.applySettings(m); break;
     case 'start': if (r && r.hostId === c.id && r.state === 'lobby') r.start(); break;
     case 'in': if (r && r.game) r.game.input(c.id, m); break;
@@ -2531,6 +2535,40 @@ function handle(hub, c, m) {
       break;
     }
     case 'ping': c.conn.send({ t: 'pong', ts: m.ts }); break;
+    case 'dbgFinish': if (hub.debug && r && r.game && r.hostId === c.id) { const g = r.game, me = g.players.get(c.id); if (g.loot) { me.extracted = true; me.out = true; me.alive = false; g.obj.banked[c.id] = ['scrap']; } g.finish(me ? me.team : 1); } break;   // 只在测试服务器（GB_DEBUG=1）里可用
+    // ---------------- 1.7：好友（服务器转发：好友码 → 连接）----------------
+    case 'socHello': {   // 上线 / 更新状态：{ fid, card: { name, pilot, tr, rank, st, code, n } }
+      const fid = String(m.fid || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      if (!fid) return;
+      if (c.fid && c.fid !== fid && hub.fids.get(c.fid)) hub.fids.get(c.fid).delete(c);
+      c.fid = fid; c.socCard = m.card && typeof m.card === 'object' ? m.card : null;
+      if (!hub.fids.has(fid)) hub.fids.set(fid, new Set());
+      hub.fids.get(fid).add(c);
+      break;
+    }
+    case 'soc': {   // 发给某个好友码：{ to, m }
+      if (!c.fid) return;
+      const to = String(m.to || '').toUpperCase(), set = hub.fids.get(to);
+      if (!set || !set.size) return c.conn.send({ t: 'socFail', to, kind: m.m && m.m.t });
+      const now = Date.now();
+      c.socTimes = (c.socTimes || []).filter((t) => now - t < 10000);
+      if (c.socTimes.length > 40) return;
+      c.socTimes.push(now);
+      for (const o of set) o.conn.send({ t: 'soc', from: c.fid, m: m.m });
+      break;
+    }
+    case 'socWho': {   // 查询好友在不在线
+      const on = {};
+      for (const f of (Array.isArray(m.fids) ? m.fids : []).slice(0, 100)) { const set = hub.fids.get(String(f)); const o = set && [...set][0]; if (o) on[f] = o.socCard || { st: 'menu' }; }
+      c.conn.send({ t: 'socWho', on });
+      break;
+    }
+    case 'kick': {   // 队长把人请出队伍
+      if (!r || r.hostId !== c.id || r.state !== 'lobby') return;
+      const o = r.members.get(m.id | 0);
+      if (o && o !== c) { r.remove(o); o.conn.send({ t: 'left', kicked: true }); }
+      break;
+    }
   }
 }
 
@@ -2540,7 +2578,7 @@ function handle(hub, c, m) {
 // conn 需要实现 send(obj) / sendRaw(str) / congested
 // =====================================================================
 class Hub {
-  constructor() { this.clients = new Map(); this.rooms = new Map(); this.nextId = 1; }
+  constructor() { this.clients = new Map(); this.rooms = new Map(); this.fids = new Map(); this.nextId = 1; }
   connect(conn) {
     const c = { id: this.nextId++, conn, name: '机兵', weapon: 'blaster', head: 'antenna', pilot: 'blaze', level: 1, room: null, team: 1 };
     this.clients.set(c.id, c);
@@ -2550,6 +2588,7 @@ class Hub {
   message(c, m) { if (this.clients.has(c.id)) handle(this, c, m); }
   disconnect(c) {
     if (!this.clients.delete(c.id)) return;
+    if (c.fid && this.fids.get(c.fid)) { this.fids.get(c.fid).delete(c); if (!this.fids.get(c.fid).size) this.fids.delete(c.fid); }
     if (c.room) c.room.remove(c);
   }
 }

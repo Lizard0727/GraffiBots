@@ -302,9 +302,16 @@
     $('title').style.setProperty('--pc', P.accent);
     renderModeCard();
     renderLootChip();
+    if (typeof renderParty === 'function' && SOC) renderParty();
     mountPreview();
   }
   function renderModeCard() {
+    // 1.7：组队时队长改模式会同步给队员；队员看到的是队长选的模式
+    if (typeof PARTY !== 'undefined' && PARTY.on && room) {
+      const mk = profile.mode + '|' + profile.map;
+      if (room.hostId === myId && PARTY.lastMode !== mk && room.state === 'lobby') { PARTY.lastMode = mk; send({ t: 'settings', mode: profile.mode, map: profile.map }); }   // 只在队长自己改了模式时同步
+      else if (room.hostId !== myId) { const mm = S.MODES[room.settings.mode] || S.MODES.turf; $('modeName').textContent = mm.name; $('modeMap').textContent = '队长选择 · ' + mapName(room.settings.map); $('modeIcon').innerHTML = ic(MODE_ICON[room.settings.mode] || 'turf'); return; }
+    }
     const m = S.MODES[profile.mode] || S.MODES.turf;
     $('modeIcon').innerHTML = ic(MODE_ICON[profile.mode] || 'turf');
     const mc = MODE_COL[profile.mode] || MODE_COL.turf;
@@ -332,6 +339,7 @@
     if (name === 'pilots') renderPilots();
     if (name === 'hero') renderHero();
     if (name === 'loot') renderLoot();
+    if (name === 'friends') renderFriends();
     if (name === 'stash') renderStash();
     if (name === 'chests') { renderChests(); const r = $('offerRow'); if (r) r.dataset.slot = ''; renderOffers(); }
     if (name === 'talents') renderTalents();
@@ -436,6 +444,13 @@
     profile.pilot = D.pick.pilot; profile.weapon = D.pick.mech; saveProfile(); sendLoadout(); renderProfile();
     closeOv(); ensureName();
     rankBefore = { rp: profile.rank.rp, ti: E.rankTier(profile.rank.rp) };
+    if (PARTY.on && room) {   // 1.7：组队排位——每个人都要满足排位条件，AI 强度按队里最高段位
+      const bad = room.players.filter((p) => p.rk && !p.rk.ok);
+      if (bad.length) { rankBefore = null; return toast(`${bad.map((p) => p.name).join('、')} 还没凑齐 3 位驾驶员和 3 台机体，不能组队排位`); }
+      const ti = Math.max(D.ti, ...room.players.map((p) => (p.rk ? p.rk.tier : 0)));
+      partyLaunch({ mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, ranked: true, fair: false, bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(ti), rankTier: ti, lang: window.GBI18N ? GBI18N.lang : 'zh' });
+      return;
+    }
     quick = { mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, bots: true, ranked: true, fair: false,
       bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(D.ti), rankTier: D.ti, lang: window.GBI18N ? GBI18N.lang : 'zh' };
     $('playBtn').classList.add('busy');
@@ -505,7 +520,8 @@
     if (UPDATE_LOCK && mustUpdate()) { checkUpdate(); return; }
     if (needPilot()) return;
     ensureName(); closeOv();
-    if (room && room.players && room.players.length > 1) {   // 组队房间：房主切到搜刮撤离，小队人数 = 房间人数
+    if (PARTY.on && room) { partyLaunch({ mode: 'loot', map: LOOTCFG.map, duration: S.LOOT.duration, squad: Math.max(room.players.length, LOOTCFG.squad), risk: LOOTCFG.risk, fill: LOOTCFG.fill }); return; }   // 1.7：组队搜刮，小队人数至少 = 队伍人数
+    if (room && room.players && room.players.length > 1) {   // 自定义房间：房主切到搜刮撤离，小队人数 = 房间人数
       if (!isHostNow()) return toast('只有房主可以开始行动');
       send({ t: 'settings', mode: 'loot', map: LOOTCFG.map, squad: Math.max(room.players.length, LOOTCFG.squad), risk: LOOTCFG.risk, fill: LOOTCFG.fill, bots: true });
       setTimeout(() => send({ t: 'start' }), 120);
@@ -824,6 +840,7 @@
     if (UPDATE_LOCK && mustUpdate()) { checkUpdate(); return; }
     if (needPilot()) return;
     ensureName();
+    if (PARTY.on && room) { partyLaunch({ mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, lang: window.GBI18N ? GBI18N.lang : 'zh' }); return; }   // 1.7：组队开打
     quick = { mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, bots: true, lang: window.GBI18N ? GBI18N.lang : 'zh' };
     $('playBtn').classList.add('busy');
     const go = () => send({ t: 'create' });
@@ -1044,7 +1061,8 @@
     $('resBack').onclick = () => {
       $('results').classList.add('hidden'); R3.clear();
       $('chatLog').classList.add('hidden'); chatClose();
-      if (quickRoom) { quickRoom = false; send({ t: 'leave' }); showScreen('title'); renderProfile(); }
+      if (PARTY.on && room) { quickRoom = false; showScreen('title'); renderProfile(); renderParty(); socHello(); }   // 组队：结算后回到大厅，队伍还在
+      else if (quickRoom) { quickRoom = false; send({ t: 'leave' }); showScreen('title'); renderProfile(); }
       else if (room) { showScreen('room'); renderRoom(); } else showScreen('title');
     };
     // 大厅导航：侧边按钮打开全屏面板
@@ -1101,7 +1119,7 @@
   let net = null, localHub = null, peerHost = null, hostCode = null, p2pStatus = { text: '', cls: '' };
   const deliver = (str) => { let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
   const send = (o) => { if (net) net.send(o); };
-  const loadoutMsg = (t) => ({ t, name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot || 'blaze', level: level(), power: E.power(profile, profile.pilot), looks: E.looks(profile) });
+  const loadoutMsg = (t) => ({ t, name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot || 'blaze', level: level(), power: E.power(profile, profile.pilot), looks: E.looks(profile), rk: { tier: E.rankTier(profile.rank.rp), ok: E.canRanked(profile) } });
   const sendHello = () => send(loadoutMsg('hello'));
   const sendLoadout = () => send(loadoutMsg('loadout'));
   setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
@@ -1119,6 +1137,7 @@
       wsEverOpen = true;
       setConn('已连接服务器 ✓', 'ok');
       sendHello();
+      setTimeout(socProbe, 200);
       if (wantRoom) { send({ t: 'join', code: wantRoom }); wantRoom = null; }
     };
     ws.onmessage = (e) => deliver(e.data);
@@ -1151,6 +1170,7 @@
     net = { kind: 'local', send: (o) => localHub.message(c, JSON.parse(JSON.stringify(o))), close: () => { conn.open = false; localHub.disconnect(c); } };
     setConn(LOCAL_TEXT(), 'ok');
     sendHello();
+    setTimeout(() => { socPeerStart(); socProbe(); }, 400);
     if (wantRoom) { const code = wantRoom; wantRoom = null; setTimeout(() => joinP2P(code), 300); }
   }
   function setP2P(text, cls) { p2pStatus = { text, cls: cls || '' }; if (room) renderRoom(); }
@@ -1245,8 +1265,25 @@
         if (!FILE_MODE && !TUT) { try { history.replaceState(null, '', '?room=' + m.code); } catch (e) { /* ignore */ } }
         if (net && net.kind === 'local') hostP2P(m.code);
         sfx.click(); break;
+      case 'soc': onSoc(m.from, m.m); break;
+      case 'socWho': {
+        const now = Date.now();
+        for (const f of SOC.friends) { if (m.on[f.fid]) onSoc(f.fid, { t: 'hiR', card: m.on[f.fid] }); else delete SOC.on[f.fid]; }
+        for (const r of SOC.reqOut) if (m.on[r.fid] && (!r.sent || now - r.sent > 30000)) { r.sent = now; socSend(r.fid, { t: 'req', card: myCard() }); }   // 对方上线了：重新发申请
+        renderFriends(); renderParty();
+        break;
+      }
+      case 'socFail': if (m.kind === 'inv' || m.kind === 'ask') toast('好友现在不在线'); break;
       case 'lobby':
         room = m.room;
+        if (room.settings && room.settings.party) PARTY.on = true;
+        if (PARTY.on) {   // 1.7：组队——留在大厅，显示队伍栏
+          if (PARTY.pending && room.hostId === myId) { send({ t: 'settings', party: true, mode: profile.mode }); const cb = PARTY.pending; PARTY.pending = null; cb(); }
+          partyCheckBans();
+          renderParty(); renderModeCard(); socHello();
+          if (!G && $('results').classList.contains('hidden') && !$('room').classList.contains('hidden')) showScreen('title');
+          if (!quick) break;
+        }
         if (quick && room.hostId === myId && room.state === 'lobby') {
           const q = quick; quick = null; quickRoom = true;
           $('playBtn').classList.remove('busy');
@@ -1260,6 +1297,7 @@
         break;
       case 'left':
         if (TUT) break;
+        if (PARTY.on) { PARTY.on = false; PARTY.pending = null; if (m.kicked) toast('你被请出了队伍'); setTimeout(() => { renderParty(); renderModeCard(); socHello(); }, 50); }
         if (!$('results').classList.contains('hidden')) { room = null; break; }   // 逃亡圈提前退出：留在结算页
         room = null; quickRoom = false;
         if (!FILE_MODE) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ } }
@@ -1267,7 +1305,7 @@
         if (net && net.kind === 'peer') backToLocal(); else if (net && net.kind === 'local') stopHost();
         break;
       case 'err': toast(m.msg); break;
-      case 'start': startGame(m); break;
+      case 'start': startGame(m); setTimeout(socHello, 100); break;
       case 'bag': if (G && G.loot) { const before = G.bag.items.length; G.bag = { items: m.items || [], cap: m.cap || S.LOOT.bag, gear: m.gear || [] }; if (G.bag.items.length < before) G.bagFlash = performance.now(); } break;
       case 's': onSnap(m); break;
       case 'over':
@@ -1285,6 +1323,258 @@
       case 'pong': ping = Math.round(performance.now() - m.ts); break;
     }
   }
+
+  // ================= 1.7：好友 + 组队开黑 =================
+  //   好友码：每台设备一个固定的 6 位码。有 Node 服务器时由服务器转发消息；没有服务器（下载版 / 官网 / 安卓）时用 P2P 直连。
+  //   组队 = 自己当队长的房间：好友接受邀请后进来，队长在大厅选模式开打，队友都在同一边，剩下的位置 AI 补上。
+  const SOC_KEY = 'social';
+  var SOC = Object.assign({ fid: '', friends: [], reqIn: [], reqOut: [] }, store.get(SOC_KEY, {}));
+  if (!/^[A-Z0-9]{6}$/.test(SOC.fid)) { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; SOC.fid = Array.from({ length: 6 }, () => A[Math.floor(Math.random() * A.length)]).join(''); }
+  SOC.on = {}; SOC.invites = []; SOC.peer = null; SOC.conns = {};
+  var PARTY = { on: false, pending: null, max: 4 };   // var：大厅初始化时可能先用到
+  const socSave = () => store.set(SOC_KEY, { fid: SOC.fid, friends: SOC.friends, reqIn: SOC.reqIn, reqOut: SOC.reqOut });
+  socSave();
+  const isFriend = (fid) => SOC.friends.some((f) => f.fid === fid);
+  const myCard = () => ({
+    name: profile.name || '机兵', pilot: profile.pilot || 'blaze', tr: profile.trophies || 0, rank: E.rankTier(profile.rank.rp),
+    st: G ? 'game' : PARTY.on && room ? 'party' : 'menu', code: PARTY.on && room ? room.code : null, n: PARTY.on && room ? room.players.length : 1, host: !!(PARTY.on && room && room.hostId === myId),
+    via: FILE_MODE ? 'peer' : 'ws', mode: PARTY.on && room ? room.settings.mode : profile.mode,
+  });
+  const socUseWs = () => !FILE_MODE && net && net.kind === 'ws' && ws && ws.readyState === 1;
+  // ---- 发消息 ----
+  function socSend(to, m) {
+    if (socUseWs()) { send({ t: 'soc', to, m }); return; }
+    socP2P(to, m);
+  }
+  let socLast = '', socLastT = 0;
+  function socHello(force) {
+    if (!socUseWs()) return;
+    const card = myCard(), k = JSON.stringify(card), now = Date.now();
+    if (!force && k === socLast && now - socLastT < 10000) return;
+    socLast = k; socLastT = now;
+    send({ t: 'socHello', fid: SOC.fid, card });
+  }
+  // ---- P2P：每个人开一个「在线状态」节点，好友直接连过来 ----
+  function socPeerStart() {
+    if (!window.Peer || SOC.peer || socUseWs() || window.GB_ARTIFACT) return;
+    const peer = new window.Peer(PEER_PREFIX + 'f-' + SOC.fid, { debug: 0 });
+    SOC.peer = peer;
+    peer.on('connection', (dc) => { dc.on('data', (d) => { let x; try { x = JSON.parse(d); } catch (e) { return; } if (x && x.from) { SOC.conns[x.from] = dc; onSoc(x.from, x.m); } }); });
+    peer.on('error', (err) => { if (err.type === 'unavailable-id') { /* 同一台设备开了两个窗口 */ } });
+    peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) { /* ignore */ } });
+  }
+  function socP2P(to, m) {
+    if (!SOC.peer || SOC.peer.destroyed) { socPeerStart(); if (!SOC.peer) return; }
+    const msg = JSON.stringify({ from: SOC.fid, m });
+    const dc0 = SOC.conns[to];
+    if (dc0 && dc0.open) { try { dc0.send(msg); } catch (e) { /* ignore */ } return; }
+    const go = () => {
+      const dc = SOC.peer.connect(PEER_PREFIX + 'f-' + to, { serialization: 'raw', reliable: true });
+      SOC.conns[to] = dc;
+      dc.on('open', () => dc.send(msg));
+      dc.on('data', (d) => { let x; try { x = JSON.parse(d); } catch (e) { return; } if (x && x.from) onSoc(x.from, x.m); });
+      dc.on('close', () => { if (SOC.conns[to] === dc) delete SOC.conns[to]; });
+    };
+    if (SOC.peer.open) go(); else SOC.peer.once('open', go);
+  }
+  // ---- 在线状态：每 12 秒问一次 ----
+  function socProbe() {
+    const fids = SOC.friends.map((f) => f.fid).concat(SOC.reqOut.map((r) => r.fid));
+    if (socUseWs()) { socHello(true); if (fids.length) send({ t: 'socWho', fids }); return; }
+    const now = Date.now();
+    for (const f of fids) { if (SOC.on[f] && now - SOC.on[f].t > 30000) delete SOC.on[f]; socSend(f, { t: 'hi', card: myCard() }); }
+    renderFriends();
+  }
+  setInterval(socProbe, 12000);
+  // ---- 收到好友消息 ----
+  function onSoc(from, m) {
+    if (!m || typeof m !== 'object' || !from || from === SOC.fid) return;
+    const card = m.card && typeof m.card === 'object' ? { name: String(m.card.name || '').slice(0, 12), pilot: S.PILOTS.some((P) => P.id === m.card.pilot) ? m.card.pilot : 'blaze', tr: m.card.tr | 0, rank: m.card.rank | 0, st: m.card.st, code: m.card.code || null, n: m.card.n | 0, host: !!m.card.host, via: m.card.via, mode: m.card.mode } : null;
+    const upd = () => { if (!card) return; SOC.on[from] = Object.assign({ t: Date.now() }, card); const f = SOC.friends.find((x) => x.fid === from); if (f) { f.name = card.name; f.pilot = card.pilot; f.tr = card.tr; socSave(); } };
+    switch (m.t) {
+      case 'hi': if (isFriend(from)) { upd(); socSend(from, { t: 'hiR', card: myCard() }); } else if (SOC.reqOut.some((r) => r.fid === from)) socSend(from, { t: 'req', card: myCard() }); break;
+      case 'hiR': if (isFriend(from)) upd(); break;
+      case 'req':
+        if (!card || isFriend(from)) { if (isFriend(from)) socSend(from, { t: 'acc', card: myCard() }); break; }
+        if (SOC.reqOut.some((r) => r.fid === from)) { addFriend(from, card); socSend(from, { t: 'acc', card: myCard() }); break; }   // 互相加：直接成为好友
+        if (!SOC.reqIn.some((r) => r.fid === from)) { SOC.reqIn.push({ fid: from, name: card.name, pilot: card.pilot, tr: card.tr, t: Date.now() }); socSave(); sfx.pick(); toast(`${card.name} 想加你为好友`); }
+        break;
+      case 'acc': if (card && (SOC.reqOut.some((r) => r.fid === from) || isFriend(from))) { const was = isFriend(from); addFriend(from, card); upd(); if (!was) { sfx.win(); toast(`${card.name} 通过了你的好友申请`); } } break;
+      case 'del': SOC.friends = SOC.friends.filter((f) => f.fid !== from); delete SOC.on[from]; socSave(); break;
+      case 'inv':
+        if (!isFriend(from) || !card || !m.code) break;
+        if (G) { socSend(from, { t: 'invR', ok: false, why: 'game' }); break; }
+        if (PARTY.on && room && room.code === m.code) break;
+        if (m.auto) { acceptInvite({ fid: from, card, code: m.code, via: m.via }); break; }   // 我请求加入，对方同意
+        SOC.invites = SOC.invites.filter((x) => x.fid !== from);
+        SOC.invites.push({ fid: from, card, code: m.code, via: m.via, mode: m.mode, t: Date.now() });
+        sfx.special(); renderInvite();
+        break;
+      case 'invR': if (m.ok === false) toast(`${(SOC.friends.find((f) => f.fid === from) || {}).name || '好友'} ${m.why === 'game' ? '正在对局中' : m.why === 'full' ? '的队伍已满' : '拒绝了邀请'}`); break;
+      case 'ask':   // 好友想加入我的队伍
+        if (!isFriend(from)) break;
+        if (!PARTY.on || !room || room.hostId !== myId) { socSend(from, { t: 'invR', ok: false, why: 'gone' }); break; }
+        if (room.players.length >= PARTY.max || G) { socSend(from, { t: 'invR', ok: false, why: G ? 'game' : 'full' }); break; }
+        socSend(from, { t: 'inv', card: myCard(), code: room.code, via: FILE_MODE ? 'peer' : 'ws', mode: room.settings.mode, auto: true });
+        break;
+    }
+    renderFriends(); renderParty();
+  }
+  function addFriend(fid, card) {
+    SOC.reqOut = SOC.reqOut.filter((r) => r.fid !== fid); SOC.reqIn = SOC.reqIn.filter((r) => r.fid !== fid);
+    if (!isFriend(fid)) SOC.friends.push({ fid, name: card.name, pilot: card.pilot, tr: card.tr, since: Date.now() });
+    socSave();
+  }
+  function sendFriendReq(code) {
+    code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 6) return toast('好友码是 6 位字母和数字');
+    if (code === SOC.fid) return toast('这是你自己的好友码');
+    if (isFriend(code)) return toast('已经是好友了');
+    if (SOC.friends.length >= 50) return toast('好友最多 50 个');
+    if (!SOC.reqOut.some((r) => r.fid === code)) SOC.reqOut.push({ fid: code, t: Date.now() });
+    socSave();
+    socSend(code, { t: 'req', card: myCard() });
+    toast('好友申请已发出（对方在线时会收到；不在线的话，等对方上线后会自动再发）');
+    renderFriends();
+  }
+  // ---- 组队 ----
+  function ensureParty(cb) {
+    if (PARTY.on && room) { if (room.hostId !== myId) return toast('只有队长可以邀请'); cb(); return; }
+    if (room && !PARTY.on) return toast('先离开当前房间');
+    PARTY.on = true; PARTY.pending = cb; PARTY.lastMode = profile.mode + '|' + profile.map;
+    const go = () => send({ t: 'create' });
+    if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 60); } else go();
+  }
+  function inviteFriend(fid) {
+    const f = SOC.friends.find((x) => x.fid === fid); if (!f) return;
+    ensureParty(() => {
+      if (room.players.length >= PARTY.max) return toast(`队伍最多 ${PARTY.max} 人`);
+      socSend(fid, { t: 'inv', card: myCard(), code: room.code, via: FILE_MODE ? 'peer' : 'ws', mode: room.settings.mode });
+      toast(`已邀请 ${f.name}`); sfx.click();
+    });
+  }
+  function askJoin(fid) { socSend(fid, { t: 'ask', card: myCard() }); toast('已请求加入队伍…'); }
+  function acceptInvite(inv) {
+    SOC.invites = SOC.invites.filter((x) => x !== inv && x.fid !== inv.fid); renderInvite();
+    if (G) return;
+    closeOv(); renderFriends();
+    if (room) { if (PARTY.on && room.code === inv.code) return; send({ t: 'leave' }); }
+    PARTY.on = true;
+    socSend(inv.fid, { t: 'invR', ok: true });
+    if (inv.via === 'ws' && !FILE_MODE) send({ t: 'join', code: inv.code });
+    else setTimeout(() => joinP2P(inv.code), room ? 300 : 0);
+    toast(`正在加入 ${inv.card.name} 的队伍…`);
+  }
+  function leaveParty() { if (!room) { PARTY.on = false; renderParty(); return; } send({ t: 'leave' }); }
+  const partyHost = () => !!(PARTY.on && room && room.hostId === myId);
+  const inParty = () => !!(PARTY.on && room && room.players.length > 1);
+  // 组队开打：所有模式都走这里（普通 / 排位 / 逃亡圈 / 搜刮撤离）
+  function partyLaunch(q) {
+    if (!partyHost()) return toast('等队长开始');
+    const n = room.players.length;
+    const cap = S.MODES[q.mode] && S.MODES[q.mode].teams > 2 && q.mode !== 'loot' ? S.MODES[q.mode].size : 4;
+    if (n > cap) toast(`「${S.MODES[q.mode].name}」每队 ${cap} 人：队伍里多出来的人会分到别的队`, 3600);
+    const st = Object.assign({ t: 'settings', bots: true, party: true, ranked: false, bans: { pilots: [], mechs: [] }, botPower: null, rankTier: null }, q);   // 上一局的排位设置要清掉
+    st.teamSize = Math.min(4, Math.max(q.teamSize || 3, n));
+    if (q.mode === 'loot') st.squad = Math.max(q.squad || 1, n);
+    send(st);
+    setTimeout(() => send({ t: 'start' }), 80);
+  }
+  // 排位赛被禁用：队友自动换成没被禁的驾驶员 / 机体
+  function partyCheckBans() {
+    if (!room || !room.settings.ranked || !room.settings.bans || room.hostId === myId) return;
+    const b = room.settings.bans; let changed = false;
+    if ((b.pilots || []).includes(profile.pilot)) { const alt = Object.keys(profile.pilots).find((id) => !b.pilots.includes(id)); if (alt) { profile.pilot = alt; changed = true; } }
+    if ((b.mechs || []).includes(profile.weapon)) { const alt = profile.mechs.find((id) => !b.mechs.includes(id)); if (alt) { profile.weapon = alt; changed = true; } }
+    if (changed) { saveProfile(); sendLoadout(); renderProfile(); toast('你的驾驶员 / 机体被禁用了，已自动换成别的'); }
+  }
+  // ---- 界面：大厅的队伍栏 ----
+  function renderParty() {
+    const bar = $('partyBar'); if (!bar) return;
+    const T = (x) => (window.GBI18N ? window.GBI18N.tr(x) : x);   // 队伍栏不自动翻译（保护玩家名字），固定文字手动翻
+    const ps = PARTY.on && room ? room.players : [];
+    const host = partyHost();
+    const slot = (p) => {
+      const P = S.pilot(p.looks && p.looks.pskin ? p.pilot + '@' + p.looks.pskin : p.pilot), me = p.id === myId, isHost = room && p.id === room.hostId;
+      return `<div class="pb-slot ${me ? 'me' : ''}" style="--pc:${S.pilot(p.pilot).accent}"><div class="pb-face">${GP.portrait(P, { face: true })}</div><b>${esc(p.name)}</b><small>${S.WEAPONS[p.weapon] ? T(S.WEAPONS[p.weapon].name) : ''}</small>${isHost ? '<i class="pb-crown">👑</i>' : ''}${host && !me ? `<button class="pb-kick" data-kick="${p.id}" title="${T('请出队伍')}">✕</button>` : ''}</div>`;
+    };
+    let html = '';
+    if (ps.length) html += ps.map(slot).join('');
+    else html += slot({ id: myId, name: profile.name || '我', pilot: profile.pilot || 'blaze', weapon: profile.weapon, looks: E.looks(profile) });
+    const n = Math.max(1, ps.length);
+    if (!PARTY.on || host) for (let i = n; i < PARTY.max; i++) html += `<button class="pb-slot empty" data-ov="friends"><span>＋</span><small>${T('邀请好友')}</small></button>`;
+    if (PARTY.on && room) html += `<button class="pb-leave" id="pbLeave">${T('离开队伍')}</button>`;
+    bar.innerHTML = html;
+    bar.classList.toggle('active', !!(PARTY.on && room));
+    for (const b of bar.querySelectorAll('[data-ov]')) b.onclick = () => { openOv('friends'); sfx.click(); };
+    for (const b of bar.querySelectorAll('[data-kick]')) b.onclick = () => { send({ t: 'kick', id: +b.dataset.kick }); sfx.click(); };
+    const lv = $('pbLeave'); if (lv) lv.onclick = () => { leaveParty(); sfx.click(); };
+    // 对战按钮：队员只能等队长
+    const pb = $('playBtn');
+    if (pb) {
+      const guest = PARTY.on && room && !host;
+      pb.classList.toggle('waiting', !!guest);
+      pb.querySelector('span').textContent = guest ? '等待队长' : '对战!';
+      pb.querySelector('small').textContent = guest ? `队长选择模式后开始 · 当前「${S.MODES[room.settings.mode] ? S.MODES[room.settings.mode].name : ''}」` : inParty() ? `和好友组队 · ${room.players.length} 人，其余 AI 补位` : '和 AI 驾驶员立即开打';
+    }
+    const fb = $('friendBadge'); if (fb) { const k = SOC.reqIn.length + SOC.invites.length; fb.textContent = k; fb.classList.toggle('hidden', !k); }
+  }
+  // ---- 界面：好友页 ----
+  const FRTAB = { t: 'list' };
+  function renderFriends() {
+    const fb = $('friendBadge'); if (fb) { const k = SOC.reqIn.length + SOC.invites.length; fb.textContent = k; fb.classList.toggle('hidden', !k); }
+    const box = $('friendsBody'); if (!box || $('ov-friends').classList.contains('hidden')) return;
+    const stName = (o) => !o ? '离线' : o.st === 'game' ? '对局中' : o.st === 'party' ? `组队中 ${o.n}/${PARTY.max}` : '在线';
+    const order = SOC.friends.slice().sort((a, b) => (!!SOC.on[b.fid] - !!SOC.on[a.fid]) || a.name.localeCompare(b.name));
+    const canInvite = !G && (!PARTY.on || partyHost()) && !(room && !PARTY.on);
+    box.innerHTML = `<div class="fr-side">
+        <div class="fr-me"><small>我的好友码</small><b id="myFid" data-noi18n>${SOC.fid}</b><button class="btn small" id="copyFid">复制</button><p>把好友码发给朋友，对方在这里输入就能加你</p></div>
+        <div class="fr-add"><input id="frCode" maxlength="6" placeholder="输入好友码" autocomplete="off" spellcheck="false"><button class="btn" id="frAdd">加好友</button></div>
+        ${SOC.invites.length ? `<div class="fr-sec"><h4>组队邀请</h4>${SOC.invites.map((v, i) => `<div class="fr-row inv"><div class="fr-face">${GP.portrait(S.pilot(v.card.pilot), { face: true })}</div><div class="fr-txt"><b data-noi18n>${esc(v.card.name)}</b><small>邀请你一起玩「${S.MODES[v.mode] ? S.MODES[v.mode].name : ''}」</small></div><button class="btn small" data-invok="${i}">加入</button><button class="btn small ghost" data-invno="${i}">拒绝</button></div>`).join('')}</div>` : ''}
+        ${SOC.reqIn.length ? `<div class="fr-sec"><h4>好友申请</h4>${SOC.reqIn.map((r) => `<div class="fr-row"><div class="fr-face">${GP.portrait(S.pilot(r.pilot), { face: true })}</div><div class="fr-txt"><b data-noi18n>${esc(r.name)}</b><small>🏆 ${r.tr}</small></div><button class="btn small" data-racc="${r.fid}">同意</button><button class="btn small ghost" data-rno="${r.fid}">忽略</button></div>`).join('')}</div>` : ''}
+        ${SOC.reqOut.length ? `<div class="fr-sec"><h4>等待对方同意</h4>${SOC.reqOut.map((r) => `<div class="fr-row out"><span class="fr-code" data-noi18n>${r.fid}</span><small>${SOC.on[r.fid] ? '对方在线' : '对方上线后会收到'}</small><button class="btn small ghost" data-rcancel="${r.fid}">取消</button></div>`).join('')}</div>` : ''}
+      </div>
+      <div class="fr-main"><h4>好友 <small>${SOC.friends.length} 人 · 在线 ${SOC.friends.filter((f) => SOC.on[f.fid]).length} 人</small></h4>
+        ${order.length ? order.map((f) => { const o = SOC.on[f.fid], inMine = PARTY.on && room && room.players.some((p) => p.fid === f.fid);
+          return `<div class="fr-row ${o ? 'on' : 'off'}"><div class="fr-face">${GP.portrait(S.pilot(f.pilot), { face: true })}<i class="dot ${o ? o.st : ''}"></i></div><div class="fr-txt"><b data-noi18n>${esc(f.name)}</b><small>${stName(o)} · 🏆 ${f.tr}${o && o.rank != null ? ` · ${E.RANK.tiers[o.rank].name}` : ''}</small></div>
+            ${inMine ? '<span class="fr-tag">队伍中</span>' : o && o.st === 'party' && o.host && o.n < PARTY.max && !PARTY.on ? `<button class="btn small" data-ask="${f.fid}">加入</button>` : ''}
+            ${!inMine && o && o.st !== 'game' && canInvite ? `<button class="btn small" data-inv="${f.fid}">邀请</button>` : ''}
+            <button class="btn small ghost fr-del" data-del="${f.fid}" title="删除好友">✕</button></div>`; }).join('') : '<p class="fr-empty">还没有好友。把你的好友码发给朋友，或者输入朋友的好友码！</p>'}
+        <p class="fr-note">${FILE_MODE ? '下载版 / 官网：好友之间通过网络直连，双方都需要打开游戏并联网。' : '已连接服务器：好友在同一个服务器上就能互相邀请。'}没有好友在线也没关系——点「对战」就会和 AI 队友一起单排。</p>
+      </div>`;
+    $('copyFid').onclick = () => { try { navigator.clipboard.writeText(SOC.fid); toast('好友码已复制'); } catch (e) { toast('好友码：' + SOC.fid); } };
+    $('frAdd').onclick = () => sendFriendReq($('frCode').value);
+    $('frCode').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') sendFriendReq($('frCode').value); };
+    for (const b of box.querySelectorAll('[data-racc]')) b.onclick = () => { const r = SOC.reqIn.find((x) => x.fid === b.dataset.racc); if (!r) return; addFriend(r.fid, r); socSend(r.fid, { t: 'acc', card: myCard() }); sfx.win(); renderFriends(); };
+    for (const b of box.querySelectorAll('[data-rno]')) b.onclick = () => { SOC.reqIn = SOC.reqIn.filter((x) => x.fid !== b.dataset.rno); socSave(); renderFriends(); renderParty(); };
+    for (const b of box.querySelectorAll('[data-rcancel]')) b.onclick = () => { SOC.reqOut = SOC.reqOut.filter((x) => x.fid !== b.dataset.rcancel); socSave(); renderFriends(); };
+    for (const b of box.querySelectorAll('[data-inv]')) b.onclick = () => inviteFriend(b.dataset.inv);
+    for (const b of box.querySelectorAll('[data-ask]')) b.onclick = () => askJoin(b.dataset.ask);
+    for (const b of box.querySelectorAll('[data-del]')) b.onclick = () => { const f = SOC.friends.find((x) => x.fid === b.dataset.del); if (!f || !confirm(`删除好友「${f.name}」？`)) return; socSend(f.fid, { t: 'del' }); SOC.friends = SOC.friends.filter((x) => x !== f); socSave(); renderFriends(); };
+    for (const b of box.querySelectorAll('[data-invok]')) b.onclick = () => { const v = SOC.invites[+b.dataset.invok]; if (v) { closeOv(); acceptInvite(v); } };
+    for (const b of box.querySelectorAll('[data-invno]')) b.onclick = () => { const v = SOC.invites[+b.dataset.invno]; if (v) { socSend(v.fid, { t: 'invR', ok: false }); SOC.invites = SOC.invites.filter((x) => x !== v); renderFriends(); renderInvite(); renderParty(); } };
+  }
+  // ---- 邀请弹窗（20 秒内有效）----
+  function renderInvite() {
+    const pop = $('invPop'); if (!pop) return;
+    const now = Date.now();
+    SOC.invites = SOC.invites.filter((v) => now - v.t < 20000);
+    const v = SOC.invites[SOC.invites.length - 1];
+    clearTimeout(renderInvite.h);
+    if (!v || G) { pop.classList.add('hidden'); pop.dataset.inv = ''; renderParty(); return; }
+    const key = v.fid + v.t;
+    if (pop.dataset.inv !== key) {   // 只在换了一个邀请时重建（倒计时只更新进度条，按钮不会被替换）
+      pop.dataset.inv = key;
+      pop.innerHTML = `<div class="ip-face">${GP.portrait(S.pilot(v.card.pilot), { face: true })}</div><div class="ip-txt"><small>组队邀请</small><b><span data-noi18n>${esc(v.card.name)}</span> 邀请你一起玩</b><span>「${S.MODES[v.mode] ? S.MODES[v.mode].name : ''}」</span><i class="ip-bar"></i></div><button class="btn" id="ipOk">加入</button><button class="btn ghost small" id="ipNo">拒绝</button>`;
+      pop.classList.remove('hidden');
+      $('ipOk').onclick = () => { acceptInvite(v); sfx.click(); };
+      $('ipNo').onclick = () => { socSend(v.fid, { t: 'invR', ok: false }); SOC.invites = SOC.invites.filter((x) => x !== v); renderInvite(); renderFriends(); };
+      renderParty();
+    }
+    const bar = pop.querySelector('.ip-bar'); if (bar) bar.style.setProperty('--k', Math.max(0, 1 - (now - v.t) / 20000).toFixed(3));
+    renderInvite.h = setTimeout(renderInvite, 400);
+  }
+
 
   // ================= 对局状态 =================
   const INTERP = 100;
@@ -3138,6 +3428,7 @@
     $('resMvp').classList.remove('show');
     // 经验 / 奖杯：在线账号由服务器结算（防止改本地数据刷分），其余在本机结算
     pendingReward = null;
+    if (r.ranked && meRow && !rankBefore) rankBefore = { rp: profile.rank.rp, ti: E.rankTier(profile.rank.rp) };   // 1.7：组队排位的队员也显示排位分变化
     if (meRow) {
       const rw = S.matchReward(r, myId);
       if (session && session.kind === 'online') {
@@ -4124,7 +4415,7 @@
   $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 
   // ================= 启动 =================
-  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
+  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
   boot().then(startAccount);

@@ -16,6 +16,19 @@
   const TIER = { 高级: 'Premium', 免费: 'Free' };
   // 带数字 / 名字的句式（先于片段替换）
   const PATTERNS = [
+    [/^组队中 (\d+)\/(\d+)$/g, 'In party $1/$2'],
+    [/^(\d+) 人 · 在线 (\d+) 人$/g, '$1 friends · $2 online'],
+    [/^邀请你一起玩「(.+)」$/g, (m, t) => `invites you to play ${tr(t)}`],
+    [/^「(.+)」$/g, (m, t) => tr(t)],
+    [/^队长选择模式后开始 · 当前「(.*)」$/g, (m, t) => `The leader picks the mode · now ${tr(t)}`],
+    [/^和好友组队 · (\d+) 人，其余 AI 补位$/g, 'Party of $1 · AI fills the rest'],
+    [/^队长选择 · (.+)$/g, (m, t) => `Leader's pick · ${tr(t)}`],
+    [/^(.+) 想加你为好友$/g, '$1 wants to be your friend'], [/^(.+) 通过了你的好友申请$/g, '$1 accepted your friend request'],
+    [/^已邀请 (.+)$/g, 'Invited $1'], [/^正在加入 (.+) 的队伍…$/g, "Joining $1's party…"],
+    [/^「(.+)」每队 (\d+) 人：队伍里多出来的人会分到别的队$/g, (m, t, n) => `${tr(t)} has ${n} per team: extra party members go to other teams`],
+    [/^(.+) 还没凑齐 3 位驾驶员和 3 台机体，不能组队排位$/g, "$1 doesn't have 3 pilots and 3 mechs yet, so the party can't play Ranked"],
+    [/^(.+) 正在对局中$/g, '$1 is in a match'], [/^(.+) 的队伍已满$/g, "$1's party is full"], [/^(.+) 拒绝了邀请$/g, '$1 declined the invite'],
+    [/^好友码：(.+)$/g, 'Friend code: $1'], [/^删除好友「(.+)」？$/g, 'Remove friend $1?'], [/^队伍最多 (\d+) 人$/g, 'Parties can have up to $1 players'],
     [/^(\d+) 件物资 · 点击进入$/g, '$1 items · tap to open'],
     [/^你排第 (\d+) 名$/g, "You're #$1"],
     [/^仓库价值 ([\d,]+)$/g, 'Warehouse $1'],

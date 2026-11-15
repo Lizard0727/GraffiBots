@@ -1,28 +1,24 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "date": "2026-11-15",
-  "title": "1.6 更新 · 搜刮撤离",
-  "en_title": "Update 1.6 · Extraction",
+  "title": "1.7 更新 · 开黑",
+  "en_title": "Update 1.7 · Squad Up",
   "page": "#updates",
   "force": true,
   "notes": [
-    "全新玩法「搜刮撤离」",
-    "仓库与军需处",
-    "活动界面",
-    "信箱",
-    "通行证",
-    "帧数与操作手感",
-    "新音乐与音效",
+    "好友系统",
+    "组队开黑",
+    "所有模式都能组队",
+    "单排",
+    "AI 对手调整",
     "更新奖励"
   ],
   "en_notes": [
-    "New mode: Extraction",
-    "Warehouse & Quartermaster",
-    "Events screen",
-    "Mailbox",
-    "Season pass",
-    "Frame rate & controls",
-    "New music & sound",
+    "Friends",
+    "Party play",
+    "Parties in every mode",
+    "Solo play",
+    "AI opponent changes",
     "Update rewards"
   ]
 }
