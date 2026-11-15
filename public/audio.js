@@ -363,6 +363,26 @@
     siren() { for (let i = 0; i < 3; i++) { tone(660, 0.35, 'sawtooth', 0.035, 1.5, i * 0.4); } },
     extracted() { arp([523, 659, 784, 1046, 1318, 1568], 0.08, 0.3, 'square', 0.05); tone(784, 1.2, 'triangle', 0.05, 0, 0.5); noise(0.8, 0.03, 1500, 'bandpass', 0.4, 6000); },
     coin() { tone(1568, 0.06, 'square', 0.04); tone(2093, 0.12, 'square', 0.035, 0, 0.06); },
+    // 1.9：部分传说 / 限定传说皮肤有专属的开火声和命中声（手感完全不同）
+    skinShoot(k) {
+      if (!rl('shoot', 70)) return;
+      if (k === 'gold') { tone(1760, 0.05, 'triangle', 0.035, 0.8); tone(2640, 0.04, 'sine', 0.02); noise(0.05, 0.03, 5200, 'highpass'); }   // 金币叮当
+      else if (k === 'flag') { tone(150, 0.09, 'sine', 0.09, 0.45); noise(0.06, 0.06, 900, 'lowpass'); }   // 军鼓
+      else if (k === 'ice') { tone(2093, 0.09, 'sine', 0.03); tone(3136, 0.07, 'sine', 0.02, 0, 0.02); noise(0.05, 0.02, 7000, 'highpass'); }   // 冰晶风铃
+      else if (k === 'yato') { noise(0.09, 0.04, 1200, 'bandpass', 0, 4200); tone(1046, 0.08, 'triangle', 0.025, 0, 0.015); }   // 符纸破空 + 铃
+      else if (k === 'wraith') { tone(110, 0.12, 'sawtooth', 0.045, 0.6); noise(0.1, 0.05, 400, 'lowpass', 0, 160); }   // 恶灵低吼
+      else if (k === 'martyr') { tone(98, 0.12, 'sine', 0.1, 0.5); tone(392, 0.07, 'square', 0.025, 1.02, 0.01); noise(0.07, 0.05, 700, 'lowpass'); }   // 战鼓 + 号角
+      else noise(0.07, 0.05, 2600);
+    },
+    skinHit(k) {
+      if (!rl('hc', 45)) return;
+      if (k === 'gold') { tone(2349, 0.06, 'triangle', 0.035); tone(3136, 0.08, 'sine', 0.025, 0, 0.03); }
+      else if (k === 'flag' || k === 'martyr') { tone(220, 0.07, 'square', 0.04, 0.6); noise(0.05, 0.05, 1500, 'bandpass'); }
+      else if (k === 'ice') { tone(2637, 0.05, 'sine', 0.035); noise(0.06, 0.03, 6000, 'highpass', 0, 9000); }
+      else if (k === 'yato') { tone(1318, 0.06, 'triangle', 0.035); tone(1975, 0.05, 'sine', 0.02, 0, 0.03); }
+      else if (k === 'wraith') { tone(330, 0.08, 'sawtooth', 0.035, 0.5); noise(0.05, 0.04, 2500, 'bandpass'); }
+      else { tone(1500, 0.035, 'square', 0.03, 0.7); noise(0.03, 0.03, 4000, 'highpass'); }
+    },
     hitConfirm() { if (rl('hc', 45)) { tone(1500, 0.035, 'square', 0.03, 0.7); noise(0.03, 0.03, 4000, 'highpass'); } },
     killConfirm() { tone(392, 0.08, 'square', 0.06, 1.5); tone(784, 0.16, 'triangle', 0.06, 0, 0.07); noise(0.25, 0.05, 600, 'lowpass', 0, 120); },
   };

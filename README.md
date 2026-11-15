@@ -183,6 +183,15 @@
 - **只保留俯视视角**：第三人称视角下线（狙击、迫击等机体在第三人称下优势过大）。
 - **平衡调整**：用 `node tools/balance.js [局数]` 让 AI 随机搭配打几百局，统计每个驾驶员 / 机体的胜率和 K/D，再按数据调整（具体数值见游戏内公告）。机体胜率差距从 34%–62% 缩小到大致 39%–60%，同时改进了近战机体的 AI。
 
+## 1.9 更新 · 排位赛第一赛季「烈士」
+
+- **赛季段位**（`economy.js` 的 `E.RANK`）：10 个段位（`tiers`，`rp` 门槛 0/100/200/300/450/600/800/1000/1400/1800），`E.rankDelta` 算加减分（赢 +10、MVP +20、输 −5、钻石起 −10、败方 MVP 减半），`protect` 段以下不掉段。`E.rankSeason` 在新赛季（`rank.s !== season.id`）把分数减半、清空夺冠之路。
+- **夺冠之路**（`E.RANK.road`）：`applyMatch` 里按分数自动发奖（`rank.road` 记录已领的格子）；新货币 `shards`（传说碎片），`roadSkin` 操作用 20 个兑换赛季传说皮肤 `flag_martyr`。
+- **皮肤品质**（`S.RARE`，1–6）：普通、稀有、史诗、赛季传说、传说、限定传说。皮肤可以带 `entrance`（进场动作，`render3d.js` 的 `entranceTick`，展示台特效 `cpFxSpawn`）和 `bg`（专属背景 / 游戏里的主题粒子）。
+- **MLBB 式选人**（`client.js` 的 `startRanked` / `drNext` / `drTick`）：客户端模拟禁用 + 1-2-2-2-1 选人，AI 有秒选 / 犹豫 / 挂机几种性格；结果通过 `settings.draft` 发给服务器，`core.js` 按顺序给 AI 分配驾驶员、机体和名字。
+- **开局观察界面**（`showObserve`）：非教程对局的倒计时从 3.5 秒加到 6 秒，`startMsg` 带 `cd` / `ranked` / `bans`。
+- **结算评级**（`S.perfScore` / `S.badgesOf`）：MVP / 钻石标（≥75%）/ 黄金标（≥50%）/ 白银标（≥25%）/ 青铜标；新统计 `assists`（倒下前 8 秒内打中过）。`S.mvpOf(result, team)` 可以取任一队的最佳，`matchReward` 里败方 MVP 也算 `mvp`。
+
 ## 1.8 更新 · 夜都决战
 
 - **联动活动**（`economy.js` 的 `E.EVENTS` 里 `yato`）：原创都市咒术风，代币 `talismans`（灵符）、活动任务（奖励里可以直接给 `pilot` / `mech`）、7 天登录奖励（`evLogin` 操作）、灵符商店（`eventShop` 支持 `ev.cur`）、宝石买联动角色（`collabBuy`，`E.COLLAB`）。联动角色不会从宝箱 / 限时购买里出现（`E.noDrop`）。

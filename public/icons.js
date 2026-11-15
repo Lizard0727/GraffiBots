@@ -63,6 +63,8 @@
       <path d="M24,12 C31,12 36,16 36,23 C36,30 31,35 24,35 C17,35 12,30 12,23 C12,16 17,12 24,12 Z" fill="none" stroke="#b9800a" stroke-width="2.6"/>
       <path d="M19,17 L24,23 L29,17 M24,23 L24,31 M19,25 L29,25" fill="none" stroke="${K}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14,15 Q17,10 22,9" stroke="#fff9" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     // 乐园票
+    // 1.9：传说碎片
+    shards: (c = '#ffb43d') => `<path d="M24,3 L36,16 L30,44 L18,44 L12,16 Z" fill="${c}" ${st()}/><path d="M24,3 L24,44 M12,16 L36,16" stroke="#141018" stroke-width="2" opacity=".5"/><path d="M19,12 L22,20" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`,
     // 1.8：灵符（夜都决战代币）/ 咒灵讨伐 / 封印争夺
     talismans: (c = '#b48cff') => `<path d="M15,5 L34,6 L33,43 L14,42 Z" fill="#f4e6c8" ${st()}/><path d="M24,9 L24,38" stroke="${c}" stroke-width="5" stroke-linecap="round"/><path d="M18,15 L30,15 M18,24 L30,24 M19,32 L29,32" stroke="#c8102e" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="24" r="4" fill="${c}" ${st(2)}/>`,
     raid: (c = '#ff2d4b') => `<path d="M8,30 C6,14 16,6 25,6 C35,6 43,14 41,30 C40,40 33,44 24,44 C15,44 9,40 8,30 Z" fill="#3a1a5a" ${st()}/><path d="M14,8 L10,1 M35,8 L39,1" ${st(3.4)}/><circle cx="17" cy="22" r="5" fill="#fff6e8" ${st(2)}/><circle cx="31" cy="20" r="6" fill="#fff6e8" ${st(2)}/><circle cx="24" cy="32" r="4" fill="#fff6e8" ${st(2)}/><circle cx="17" cy="22" r="2.2" fill="${c}"/><circle cx="31" cy="20" r="2.6" fill="${c}"/><circle cx="24" cy="32" r="1.8" fill="${c}"/>`,

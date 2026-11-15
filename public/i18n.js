@@ -16,6 +16,15 @@
   const TIER = { 高级: 'Premium', 免费: 'Free' };
   // 带数字 / 名字的句式（先于片段替换）
   const PATTERNS = [
+    // 1.9
+    [/^排位赛 · 第 (\d+) 赛季$/g, 'Ranked · Season $1'], [/^还剩 (.+) · 下个赛季分数减半$/g, (m, t) => `${tr(t)} left · points are halved next season`],
+    [/^\+(\d+) 分 · $/g, '+$1 · '], [/^ \+(\d+) 分$/g, ' +$1'], [/^ (-?\d+) 分（(.+)起 (-?\d+) 分）· 输了拿到 MVP 只扣一半$/g, (m, a, t, b) => ` ${a} (${b} from ${tr(t)}) · MVP on a loss only loses half`],
+    [/^金币和通行证经验 ×([\d.]+)$/g, 'Coins and pass XP ×$1'], [/^再拿 (\d+) 分升到「(.+)」 · 本赛季 (\d+) 局$/g, (m, a, t, n) => `${a} more to reach ${tr(t)} · ${n} matches this season`],
+    [/^已经是最高段位 · 本赛季 (\d+) 局$/g, 'Already at the top tier · $1 matches this season'],
+    [/^每 (\d+) 小时轮换 · (.+) 后换成「(.+)」$/g, (m, h, t, n) => `Rotates every ${h}h · ${tr(n)} in ${tr(t)}`],
+    [/^(.+)的服装 · (.+)$/g, (m, p, r) => `${tr(p)} outfit · ${tr(r)}`], [/^(.+)还没有禁用阶段$/g, (m, t) => `No ban phase at ${tr(t)}`],
+    [/^表现评分 (\d+)$/g, 'Performance $1'], [/^夺冠之路 · (\d+) 分$/g, 'Road to Glory · $1 pts'], [/^排位赛 · (\d+) 个传说碎片兑换$/g, 'Ranked · exchange $1 Legend Shards'],
+    [/^传说碎片不够（需要 (\d+) 个）$/g, 'Not enough Legend Shards (need $1)'], [/^(\d+) 分$/g, '$1 pts'],
     [/^组队中 (\d+)\/(\d+)$/g, 'In party $1/$2'],
     [/^(\d+) 人 · 在线 (\d+) 人$/g, '$1 friends · $2 online'],
     [/^邀请你一起玩「(.+)」$/g, (m, t) => `invites you to play ${tr(t)}`],

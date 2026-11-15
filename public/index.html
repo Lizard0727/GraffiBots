@@ -213,8 +213,8 @@
       </div>
     </section>
     <section id="ov-ranked" class="ov hidden">
-      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>排位赛</h2><small>4 对 4 单排：赢了加分、输了扣分，段位越高奖励越丰厚。黄金段位开始有禁用阶段</small></header>
-      <div class="ov-body narrow"><div id="rankBody"></div></div>
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>排位赛</h2><small>第一赛季「烈士」：打到指定段位领取夺冠之路奖励，钻石起有禁用阶段</small></header>
+      <div class="ov-body"><div id="rankBody" class="rank-page"></div></div>
     </section>
     <section id="ov-draft" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2 id="draftTitle">禁用阶段</h2><small id="draftSub">双方各禁用两个驾驶员 / 机体，被禁用的这一局谁都不能用</small></header>
@@ -323,6 +323,7 @@
         <h1 id="resTitle"></h1>
         <div id="resSub" class="sub"></div>
         <div id="resScore" class="score"></div>
+        <div id="resBadge" class="r-badge hidden"></div>
       </header>
       <div class="r-body">
         <div class="r-stage" id="resStage">
@@ -349,6 +350,7 @@
   </div>
 
   <div id="vsSplash" class="vs-splash hidden"></div>
+  <div id="observe" class="observe hidden"></div>
   <div id="netLost" class="net-lost hidden" data-noi18n></div>
   <div id="trailer" class="trailer hidden">
     <div id="trStage" class="tr-stage"></div>

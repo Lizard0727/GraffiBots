@@ -1722,6 +1722,8 @@
     academy:  { top: '#1d2140', inner: '#8a6bff', pants: '#1d2140', shoes: '#14151d', sleeve: 'long', coat: true, gakuran: '#d8b25a' },
     academyH: { top: '#16141c', inner: '#ff2d4b', pants: '#16141c', shoes: '#2a2430', sleeve: 'long', gakuran: '#c8c8d0', hood: '#16141c' },
     academyW: { top: '#eef0fa', inner: '#8a6bff', pants: '#1d2140', shoes: '#1d2140', sleeve: 'long', coat: true, gakuran: '#d8b25a', haori: '#8a6bff' },
+    // 1.9：排位赛季传说「烈士·不灭战旗」——深色长大衣 + 金扣 + 红色围巾
+    martyr:   { top: '#2a2420', inner: '#c8102e', pants: '#1d1a18', shoes: '#2a2420', sleeve: 'long', coat: true, gakuran: '#ffd35e', scarf: '#c8102e' },
   };
 
   // 随身武器模型：枪口朝 +x，握把在原点
@@ -1969,6 +1971,13 @@
       if (big) arm.add(part(SH.box, M('#ffffff'), 0.5, 1.2, 2.6, 1.6, -5.4, 0));
       arms.push(arm);
     }
+    if (X.has('warbanner')) {   // 背后插着一面金边战旗
+      const fb = new T.Group(); fb.position.set(-3.6, 4, -1.6); fb.rotation.z = 0.12; tb.add(fb);
+      fb.add(part(SH.cylH, M('#3a2a1c'), 0.25, 22, 0.25, 0, 9, 0));
+      fb.add(outlined(rbox(0.4, 7, 9, 0.2), M('#c8102e'), 1, 1, 1, 0, 16, -4.6, 0.6));
+      fb.add(part(SH.box, M('#ffd35e'), 0.5, 7.4, 0.5, 0, 16, -9.1)); fb.add(part(SH.box, M('#ffd35e'), 0.5, 0.5, 9.4, 0, 19.6, -4.6));
+      fb.add(part(SH.sph, basic(0xffe14d), 0.3, 1.2, 1.2, 0.3, 16.5, -4.6));
+    }
     if (X.has('sealband')) { arms[0].add(part(SH.cylH, M('#c8102e'), 1.25, 0.9, 1.25, 0, -1.6, 0)); arms[0].add(part(SH.box, M('#f4e6c8'), 0.5, 1.4, 1.0, 1.2, -1.6, 0)); }
     if (pid === 'aka') for (const y of [-2.4, -3.2, -4.0]) arms[0].add(part(SH.cylH, M('#f4efe6'), 1.12, 0.45, 1.12, 0, y, 0));   // 左臂缠着绷带
     if (X.has('surfboard')) { const sb = outlined(rbox(1.2, 13, 4.6, 0.6), M('#ffffff'), 1, 1, 1, -4.3, 4.6, 0, 1); sb.rotation.z = 0.12; tb.add(sb); tb.add(part(SH.box, M(P.accent), 1.3, 12, 1.2, -4.25, 4.6, 0)); tb.add(part(SH.box, M('#ff8a1f'), 1.3, 1.2, 4.7, -4.25, 9.4, 0)); }
@@ -2092,8 +2101,93 @@
   const ACT_LEN = { hello: 1.1, attack: 1.9, victory: 1.5 };
   const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
   const hump = (t, a, b) => (t <= a || t >= b ? 0 : Math.sin(((t - a) / (b - a)) * Math.PI));
+  // ---------------- 1.9：史诗及以上皮肤的专属进场动作（约 2.6 秒）----------------
+  //   c.enterOff = { x, y, s }：角色整体的平移 / 缩放；特效通过 c.fx(type, ...) 交给宿主（展示台）画
+  const ENTER_LEN = 2.6;
+  function entranceTick(c, a, dt) {
+    const t = a.t, L = c.arms[0], R = c.arms[1], once = (k, at) => { if (t >= at && !a[k]) { a[k] = 1; return true; } return false; };
+    const fx = c.fx || (() => {}), col = c.accent || '#ffffff';
+    const eo = c.enterOff || (c.enterOff = { x: 0, y: 0, s: 1 });
+    eo.x = 0; eo.y = 0; eo.s = 1;
+    switch (a.type) {
+      case 'hammer': {   // 金牌工头：蹲下蓄力 → 高高跳起 → 砸地出金色冲击波 → 叉腰
+        if (t < 0.5) { c.lift = -1.5 * ease(t / 0.5); R.rotation.z = -0.6; L.rotation.z = -0.6; }
+        else if (t < 1.2) { const u = (t - 0.5) / 0.7; c.lift = hump(u, 0, 1) * 14; R.rotation.z = 3 - u; L.rotation.z = 3 - u; L.rotation.x = 0.3; }
+        else { const u = Math.min(1, (t - 1.2) / 0.5); c.lift = -1.2 * (1 - u); R.rotation.z = 0.4; L.rotation.z = 0.4; R.rotation.x = -0.9; L.rotation.x = 0.9; }
+        if (once('s1', 1.2)) { fx('ring', '#ffd35e', 26); fx('ring', '#ffffff', 18); fx('burst', '#ffd35e', 26); }
+        break;
+      }
+      case 'flag': case 'warbanner': {   // 红旗特装 / 烈士·不灭战旗：走进来 → 插下战旗 → 敬礼
+        eo.x = -16 * (1 - ease(t / 0.8));
+        const sp = t < 0.8 ? 1 : 0; for (const lg of c.legs) lg.rotation.z = Math.sin(t * 14) * 0.6 * sp;
+        if (t > 0.8 && t < 1.6) { L.rotation.z = 0.2; L.rotation.x = 0.15 + 2.6 * hump(t, 0.8, 1.6); }
+        if (once('s1', 0.9)) fx('flag', a.type === 'warbanner' ? '#ffd35e' : '#c8102e', a.type === 'warbanner' ? 1.4 : 1);
+        if (once('s2', 1.3)) { fx('ring', a.type === 'warbanner' ? '#ffd35e' : '#ff5a36', 22); fx('burst', a.type === 'warbanner' ? '#ffe14d' : '#ff5a36', 22); }
+        if (t > 1.7) { R.rotation.z = 2.6; R.rotation.x = -1.4; c.head.rotation.x = -0.1; }
+        break;
+      }
+      case 'ice': {   // 冰沙女王：被冰晶包着 → 冰晶炸开 → 张开双手
+        if (once('s0', 0)) fx('crystal', '#bff6ff', 1.0);
+        if (once('s1', 1.0)) { fx('shards', '#dff8ff', 24); fx('ring', '#7af0ff', 24); fx('ring', '#ffffff', 16); }
+        if (t > 1.0) { const u = ease((t - 1.0) / 0.5); L.rotation.x = 0.15 + 1.6 * u; R.rotation.x = -0.12 - 1.6 * u; L.rotation.z = R.rotation.z = 0.3; c.lift = hump(t, 1.0, 1.6) * 3; }
+        else c.lift = 0;
+        break;
+      }
+      case 'sealer': {   // 夜都·封咒师：符纸围着转圈越收越紧 → 紫光炸开 → 双手抱胸
+        if (once('s0', 0)) fx('talismans', '#f4e6c8', 1.2);
+        eo.s = t < 1.2 ? 0.25 + 0.75 * ease(t / 1.2) : 1; c.yawOff = t < 1.2 ? (1 - ease(t / 1.2)) * Math.PI * 4 : 0;
+        if (once('s1', 1.2)) { fx('ring', '#8a6bff', 26); fx('ring', '#d8b25a', 18); fx('burst', '#b48cff', 30); }
+        if (t > 1.3) { L.rotation.z = R.rotation.z = 1.2; L.rotation.x = 0.9; R.rotation.x = -0.9; c.head.rotation.x = 0.08; }
+        break;
+      }
+      case 'wraith': {   // 恶灵觉醒：脚下升起红黑火柱 → 从地底升上来 → 红光炸开 → 弓身狞笑
+        if (once('s0', 0)) fx('pillar', '#ff2d4b', 1.4);
+        eo.y = t < 0.3 ? -32 : t < 1.1 ? -32 * (1 - ease((t - 0.3) / 0.8)) : 0;
+        if (once('s1', 1.1)) { fx('ring', '#ff2d4b', 26); fx('burst', '#ff2d4b', 32); fx('burst', '#3a0a18', 20); }
+        if (t > 1.2) { const u = ease((t - 1.2) / 0.4); c.torso.rotation.z = -0.25 * u; c.lift = -1.5 * u; c.head.rotation.z = 0.2 * u; R.rotation.z = 0.6; R.rotation.x = -0.4 - 0.5 * u; L.rotation.x = 0.6 * u; }
+        break;
+      }
+      case 'dj': {   // 午夜频道：搓碟 + 低音音波 + 最后指天
+        c.head.rotation.x = Math.sin(t * 12) * 0.12; c.lift = Math.abs(Math.sin(t * 6)) * 1.2;
+        R.rotation.z = 1.2; R.rotation.x = -0.6 + Math.sin(t * 18) * 0.35;
+        for (const [k, at] of [['s1', 0.3], ['s2', 0.9], ['s3', 1.5]]) if (once(k, at)) fx('ring', at === 0.9 ? '#ffffff' : col, 20 + at * 6);
+        if (t > 2.0) { L.rotation.z = 0.1; L.rotation.x = 2.8; }
+        break;
+      }
+      case 'surf': {   // 冲浪少年：踩着冲浪板滑进来 → 跳下 → 竖大拇指
+        if (once('s0', 0)) fx('board', '#1fd6ee', 1.1);
+        eo.x = -40 * (1 - ease(Math.min(1, t / 1.0))); c.torso.rotation.z = t < 1 ? 0.25 : 0;
+        L.rotation.x = t < 1 ? 1.2 : L.rotation.x; R.rotation.x = t < 1 ? -1.2 : R.rotation.x;
+        c.lift = 2 + hump(t, 1.0, 1.4) * 6 - (t > 1.4 ? 2 : 0);
+        if (once('s1', 1.4)) fx('burst', '#1fd6ee', 18);
+        if (t > 1.6) { R.rotation.z = 1.6; R.rotation.x = -0.4; }
+        break;
+      }
+      case 'idol': {   // 海滩偶像：转两圈 → 飘出爱心 → 比心眨眼
+        c.yawOff = t < 1.2 ? ease(t / 1.2) * Math.PI * 4 : 0; c.lift = hump(t, 0, 1.2) * 3;
+        if (once('s1', 1.0)) fx('hearts', '#ff6ec4', 10);
+        if (t > 1.2) { L.rotation.z = 0.3; L.rotation.x = 2.4; R.rotation.z = 0.3; R.rotation.x = -2.4; c.head.rotation.z = 0.25; }
+        break;
+      }
+      case 'academy': {   // 夜都·学院生：从天而降 → 落地蹲下，符纸散开 → 站起来
+        eo.y = t < 0.5 ? 40 * (1 - ease(t / 0.5)) : 0;
+        if (once('s1', 0.5)) { fx('papers', '#f4e6c8', 20); fx('ring', col, 20); }
+        c.lift = t > 0.5 && t < 1.0 ? -2.2 * hump(t, 0.5, 1.0) : 0;
+        if (t > 1.1) { R.rotation.z = 1.4; R.rotation.x = -0.2; }
+        break;
+      }
+      case 'moon': {   // 月下符姬：月光照下来 → 慢慢飘落 → 双手合十
+        if (once('s0', 0)) fx('beam', '#ffd35e', 1.6);
+        eo.y = t < 1.4 ? 26 * (1 - ease(t / 1.4)) : 0; eo.s = t < 0.6 ? 0.4 + ease(t / 0.6) * 0.6 : 1;
+        if (once('s1', 1.4)) { fx('crescent', '#ffd35e', 1.2); fx('burst', '#ffe9a8', 16); }
+        if (t > 1.5) { L.rotation.z = R.rotation.z = 1.0; L.rotation.x = 1.15; R.rotation.x = -1.15; }
+        break;
+      }
+    }
+  }
   function charActionTick(c, dt) {
     const a = c.act; a.t += dt;
+    if (a.name === 'enter') { if (a.t >= ENTER_LEN) { c.act = null; if (c.enterOff) { c.enterOff.x = c.enterOff.y = 0; c.enterOff.s = 1; } return; } entranceTick(c, a, dt); return; }
     let name = a.name, t = a.t;
     if (name === 'show') {
       if (t < ACT_LEN.hello) name = 'hello';
@@ -2160,7 +2254,44 @@
       if (t > 0.85) { const p2 = ease((t - 0.85) / 0.2); c.torso.rotation.z = -0.1 * p2; c.head.rotation.z = 0.15 * p2; }
     }
   }
-  function charAction(name) { if (CP.ch) { CP.ch.act = { name: name || 'show', t: 0 }; CP.t0 = performance.now(); } }
+  const skinEntrance = (pilotId) => { const P = S.pilot(pilotId), K = P.skinId && S.skin(P.skinId); return K && K.entrance; };
+  function charAction(name) {
+    if (!CP.ch) return;
+    if (name === 'enter') { const tp = skinEntrance(CP.key.split('|')[0]); if (!tp) return; cpFxClear(); CP.ch.act = { name: 'enter', type: tp, t: 0 }; }
+    else CP.ch.act = { name: name || 'show', t: 0 };
+    CP.t0 = performance.now();
+  }
+  // 展示台上的进场特效（光圈 / 碎片 / 战旗 / 冰晶 / 火柱……）；CP.fx 在 CP 定义处初始化
+  function cpFxClear() { for (const f of CP.fx) CP.scene.remove(f.m); CP.fx = []; }
+  function cpAdd(m, life, update) { CP.scene.add(m); CP.fx.push({ m, t: 0, life, update }); }
+  const add3 = (c, o) => { const m = new T.MeshBasicMaterial(Object.assign({ color: c, transparent: true, depthWrite: false }, o)); return m; };
+  function cpFxSpawn(type, color, k) {
+    if (!CP.scene) return;
+    if (type === 'ring') { const m = new T.Mesh(new T.RingGeometry(0.85, 1, 48), add3(color, { side: T.DoubleSide, blending: T.AdditiveBlending })); m.rotation.x = -Math.PI / 2; m.position.y = 0.3; cpAdd(m, 0.6, (o, u) => { o.scale.setScalar(k * (0.2 + 0.8 * Math.sqrt(u))); o.material.opacity = 1 - u; }); return; }
+    if (type === 'burst' || type === 'shards' || type === 'papers' || type === 'hearts') {
+      for (let i = 0; i < k; i++) {
+        const geo = type === 'shards' ? new T.OctahedronGeometry(0.8) : type === 'papers' ? new T.BoxGeometry(0.15, 1.6, 1) : type === 'hearts' ? new T.SphereGeometry(0.7, 8, 6) : new T.SphereGeometry(0.45, 6, 4);
+        const m = new T.Mesh(geo, add3(color, { blending: type === 'burst' ? T.AdditiveBlending : T.NormalBlending })); const a = Math.random() * 6.28, e = Math.random() * 1.2, v = 14 + Math.random() * 18;
+        const vel = new T.Vector3(Math.cos(a) * Math.cos(e) * v, (type === 'hearts' ? 6 : 10) + Math.sin(e) * v, Math.sin(a) * Math.cos(e) * v); m.position.set(0, type === 'hearts' ? 22 : 12, 0);
+        cpAdd(m, type === 'hearts' ? 1.4 : 0.9, (o, u, dt) => { o.position.addScaledVector(vel, dt); vel.y -= (type === 'hearts' ? -4 : 30) * dt; vel.multiplyScalar(type === 'hearts' ? 0.97 : 0.985); o.rotation.x += dt * 6; o.rotation.y += dt * 4; o.material.opacity = 1 - u; });
+      }
+      return;
+    }
+    if (type === 'flag') {   // 战旗：旗杆从地里升起，旗面展开
+      const g = new T.Group(); g.position.set(-9, 0, -7);
+      g.add(new T.Mesh(new T.CylinderGeometry(0.35, 0.35, 34 * k, 8), add3(0x3a2a1c, { transparent: false }))); g.children[0].position.y = 17 * k;
+      const cloth = new T.Mesh(new T.PlaneGeometry(14 * k, 9 * k), add3(color, { side: T.DoubleSide, transparent: false })); cloth.position.set(7 * k, 29 * k, 0); g.add(cloth);
+      const star = new T.Mesh(new T.CircleGeometry(1.8 * k, 5), add3(color === '#c8102e' ? 0xffe14d : 0xc8102e, { side: T.DoubleSide, transparent: false })); star.position.set(4 * k, 30 * k, 0.05); g.add(star);
+      cpAdd(g, ENTER_LEN + 1.6, (o, u, dt, tt) => { const up = Math.min(1, tt / 0.4); o.position.y = -34 * k * (1 - up); const un = Math.min(1, Math.max(0, (tt - 0.35) / 0.5)); cloth.scale.x = Math.max(0.05, un); cloth.position.x = 7 * k * un; star.scale.setScalar(un); cloth.rotation.y = Math.sin(tt * 5) * 0.12; });
+      return;
+    }
+    if (type === 'crystal') { const m = new T.Mesh(new T.OctahedronGeometry(1), add3(color, { opacity: 0.7 })); m.scale.set(13, 22, 13); m.position.y = 15; cpAdd(m, k, (o, u, dt, tt) => { o.rotation.y = tt * 0.6; o.material.opacity = 0.75 * (u > 0.85 ? (1 - u) / 0.15 : 1); }); return; }
+    if (type === 'talismans') { const g = new T.Group(); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2, tg = new T.Mesh(new T.BoxGeometry(0.2, 4.4, 1.8), add3(color, { transparent: false })); tg.position.set(Math.cos(a) * 16, 14 + (i % 2) * 4, Math.sin(a) * 16); tg.rotation.y = -a; g.add(tg); } cpAdd(g, k, (o, u, dt, tt) => { o.rotation.y = tt * 7; const s2 = 1 - 0.75 * u; o.scale.set(s2, 1, s2); }); return; }
+    if (type === 'pillar') { const m = new T.Mesh(new T.CylinderGeometry(7, 11, 46, 16, 1, true), add3(color, { opacity: 0.55, side: T.DoubleSide, blending: T.AdditiveBlending })); m.position.y = 23; cpAdd(m, k, (o, u, dt, tt) => { o.rotation.y = tt * 3; o.scale.set(1 + Math.sin(tt * 20) * 0.05, Math.min(1, tt * 4), 1); o.material.opacity = 0.55 * (1 - u); }); return; }
+    if (type === 'board') { const m = new T.Mesh(new T.BoxGeometry(18, 0.8, 5), add3(color, { transparent: false })); m.position.y = 0.5; cpAdd(m, k + 0.4, (o, u, dt, tt) => { const x = CP.ch && CP.ch.enterOff ? CP.ch.enterOff.x : 0; o.position.x = tt < 1 ? x : x - (tt - 1) * 30; o.material.opacity = tt > 1 ? 1 - (tt - 1) / 0.4 : 1; o.material.transparent = tt > 1; }); return; }
+    if (type === 'beam') { const m = new T.Mesh(new T.CylinderGeometry(9, 9, 80, 20, 1, true), add3(color, { opacity: 0.3, side: T.DoubleSide, blending: T.AdditiveBlending })); m.position.y = 40; cpAdd(m, k, (o, u) => { o.material.opacity = 0.32 * (u < 0.8 ? 1 : (1 - u) / 0.2); }); return; }
+    if (type === 'crescent') { const m = new T.Mesh(new T.TorusGeometry(12, 0.8, 6, 30, Math.PI * 1.4), add3(color, { blending: T.AdditiveBlending })); m.rotation.x = -Math.PI / 2; m.position.y = 0.6; cpAdd(m, k, (o, u, dt, tt) => { o.rotation.z = tt * 2; o.material.opacity = 1 - u; }); }
+  }
 
   // =====================================================================
   // 机兵模型：双足 + 圆角装甲 + 驾驶舱
@@ -2544,6 +2675,7 @@
         b.rare = ks.reduce((m, k) => Math.max(m, k.rare), 0);
         const top = ks.sort((x, y) => y.rare - x.rare)[0];
         b.skinCol = top ? (top.over ? top.over.accent : top.paint.light) : null;
+        b.theme = top && top.bg || null;
         if (b.rare >= 4) { b.halo = new T.Mesh(new T.RingGeometry(20, 24, 40), basic(b.skinCol, { transparent: true, opacity: 0.55, side: T.DoubleSide, depthWrite: false })); b.halo.rotation.x = -Math.PI / 2; b.root.add(b.halo); }
         W.bots.set(id, b); scene.add(b.root);
       }
@@ -2574,6 +2706,16 @@
         // 皮肤特效：稀有 = 移动拖尾；史诗 = 再加呼吸灯；传说 = 再加环绕光环
         if (b.rare >= 2 && Math.hypot(p.vx || 0, p.vy || 0) > 60) emit(p.x - (p.vx || 0) * 0.03, p.y - (p.vy || 0) * 0.03, z + 10 + Math.random() * 14, b.skinCol, b.rare >= 3 ? 2 : 1, 25, 0.5, { sys: 'pg', size: b.rare >= 3 ? 11 : 8, life: 0.4, grav: 0, drag: 3 });
         if (b.rare >= 4) { const a = now / 260; for (let k = 0; k < 2; k++) { const aa = a + k * Math.PI; emit(p.x + Math.cos(aa) * 24, p.y + Math.sin(aa) * 24, z + 22 + Math.sin(now / 200 + k) * 10, k ? '#ffffff' : b.skinCol, 1, 8, 1, { sys: 'pg', size: 10, life: 0.5, grav: -30, drag: 2 }); } }
+        // 1.9：传说 = 更强的光环 + 往上飘的星光；限定传说 = 主题粒子 + 主题脚印
+        if (b.rare >= 5 && Math.random() < 0.5) emit(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, z + 4, Math.random() < 0.4 ? '#ffffff' : b.skinCol, 1, 12, 1, { sys: 'pg', size: 9, life: 0.7, grav: -110, drag: 2 });
+        if (b.rare >= 6 && b.theme) {
+          const TC = { ice: ['#dff8ff', '#7af0ff'], yato: ['#f4e6c8', '#8a6bff'], wraith: ['#ff2d4b', '#3a0a18'], martyr: ['#ffd35e', '#c8102e'] }[b.theme] || ['#fff', '#fff'];
+          if (b.theme === 'ice' && Math.random() < 0.6) emit(p.x + (Math.random() - 0.5) * 60, p.y + (Math.random() - 0.5) * 60, z + 50 + Math.random() * 20, TC[Math.random() < 0.5 ? 0 : 1], 1, 6, 0, { sys: 'pg', size: 8, life: 1.2, grav: 40, drag: 1 });
+          if (b.theme === 'yato') { const a = now / 330; emit(p.x + Math.cos(a) * 28, p.y + Math.sin(a) * 28, z + 26 + Math.sin(now / 240) * 6, TC[0], 1, 4, 0, { sys: 'pg', size: 10, life: 0.5, grav: 0, drag: 2 }); }
+          if (b.theme === 'wraith' && Math.random() < 0.7) emit(p.x + (Math.random() - 0.5) * 26, p.y + (Math.random() - 0.5) * 26, z + 2, TC[Math.random() < 0.65 ? 0 : 1], 1, 20, 1, { sys: Math.random() < 0.5 ? 'pg' : 'pk', size: 14, life: 0.6, grav: -160, drag: 2 });
+          b.stepAcc = (b.stepAcc || 0) + 0.03;
+          if (Math.hypot(p.vx || 0, p.vy || 0) > 60 && b.stepAcc > 0.15 && (p.z || 0) < (W.M ? S.topAt(W.M, p.x, p.y) : 0) + 2) { b.stepAcc = 0; emit(p.x, p.y, z + 1, TC[0], 1, 0, 0, { sys: 'pg', size: 12, life: 1.1, grav: 0, drag: 8 }); }
+        }
         if (bf & 64) for (let k = 0; k < 2; k++) emit(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, z + 4 + Math.random() * 36, k ? '#b78cff' : '#ffffff', 1, 30, 1, { sys: 'pg', size: 12, life: 0.45, grav: -140, drag: 2 });   // 超载
         if (bf & 128) emit(p.x, p.y, z + 44, '#ff5a36', 1, 20, 0.3, { sys: 'pg', size: 8, life: 0.3, grav: -40 });   // 集结
       }
@@ -2709,7 +2851,7 @@
   }
 
   // ---------------- 驾驶员展示台：转台上的全身 3D 角色（待机 → 走两步 → 开火） ----------------
-  const CP = { yaw: -0.5 };
+  const CP = { yaw: -0.5, fx: [] };
   function cpInit() {
     if (CP.r) return true;
     if (!T) return false;
@@ -2745,7 +2887,10 @@
     CP.scene.add(CP.ch.root); CP.key = key; CP.t0 = performance.now();
     CP.ring.material.color.set(S.pilot(pilotId).accent);
     if (CP.rim) CP.rim.color.set(S.pilot(pilotId).accent);
-    CP.ch.act = { name: 'show', t: 0 };   // 选中驾驶员：播一整套展示动作
+    cpFxClear();
+    CP.ch.accent = S.pilot(pilotId).accent; CP.ch.fx = cpFxSpawn;
+    const tp = skinEntrance(pilotId);
+    CP.ch.act = tp ? { name: 'enter', type: tp, t: 0 } : { name: 'show', t: 0 };   // 史诗以上皮肤：先播专属进场动作；否则播一整套展示动作
   }
   function cpSize(w, h) {
     CP.r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); CP.r.setSize(w, h, false);
@@ -2778,6 +2923,9 @@
     if (CP.ch.act) CP.yaw += wrapA(front - CP.yaw) * Math.min(1, dt * 5);
     animateChar(CP.ch, { a: face, vx: Math.cos(face) * sp, vy: Math.sin(face) * sp }, dt, sp, { fire });
     CP.ch.root.rotation.y = -face + CP.ch.yawOff;
+    const eo = CP.ch.enterOff;   // 1.9：进场动作的位移 / 缩放
+    CP.ch.root.position.set(eo ? eo.x * Math.cos(face) : 0, eo ? eo.y : 0, eo ? -eo.x * Math.sin(face) : 0); CP.ch.root.scale.setScalar(eo ? eo.s : 1);
+    for (let i = CP.fx.length - 1; i >= 0; i--) { const f = CP.fx[i]; f.t += dt; f.update(f.m, Math.min(1, f.t / f.life), dt, f.t); if (f.t >= f.life) { CP.scene.remove(f.m); CP.fx.splice(i, 1); } }
     CP.r.render(CP.scene, CP.cam);
   }
 

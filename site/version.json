@@ -1,26 +1,26 @@
 {
-  "version": "1.8",
+  "version": "1.9",
   "date": "2026-11-15",
-  "title": "1.8 更新 · 夜都决战",
-  "en_title": "Update 1.8 · Night City Showdown",
+  "title": "1.9 更新 · 排位赛第一赛季「烈士」",
+  "en_title": "Update 1.9 · Ranked Season 1 “Martyr”",
   "page": "#updates",
   "force": true,
   "notes": [
-    "联动活动「夜都决战」（14 天）",
-    "新驾驶员",
-    "新机体",
-    "联动皮肤（都带约 20 秒的 3D 战斗动画）",
-    "限时玩法",
-    "修复",
+    "排位赛第一赛季「烈士」",
+    "夺冠之路",
+    "MLBB 式禁用 / 选人",
+    "开局观察界面",
+    "皮肤品质重做",
+    "结算评级",
     "更新奖励"
   ],
   "en_notes": [
-    "Collab event: Night City Showdown (14 days)",
-    "New pilots",
-    "New mechs",
-    "Collab skins (each with a ~20-second 3D battle trailer)",
-    "Limited modes",
-    "Fixes",
-    "Update rewards"
+    "Ranked Season 1 “Martyr”",
+    "Road to Glory",
+    "MLBB-style bans and picks",
+    "Pre-match scouting screen",
+    "Skin rarity rework",
+    "Match ratings",
+    "Update reward"
   ]
 }

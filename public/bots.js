@@ -31,14 +31,17 @@
   B.MIX = {
     low:  [36, 8, 3, 40, 9, 2, 2],
     high: [20, 6, 3, 36, 26, 5, 4],
-    rank: [
-      [34, 9, 3, 42, 9, 2, 1],      // 青铜
-      [28, 8, 3, 42, 14, 3, 2],     // 白银
-      [22, 7, 3, 40, 21, 4, 3],     // 黄金
-      [16, 6, 2, 38, 28, 6, 4],     // 铂金
-      [11, 5, 2, 35, 34, 8, 5],     // 钻石
-      [7, 4, 2, 31, 39, 10, 7],     // 大师
-      [4, 3, 1, 27, 43, 12, 10],    // 传奇
+    rank: [   // 1.9：10 个段位（铜铁 → 终末传说）
+      [36, 9, 3, 42, 7, 2, 1],      // 铜铁
+      [32, 9, 3, 42, 10, 2, 2],     // 白铁
+      [28, 8, 3, 42, 14, 3, 2],     // 黄铁
+      [22, 7, 3, 40, 21, 4, 3],     // 白金
+      [17, 6, 2, 38, 27, 6, 4],     // 黄金
+      [12, 5, 2, 35, 33, 8, 5],     // 钻石
+      [8, 4, 2, 31, 38, 10, 7],     // 星耀
+      [5, 3, 1, 28, 42, 12, 9],     // 荣誉传说
+      [3, 3, 1, 25, 44, 13, 11],    // 至尊传说
+      [2, 2, 1, 22, 45, 15, 13],    // 终末传说
     ],
   };
   B.MAX_LV = 11;
@@ -95,7 +98,7 @@
   // 外观：越强的性格越可能穿稀有皮肤；段位框只在高段位出现
   B.looks = (S, pilot, persona, tier) => {
     const P = B.persona(persona), L = {};
-    const own = (k) => k.price > 0 || k.pass || (k.event && Math.random() < 0.5) || (k.rank === 'master' && tier >= 5);
+    const own = (k) => k.price > 0 || k.pass || (k.event && Math.random() < 0.5) || (k.rank === 'master' && tier >= 6) || (k.road && tier >= 4 && Math.random() < 0.6) || (k.shards && tier >= 7 && Math.random() < 0.5);
     const choose = (kind, extra) => { const list = S.SKINS.filter((k) => k.kind === kind && (!extra || extra(k)) && own(k)); return list.length ? pick(list).id : ''; };
     if (Math.random() < P.skin) L.pskin = choose('pilot', (k) => k.pilot === pilot);
     if (Math.random() < P.skin * 0.8) L.paint = choose('mech');

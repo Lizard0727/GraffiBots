@@ -17,6 +17,7 @@
     parts: { name: '零件', short: '零件', color: '#7af0ff' },
     crystals: { name: '能量结晶', short: '结晶', color: '#b78cff' },
     tickets: { name: '乐园票', short: '乐园票', color: '#ff6ec4' },   // 乐园祭活动代币
+    shards: { name: '传说碎片', short: '碎片', color: '#ffb43d' },   // 1.9：夺冠之路（荣誉传说起），20 个换赛季传说皮肤
     talismans: { name: '灵符', short: '灵符', color: '#b48cff' },   // 1.8：夜都决战活动代币
   };
   // 常驻角色：新手宝箱从这 5 位里给 1 位
@@ -99,20 +100,45 @@
     steps: [['loot', 1, RW('gems', 60)], ['lootex', 1, RW('coins', 1000)], ['lootv', 8000, RW('gems', 120)], ['lootex', 5, RC('strike')], ['lootgold', 1, RW('gems', 150)], ['loothi', 1, RW('crystals', 1)], ['lootv', 60000, RC('airdrop')]] };
   E.TASKLINE_ORDER = ['rookie', 'loot', 'strike'];
   // ---------------- 排位赛：段位、分数、段位奖励 ----------------
+  // 1.9：排位赛第一赛季「烈士」——10 个段位；每个赛季开始时分数减半
+  //   铁段每段 100 分、金段每段 150 分、钻石 / 星耀每段 200 分、传说段每段 400 分
+  //   赢 +10（MVP +20）；输 -5（钻石起 -10）；输了但拿到 MVP 只扣一半；钻石起有禁用阶段
   E.RANK = {
     need: { pilots: 3, mechs: 3 },   // 至少拥有 3 位驾驶员和 3 台机体
-    banFrom: 2,                       // 从黄金段位开始有禁用阶段
-    win: 24, draw: 4, loss: -14, mvp: 6, protect: 1,   // 青铜 / 白银掉分不会掉段
+    season: { id: 1, name: '烈士', en: 'MARTYR', start: Date.UTC(2026, 10, 15), end: Date.UTC(2027, 0, 31) },
+    banFrom: 5,                       // 从钻石开始有禁用阶段
+    win: 10, mvpWin: 20, draw: 0, loss: -5, lossHi: -10, hiFrom: 5, protect: 2,   // 铁段掉分不会掉段
     coinMul: 1.5, passMul: 1.5,
     tiers: [
-      { id: 'bronze', name: '青铜', rp: 0, color: '#c8814a' },
-      { id: 'silver', name: '白银', rp: 100, color: '#c9d3dc', reward: RW('gems', 80) },
-      { id: 'gold', name: '黄金', rp: 250, color: '#ffd23f', reward: RC('strike') },
-      { id: 'plat', name: '铂金', rp: 450, color: '#5fe8d0', reward: RC('airdrop') },
-      { id: 'diamond', name: '钻石', rp: 700, color: '#7ab8ff', reward: RW('crystals', 2) },
-      { id: 'master', name: '大师', rp: 1000, color: '#b06bff', reward: RS('fr_master') },
-      { id: 'legend', name: '传奇', rp: 1400, color: '#ff3b52', reward: RW('gems', 500) },
+      { id: 'iron1', name: '铜铁', rp: 0, color: '#b87333' },
+      { id: 'iron2', name: '白铁', rp: 100, color: '#c9d3dc' },
+      { id: 'iron3', name: '黄铁', rp: 200, color: '#d9b44a' },
+      { id: 'plat', name: '白金', rp: 300, color: '#5fe8d0' },
+      { id: 'gold', name: '黄金', rp: 450, color: '#ffd23f' },
+      { id: 'diamond', name: '钻石', rp: 600, color: '#7ab8ff' },
+      { id: 'star', name: '星耀', rp: 800, color: '#b06bff' },
+      { id: 'honor', name: '荣誉传说', rp: 1000, color: '#ff8a1f', legend: 1 },
+      { id: 'supreme', name: '至尊传说', rp: 1400, color: '#ff3b52', legend: 1 },
+      { id: 'final', name: '终末传说', rp: 1800, color: '#ffe14d', legend: 1 },
     ],
+    // 夺冠之路：打到指定分数自动领奖；荣誉传说起每 200 分给 5 个传说碎片，20 个碎片兑换赛季传说皮肤
+    road: [[100, RW('gems', 80)], [200, RC('military')], [300, RC('strike')], [450, RS('blaze_martyr')], [600, RC('airdrop')], [800, RW('crystals', 2)],
+      [1000, RW('shards', 5)], [1200, RW('shards', 5)], [1400, RW('shards', 5)], [1600, RW('shards', 5)], [1800, RS('fr_final')]],
+    legendSkin: 'flag_martyr', shardsNeed: 20,
+  };
+  // 赛季切换：分数减半，夺冠之路重新开始
+  E.rankSeason = (o) => {
+    const R = E.RANK, rk = o.rank || (o.rank = { rp: 0, best: 0, got: [], n: 0 });
+    if (rk.s === R.season.id) return false;
+    rk.rp = Math.floor((rk.rp || 0) / 2); rk.road = []; rk.n = 0; rk.best = E.rankTier(rk.rp); rk.s = R.season.id;
+    return true;
+  };
+  E.rankDelta = (rw, rp0) => {
+    const R = E.RANK, t0 = E.rankTier(rp0);
+    if (rw.won) return rw.mvp ? R.mvpWin : R.win;
+    if (rw.draw) return R.draw;
+    const d = t0 >= R.hiFrom ? R.lossHi : R.loss;
+    return rw.mvp ? Math.trunc(d / 2) : d;   // 输了但拿到 MVP：只扣一半
   };
   E.rankTier = (rp) => { let i = 0; E.RANK.tiers.forEach((t, k) => { if ((rp || 0) >= t.rp) i = k; }); return i; };
   E.canRanked = (o) => Object.keys(o.pilots || {}).length >= E.RANK.need.pilots && (o.mechs || []).length >= E.RANK.need.mechs;
@@ -153,10 +179,11 @@
     return bans;
   };
   E.BAN_WHY = { mine: '你的选择', counter: '克制你的{v}', meta: '当前强度最高', ace: '针对你的王牌驾驶员', yours: '你拥有的强势机体' };
-  E.rankBotPower = (tier) => ({ lv: Math.min(11, 3 + tier + (tier >= 4 ? 1 : 0)), bt: tier >= 5 ? 2 : tier >= 2 ? 1 : 0 });   // AI 强度跟着段位
+  E.rankBotPower = (tier) => ({ lv: Math.min(11, 3 + tier), bt: tier >= 6 ? 2 : tier >= 3 ? 1 : 0 });   // AI 强度跟着段位
   // ---------------- 信箱（系统邮件：版本补偿 / 活动礼包） ----------------
   E.MAILS = [
     { id: 'v15', t: Date.UTC(2026, 10, 14, 4), from: '灰城反抗军指挥部', title: '1.5 更新礼包', body: '1.5 版本上线啦：点驾驶员和机体就能进入全新的角色页面，画面更精致，所有角色和机体都重新调整了平衡。这份更新礼包请收下！', items: [RW('gems', 150), RC('hero'), RW('coins', 1500)] },
+    { id: 'v19', t: Date.UTC(2026, 10, 15, 8), from: '排位赛委员会', title: '1.9 更新礼包 · 烈士赛季', body: '排位赛第一赛季「烈士」开打！全新的排位赛界面、夺冠之路、MLBB 式禁用选人、开局观察界面、皮肤品质重做和结算评级都上线了。这份礼包请收下，祝你一路打到终末传说！', items: [RW('gems', 100), RC('strike'), RW('shards', 5)] },
     { id: 'v18', t: Date.UTC(2026, 10, 15, 6), from: '夜都术师学院', title: '1.8 更新礼包 · 夜都决战', body: '午夜的夜都，咒灵从地铁站里涌了出来！联动活动「夜都决战」开幕：新驾驶员符零和赤镰、结界机兵和灵刃机兵、限时玩法「咒灵讨伐」「封印争夺」都上线了。这些灵符请收下，去活动商店看看联动皮肤吧！', items: [RW('talismans', 150), RW('gems', 100), RC('military')] },
     { id: 'v17', t: Date.UTC(2026, 10, 15, 5), from: '灰城反抗军指挥部', title: '1.7 更新礼包', body: '好友系统和组队开黑上线了！把你的好友码发给朋友，拉上他们一起打——所有模式都能组队，排位赛也行。人不够就让 AI 队友补位。', items: [RW('gems', 100), RW('coins', 1500), RC('military')] },
     { id: 'v16', t: Date.UTC(2026, 10, 15, 2), from: '灰城反抗军指挥部', title: '1.6 更新礼包', body: '全新玩法「搜刮撤离」上线！进入两张超大地图搜刮物资、和其他小队争夺，活着撤离就能把物资带回仓库。送你几件装备，去高危行动碰碰运气吧！', items: [RW('gems', 150), RW('coins', 2000), RC('military')] },
@@ -257,7 +284,7 @@
       talents: [], tal: [], tpBonus: 0,
       pass: { s: 1, xp: 0, prem: false, cf: [], cp: [] }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
       skins: [], wear: {}, mailGot: [], mailDel: [], stash: {}, gear: {}, gearOn: [], lootRec: { runs: 0, ex: 0, best: 0, total: 0, gold: 0, wk: 0, wbest: 0 }, ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
-      tl: {}, rank: { rp: 0, best: 0, got: [], n: 0 }, streak: 0, bestStreak: 0,
+      tl: {}, rank: { rp: 0, best: 0, got: [], n: 0, road: [], s: E.RANK.season.id }, streak: 0, bestStreak: 0,
     }, E.START);
   };
   // 读取任意来源的资料：旧版本直接重置成新手号；字段做类型和范围检查
@@ -265,7 +292,7 @@
     if (!p || typeof p !== 'object' || p.v !== E.VERSION) return E.newProfile(name != null ? name : p && typeof p.name === 'string' ? p.name : '');
     const o = E.newProfile(typeof p.name === 'string' ? p.name : name || '');
     o.tut = p.tut ? 1 : 0;
-    for (const k of ['coins', 'gems', 'parts', 'crystals', 'tickets', 'talismans', 'trophies', 'xp', 'matches', 'wins', 'kills', 'paint', 'day', 'dayWin', 'tpBonus', 'streak', 'bestStreak']) o[k] = int(p[k], 0, 1e9);
+    for (const k of ['coins', 'gems', 'parts', 'crystals', 'tickets', 'talismans', 'shards', 'trophies', 'xp', 'matches', 'wins', 'kills', 'paint', 'day', 'dayWin', 'tpBonus', 'streak', 'bestStreak']) o[k] = int(p[k], 0, 1e9);
     // 天赋：只保留按顺序点亮的（同一支必须先点前一级）
     const want = new Set(Array.isArray(p.talents) ? p.talents : []);
     o.talents = S.TALENTS.filter((t) => want.has(t.id)).filter((t, _, arr) => t.tier === 1 || arr.some((u) => u.br === t.br && u.tier === t.tier - 1)).map((t) => t.id);
@@ -305,7 +332,9 @@
     if (p.ev && typeof p.ev === 'object') for (const ev of E.EVENTS) { const q = p.ev[ev.id]; if (q) o.ev[ev.id] = { p: ev.quests.map((_, i) => int(Array.isArray(q.p) ? q.p[i] : 0, 0, 1e7)), c: ev.quests.map((_, i) => !!(Array.isArray(q.c) && q.c[i])), s: (ev.shop || []).map((_, i) => int(Array.isArray(q.s) ? q.s[i] : 0, 0, 999)) }; }
     o.tl = {};
     if (p.tl && typeof p.tl === 'object') for (const id of Object.keys(E.TASKLINES)) { const q = p.tl[id], L = E.TASKLINES[id]; if (q) o.tl[id] = { p: L.steps.map((_, i) => int(Array.isArray(q.p) ? q.p[i] : 0, 0, 1e7)), c: L.steps.map((_, i) => !!(Array.isArray(q.c) && q.c[i])) }; }
-    if (p.rank && typeof p.rank === 'object') { const rp = int(p.rank.rp, 0, 1e6); o.rank = { rp, best: Math.max(E.rankTier(rp), int(p.rank.best, 0, E.RANK.tiers.length - 1)), got: (Array.isArray(p.rank.got) ? p.rank.got : []).filter((n) => Number.isInteger(n) && n > 0 && n < E.RANK.tiers.length), n: int(p.rank.n, 0, 1e7) }; }
+    if (p.rank && typeof p.rank === 'object') { const rp = int(p.rank.rp, 0, 1e6); o.rank = { rp, best: Math.max(E.rankTier(rp), int(p.rank.best, 0, E.RANK.tiers.length - 1)), got: (Array.isArray(p.rank.got) ? p.rank.got : []).filter((n) => Number.isInteger(n) && n > 0 && n < E.RANK.tiers.length), n: int(p.rank.n, 0, 1e7),
+      road: [...new Set((Array.isArray(p.rank.road) ? p.rank.road : []).filter((n) => Number.isInteger(n) && n >= 0 && n < E.RANK.road.length))], s: Number.isInteger(p.rank.s) ? p.rank.s : 0 }; }
+    E.rankSeason(o);   // 1.9：新赛季分数减半
     if (p.story && typeof p.story === 'object') o.story = { p: E.STORY.steps.map((_, i) => int(Array.isArray(p.story.p) ? p.story.p[i] : 0, 0, 1e7)), c: (Array.isArray(p.story.c) ? p.story.c : []).filter((n) => E.STORY.rewards.some((r) => r[0] === n)) };
     o.chests = {};
     if (p.chests && typeof p.chests === 'object') for (const c in E.CHESTS) { const n = int(p.chests[c], 0, 999); if (n) o.chests[c] = n; }
@@ -624,6 +653,14 @@
         grant(o, [it]);
         return { ok: true, items: [it], spent: { [cur]: item.cost } };
       }
+      case 'roadSkin': {   // 1.9：20 个传说碎片兑换赛季传说皮肤
+        const R = E.RANK, K = S.skin(R.legendSkin);
+        if (!K) return no('没有这个皮肤');
+        if (o.skins.includes(K.id)) return no('已经拥有了');
+        if ((o.shards || 0) < R.shardsNeed) return no(`传说碎片不够（需要 ${R.shardsNeed} 个）`);
+        o.shards -= R.shardsNeed; o.skins.push(K.id);
+        return { ok: true, items: [{ k: 'skin', id: K.id }], spent: { shards: R.shardsNeed } };
+      }
       case 'evLogin': {   // 1.8：活动登录奖励（每天领一次，共 7 天）
         const ev = E.activeEvents(a.now).find((x) => x.id === a.id);
         if (!ev || !ev.login) return no('活动已经结束了');
@@ -687,14 +724,14 @@
     // 排位赛：段位分
     let rankInfo = null;
     if (rw.ranked) {
+      E.rankSeason(o);
       const rp0 = o.rank.rp, t0 = E.rankTier(rp0);
-      let d = rw.won ? R.win : rw.draw ? R.draw : R.loss;
-      if (rw.mvp) d += R.mvp;
-      let rp1 = Math.max(0, rp0 + d);
-      if (!rw.won && !rw.draw && t0 <= R.protect) rp1 = Math.max(rp1, R.tiers[t0].rp);   // 低段位掉分不掉段
+      let rp1 = Math.max(0, rp0 + E.rankDelta(rw, rp0));
+      if (!rw.won && !rw.draw && t0 <= R.protect) rp1 = Math.max(rp1, R.tiers[t0].rp);   // 铁段掉分不掉段
       o.rank.rp = rp1; o.rank.n = (o.rank.n || 0) + 1;
       const t1 = E.rankTier(rp1);
-      for (let t = 1; t <= t1; t++) if (!o.rank.got.includes(t) && R.tiers[t].reward) { o.rank.got.push(t); items.push(Object.assign({}, R.tiers[t].reward, { why: `首次到达${R.tiers[t].name}` })); }
+      if (!Array.isArray(o.rank.road)) o.rank.road = [];
+      R.road.forEach(([need, it], i) => { if (rp1 >= need && !o.rank.road.includes(i)) { o.rank.road.push(i); if (!(it.k === 'skin' && o.skins.includes(it.id))) items.push(Object.assign({}, it, { why: `夺冠之路 · ${need} 分` })); } });
       o.rank.best = Math.max(o.rank.best || 0, t1);
       rankInfo = { rp0, rp1, d: rp1 - rp0, t0, t1 };
     }

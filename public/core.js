@@ -249,7 +249,7 @@ class Game {
     this.risk = this.loot && st.risk === 'high' ? 'high' : 'normal';
     if (this.loot) st = Object.assign({}, st, { duration: S.LOOT.duration });
     this.duration = st.duration; this.timeLeft = st.duration;
-    this.countdown = 3.5; this.time = 0; this.tick = 0; this.over = false;
+    this.countdown = st.tutorial ? 3.5 : 6; this.time = 0;   // 1.9：开局多给 2.5 秒看观察界面 this.tick = 0; this.over = false;
     this.players = new Map(); this.projs = []; this.bombs = []; this.missiles = []; this.shells = []; this.helpers = [];
     this.reveal = new Array(this.teams + 1).fill(0);   // 全队扫描（义眼扫描）结束时间
     this.nextId = 1; this.diff = []; this.events = [];
@@ -301,14 +301,17 @@ class Game {
       const tier = this.ranked && Number.isInteger(st.rankTier) ? st.rankTier : null;
       const personas = usePersona ? BOTS.assign(slotList, tier, hTeams, avgLv) : slotList.map(() => 'decent');
       const names = usePersona ? BOTS.nicks(slotList.length, st.lang) : BOT_NAMES.slice().sort(() => Math.random() - 0.5);
+      const dIdx = { 1: 0, 2: 0 };
       slotList.forEach(({ team }, i) => {
         bi++;
-        const pp = free.shift();
-        const okP = S.PILOTS.filter((x) => !bannedP.has(x.id)), pil = pp || okP[randInt(okP.length)] || S.PILOTS[0];
+        const dr = st.draft && st.draft[team] && st.draft[team][dIdx[team]++];   // 1.9：排位赛选人阶段选好的组合
+        const pp = dr ? null : free.shift();
+        const okP = S.PILOTS.filter((x) => !bannedP.has(x.id)), pil = dr ? S.pilot(dr.pilot) : pp || okP[randInt(okP.length)] || S.PILOTS[0];
         const P = BOTS.persona(personas[i]);
         const pw = usePersona && !this.fair ? Object.assign({}, botPw, { lv: clamp(botPw.lv + P.lv, 1, E.MAX_LV) }) : botPw;
         // 驾驶员和机体分开选：一半用擅长机体，一半随机
-        const pl = this.addPlayer(-bi, usePersona ? names[i] : pp ? pp.name : names[bi % names.length], team, Math.random() < 0.5 && !bannedM.has(pil.weapon) ? pil.weapon : mechPool[randInt(mechPool.length)],
+        const wpn = dr ? dr.mech : Math.random() < 0.5 && !bannedM.has(pil.weapon) ? pil.weapon : mechPool[randInt(mechPool.length)];
+        const pl = this.addPlayer(-bi, dr && dr.name ? dr.name : usePersona ? names[i] : pp ? pp.name : names[bi % names.length], team, wpn,
           S.HEADS[randInt(S.HEADS.length)].id, true, slots[team]++, pil.id, pw);
         pl.persona = usePersona ? personas[i] : null;
         if (usePersona) { pl.looks = BOTS.looks(S, pl.pilot, pl.persona, tier == null ? 2 : tier); pl.chatty = Math.random() < 0.7 ? P.chat * rand(0.4, 1.6) : 0; }
@@ -367,7 +370,7 @@ class Game {
       quakeT: 0, quakeArm: 0,
       input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, qq: 0, gq: 0, aq: 0, oq: 0, ad: 200 },
       lastQq: 0, lastGq: 0, lastAq: 0, sync: 0, lastPosT: 0, hitCd: {},
-      stats: { kills: 0, deaths: 0, paint: 0, obj: 0, balloons: 0, float: 0, seals: 0, spirits: 0 },
+      stats: { kills: 0, deaths: 0, paint: 0, obj: 0, assists: 0, balloons: 0, float: 0, seals: 0, spirits: 0 },
       bag: [], bagCap: S.LOOT.bag, exT: 0, extracted: false, pickT: 0,
     };
     this.players.set(id, p);
@@ -414,7 +417,7 @@ class Game {
     return {
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
       players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null, npc: p.npc ? 1 : 0, boss: p.boss ? 1 : 0, spirit: p.spirit ? 1 : 0 })),
-      fair: this.fair, teams: this.teams, risk: this.loot ? this.risk : undefined, squad: this.squad,
+      fair: this.fair, teams: this.teams, cd: Math.round(this.countdown * 10) / 10, ranked: this.ranked ? 1 : 0, bans: this.ranked ? this.bans : undefined, tutorial: this.tutorial ? 1 : 0, risk: this.loot ? this.risk : undefined, squad: this.squad,
       loot: this.loot ? this.lootList() : undefined,
     };
   }
@@ -1108,6 +1111,7 @@ class Game {
     if (tOV && tOV.undying) dmg = Math.min(dmg, Math.max(0, t.hp - 1));         // 秦岳超载：老兵不死
     if (t.tal && t.tal.has('d5') && !t.foot && !t.d5used && dmg >= t.hp) { dmg = Math.max(0, t.hp - 1); t.d5used = true; t.invulnT = 1.5; this.ev(['blk', t.id]); }   // 天赋：不屈装甲
     t.hp -= dmg; t.lastHurt = this.time;
+    if (by && by !== t && by.team !== t.team) (t.hitBy || (t.hitBy = {}))[by.id] = this.time;   // 1.9：助攻——8 秒内打过它的人
     if (by && by !== t && by.team !== t.team && by.alive && this.players.has(by.id)) {   // 1.8：赤镰吸血（恶灵附身 / 灵化爆发）
       const bo2 = by.ovT > 0 ? S.OVERLOADS[by.pilot] : null;
       const heal = (by.possT > 0 ? dmg * 0.35 : 0) + (bo2 && bo2.hitHeal ? bo2.hitHeal : 0);
@@ -1126,6 +1130,7 @@ class Game {
   onTakedown(by, t) {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
+    if (t && t.hitBy) { for (const id in t.hitBy) { const q = this.players.get(+id); if (q && q !== by && q.team !== t.team && this.time - t.hitBy[id] < 8) q.stats.assists++; } t.hitBy = null; }
     if (this.chat && t) this.chat.onKill(by, t);
     if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 60, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
     if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.4);
@@ -2689,6 +2694,12 @@ class Room {
       s.bans = { pilots: pick(m.bans.pilots, (id) => S.PILOTS.some((P) => P.id === id)), mechs: pick(m.bans.mechs, (id) => !!S.WEAPONS[id]) };
     }
     if (m.botPower === null) delete s.botPower;
+    if (m.draft === null) delete s.draft;
+    if (m.draft && typeof m.draft === 'object') {   // 1.9：排位赛选人结果（AI 的驾驶员 / 机体 / 名字，按选人顺序）
+      const one = (x) => x && typeof x === 'object' && S.PILOTS.some((P) => P.id === x.pilot) && S.WEAPONS[x.mech] ? { pilot: x.pilot, mech: x.mech, name: sanitizeName(x.name) } : null;
+      s.draft = {};
+      for (const t of [1, 2]) s.draft[t] = (Array.isArray(m.draft[t]) ? m.draft[t] : []).slice(0, 4).map(one).filter(Boolean);
+    }
     if (m.rankTier === null) delete s.rankTier;
     if (m.botPower && typeof m.botPower === 'object') s.botPower = { lv: Math.max(1, Math.min(11, m.botPower.lv | 0)), bt: Math.max(0, Math.min(2, m.botPower.bt | 0)) };
     if (Number.isInteger(m.rankTier) && m.rankTier >= 0 && m.rankTier < E.RANK.tiers.length) s.rankTier = m.rankTier;   // AI 性格按段位混合

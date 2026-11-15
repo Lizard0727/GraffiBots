@@ -357,6 +357,7 @@
       s += `<path d="M154,40 L160,30 M168,34 L168,24" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.5"/>`;
     }
     const X = P.extra || [];
+    if (X.includes('warbanner')) s += `<path d="M330,40 L334,330" stroke="#3a2a1c" stroke-width="7"/><path d="M334,48 L392,62 L384,120 L334,112 Z" fill="#c8102e" ${ol(2.6)}/><path d="M334,48 L392,62" stroke="#ffd35e" stroke-width="5"/><path d="M356,78 l4,8 l9,1 l-7,6 l2,9 l-8,-5 l-8,5 l2,-9 l-7,-6 l9,-1 Z" fill="#ffe14d"/>`;
     if (X.includes('moonpin')) s += `<path d="M118,112 A22,22 0 1,0 150,84 A16,16 0 1,1 118,112 Z" fill="#ffd35e" ${ol(2.4)}/>`;
     if (X.includes('talismans')) for (const [x, y, r] of [[78, 150, -14], [326, 136, 12], [64, 268, -8], [340, 260, 10], [110, 70, -22]]) s += `<g transform="rotate(${r} ${x} ${y})"><rect x="${x - 11}" y="${y - 30}" width="22" height="60" rx="2" fill="#f4e6c8" ${ol(2)} opacity="0.95"/><path d="M${x},${y - 24} L${x},${y + 24}" stroke="#8a6bff" stroke-width="4"/></g>`;
     if (X.includes('wraith')) {
@@ -552,6 +553,15 @@
         s += `<path d="M160,394 L170,340 M240,394 L230,340" stroke="#ff6ec4" stroke-width="8" stroke-linecap="round"/>`;
         for (const [x, y] of [[140, 450], [180, 480], [230, 446], [268, 486], [200, 432]]) s += `<circle cx="${x}" cy="${y}" r="6" fill="#fff"/>`;
         s += path('M200,408 L176,396 L178,422 Z', '#ffe14d', ol(2)) + path('M200,408 L224,396 L222,422 Z', '#ffe14d', ol(2)) + `<circle cx="200" cy="408" r="6" fill="#ffe14d" ${ol(2)}/>`;
+        break;
+      }
+      case 'martyr': {   // 1.9 烈士·不灭战旗：深色长大衣 + 金扣 + 红围巾
+        s += path(shape(SH), '#2a2420', ol(3));
+        s += path('M162,336 L170,296 L230,296 L238,336 L200,352 Z', '#2a2420', ol(3));
+        s += path(shape([[120, 330], [200, 356], [280, 330], [290, 362], [200, 392], [110, 362]]), '#c8102e', ol(2.6));
+        s += path('M226,372 L262,470 L244,476 L214,384 Z', '#c8102e', ol(2.4));
+        for (const y of [408, 444, 480]) for (const x of [186, 214]) s += `<circle cx="${x}" cy="${y}" r="6" fill="#ffd35e" ${ol(1.8)}/>`;
+        s += `<path d="M70,470 L130,470 M270,470 L330,470" stroke="#ffd35e" stroke-width="5"/>`;
         break;
       }
       case 'academy': case 'academyW': case 'academyH': {   // 1.8 夜都术师学院制服：高立领 + 一排扣子（白色款有紫色镶边，连帽款背后有兜帽）

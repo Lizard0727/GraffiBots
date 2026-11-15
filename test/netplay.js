@@ -78,7 +78,7 @@ class Bot {
     A.send({ t: 'start' });
     await A.wait('start'); await sleep(50);
     check(A.game.players.length === 4, `开局：2v2，共 ${A.game.players.length} 名机兵（含 AI 补位）`);
-    await sleep(3800); // 倒计时
+    await sleep(6300); // 倒计时（1.9：开局观察界面，6 秒）
     const start = { ...A.pos };
     const dir = A.team === 1 ? 1 : -1;
     await A.drive(2500, dir, 0, true, dir > 0 ? 0 : Math.PI);

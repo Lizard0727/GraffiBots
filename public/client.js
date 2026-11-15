@@ -369,12 +369,16 @@
   }
   // ---------------- 排位赛 ----------------
   const RT = () => E.RANK.tiers;
+  // 1.9：10 个段位的徽章——铁段 1–3 颗星，金段加翅膀，钻石 / 星耀加皇冠，传说段金色光环 + 大皇冠
   function rankBadge(ti) {
-    const T = RT()[ti] || RT()[0], c = T.color, n = ti;
-    const stars = Array.from({ length: Math.min(3, (n % 3) + 1) }, (_, i) => `<path transform="translate(${16 + i * 8 - (Math.min(3, (n % 3) + 1) - 1) * 4} 40)" d="M0,-4 l1.2,2.6 l2.8,.3 l-2.1,1.9 l.6,2.8 l-2.5,-1.4 l-2.5,1.4 l.6,-2.8 l-2.1,-1.9 l2.8,-.3 Z" fill="#fff"/>`).join('');
-    const wing = n >= 4 ? `<path d="M6,18 C0,14 2,6 8,8 C6,12 8,16 12,18 Z M42,18 C48,14 46,6 40,8 C42,12 40,16 36,18 Z" fill="${c}" stroke="#141018" stroke-width="2"/>` : '';
+    const T = RT()[ti] || RT()[0], c = T.color, n = ti, inG = n <= 2 ? n : n <= 4 ? n - 3 : n <= 6 ? n - 5 : n - 7;
+    const ns = inG + 1;
+    const stars = Array.from({ length: ns }, (_, i) => `<path transform="translate(${16 + i * 8 - (ns - 1) * 4} 40)" d="M0,-4 l1.2,2.6 l2.8,.3 l-2.1,1.9 l.6,2.8 l-2.5,-1.4 l-2.5,1.4 l.6,-2.8 l-2.1,-1.9 l2.8,-.3 Z" fill="#fff"/>`).join('');
+    const wing = n >= 3 ? `<path d="M6,18 C0,14 2,6 8,8 C6,12 8,16 12,18 Z M42,18 C48,14 46,6 40,8 C42,12 40,16 36,18 Z" fill="${c}" stroke="#141018" stroke-width="2"/>` : '';
     const crown = n >= 5 ? `<path d="M15,8 L19,2 L24,7 L29,2 L33,8 Z" fill="#ffd23f" stroke="#141018" stroke-width="2"/>` : '';
-    return `<svg viewBox="0 0 48 52">${wing}<path d="M24,6 L40,12 L38,32 C36,40 30,45 24,48 C18,45 12,40 10,32 L8,12 Z" fill="${c}" stroke="#141018" stroke-width="3" stroke-linejoin="round"/><path d="M24,11 L35,15 L33.5,31 C32,36 28,40 24,42 C20,40 16,36 14.5,31 L13,15 Z" fill="#fff" opacity=".22"/>${crown}<text x="24" y="31" text-anchor="middle" font-family="GBNum,Impact,sans-serif" font-size="15" fill="#141018">${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][n]}</text>${stars}</svg>`;
+    const halo = T.legend ? `<circle cx="24" cy="28" r="23" fill="none" stroke="${c}" stroke-width="2.5" stroke-dasharray="4 3" opacity=".9"/><path d="M12,8 L17,0 L24,6 L31,0 L36,8 Z" fill="#ffe14d" stroke="#141018" stroke-width="2"/>` : '';
+    const sym = T.legend ? (window.GBI18N && GBI18N.lang === 'en' ? ['H', 'S', 'F'] : ['传', '尊', '终'])[n - 7] : ['I', 'II', 'III', 'I', 'II', 'I', 'II'][n];
+    return `<svg viewBox="0 0 48 52">${halo}${wing}<path d="M24,6 L40,12 L38,32 C36,40 30,45 24,48 C18,45 12,40 10,32 L8,12 Z" fill="${c}" stroke="#141018" stroke-width="3" stroke-linejoin="round"/><path d="M24,11 L35,15 L33.5,31 C32,36 28,40 24,42 C20,40 16,36 14.5,31 L13,15 Z" fill="#fff" opacity=".22"/>${T.legend ? '' : crown}<text x="24" y="31" text-anchor="middle" font-family="GBNum,GBHead,Impact,sans-serif" font-size="${T.legend ? 14 : 15}" fill="#141018">${sym}</text>${T.legend ? '' : stars}</svg>`;
   }
   function renderRankChip() {
     const r = profile.rank || { rp: 0 }, ti = E.rankTier(r.rp), T = RT()[ti];
@@ -383,85 +387,202 @@
     $('rankBadge').innerHTML = rankBadge(ti); $('rankName').textContent = T.name; $('rankRp').textContent = `${r.rp} 分`;
   }
   function renderRanked() {
-    const r = profile.rank || { rp: 0, got: [] }, ti = E.rankTier(r.rp), T = RT()[ti], N = RT()[ti + 1];
-    const k = N ? (r.rp - T.rp) / (N.rp - T.rp) : 1, now = Date.now(), mode = E.rankedMode(now);
+    const RK = E.RANK, r = profile.rank || { rp: 0, road: [] }, ti = E.rankTier(r.rp), T = RT()[ti], N = RT()[ti + 1];
+    const k = N ? (r.rp - T.rp) / (N.rp - T.rp) : 1, now = Date.now(), mode = E.rankedMode(now), SE = RK.season;
     const np = Object.keys(profile.pilots).length, nm = profile.mechs.length, can = E.canRanked(profile);
     const need = [];
-    if (np < E.RANK.need.pilots) need.push(`${E.RANK.need.pilots - np} 位驾驶员`);
-    if (nm < E.RANK.need.mechs) need.push(`${E.RANK.need.mechs - nm} 台机体`);
-    $('rankBody').innerHTML = `<div class="rank-hero" style="--rc:${T.color}"><span class="rk-badge">${rankBadge(ti)}</span><div style="flex:1">
-        <small>当前段位</small><h3>${T.name}</h3><div class="rp">${r.rp} 分</div>
-        <div class="rank-bar"><i style="width:${Math.round(k * 100)}%"></i></div><small>${N ? `再拿 ${N.rp - r.rp} 分升到「${N.name}」` : '已经是最高段位'} · 共打了 ${r.n || 0} 局</small></div></div>
-      <div class="rank-info"><div><small>本时段玩法（每 ${E.RANK_HOURS} 小时轮换）</small><b>${S.MODES[mode].name}</b><small>${fmtLeft(E.rankedModeEnds(now) - now)} 后换成「${S.MODES[E.rankedMode(E.rankedModeEnds(now) + 1)].name}」</small></div>
-        <div><small>规则</small><b>赢 +${E.RANK.win} · 输 ${E.RANK.loss} · MVP +${E.RANK.mvp}</b><small>金币和通行证经验 ×${E.RANK.coinMul} · ${RT()[E.RANK.banFrom].name}起有禁用阶段</small></div></div>
-      <button class="btn big rank-go" id="rankGo" ${can ? '' : 'disabled'}>开始排位</button>
-      ${can ? '' : `<p class="rank-need">还需要 ${need.join('、')}才能参加排位赛（至少 ${E.RANK.need.pilots} 位驾驶员和 ${E.RANK.need.mechs} 台机体）。去「活动 → 新兵之路」领新手宝箱吧！</p>`}
-      <div class="rank-ladder">${RT().map((t, i) => { const got = (r.got || []).includes(i), rw = t.reward; return `<div class="rank-step ${i === ti ? 'cur' : ''} ${i > ti ? 'locked' : ''}" style="--rc:${t.color}"><span class="rk-badge">${rankBadge(i)}</span><div><b>${t.name}</b><small>${t.rp} 分${i >= E.RANK.banFrom ? ' · 有禁用阶段' : ''}</small></div>
-        <div class="rw">${rw ? `${rewardArt(rw)}<span>${rewardLabel(rw)}${got ? ' ✓' : ''}</span>` : '<small>起点</small>'}</div></div>`; }).join('')}</div>`;
+    if (np < RK.need.pilots) need.push(`${RK.need.pilots - np} 位驾驶员`);
+    if (nm < RK.need.mechs) need.push(`${RK.need.mechs - nm} 台机体`);
+    const road = r.road || [], LS = S.skin(RK.legendSkin), shards = profile.shards || 0, ownLS = profile.skins.includes(RK.legendSkin);
+    const hiLoss = ti >= RK.hiFrom;
+    // 夺冠之路：一格一格的里程碑
+    const nodes = RK.road.map(([need2, it], i) => { const got = road.includes(i), ti2 = E.rankTier(need2), T2 = RT()[ti2], next = !got && (i === 0 || road.includes(i - 1)) && r.rp < need2;
+      return `<div class="rr-node ${got ? 'got' : ''} ${next ? 'next' : ''} ${it.k === 'skin' ? 'big' : ''}" style="--rc:${T2.color}"><span class="rr-tier">${rankBadge(ti2)}</span><b>${need2}</b><small>${T2.name}</small><div class="rr-rw">${rewardArt(it)}</div><em>${rewardLabel(it)}</em>${got ? '<i class="rr-ok">✓</i>' : ''}</div>`; }).join('');
+    const pos = (() => { const L = RK.road; if (r.rp >= L[L.length - 1][0]) return 100; let i2 = 0; while (i2 < L.length && r.rp >= L[i2][0]) i2++; const a = i2 ? L[i2 - 1][0] : 0, b = L[i2][0]; return ((i2 + (r.rp - a) / (b - a)) / L.length) * 100; })();
+    $('rankBody').innerHTML = `<div class="rk-season"><span class="rk-sbadge">S${SE.id}</span><div><small>排位赛 · 第 ${SE.id} 赛季</small><b>「${SE.name}」</b><small>还剩 ${fmtLeft(SE.end - now)} · 下个赛季分数减半</small></div></div>
+      <div class="rk-main" style="--rc:${T.color}">
+        <div class="rk-col rk-rules"><h4>规则</h4>
+          <p><b>赢</b> +${RK.win} 分 · <b>MVP</b> +${RK.mvpWin} 分</p>
+          <p><b>输</b> ${RK.loss} 分（${RT()[RK.hiFrom].name}起 ${RK.lossHi} 分）· 输了拿到 MVP 只扣一半</p>
+          <p>${RT()[RK.protect].name}及以下掉分不掉段</p>
+          <p>${RT()[RK.banFrom].name}起有禁用阶段，选人按顺序轮流来，双方不会出现同一个驾驶员或机体</p>
+          <p>金币和通行证经验 ×${RK.coinMul}</p></div>
+        <div class="rk-center ${T.legend ? 'legend' : ''}"><div class="rk-glow"></div><span class="rk-big">${rankBadge(ti)}</span><h3>${T.name}</h3><div class="rk-rp">${r.rp}<small> 分</small></div>
+          <div class="rank-bar"><i style="width:${Math.round(k * 100)}%"></i></div><small>${N ? `再拿 ${N.rp - r.rp} 分升到「${N.name}」` : '已经是最高段位'} · 本赛季 ${r.n || 0} 局</small>
+          ${hiLoss ? '<span class="rk-warn">输了扣 10 分</span>' : ''}</div>
+        <div class="rk-col rk-play"><h4>本时段玩法</h4><b class="rk-mode">${S.MODES[mode].name}</b><small>每 ${E.RANK_HOURS} 小时轮换 · ${fmtLeft(E.rankedModeEnds(now) - now)} 后换成「${S.MODES[E.rankedMode(E.rankedModeEnds(now) + 1)].name}」</small>
+          <button class="btn big rank-go" id="rankGo" ${can ? '' : 'disabled'}>开始排位</button>
+          ${can ? '' : `<p class="rank-need">还需要 ${need.join('、')}才能参加排位赛（至少 ${RK.need.pilots} 位驾驶员和 ${RK.need.mechs} 台机体）。去「活动 → 新兵之路」领新手宝箱吧！</p>`}</div>
+      </div>
+      <div class="rk-road"><h4>夺冠之路<small>打到指定分数自动领奖；荣誉传说起每 200 分送 5 个传说碎片</small></h4>
+        <div class="rr-track"><div class="rr-line"><i style="width:${pos.toFixed(1)}%"></i></div>${nodes}</div></div>
+      <div class="rk-legend"><div class="rl-art">${LS ? GP.portrait(S.pilot(LS.pilot + '@' + LS.id)) : ''}</div><div class="rl-txt"><small>赛季传说皮肤</small><b>${LS ? LS.name : ''}</b><span>${LS ? `${S.pilot(LS.pilot).name}的服装 · ${S.rareName(LS.rare)}` : ''}</span>
+        <div class="rl-bar"><i style="width:${Math.min(100, (shards / RK.shardsNeed) * 100)}%"></i><em>${ic('shards')}${shards} / ${RK.shardsNeed}</em></div></div>
+        <button class="btn" id="rkShard" ${!ownLS && shards >= RK.shardsNeed ? '' : 'disabled'}>${ownLS ? '已拥有' : '兑换'}</button></div>`;
     $('rankGo').onclick = () => startRanked();
+    $('rkShard').onclick = async () => { const r2 = await eco('roadSkin', {}); if (!r2.ok) return toast(r2.err); sfx.win(); showGain(r2.items, '夺冠之路'); renderRanked(); };
+    const tr = $('rankBody').querySelector('.rr-track'), cur = tr && tr.querySelector('.rr-node.next');
+    if (cur) tr.scrollLeft = Math.max(0, cur.offsetLeft - tr.clientWidth / 2 + cur.offsetWidth / 2);
   }
+  // ---------------- 1.9：排位赛选人（MLBB 式）----------------
+  //   钻石起先轮流禁用（我方 2 个、对方 2 个），再按 1-2-2-2-1 的顺序轮流选人
+  //   每次选人 = 驾驶员 + 机体；双方加起来同一个驾驶员 / 机体只能出现一次
+  //   AI 有的秒选、有的想一想、有的犹豫半天换来换去、有的挂机到时间让系统帮选
   let draft = null;
+  const DRT = { ban: 12, pick: 15, me: 20 };
   function pilotFace(id) { return GP.portrait(S.pilot(id), { face: true }); }
   function mechFace(id) { const img = R3.mechThumb ? R3.mechThumb({ color: S.pilot(profile.pilot || 'blaze').accent, head: profile.head, weapon: id, pilot: profile.pilot || 'blaze' }) : ''; return img ? `<img src="${img}" alt="">` : ic('mech'); }
   function startRanked() {
     if (!E.canRanked(profile)) return toast('至少需要 3 位驾驶员和 3 台机体');
     if (needPilot()) return;
-    const ti = E.rankTier(profile.rank.rp);
-    draft = { ti, step: ti >= E.RANK.banFrom ? 'ban' : 'pick', myBan: null, bans: [], pick: { pilot: profile.pilot, mech: profile.weapon } };
-    openOv('draft'); renderDraft();
+    const ti = E.rankTier(profile.rank.rp), n = 4, B = window.GBBots;
+    const lang = window.GBI18N ? GBI18N.lang : 'zh';
+    const nicks = B ? B.nicks(8, lang) : ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5'];
+    const beh = () => { const r = Math.random(), afk = ti >= 5 ? 0.05 : 0.1; return r < afk ? 'afk' : r < afk + 0.2 ? 'hesitate' : r < afk + 0.5 ? 'normal' : 'quick'; };
+    const A = [{ who: 'me', name: profile.name || '机兵' }];
+    if (PARTY.on && room) for (const pl of room.players) if (pl.id !== myId && A.length < n) A.push({ who: 'friend', name: pl.name, want: { pilot: pl.pilot, mech: pl.weapon } });
+    let k = 0;
+    while (A.length < n) A.push({ who: 'ai', name: nicks[k++], beh: beh() });
+    for (let a = A.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); [A[a], A[b]] = [A[b], A[a]]; }   // 我在第几个选是随机的
+    const Bt = Array.from({ length: n }, () => ({ who: 'ai', name: nicks[k++], beh: beh() }));
+    const turns = [];
+    const ban = ti >= E.RANK.banFrom;
+    if (ban) { const meI = A.findIndex((x) => x.who === 'me'), allyI = A.findIndex((x) => x.who !== 'me'); turns.push({ t: 'ban', side: 'A', slot: meI }, { t: 'ban', side: 'B', slot: 0 }, { t: 'ban', side: 'A', slot: allyI }, { t: 'ban', side: 'B', slot: 1 }); }
+    const ord = ['A', 'B', 'B', 'A', 'A', 'B', 'B', 'A'], ci = { A: 0, B: 0 };
+    for (const sd of ord) turns.push({ t: 'pick', side: sd, slot: ci[sd]++ });
+    draft = { ti, n, A, B: Bt, turns, cur: -1, bans: [], sel: { pilot: null, mech: null, ban: null }, done: false };
+    openOv('draft');
+    drNext();
+    clearInterval(draft.tick);
+    draft.tick = setInterval(drTick, 100);
+  }
+  const drTeam = (side) => (side === 'A' ? draft.A : draft.B);
+  const drTaken = () => { const t = { p: new Set(), m: new Set() }; for (const x of [...draft.A, ...draft.B]) if (x.pick) { t.p.add(x.pick.pilot); t.m.add(x.pick.mech); } return t; };
+  const drBanned = (k, id) => draft.bans.some((b) => b.k === k && b.id === id);
+  function drAvail(owner) {   // 还能选的驾驶员 / 机体；owner = 只看玩家自己拥有的
+    const tk = drTaken();
+    const ps = S.PILOTS.map((P) => P.id).filter((id) => !tk.p.has(id) && !drBanned('pilot', id) && (!owner || profile.pilots[id]));
+    const ms = S.WEAPON_ORDER.filter((id) => !tk.m.has(id) && !drBanned('mech', id) && (!owner || profile.mechs.includes(id)));
+    return { ps, ms };
+  }
+  function drAiPick(slotObj) {
+    const me = draft.A.find((x) => x.who === 'me'), myLeft = !me.pick ? drAvail(true) : null;
+    const meta = S.META || { pilots: {}, mechs: {} };
+    let { ps, ms } = drAvail(false);
+    if (myLeft && myLeft.ps.length <= 1) ps = ps.filter((id) => !myLeft.ps.includes(id)) .length ? ps.filter((id) => !myLeft.ps.includes(id)) : ps;   // 给玩家至少留一个能用的
+    if (myLeft && myLeft.ms.length <= 1) ms = ms.filter((id) => !myLeft.ms.includes(id)).length ? ms.filter((id) => !myLeft.ms.includes(id)) : ms;
+    if (slotObj.who === 'friend' && slotObj.want && ps.includes(slotObj.want.pilot) && ms.includes(slotObj.want.mech)) return { pilot: slotObj.want.pilot, mech: slotObj.want.mech };
+    const w = (id) => 0.5 + (meta.pilots[id] || 0.5) * (draft.ti / 9);
+    const tot = ps.reduce((m, id) => m + w(id), 0); let r = Math.random() * tot, pilot = ps[0];
+    for (const id of ps) { r -= w(id); if (r <= 0) { pilot = id; break; } }
+    const fav = S.pilot(pilot).weapon, mech = ms.includes(fav) && Math.random() < 0.6 ? fav : ms[Math.floor(Math.random() * ms.length)];
+    return { pilot, mech };
+  }
+  function drAiBan(side) {
+    const sug = E.draftBans({ myBan: draft.bans.find((b) => b.side === 'me') || { k: 'mech', id: '__' }, pick: { pilot: profile.pilot, mech: profile.weapon }, o: profile });
+    const want = sug.filter((b) => (side === 'B' ? b.side === 'enemy' : b.side === 'ally') && !drBanned(b.k, b.id));
+    if (want.length) return { k: want[0].k, id: want[0].id, why: want[0].why, vs: want[0].vs };
+    const pool = S.PILOTS.map((P) => P.id).filter((id) => !drBanned('pilot', id));
+    return { k: 'pilot', id: pool[Math.floor(Math.random() * pool.length)], why: 'meta' };
+  }
+  function drNext() {
+    const D = draft;
+    D.cur++;
+    if (D.cur >= D.turns.length) { D.done = true; D.readyT = performance.now(); renderDraft(); sfx.special(); return; }
+    const T = D.turns[D.cur], who = drTeam(T.side)[T.slot];
+    T.t0 = performance.now(); T.who = who;
+    T.dur = (who.who === 'me' ? DRT.me : T.t === 'ban' ? DRT.ban : DRT.pick) * 1000;
+    T.act = who.who === 'me' ? null : who.who === 'friend' ? 800 : who.beh === 'afk' ? Infinity : who.beh === 'quick' ? 700 + Math.random() * 1600 : who.beh === 'normal' ? 2500 + Math.random() * 3500 : 6500 + Math.random() * 4500;
+    if (T.t === 'ban') T.act = who.who === 'me' ? null : Math.min(T.act, 2500 + Math.random() * 3000);
+    T.hovers = who.beh === 'hesitate' && T.t === 'pick' ? [1500, 3200, 5000].map((ms) => ({ at: ms, p: drAiPick(who) })) : [];
+    D.sel = { pilot: null, mech: null, ban: null };
+    if (who.who === 'me' && T.t === 'pick') { const av = drAvail(true); D.sel.pilot = av.ps.includes(profile.pilot) ? profile.pilot : av.ps[0]; D.sel.mech = av.ms.includes(profile.weapon) ? profile.weapon : av.ms[0]; sfx.go(); }
+    if (who.who === 'me' && T.t === 'ban') sfx.go();
+    renderDraft();
+  }
+  function drCommit(T, val, sys) {
+    const D = draft, who = T.who;
+    if (T.t === 'ban') { if (val && val.id) D.bans.push({ side: T.side === 'A' ? (who.who === 'me' ? 'me' : 'ally') : 'enemy', k: val.k, id: val.id, why: val.why || (who.who === 'me' ? 'mine' : 'meta'), vs: val.vs, sys }); }
+    else { who.pick = val; who.sys = !!sys; who.hover = null; }
+    if (T.t === 'pick') sfx.pick(); else sfx.click();
+    drNext();
+  }
+  function drTick() {
+    const D = draft;
+    if (!D || $('ov-draft').classList.contains('hidden')) { if (D) clearInterval(D.tick); return; }
+    if (D.done) { if (performance.now() - D.readyT > 1800) { clearInterval(D.tick); launchRanked(); } return; }
+    const T = D.turns[D.cur], who = T.who, el = performance.now() - T.t0;
+    for (const h of T.hovers) if (!h.shown && el >= h.at) { h.shown = true; who.hover = h.p; drRenderTop(); }
+    if (who.who !== 'me' && el >= T.act) { const v = T.t === 'ban' ? drAiBan(T.side) : who.hover && Math.random() < 0.5 && drAvail(false).ps.includes(who.hover.pilot) && drAvail(false).ms.includes(who.hover.mech) ? who.hover : drAiPick(who); drCommit(T, v); return; }
+    if (el >= T.dur) {   // 时间到：系统帮选（挂机的 AI / 玩家没选）
+      if (T.t === 'ban') { if (who.who === 'me' && D.sel.ban) drCommit(T, D.sel.ban); else if (who.who === 'me') drCommit(T, null, true); else drCommit(T, drAiBan(T.side), true); }
+      else if (who.who === 'me') { const av = drAvail(true), pilot = av.ps.includes(D.sel.pilot) ? D.sel.pilot : av.ps[0] || drAvail(false).ps[0], mech = av.ms.includes(D.sel.mech) ? D.sel.mech : av.ms[0] || drAvail(false).ms[0]; drCommit(T, { pilot, mech }, true); }
+      else drCommit(T, drAiPick(who), true);
+      return;
+    }
+    const c = $('drClock'); if (c) { const left = Math.max(0, Math.ceil((T.dur - el) / 1000)); c.textContent = left; c.classList.toggle('hurry', left <= 5); }
+  }
+  function drCard(x, side, i) {
+    const D = draft, T = !D.done && D.turns[D.cur], active = T && T.side === side && T.slot === i && T.t === 'pick';
+    const shown = x.pick || (active && x.who === 'me' && D.sel.pilot ? { pilot: D.sel.pilot, mech: D.sel.mech, prev: 1 } : null) || (x.hover ? Object.assign({ prev: 1 }, x.hover) : null);
+    const st = x.pick ? (x.sys ? '系统选择' : '已锁定') : active ? (x.who === 'me' ? '轮到你选择' : x.hover ? '犹豫中…' : '选择中…') : '';
+    return `<div class="drc ${side === 'A' ? 'a' : 'b'} ${active ? 'on' : ''} ${x.pick ? 'locked' : ''} ${x.who === 'me' ? 'me' : ''}">
+      <div class="drc-face ${shown && shown.prev && !x.pick ? 'prev' : ''}">${shown ? pilotFace(shown.pilot) : '<span>?</span>'}</div>
+      <div class="drc-txt"><b data-noi18n>${esc(x.name)}</b><small>${shown ? `${S.pilot(shown.pilot).name} · ${S.WEAPONS[shown.mech].short}` : x.who === 'me' ? '你' : x.who === 'friend' ? '好友' : ''}</small>${st ? `<em>${st}</em>` : ''}</div>
+      <div class="drc-mech">${shown ? mechFace(shown.mech) : ''}</div></div>`;
+  }
+  function drRenderTop() {
+    const D = draft, box = $('drTop'); if (!box) return;
+    const T = !D.done && D.turns[D.cur];
+    const sideName = { me: '你', ally: '队友', enemy: '对手' }, why = (b) => (E.BAN_WHY[b.why] || '').replace('{v}', b.vs ? S.WEAPONS[b.vs].short : '');
+    const banChip = (b) => `<div class="drb ${b.side === 'enemy' ? 'b' : 'a'}" title="${why(b)}">${b.k === 'pilot' ? pilotFace(b.id) : mechFace(b.id)}<small>${sideName[b.side]}${b.sys ? '·系统' : ''}</small></div>`;
+    const turnTxt = D.done ? '选人完成，准备开战！' : T.who.who === 'me' ? (T.t === 'ban' ? '轮到你禁用' : '轮到你选择') : `${T.side === 'A' ? '队友' : '对手'}正在${T.t === 'ban' ? '禁用' : '选择'}…`;
+    box.innerHTML = `<div class="dr-team a">${D.A.map((x, i) => drCard(x, 'A', i)).join('')}</div>
+      <div class="dr-mid"><div class="dr-phase">${D.done ? '准备开战' : T.t === 'ban' ? '禁用阶段' : '选人阶段'}</div><div class="dr-clock" id="drClock">${D.done ? '✓' : ''}</div><div class="dr-turn">${turnTxt}</div>
+        <div class="dr-mode">${S.MODES[E.rankedMode()].name} · ${RT()[D.ti].name}</div>
+        <div class="dr-bans">${D.bans.length ? D.bans.map(banChip).join('') : D.turns.some((t2) => t2.t === 'ban') ? '<small>还没有禁用</small>' : `<small>${RT()[D.ti].name}还没有禁用阶段</small>`}</div></div>
+      <div class="dr-team b">${D.B.map((x, i) => drCard(x, 'B', i)).join('')}</div>`;
   }
   function renderDraft() {
-    const D = draft, isBan = D.step === 'ban';
-    const banned = (k, id) => D.bans.some((b) => b.k === k && b.id === id);
-    $('draftTitle').textContent = isBan ? '禁用阶段' : '选择出战';
-    $('draftSub').textContent = isBan ? '你和队友各禁 1 个，对手禁 2 个；被禁用的驾驶员 / 机体这一局双方都不能用' : D.bans.length ? '从没被禁用、已经拥有的驾驶员和机体里选择出战组合' : `${RT()[D.ti].name}段位还没有禁用阶段，直接选择出战组合`;
-    const card = (k, id) => {
-      const own = k === 'pilot' ? !!profile.pilots[id] : profile.mechs.includes(id), b = banned(k, id);
-      const sel = isBan ? D.myBan && D.myBan.k === k && D.myBan.id === id : D.pick[k === 'pilot' ? 'pilot' : 'mech'] === id;
-      const name = k === 'pilot' ? S.pilot(id).name : S.WEAPONS[id].short;
-      return `<button class="dcard ${isBan ? '' : 'pick'} ${sel ? 'sel' : ''} ${b ? 'banned' : ''} ${!isBan && !own ? 'notown' : ''}" data-k="${k}" data-id="${id}" ${b || (!isBan && !own) ? 'disabled' : ''}>${k === 'pilot' ? pilotFace(id) : mechFace(id)}${name}</button>`;
-    };
-    const pilots = isBan ? S.PILOTS.map((P) => P.id) : S.PILOTS.map((P) => P.id).filter((id) => profile.pilots[id]);
-    const mechs = isBan ? S.WEAPON_ORDER : S.WEAPON_ORDER.filter((id) => profile.mechs.includes(id));
-    const why = (b) => (E.BAN_WHY[b.why] || '').replace('{v}', b.vs ? S.WEAPONS[b.vs].short : '');
-    const sideName = { me: '你', ally: '队友', enemy: '对手' };
-    const banList = D.bans.map((b, i) => `<div class="ban-row" style="animation-delay:${i * 0.35}s">${b.k === 'pilot' ? pilotFace(b.id) : mechFace(b.id)}<div><b><span class="side side-${b.side}">${sideName[b.side]}</span>${b.k === 'pilot' ? S.pilot(b.id).name : S.WEAPONS[b.id].name}</b><small>${why(b)}</small></div></div>`).join('');
-    const okPick = !banned('pilot', D.pick.pilot) && profile.pilots[D.pick.pilot] && !banned('mech', D.pick.mech) && profile.mechs.includes(D.pick.mech);
-    $('draftBody').innerHTML = `<div class="draft-wrap"><div class="draft-grid"><h3>驾驶员</h3><div class="draft-cards">${pilots.map((id) => card('pilot', id)).join('')}</div>
-        <h3>机体</h3><div class="draft-cards">${mechs.map((id) => card('mech', id)).join('')}</div></div>
-      <div class="draft-side"><h4>${isBan ? '选一个要禁用的' : '本局禁用'}</h4>${banList || `<small>${isBan ? '点左边任意一个驾驶员或机体' : '没有禁用'}</small>`}
-        ${isBan ? `<button class="btn" id="draftBan" ${D.myBan ? '' : 'disabled'}>确认禁用</button>` : `<p style="margin:10px 0 0">出战：<b>${S.pilot(D.pick.pilot).name}</b> + <b>${S.WEAPONS[D.pick.mech].name}</b></p><button class="btn" id="draftGo" ${okPick ? '' : 'disabled'}>开始比赛 · ${S.MODES[E.rankedMode()].name}</button>`}</div></div>`;
-    for (const el of $('draftBody').querySelectorAll('.dcard')) el.onclick = () => {
-      const k = el.dataset.k, id = el.dataset.id;
-      if (isBan) D.myBan = { k, id }; else D.pick[k === 'pilot' ? 'pilot' : 'mech'] = id;
-      sfx.click(); renderDraft();
-    };
-    const bb = $('draftBan');
-    if (bb) bb.onclick = () => {
-      D.bans = E.draftBans({ myBan: D.myBan, pick: D.pick, o: profile });
-      // 被禁了就换成第一个还能用的
-      if (banned('pilot', D.pick.pilot)) D.pick.pilot = Object.keys(profile.pilots).find((id) => !banned('pilot', id));
-      if (banned('mech', D.pick.mech)) D.pick.mech = profile.mechs.find((id) => !banned('mech', id));
-      D.step = 'pick'; sfx.special(); renderDraft();
-    };
-    const go = $('draftGo');
-    if (go) go.onclick = () => launchRanked();
+    const D = draft; if (!D) return;
+    const T = !D.done && D.turns[D.cur], mine = T && T.who.who === 'me', isBan = T && T.t === 'ban';
+    $('draftTitle').textContent = isBan ? '禁用阶段' : '选人阶段';
+    $('draftSub').textContent = '双方轮流禁用、轮流选人；同一个驾驶员和机体整局只能出现一次';
+    let grid = '';
+    if (mine) {
+      const tk = drTaken();
+      const card = (k, id) => { const own = k === 'pilot' ? !!profile.pilots[id] : profile.mechs.includes(id), b = drBanned(k, id), taken = k === 'pilot' ? tk.p.has(id) : tk.m.has(id);
+        const sel = isBan ? D.sel.ban && D.sel.ban.k === k && D.sel.ban.id === id : D.sel[k] === id, dis = b || taken || (!isBan && !own);
+        return `<button class="dcard ${sel ? 'sel' : ''} ${b ? 'banned' : ''} ${taken ? 'taken' : ''} ${!isBan && !own ? 'notown' : ''}" data-k="${k}" data-id="${id}" ${dis ? 'disabled' : ''}>${k === 'pilot' ? pilotFace(id) : mechFace(id)}${k === 'pilot' ? S.pilot(id).name : S.WEAPONS[id].short}${taken ? '<i>已被选</i>' : b ? '<i>禁用</i>' : ''}</button>`; };
+      const pilots = isBan ? S.PILOTS.map((P) => P.id) : S.PILOTS.map((P) => P.id).filter((id) => profile.pilots[id]);
+      const mechs = isBan ? S.WEAPON_ORDER : S.WEAPON_ORDER.filter((id) => profile.mechs.includes(id));
+      const ok = isBan ? !!D.sel.ban : D.sel.pilot && D.sel.mech;
+      grid = `<div class="dr-pick"><div class="draft-grid"><h3>驾驶员</h3><div class="draft-cards">${pilots.map((id) => card('pilot', id)).join('')}</div><h3>机体</h3><div class="draft-cards">${mechs.map((id) => card('mech', id)).join('')}</div></div>
+        <div class="dr-lock"><p>${isBan ? (D.sel.ban ? `禁用：<b>${D.sel.ban.k === 'pilot' ? S.pilot(D.sel.ban.id).name : S.WEAPONS[D.sel.ban.id].name}</b>` : '点一个要禁用的驾驶员或机体') : `出战：<b>${D.sel.pilot ? S.pilot(D.sel.pilot).name : '?'}</b> + <b>${D.sel.mech ? S.WEAPONS[D.sel.mech].name : '?'}</b>`}</p>
+        <button class="btn big" id="drLock" ${ok ? '' : 'disabled'}>${isBan ? '确认禁用' : '锁定'}</button>${isBan ? '<button class="btn small ghost" id="drSkip">不禁用</button>' : ''}</div></div>`;
+    } else grid = `<div class="dr-wait">${D.done ? '选人完成，马上开战！' : '等待其他玩家……你可以先看看双方的阵容'}</div>`;
+    $('draftBody').innerHTML = `<div class="dr2"><div class="dr-top" id="drTop"></div>${grid}</div>`;
+    drRenderTop();
+    for (const el of $('draftBody').querySelectorAll('.dcard')) el.onclick = () => { const k = el.dataset.k, id = el.dataset.id; if (isBan) D.sel.ban = { k, id }; else D.sel[k] = id; sfx.click(); renderDraft(); };
+    const lk = $('drLock'); if (lk) lk.onclick = () => { if (isBan) drCommit(T, D.sel.ban); else drCommit(T, { pilot: D.sel.pilot, mech: D.sel.mech }); };
+    const sk = $('drSkip'); if (sk) sk.onclick = () => drCommit(T, null);
   }
   let rankBefore = null;
   function launchRanked() {
-    const D = draft;
-    profile.pilot = D.pick.pilot; profile.weapon = D.pick.mech; saveProfile(); sendLoadout(); renderProfile();
+    const D = draft, me = D.A.find((x) => x.who === 'me');
+    profile.pilot = me.pick.pilot; profile.weapon = me.pick.mech; saveProfile(); sendLoadout(); renderProfile();
     closeOv(); ensureName();
     rankBefore = { rp: profile.rank.rp, ti: E.rankTier(profile.rank.rp) };
+    const bans = { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) };
+    const dr = { 1: D.A.filter((x) => x.who === 'ai').map((x) => ({ pilot: x.pick.pilot, mech: x.pick.mech, name: x.name })), 2: D.B.map((x) => ({ pilot: x.pick.pilot, mech: x.pick.mech, name: x.name })) };
     if (PARTY.on && room) {   // 1.7：组队排位——每个人都要满足排位条件，AI 强度按队里最高段位
       const bad = room.players.filter((p) => p.rk && !p.rk.ok);
       if (bad.length) { rankBefore = null; return toast(`${bad.map((p) => p.name).join('、')} 还没凑齐 3 位驾驶员和 3 台机体，不能组队排位`); }
       const ti = Math.max(D.ti, ...room.players.map((p) => (p.rk ? p.rk.tier : 0)));
-      partyLaunch({ mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, ranked: true, fair: false, bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(ti), rankTier: ti, lang: window.GBI18N ? GBI18N.lang : 'zh' });
+      partyLaunch({ mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, ranked: true, fair: false, bans, draft: dr, botPower: E.rankBotPower(ti), rankTier: ti, lang: window.GBI18N ? GBI18N.lang : 'zh' });
       return;
     }
-    quick = { mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, bots: true, ranked: true, fair: false,
-      bans: { pilots: D.bans.filter((b) => b.k === 'pilot').map((b) => b.id), mechs: D.bans.filter((b) => b.k === 'mech').map((b) => b.id) }, botPower: E.rankBotPower(D.ti), rankTier: D.ti, lang: window.GBI18N ? GBI18N.lang : 'zh' };
+    quick = { mode: E.rankedMode(), map: -1, teamSize: 4, duration: 180, bots: true, ranked: true, fair: false, bans, draft: dr, botPower: E.rankBotPower(D.ti), rankTier: D.ti, lang: window.GBI18N ? GBI18N.lang : 'zh' };
     $('playBtn').classList.add('busy');
     const go = () => send({ t: 'create' });
     if (net && net.kind === 'peer') { backToLocal(); setTimeout(go, 50); } else go();
@@ -706,7 +827,11 @@
         <button class="hp-link" data-hero="mech:${P.weapon}"><div class="hl-img">${R3.mechThumb ? `<img src="${R3.mechThumb({ color: P.accent, head: profile.head, weapon: P.weapon, pilot: P.id })}" alt="">` : ''}</div><div><small>擅长机体</small><b>${rec.name}</b><span>${rec.role} · 查看机体 ›</span></div></button>`;
     }
     $('hpPanel').innerHTML = body;
-    $('hpActs').innerHTML = `<button data-act="hello">打招呼</button><button data-act="attack">攻击</button><button data-act="victory">庆祝</button>`;
+    const SKN = skinId && S.skin(skinId);
+    $('hpActs').innerHTML = `${SKN && SKN.entrance ? `<button data-act="enter" class="enter">✦ 进场动作</button>` : ''}<button data-act="hello">打招呼</button><button data-act="attack">攻击</button><button data-act="victory">庆祝</button>`;
+    // 1.9：限定传说 / 赛季传说皮肤有专属背景
+    const stg = $('hpStageP'); for (const c of [...stg.classList]) if (c.startsWith('bg-')) stg.classList.remove(c);
+    if (SKN && SKN.bg) stg.classList.add('bg-' + SKN.bg);
     for (const bt of $('hpActs').querySelectorAll('[data-act]')) bt.onclick = () => { if (R3.charAction) R3.charAction(bt.dataset.act); sfx.click(); };
     $('hpGlow').style.background = `radial-gradient(closest-side, ${P.accent}88, transparent)`;
     if (R3.charPreview) R3.charPreview($('hpStageP'), skinId ? P.id + '@' + skinId : P.id, P.accent);
@@ -1593,7 +1718,7 @@
     const n = room.players.length;
     const cap = S.MODES[q.mode] && S.MODES[q.mode].teams > 2 && q.mode !== 'loot' ? S.MODES[q.mode].size : 4;
     if (n > cap) toast(`「${S.MODES[q.mode].name}」每队 ${cap} 人：队伍里多出来的人会分到别的队`, 3600);
-    const st = Object.assign({ t: 'settings', bots: true, party: true, ranked: false, bans: { pilots: [], mechs: [] }, botPower: null, rankTier: null }, q);   // 上一局的排位设置要清掉
+    const st = Object.assign({ t: 'settings', bots: true, party: true, ranked: false, bans: { pilots: [], mechs: [] }, botPower: null, draft: null, rankTier: null }, q);   // 上一局的排位设置要清掉
     st.teamSize = Math.min(4, Math.max(q.teamSize || 3, n));
     if (q.mode === 'loot') st.squad = Math.max(q.squad || 1, n);
     send(st);
@@ -1812,8 +1937,9 @@
     touchShow(true);
     document.body.classList.toggle('topcam', TOP());
     G.camF = null;
-    if (!m.resume) showVs(m.players, colors);
-    else { G.cd = 0; $('vsSplash').classList.add('hidden'); }
+    if (!m.resume && !m.tutorial && (m.cd || 0) > 4) showObserve(m, colors);
+    else if (!m.resume) showVs(m.players, colors);
+    else { G.cd = 0; $('vsSplash').classList.add('hidden'); $('observe').classList.add('hidden'); }
   }
   // 1.7.1：重连后收到整张涂料图（游程编码：值, 个数, 值, 个数…）
   function applyGrid(rle) {
@@ -1846,7 +1972,66 @@
     showVs.h = setTimeout(() => el.classList.add('hidden'), 2800);
   }
 
+  // 1.9：开局观察界面——看清两队的驾驶员、机体和皮肤品质；中间是自己的驾驶员在 3D 里做进场动作
+  function obsCard(p, i, side) {
+    const P = S.pilot(p.pilot), sk = p.looks && p.looks.pskin && S.skin(p.looks.pskin), pt = p.looks && p.looks.paint && S.skin(p.looks.paint);
+    const r = Math.max(sk ? sk.rare : 0, pt ? pt.rare : 0), R = S.RARE[r] || null;
+    const W = S.WEAPONS[p.weapon], fr = p.looks && p.looks.frame && S.skin(p.looks.frame);
+    if (p.boss) return `<div class="obc boss ${side}" style="animation-delay:${0.1 + i * 0.09}s"><div class="obc-face">${ic('raid', '#ff3b52')}</div><div class="obc-txt"><b>${esc(p.name)}</b><small>${L('首领')} · ${L('团队讨伐')}</small></div></div>`;
+    const img = R3.mechThumb ? R3.mechThumb({ color: P.accent, head: p.head, weapon: p.weapon, pilot: p.pilot, paint: pt ? pt.id : undefined }) : '';
+    return `<div class="obc ${side}${p.id === myId ? ' me' : ''}${r ? ' r' + r : ''}" style="animation-delay:${0.1 + i * 0.09}s;${R && r ? '--rc:' + R.c : ''}">
+      <div class="obc-face${fr ? ' frame-' + fr.frame : ''}">${GP.portrait(sk ? S.pilot(P.id + '@' + sk.id) : P, { face: true })}</div>
+      <div class="obc-txt"><b data-noi18n>${esc(p.name)}</b><small>${esc(L(P.name))} · ${esc(L(W ? W.name : ''))}</small>${R && r >= 2 ? `<em>${esc(L(sk ? sk.name : pt.name))} · ${esc(L(R.name))}</em>` : ''}</div>
+      <div class="obc-mech">${img ? `<img src="${img}" alt="">` : ''}</div>${p.lv ? `<i class="obc-lv">${p.lv}</i>` : ''}</div>`;
+  }
+  function showObserve(m, colors) {
+    const el = $('observe'), list = m.players.filter((p) => !p.npc && !p.spirit), me = list.find((p) => p.id === myId);
+    const myTeam = me ? me.team : 1, MO = S.MODES[G.mode], MAP = S.MAPS[G.map];
+    const mine = list.filter((p) => p.team === myTeam), foes = list.filter((p) => p.team !== myTeam).sort((a, b) => a.team - b.team);
+    const sk = me && me.looks && me.looks.pskin && S.skin(me.looks.pskin), R = sk ? S.RARE[sk.rare] : null;
+    const bans = m.bans && ((m.bans.pilots || []).length + (m.bans.mechs || []).length) ? `<div class="ob-bans"><small>${L('本局禁用')}</small>${(m.bans.pilots || []).map((id) => `<span class="ob-ban">${GP.portrait(S.pilot(id), { face: true })}</span>`).join('')}${(m.bans.mechs || []).map((id) => { const img = R3.mechThumb ? R3.mechThumb({ color: '#888', head: 'antenna', weapon: id, pilot: 'blaze' }) : ''; return `<span class="ob-ban">${img ? `<img src="${img}" alt="">` : ''}</span>`; }).join('')}</div>` : '';
+    el.innerHTML = `<div class="ob-head"><small>${m.ranked ? L('排位赛') + ' · ' + L('烈士') : L('观察阶段')}</small><b>${esc(L(MO.name))}</b><span>${esc(L(MAP.name))}</span></div>
+      <div class="ob-side a" style="--tc:${colors[myTeam]}"><div class="ob-tn">${esc(teamName(myTeam))}</div>${mine.map((p, i) => obsCard(p, i, 'a')).join('')}</div>
+      <div class="ob-mid"><div id="obStage" class="ob-stage${sk && sk.bg ? ' hp-stage bg-' + sk.bg : ''}"></div>
+        <div class="ob-me">${me ? `<b>${esc(L(S.pilot(me.pilot).name))}</b><small${R ? ` style="color:${R.c}"` : ''}>${sk ? esc(L(sk.name)) + ' · ' + esc(L(R.name)) : L('经典')}</small>` : ''}</div>
+        <div id="obCd" class="ob-cd"></div>${bans}</div>
+      <div class="ob-side b" style="--tc:${colors[foes[0] ? foes[0].team : 3 - myTeam]}"><div class="ob-tn">${G.teams > 2 ? L('其他队伍') : esc(teamName(3 - myTeam))}</div>${foes.map((p, i) => obsCard(p, i, 'b' + (G.teams > 2 ? ' t' + p.team : ''))).join('')}</div>`;
+    el.classList.remove('hidden'); $('vsSplash').classList.add('hidden');
+    G.observe = true;
+    if (me && R3.charPreview) R3.charPreview($('obStage'), sk ? me.pilot + '@' + sk.id : me.pilot, S.pilot(me.pilot).accent);
+    if (me && R3.charAction && !(sk && sk.entrance)) setTimeout(() => R3.charAction('wave'), 300);
+    sfx.morph();
+  }
+  function observeTick() {
+    if (!G || !G.observe) return;
+    const el = $('observe');
+    if (G.cd <= 0.6 || G.over) { G.observe = false; el.classList.add('out'); setTimeout(() => { el.classList.add('hidden'); el.classList.remove('out'); }, 350); return; }
+    const n = Math.ceil(G.cd - 0.5), c = $('obCd');
+    if (c && c.dataset.n !== String(n)) { c.dataset.n = n; c.textContent = n >= 1 && n <= 3 ? n : ''; c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
+  }
+
   function paintCell(i, team) { R3.paintCell(i, team); }
+  // 1.9：专属开火声 + 手感（重型主题有后坐震动，轻型主题有清脆的枪口光）
+  const SND_FEEL = { gold: { kick: 0.4, col: '#ffd23f' }, flag: { kick: 1.1, col: '#ff3b30' }, martyr: { kick: 1.3, col: '#ffd35e' }, ice: { kick: 0, col: '#bff6ff' }, yato: { kick: 0.2, col: '#f4e6c8' }, wraith: { kick: 0.9, col: '#ff2d4b' } };
+  function myShotFx(e) {
+    const me = G.players.get(myId), sk = G.mySk || (me && (G.mySk = skinInfo(me)));
+    if (!sk || !sk.snd) return sfx.shoot();
+    sfx.skinShoot(sk.snd);
+    const F = SND_FEEL[sk.snd]; if (!F) return;
+    if (F.kick) G.shake = Math.max(G.shake || 0, F.kick);
+    R3.emit(e[2], e[3], e[4], F.col, sk.snd === 'ice' ? 5 : 3, 90, 1, { sys: 'pg', size: 7, life: 0.25, grav: 0, drag: 4 });
+  }
+  // 1.9：开打瞬间，史诗及以上皮肤的落地特效（品质越高越华丽；限定传说用自己的主题色）
+  function dropInFx() {
+    for (const p of G.players.values()) {
+      if (!p.alive || p.npc) continue;
+      const sk = skinInfo(p); if (sk.rare < 3) continue;
+      const tc = sk.rare >= 6 && THEME_COL[sk.bg], c1 = tc ? tc[0] : sk.col, c2 = tc ? tc[1] : '#ffffff', z = p.z || 0;
+      for (let i = 0; i < (sk.rare >= 5 ? 3 : sk.rare >= 4 ? 2 : 1); i++) ringFx(p.x, p.y, z, 50 + i * 30, i % 2 ? c2 : c1, 700, i * 110);
+      R3.emit(p.x, p.y, z + 6, c1, sk.rare >= 5 ? 26 : 14, 240, 1, { sys: 'pg', size: 10, life: 0.8, grav: -60, drag: 2 });
+      if (sk.rare >= 4) R3.emit(p.x, p.y, z + 4, c2, 10, 40, 0, { sys: 'pg', size: 16, life: 1, grav: -360, drag: 1 });
+    }
+  }
 
   // ---------------- 快照 ----------------
   function onSnap(m) {
@@ -1859,7 +2044,7 @@
     const mine = pm.get(myId);
     if (mine && G.me) applyMe(mine);
     for (const e of m.e) {
-      if (e[0] === 'pj' && e[11] === myId) { addProj(e, true); sfx.shoot(); }
+      if (e[0] === 'pj' && e[11] === myId) { addProj(e, true); myShotFx(e); }
       else if (e[0] === 'px') { const pr = G.projs.get(e[1]); if (pr && pr.mine) killProj(pr, e[2], e[3], e[4]); }
       else if (e[0] === 'ln' && e[9] === myId) handleEvent(e);
       else if (e[0] === 'hit' && e[1] === myId && !e[3]) { G.dmgFlash = 0.35; sfx.hurt(); }
@@ -1916,7 +2101,7 @@
           const tx = e[1] === myId && G.me ? G.me.px : t.x, ty = e[1] === myId && G.me ? G.me.py : t.y, tz = (e[1] === myId && G.me ? G.me.pz : t.z) || 0;
           R3.emit(tx, ty, tz + 18, e[3] ? '#bef6ff' : '#ffffff', e[4] > 30 ? 8 : 4, 200, 0.8, { sys: 'pg', size: 8, life: 0.2, grav: 0, drag: 5 });
         }
-        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; G.hitPulse = 1; sfx.hit(); sfx.hitConfirm(); if (e[4] > 40) G.shake = Math.max(G.shake, 3); else if (e[4] > 15) G.shake = Math.max(G.shake, 1.2); }
+        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; G.hitPulse = 1; sfx.hit(); const msk = G.mySk; if (msk && msk.snd) { sfx.skinHit(msk.snd); const tp = G.players.get(e[1]); if (tp) R3.emit(tp.x, tp.y, (tp.z || 0) + 20, (THEME_COL[msk.bg] || [msk.col])[0], 6, 160, 1, { sys: 'pg', size: 8, life: 0.35, grav: 0, drag: 3 }); } else sfx.hitConfirm(); if (e[4] > 40) G.shake = Math.max(G.shake, 3); else if (e[4] > 15) G.shake = Math.max(G.shake, 1.2); }
         // 伤害数字：只显示和自己有关的
         if (t && e[4] > 0 && !silent && (e[2] === myId || e[1] === myId)) G.dmgTexts.push({ id: e[1], dx: (Math.random() - 0.5) * 24, text: String(e[4]), color: e[1] === myId ? '#ff5a6a' : '#fff', t: now });
         break;
@@ -2126,7 +2311,8 @@
     }
   }
   function addProj(e, mine) {
-    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12], fx: fxOf(e[11]) });
+    const own = G.players.get(e[11]), osk = own ? skinInfo(own) : null;
+    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12], fx: fxOf(e[11]), sk: osk && osk.rare >= 5 ? osk : null });
     if (G.projs.get(e[1]).fx && G.projs.get(e[1]).fx.rare >= 3) { const F = G.projs.get(e[1]).fx; R3.emit(e[2], e[3], e[4], F.fx.cols[0], F.rare >= 4 ? 6 : 3, 140, 0, { sys: 'pg', size: 9, life: 0.25, grav: 0, drag: 5 }); }
     // 枪口火光：白色核心 + 队伍色火花，沿射击方向喷出
     const L = Math.hypot(e[5], e[6], e[7]) || 1, dir = { x: e[5] / L, y: e[6] / L, z: e[7] / L };
@@ -2137,13 +2323,21 @@
   const pk = (p) => (p && p.looks && p.looks.pskin ? p.pilot + '@' + p.looks.pskin : p.pilot);   // 带服装的驾驶员
   function skinInfo(p) {
     const ks = [p && p.looks && p.looks.pskin, p && p.looks && p.looks.paint].map((k) => k && S.skin(k)).filter(Boolean).sort((a, b) => b.rare - a.rare);
-    return ks.length ? { rare: ks[0].rare, col: ks[0].over ? ks[0].over.accent : ks[0].paint.light } : { rare: 0, col: '#fff' };
+    return ks.length ? { rare: ks[0].rare, col: ks[0].over ? ks[0].over.accent : ks[0].paint.light, bg: ks[0].bg || null, snd: (ks.find((K) => K.snd) || {}).snd || null } : { rare: 0, col: '#fff', bg: null, snd: null };
   }
+  // 1.9：限定传说的主题颜色（冰雪 / 夜都符纸 / 恶灵火 / 战旗金）
+  const THEME_COL = { ice: ['#dff8ff', '#7af0ff'], yato: ['#f4e6c8', '#8a6bff'], wraith: ['#ff2d4b', '#3a0a18'], martyr: ['#ffd35e', '#c8102e'] };
   function fxOf(ownerId) { const o = G && G.players.get(ownerId), K = o && o.looks && o.looks.fx && S.skin(o.looks.fx); return K ? { fx: K.fx, rare: K.rare } : null; }
   // 传说皮肤：击倒时炸出星光
   function legendKill(by, x, y, z) {
     const sk = skinInfo(by);
     if (sk.rare < 4) return;
+    if (sk.rare >= 6 && THEME_COL[sk.bg]) {   // 1.9 限定传说：主题击倒特效
+      const [c1, c2] = THEME_COL[sk.bg];
+      for (let i = 0; i < 4; i++) ringFx(x, y, z || 0, 40 + i * 35, i % 2 ? c2 : c1, 800, i * 90);
+      R3.emit(x, y, (z || 0) + 20, c1, 30, 300, 1.2, { sys: 'pg', size: 13, life: 1, grav: sk.bg === 'ice' ? 300 : -120, drag: 2 });
+      R3.emit(x, y, (z || 0) + 10, c2, 20, 180, 1, { sys: sk.bg === 'wraith' ? 'pk' : 'pg', size: sk.bg === 'wraith' ? 26 : 10, life: 1.1, grav: -80, drag: 2, grow: sk.bg === 'wraith' ? 1.2 : 0 });
+    }
     for (let i = 0; i < 3; i++) ringFx(x, y, z || 0, 50 + i * 40, i === 1 ? '#ffffff' : sk.col, 700, i * 100);
     for (let i = 0; i < 16; i++) R3.emit(x, y, (z || 0) + 30, i % 2 ? '#ffffff' : sk.col, 1, 420, 0, { sys: 'pg', size: 12, life: 0.7, grav: -60, drag: 2.5, dir: { x: Math.cos(i * 0.39), y: Math.sin(i * 0.39), z: 0.4 }, spread: 0.2 });
   }
@@ -2931,11 +3125,12 @@
       else if (tl <= 30) AU.music('final');
       G.prevTl = tl;
     }
+    observeTick();
     // 倒计时音效
     const n = Math.ceil(G.cd - 0.5);
     if (n !== G.lastCount) {
       if (n >= 1 && n <= 3) sfx.count();
-      if (n <= 0 && G.lastCount >= 1) { sfx.go(); G.goT = now; }
+      if (n <= 0 && G.lastCount >= 1) { sfx.go(); G.goT = now; dropInFx(); }
       G.lastCount = n;
     }
     // 子弹、炸弹（本地按同一套弹道公式推算）
@@ -2944,6 +3139,7 @@
       const gh = S.topAt(G.M, q.x, q.y);
       if (t > 3.2 || (pr.ghost ? t > pr.ts : q.z < gh - 1)) { killProj(pr, q.x, q.y, gh < 1e3 ? Math.max(gh, q.z) : q.z); continue; }
       pr.x = q.x; pr.y = q.y; pr.z = q.z;
+      if (pr.sk && Math.random() < 0.55) { const tc = THEME_COL[pr.sk.bg]; R3.emit(q.x, q.y, q.z, tc && pr.sk.rare >= 6 ? tc[(Math.random() * 2) | 0] : pr.sk.col, 1, 12, 1, { sys: 'pg', size: 8, life: 0.35, grav: 0, drag: 2 }); }   // 1.9 传说 / 限定传说：子弹星光拖尾
       if (pr.fx && pr.fx.rare >= 4 && Math.random() < 0.6) R3.emit(q.x, q.y, q.z, pr.fx.fx.cols[(Math.random() * pr.fx.fx.cols.length) | 0], 1, 10, 1, { sys: 'pg', size: 7, life: 0.3, grav: 0, drag: 2 });   // 传说：子弹拖尾
     }
     for (const [id, b] of G.bombs) { S.stepBomb(b, dt, G.M); b.life += dt; if (b.life > 5) G.bombs.delete(id); }
@@ -3529,7 +3725,8 @@
     }
 
     // ---- 倒计时 ----
-    if (G.cd > 0) {
+    if (G.cd > 0 && G.observe) { /* 1.9：观察界面自己显示倒计时 */ }
+    else if (G.cd > 0) {
       const n = Math.ceil(G.cd - 0.5);
       ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, VW, VH);
       const M = S.MODES[G.mode];
@@ -3611,6 +3808,13 @@
   }
 
   // ================= 结算 =================
+  // 1.9：结算评级徽章（青铜标 / 白银标 / 黄金标 / 钻石标 / MVP）
+  function badgeSvg(n, big) {
+    const B = S.BADGES[n], sz = big ? 92 : 26;
+    const shape = n === 4 ? '<path d="M50 6l12 26 28 3-21 19 6 28-25-15-25 15 6-28-21-19 28-3z"/>' : n === 3 ? '<path d="M50 6l36 30-36 58-36-58z"/>' : '<path d="M50 6l38 14v30c0 24-18 38-38 46C30 88 12 74 12 50V20z"/>';
+    return `<svg class="bdg-svg" viewBox="0 0 100 100" width="${sz}" height="${sz}"><g fill="${B.c}" stroke="#000" stroke-width="6" stroke-linejoin="round">${shape}</g>${n === 3 ? '<path d="M50 14l-24 22h48z" fill="#fff" opacity=".55"/>' : ''}${n < 3 ? `<path d="M30 30h40" stroke="#fff" stroke-width="5" opacity=".55"/><text x="50" y="68" text-anchor="middle" font-size="30" font-weight="900" fill="#000" opacity=".55">${['Ⅲ', 'Ⅱ', 'Ⅰ'][n]}</text>` : ''}${n === 4 ? '<text x="50" y="62" text-anchor="middle" font-size="22" font-weight="900" fill="#000">MVP</text>' : ''}</svg>`;
+  }
+  function badgeChip(n, lose) { const B = S.BADGES[n]; return `<span class="rbadge b${n}" style="--bc:${B.c}">${badgeSvg(n)}<b>${n === 4 && lose ? '败方MVP' : B.name}</b></span>`; }
   function showResults(r) {
     chatClose();
     const meRow = r.players.find((p) => p.id === myId);
@@ -3653,6 +3857,12 @@
     const mvp = S.mvpOf(r);
     const objLabel = { escort: '得分', battery: '电池', loot: '带出', seal: '封印石', raid: '讨伐' }[r.mode] || '—';
     const lootOf = (p) => (r.loot && r.loot.players[p.id]) || null;
+    const BG = S.badgesOf(r);
+    if (meRow && BG[myId] != null) {
+      const n = BG[myId], lose = n === 4 && r.winner !== myTeam;
+      $('resBadge').innerHTML = `<div class="rb-big b${n}" style="--bc:${S.BADGES[n].c}">${badgeSvg(n, true)}<b>${n === 4 && lose ? '败方MVP' : S.BADGES[n].name}</b><small>表现评分 ${S.perfScore(meRow)}</small></div>`;
+      $('resBadge').classList.remove('hidden');
+    } else $('resBadge').classList.add('hidden');
     $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
     // 1.5：数据卡片——每队一张卡，每人一行：头像、名字、机体、击毁 / 倒下 / 涂地条，MVP 金色标记
     const maxPaint = Math.max(1, ...r.players.map((p) => p.paint)), maxK = Math.max(1, ...r.players.map((p) => p.kills));
@@ -3673,9 +3883,10 @@
           <div class="rt-name"><b data-noi18n>${esc(p.name)}</b><small>${S.pilot(p.pilot).name} · ${S.WEAPONS[p.weapon].name}</small></div>
           <div class="rt-stats"><span class="st k" title="击毁"><i>击毁</i><b>${p.kills}</b><em style="width:${Math.round(p.kills / maxK * 100)}%"></em></span>
           <span class="st d" title="倒下"><i>倒下</i><b>${p.deaths}</b></span>
+          <span class="st a" title="助攻"><i>助攻</i><b>${p.assists || 0}</b></span>
           <span class="st p" title="涂地"><i>涂地</i><b>${p.paint}</b><em style="width:${Math.round(p.paint / maxPaint * 100)}%"></em></span>
           ${objLabel !== '—' ? `<span class="st o"><i>${objLabel}</i><b>${LR ? (lootOf(p) && lootOf(p).ex ? fmtV(S.lootValue(lootOf(p).items)) : p.deaths ? '阵亡' : '未撤离') : p.obj}</b></span>` : ''}</div>
-          ${isM ? '<span class="mvp">★ MVP</span>' : p.id === myId ? '<span class="you">你</span>' : ''}</div>`;
+          <span class="rt-tags">${BG[p.id] != null ? badgeChip(BG[p.id], p.team !== r.winner) : ''}${p.id === myId ? '<span class="you">你</span>' : ''}</span></div>`;
       }
       html += '</div>';
     }
@@ -4010,7 +4221,7 @@
     $('shopTabs').innerHTML = S.SKIN_KINDS.map(([k, n]) => `<button class="${shopTab === k ? 'sel' : ''}" data-k="${k}">${n}</button>`).join('');
     for (const b of $('shopTabs').children) b.onclick = () => { shopTab = b.dataset.k; renderShop(); sfx.click(); };
     const desc = shopTab === 'fx' ? S.FX_RARE : shopTab === 'frame' ? S.FRAME_RARE : S.RARE.map((r) => r && r.fx);
-    $('rareLegend').innerHTML = [1, 2, 3, 4].map((r) => `<span style="--rc:${S.RARE[r].c}"><b>${S.RARE[r].name}</b>${desc[r]}</span>`).join('');
+    $('rareLegend').innerHTML = [1, 2, 3, 4, 5, 6].map((r) => `<span style="--rc:${S.RARE[r].c}"><b>${S.RARE[r].name}</b>${desc[r]}</span>`).join('');
     grid.innerHTML = '';
     for (const K of S.SKINS.filter((k) => k.kind === shopTab).sort((a, b) => b.rare - a.rare)) {
       const own = profile.skins.includes(K.id), price = E.skinPrice(K), on = own && wearing(K);
@@ -4020,7 +4231,7 @@
       const who = K.kind === 'pilot' ? `${S.pilot(K.pilot).name}的服装${E.hasPilot(profile, K.pilot) ? '' : '（还没有这位驾驶员）'}` : { mech: '所有机体通用', fx: '子弹和命中特效', frame: '大厅名片边框', avatar: '大厅名片头像' }[K.kind];
       const btn = own ? `<button class="btn small ${on ? 'ghost' : ''}" data-act="wear">${on ? '卸下' : '装上'}</button>`
         : K.price ? `<button class="btn small" data-act="buy" ${profile.gems < price ? 'disabled' : ''}>${ic('gems')}${price}${price < K.price ? `<s>${K.price}</s>` : ''}</button>`
-        : `<span class="pass-only">${K.pass ? `通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级` : K.event === 'yato' ? '夜都决战活动商店' : K.event ? '乐园祭活动商店' : K.rank ? '排位赛大师段位奖励' : '活动奖励'}</span>`;
+        : `<span class="pass-only">${K.pass ? `通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级` : K.event === 'yato' ? '夜都决战活动商店' : K.event ? '乐园祭活动商店' : K.road ? '排位赛 · 夺冠之路奖励' : K.shards ? `排位赛 · ${K.shards} 个传说碎片兑换` : K.rank ? '排位赛大师段位奖励' : '活动奖励'}</span>`;
       el.innerHTML = `${K.id === deal.id && !own ? '<span class="deal">今日 7 折</span>' : ''}<span class="rare-tag">${S.RARE[K.rare].name}</span>${K.series === 'yato' ? '<span class="collab-tag">夜都决战</span>' : ''}
         <div class="sk-art ${K.kind}">${skinArt(K)}</div><b>${K.name}</b><small>${who}</small>${K.trailer ? `<button class="btn small ghost sk-trailer" data-trailer="${K.id}">▶ 3D 战斗动画</button>` : ''}${btn}`;
       const tb = el.querySelector('[data-trailer]'); if (tb) tb.onclick = () => playTrailer(K.id);
@@ -4710,7 +4921,7 @@
   // ================= 启动 =================
   $('trSkip').onclick = () => { closeTrailer(); sfx.click(); };
   $('trReplay').onclick = () => { if (TRL.id) playTrailer(TRL.id); };
-  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, openHero, playTrailer, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
+  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, openHero, playTrailer, showResults, draftSt: () => draft, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
   boot().then(startAccount);

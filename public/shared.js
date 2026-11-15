@@ -257,52 +257,60 @@
     { id: 'candy_neon', kind: 'pilot', pilot: 'candy', name: '霓虹偶像', rare: 2, price: 150, over: { hair: '#a46bff', hair2: '#5b2bb0', accent: '#a46bff', eye: '#ff3ea5' } },
     { id: 'titan_hivis', kind: 'pilot', pilot: 'titan', name: '拆迁工装', rare: 1, price: 100, over: { accent: '#ff8a1f', hair: '#4a3020' } },
     { id: 'raven_ash', kind: 'pilot', pilot: 'raven', name: '灰烬', rare: 2, price: 150, over: { hair: '#c9ccd4', hair2: '#6c7078', accent: '#ff3b52', eye: '#ff3b52' } },
-    { id: 'echo_midnight', kind: 'pilot', pilot: 'echo', name: '午夜频道', rare: 3, price: 0, pass: 'p14', over: { hair: '#ff3ea5', hair2: '#8f1060', accent: '#ff3ea5', eye: '#2ef0c8' } },
-    { id: 'hammer_gold', kind: 'pilot', pilot: 'hammer', name: '金牌工头', rare: 4, price: 380, over: { accent: '#ffd35e', hair: '#1e120a' } },
-    { id: 'flag_red', kind: 'pilot', pilot: 'flag', name: '红旗特装', rare: 4, price: 0, pass: 'p30', over: { hair: '#c8102e', hair2: '#5a0012', accent: '#ffe14d', eye: '#ffe14d' } },
+    { id: 'echo_midnight', kind: 'pilot', pilot: 'echo', name: '午夜频道', rare: 3, entrance: 'dj', price: 0, pass: 'p14', over: { hair: '#ff3ea5', hair2: '#8f1060', accent: '#ff3ea5', eye: '#2ef0c8' } },
+    { id: 'hammer_gold', snd: 'gold', kind: 'pilot', pilot: 'hammer', name: '金牌工头', rare: 5, entrance: 'hammer', price: 380, over: { accent: '#ffd35e', hair: '#1e120a' } },
+    { id: 'flag_red', snd: 'flag', kind: 'pilot', pilot: 'flag', name: '红旗特装', rare: 5, entrance: 'flag', price: 0, pass: 'p30', over: { hair: '#c8102e', hair2: '#5a0012', accent: '#ffe14d', eye: '#ffe14d' } },
     // ---- 1.4：夏日系列 ----
-    { id: 'blaze_surf', kind: 'pilot', pilot: 'blaze', name: '冲浪少年', rare: 3, price: 320, series: 'summer', over: { hair: '#ffb21f', hair2: '#c45a0c', accent: '#1fd6ee', outfit: 'surf', extra: ['sunglasses', 'surfboard'] } },
-    { id: 'candy_beach', kind: 'pilot', pilot: 'candy', name: '海滩偶像', rare: 3, price: 320, series: 'summer', over: { hair: '#ff9ad6', hair2: '#d1408e', accent: '#ffe14d', eye: '#1fd6ee', outfit: 'swim', extra: ['strawhat', 'float'] } },
-    { id: 'frost_sorbet', kind: 'pilot', pilot: 'frost', name: '冰沙女王', rare: 4, price: 680, series: 'summer', over: { hair: '#bff3ff', hair2: '#5ec8f0', accent: '#7af0ff', eye: '#ff6ec4', outfit: 'sorbet', extra: ['icecrown', 'parasol'] } },
+    { id: 'blaze_surf', kind: 'pilot', pilot: 'blaze', name: '冲浪少年', rare: 3, entrance: 'surf', price: 320, series: 'summer', over: { hair: '#ffb21f', hair2: '#c45a0c', accent: '#1fd6ee', outfit: 'surf', extra: ['sunglasses', 'surfboard'] } },
+    { id: 'candy_beach', kind: 'pilot', pilot: 'candy', name: '海滩偶像', rare: 3, entrance: 'idol', price: 320, series: 'summer', over: { hair: '#ff9ad6', hair2: '#d1408e', accent: '#ffe14d', eye: '#1fd6ee', outfit: 'swim', extra: ['strawhat', 'float'] } },
+    { id: 'frost_sorbet', snd: 'ice', kind: 'pilot', pilot: 'frost', name: '冰沙女王', rare: 6, entrance: 'ice', bg: 'ice', price: 680, series: 'summer', over: { hair: '#bff3ff', hair2: '#5ec8f0', accent: '#7af0ff', eye: '#ff6ec4', outfit: 'sorbet', extra: ['icecrown', 'parasol'] } },
     { id: 'm_camo', kind: 'mech', name: '灰城迷彩', rare: 2, price: 0, pass: 'p5', paint: { frame: '#4a4d56', light: '#9aa0a8', joint: '#2a2c33' } },
     { id: 'm_chrome', kind: 'mech', name: '铬合金', rare: 2, price: 180, paint: { frame: '#c9d3dc', light: '#ffffff', joint: '#8c94ab' } },
     { id: 'm_graffiti', kind: 'mech', name: '涂鸦大师', rare: 3, price: 240, paint: { frame: '#ff3ea5', light: '#ffe600', joint: '#1fd6ee' } },
     { id: 'm_neon', kind: 'mech', name: '霓虹描边', rare: 3, price: 0, pass: 'p20', paint: { frame: '#141018', light: '#2ef0c8', joint: '#141018', glow: 1 } },
-    { id: 'm_gold', kind: 'mech', name: '金色传说', rare: 4, price: 380, paint: { frame: '#b88a1a', light: '#ffd35e', joint: '#7a5a10', glow: 1 } },
+    { id: 'm_gold', kind: 'mech', name: '金色传说', rare: 5, price: 380, paint: { frame: '#b88a1a', light: '#ffd35e', joint: '#7a5a10', glow: 1 } },
     { id: 'fx_stars', kind: 'fx', name: '星星涂料', rare: 2, price: 0, pass: 'p10', fx: { cols: ['#ffe600', '#ffffff'], n: 3 } },
     { id: 'fx_confetti', kind: 'fx', name: '派对彩纸', rare: 3, price: 0, pass: 'p28', fx: { cols: ['#ff3ea5', '#1fd6ee', '#9cff2e', '#ffe600'], n: 5 } },
     { id: 'fx_notes', kind: 'fx', name: '电台音符', rare: 2, price: 160, fx: { cols: ['#2ef0c8', '#a46bff'], n: 3 } },
-    { id: 'fx_galaxy', kind: 'fx', name: '星河涂料', rare: 4, price: 400, fx: { cols: ['#b78cff', '#4fb8ff', '#ffffff'], n: 6 } },
+    { id: 'fx_galaxy', kind: 'fx', name: '星河涂料', rare: 5, price: 400, fx: { cols: ['#b78cff', '#4fb8ff', '#ffffff'], n: 6 } },
     { id: 'fr_tape', kind: 'frame', name: '胶带框', rare: 1, price: 0, pass: 'f10', frame: 'tape' },
     { id: 'fr_neon', kind: 'frame', name: '霓虹框', rare: 2, price: 120, frame: 'neon' },
     { id: 'fr_rebel', kind: 'frame', name: '反抗军框', rare: 3, price: 0, pass: 'p23', frame: 'rebel' },
     { id: 'fr_gold', kind: 'frame', name: '金框', rare: 3, price: 220, frame: 'gold' },
-    { id: 'fr_flame', kind: 'frame', name: '烈焰框', rare: 4, price: 300, frame: 'flame' },
+    { id: 'fr_flame', kind: 'frame', name: '烈焰框', rare: 5, price: 300, frame: 'flame' },
     { id: 'av_flag', kind: 'avatar', name: '反抗军旗', rare: 2, price: 0, pass: 'f20', avatar: 'flag' },
     { id: 'av_can', kind: 'avatar', name: '喷漆罐', rare: 1, price: 60, avatar: 'can' },
     { id: 'av_cat', kind: 'avatar', name: '灰城猫', rare: 2, price: 90, avatar: 'cat' },
     { id: 'av_balloon', kind: 'avatar', name: '乐园气球', rare: 2, price: 0, event: 'parkfest', avatar: 'balloon' },
-    { id: 'fr_master', kind: 'frame', name: '大师段位框', rare: 4, price: 0, rank: 'master', frame: 'master' },
+    { id: 'fr_master', kind: 'frame', name: '大师段位框', rare: 5, price: 0, rank: 'master', frame: 'master' },
     // ---- 1.8：夜都决战联动系列（每套驾驶员皮肤都有一段约 20 秒的 3D 战斗动画） ----
-    { id: 'blaze_yato', kind: 'pilot', pilot: 'blaze', name: '夜都·学院生', rare: 3, price: 0, event: 'yato', series: 'yato', trailer: 1, over: { hair: '#e8382f', hair2: '#8f1022', accent: '#ff4d3d', outfit: 'academy', extra: ['sealband'] } },
-    { id: 'fu_moon', kind: 'pilot', pilot: 'fu', name: '月下符姬', rare: 3, price: 0, event: 'yato', series: 'yato', trailer: 1, over: { hair: '#2a2f5a', hair2: '#0d1030', accent: '#ffd35e', eye: '#ffd35e', outfit: 'academyW', extra: ['moonpin'] } },
-    { id: 'frost_yato', kind: 'pilot', pilot: 'frost', name: '夜都·封咒师', rare: 4, price: 880, series: 'yato', trailer: 1, over: { hair: '#f2f6ff', hair2: '#9aa6c8', accent: '#8a6bff', eye: '#b48cff', outfit: 'academyW', extra: ['talismans'] } },
-    { id: 'aka_wraith', kind: 'pilot', pilot: 'aka', name: '恶灵觉醒', rare: 4, price: 880, series: 'yato', trailer: 1, over: { hair: '#14101a', hair2: '#ff2d4b', accent: '#ff2d4b', eye: '#ff2d4b', outfit: 'academyH', extra: ['wraith', 'halfmask'] } },
+    { id: 'blaze_yato', kind: 'pilot', pilot: 'blaze', name: '夜都·学院生', rare: 3, entrance: 'academy', price: 0, event: 'yato', series: 'yato', trailer: 1, over: { hair: '#e8382f', hair2: '#8f1022', accent: '#ff4d3d', outfit: 'academy', extra: ['sealband'] } },
+    { id: 'fu_moon', kind: 'pilot', pilot: 'fu', name: '月下符姬', rare: 3, entrance: 'moon', price: 0, event: 'yato', series: 'yato', trailer: 1, over: { hair: '#2a2f5a', hair2: '#0d1030', accent: '#ffd35e', eye: '#ffd35e', outfit: 'academyW', extra: ['moonpin'] } },
+    { id: 'frost_yato', snd: 'yato', kind: 'pilot', pilot: 'frost', name: '夜都·封咒师', rare: 6, entrance: 'sealer', bg: 'yato', price: 880, series: 'yato', trailer: 1, over: { hair: '#f2f6ff', hair2: '#9aa6c8', accent: '#8a6bff', eye: '#b48cff', outfit: 'academyW', extra: ['talismans'] } },
+    { id: 'aka_wraith', snd: 'wraith', kind: 'pilot', pilot: 'aka', name: '恶灵觉醒', rare: 6, entrance: 'wraith', bg: 'wraith', price: 880, series: 'yato', trailer: 1, over: { hair: '#14101a', hair2: '#ff2d4b', accent: '#ff2d4b', eye: '#ff2d4b', outfit: 'academyH', extra: ['wraith', 'halfmask'] } },
     { id: 'm_talisman', kind: 'mech', name: '符纹', rare: 3, price: 0, event: 'yato', series: 'yato', paint: { frame: '#1d2140', light: '#d8b25a', joint: '#8a6bff', glow: 1 } },
     { id: 'fr_yato', kind: 'frame', name: '夜都结界框', rare: 3, price: 0, event: 'yato', frame: 'yato' },
     { id: 'av_talisman', kind: 'avatar', name: '封印符', rare: 2, price: 0, event: 'yato', avatar: 'talisman' },
+    // ---- 1.9：排位赛第一赛季「烈士」 ----
+    { id: 'blaze_martyr', kind: 'pilot', pilot: 'blaze', name: '烈士·战火', rare: 2, price: 0, road: 1, series: 's1rank', over: { hair: '#e8382f', hair2: '#8f1022', accent: '#c8102e', outfit: 'rebel', extra: ['sealband'] } },
+    { id: 'flag_martyr', snd: 'martyr', kind: 'pilot', pilot: 'flag', name: '烈士·不灭战旗', rare: 4, price: 0, shards: 20, series: 's1rank', entrance: 'warbanner', bg: 'martyr', over: { hair: '#f2f2f6', hair2: '#a8a8b8', accent: '#ffd35e', eye: '#ffd35e', outfit: 'martyr', extra: ['warbanner'] } },
+    { id: 'fr_final', kind: 'frame', name: '终末传说框', rare: 5, price: 0, road: 1, frame: 'final' },
   ];
   S.skin = (id) => S.SKINS.find((k) => k.id === id);
   S.SKIN_KINDS = [['pilot', '驾驶员服装'], ['mech', '机甲涂装'], ['fx', '涂料特效'], ['frame', '名片框'], ['avatar', '头像']];
   // 皮肤等级：等级越高特效越多（对战里的表现见 render3d.js / client.js）
+  // 1.9：皮肤品质重做——史诗 < 赛季传说 < 传说 < 限定传说（史诗起都有专属进场动作）
   S.RARE = [null,
     { name: '普通', c: '#9aa0a8', fx: '专属配色' },
     { name: '稀有', c: '#4fb8ff', fx: '专属配色 + 移动闪光拖尾' },
-    { name: '史诗', c: '#b78cff', fx: '专属配色 + 闪光拖尾 + 发光部件呼吸灯 + 空投 / 复活爆发特效' },
-    { name: '传说', c: '#ffc531', fx: '以上全部 + 常驻环绕光环 + 地面光圈 + 击倒特效 + 金边大招横幅' },
+    { name: '史诗', c: '#b78cff', fx: '专属进场动作 + 闪光拖尾 + 发光部件呼吸灯 + 空投 / 复活爆发特效' },
+    { name: '赛季传说', c: '#ff9a3d', fx: '专属进场动作 + 史诗全部特效 + 环绕光环 + 地面光圈 + 金边大招横幅' },
+    { name: '传说', c: '#ffc531', fx: '赛季传说全部 + 更强的光环 + 子弹星光拖尾 + 专属击倒特效 + 专属开火 / 命中音效' },
+    { name: '限定传说', c: '#ff3e8a', fx: '传说全部 + 专属背景 + 主题粒子特效（脚印 / 环绕 / 击倒）+ 专属大招横幅 + 主题开火手感' },
   ];
-  S.FX_RARE = [null, '命中时少量彩色涂料', '命中时迸出彩色光点', '命中时迸出大片光点 + 枪口闪光', '命中光点 + 子弹拖尾 + 枪口星爆'];
-  S.FRAME_RARE = [null, '静态边框', '霓虹呼吸光', '流动条纹动画', '火焰流光动画'];
+  S.FX_RARE = [null, '命中时少量彩色涂料', '命中时迸出彩色光点', '命中时迸出大片光点 + 枪口闪光', '命中光点 + 子弹拖尾 + 枪口星爆', '命中光点 + 子弹拖尾 + 枪口星爆', '命中光点 + 子弹拖尾 + 枪口星爆'];
+  S.FRAME_RARE = [null, '静态边框', '霓虹呼吸光', '流动条纹动画', '火焰流光动画', '火焰流光动画', '火焰流光动画'];
+  S.rareName = (r) => (S.RARE[r] || S.RARE[1]).name;
   S.TALENT_SLOTS = 3;
 
   // ---------------- 驾驶员被摧毁后：弹出继续战斗 ----------------
@@ -1132,17 +1140,35 @@
   };
 
   // ---------------- 比赛奖励（客户端显示和服务器结算用同一套算法） ----------------
-  S.mvpOf = function (result) {
-    const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
+  // 1.9：表现评分（击毁 / 涂地 / 目标 / 助攻 − 倒下）和结算评级：MVP > 钻石标 > 黄金标 > 白银标 > 青铜标
+  S.perfScore = (p) => Math.max(0, (p.kills || 0) * 100 + (p.paint || 0) + (p.obj || 0) * 150 + (p.assists || 0) * 50 - (p.deaths || 0) * 40);
+  S.BADGES = [
+    { id: 'bronze', name: '青铜标', c: '#c27a3e' }, { id: 'silver', name: '白银标', c: '#cfd8e2' }, { id: 'gold', name: '黄金标', c: '#ffcf3a' },
+    { id: 'diamond', name: '钻石标', c: '#7ae0ff' }, { id: 'mvp', name: 'MVP', c: '#ff5aa8' },
+  ];
+  S.badgesOf = function (result) {
+    const ps = result.players.filter((p) => !p.npc), top = Math.max(1, ...ps.map(S.perfScore)), out = {};
+    const mv = new Set(), teams = result.winner && !result.place ? [...new Set(ps.map((p) => p.team))] : result.winner ? [result.winner] : [];
+    for (const t of teams) { const m = S.mvpOf(result, t); if (m) mv.add(m.id); }
+    for (const p of ps) {
+      const f = S.perfScore(p) / top;
+      out[p.id] = mv.has(p.id) ? 4 : f >= 0.75 ? 3 : f >= 0.5 ? 2 : f >= 0.25 ? 1 : 0;
+    }
+    return out;
+  };
+  S.mvpOf = function (result, team) {   // 默认是胜方 MVP；传 team 就是那一队的最佳（1.9：败方 MVP）
+    if (team == null) team = result.winner;
+    const val = (p) => S.perfScore(p) + 0.001 * (p.kills * 100 + p.paint + p.obj * 150);
     let mvp = null;
-    for (const p of result.players) if (p.team === result.winner && (!mvp || val(p) > val(mvp))) mvp = p;
+    for (const p of result.players) if (p.team === team && !p.npc && (!mvp || val(p) > val(mvp))) mvp = p;
     return mvp;
   };
   S.matchReward = function (result, pid) {
     const me = result.players.find((p) => p.id === pid);
     if (!me) return null;
     const won = result.winner === me.team, draw = !result.winner, mvp = S.mvpOf(result);
-    const isMvp = !!(mvp && mvp.id === pid);
+    const lm = !won && !draw && !result.place && result.mode !== 'loot' ? S.mvpOf(result, me.team) : null;
+    const isMvp = !!(mvp && mvp.id === pid) || !!(lm && lm.id === pid);   // 1.9：败方 MVP 也算（排位输了只扣一半）
     if (result.mode === 'loot') {   // 1.6：搜刮撤离——撤离成功才有物资；奖杯按是否撤离
       const L = (result.loot && result.loot.players[pid]) || { ex: false, items: [] };
       const v = L.ex ? S.lootValue(L.items) : 0;
@@ -1188,9 +1214,70 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.8';
+  S.VERSION = '1.9';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.9', date: '2026-11-15', title: '1.9 更新 · 排位赛第一赛季「烈士」', en_title: 'Update 1.9 · Ranked Season 1 “Martyr”', sections: [
+      ['排位赛第一赛季「烈士」', [
+        '全新的排位赛界面：中间是你的大段位徽章和分数，左边是规则，右边是本时段玩法',
+        '10 个段位：铜铁 → 白铁 → 黄铁 → 白金 → 黄金 → 钻石 → 星耀 → 荣誉传说 → 至尊传说 → 终末传说（铁段每段 100 分，金段 150 分，钻石 / 星耀 200 分，传说段 400 分）',
+        '赢一局 +10 分，拿到 MVP 翻倍 +20；输一局 −5 分，钻石起输了扣 10 分；输了但拿到 MVP（败方 MVP）只扣一半',
+        '黄铁及以下掉分不掉段；新赛季开始时分数减半（例如星耀 800 分 → 白金 400 分）']],
+      ['夺冠之路', [
+        '打到指定分数自动领奖：宝石、军用箱、特攻队补给箱、稀有赛季皮肤「烈士·战火」、金色空投、水晶……',
+        '荣誉传说起每 200 分送 5 个传说碎片；集齐 20 个兑换赛季传说皮肤「烈士·不灭战旗」（带专属进场动作和战旗背景）',
+        '打到终末传说送「终末传说框」']],
+      ['MLBB 式禁用 / 选人', [
+        '钻石起先进入禁用阶段：双方轮流各禁 2 个驾驶员或机体',
+        '然后按 1-2-2-2-1 的顺序一个一个选人，双方加起来同一个驾驶员 / 机体只能出现一次',
+        'AI 队友和对手也会选：有的秒选，有的想一想，有的犹豫半天换来换去，有的不小心挂机让系统帮选']],
+      ['开局观察界面', [
+        '每局开始前约 5 秒：左右两边是双方的驾驶员、机体、等级和皮肤品质，中间是你的驾驶员在 3D 里做进场动作',
+        '排位赛还会显示本局被禁用的驾驶员和机体']],
+      ['皮肤品质重做', [
+        '品质分成：普通 → 稀有 → 史诗 → 赛季传说 → 传说 → 限定传说',
+        '限定传说（夜都·封咒师、恶灵觉醒、冰沙女王）：专属进场动作、专属背景、主题粒子（冰雪 / 符纸 / 恶灵火）、主题脚印和击倒特效',
+        '传说（金牌工头、红旗特装）：专属进场动作、更强的光环、子弹星光拖尾',
+        '部分传说 / 限定传说皮肤有专属的开火声和命中声，手感也完全不同：金牌工头是金币叮当，红旗特装和烈士·不灭战旗是军鼓（带后坐震动），冰沙女王是冰晶风铃，夜都·封咒师是符纸破空，恶灵觉醒是恶灵低吼',
+        '赛季传说（烈士·不灭战旗）：专属进场动作和背景，特效比传说稍弱',
+        '史诗（午夜频道、冲浪少年、海滩偶像、夜都·学院生、月下符姬）：每套都有不一样的进场动作',
+        '进场动作在角色页面（新按钮「✦ 进场动作」）、开局观察界面和开打瞬间的落地特效里都能看到']],
+      ['结算评级', [
+        '按表现评分（击毁、涂地、目标、助攻，减去倒下）给每个人评级：MVP、钻石标、黄金标、白银标、青铜标',
+        '新增「助攻」数据：敌人倒下前 8 秒内打中过它就算助攻',
+        '输的一方表现最好的人是「败方 MVP」']],
+      ['更新奖励', ['信箱里有一份 1.9 更新礼包：100 宝石 + 特攻队补给箱 + 5 个传说碎片']],
+    ], en: [
+      ['Ranked Season 1 “Martyr”', [
+        'A brand-new Ranked screen: your big tier badge and points in the middle, the rules on the left and the current mode on the right',
+        '10 tiers: Rust Iron → Steel Iron → Brass Iron → Platinum → Gold → Diamond → Starlight → Honor Legend → Supreme Legend → Final Legend (100 points per iron tier, 150 per gold tier, 200 for Diamond / Starlight, 400 per legend tier)',
+        'A win gives +10, doubled to +20 with MVP. A loss costs 5, or 10 from Diamond up. If you lose but are the losing-side MVP, you only lose half',
+        'At Brass Iron and below you can lose points but never drop a tier. Points are halved when a new season starts (e.g. Starlight 800 → Platinum 400)']],
+      ['Road to Glory', [
+        'Rewards unlock automatically at each score: gems, a Military Crate, a Strike Team Chest, the rare season skin Martyr · Warfire, a Golden Airdrop, crystals…',
+        'From Honor Legend, every 200 points gives 5 Legend Shards. Collect 20 to exchange for the Season Legendary skin Martyr · Undying Banner (with its own entrance and war-banner background)',
+        'Reach Final Legend to get the Final Legend Frame']],
+      ['MLBB-style bans and picks', [
+        'From Diamond up, a ban phase comes first: each team bans 2 pilots or mechs, taking turns',
+        'Then picks go one by one in a 1-2-2-2-1 order, and no pilot or mech can appear twice across both teams',
+        'AI teammates and opponents pick too: some lock in instantly, some think for a moment, some hesitate and switch, and some go AFK and let the system pick']],
+      ['Pre-match scouting screen', [
+        'About 5 seconds before each match: both teams’ pilots, mechs, levels and skin rarities on either side, and your pilot doing their entrance in 3D in the middle',
+        'Ranked also shows the pilots and mechs banned this match']],
+      ['Skin rarity rework', [
+        'Rarities are now: Common → Rare → Epic → Season Legendary → Legendary → Limited Legendary',
+        'Limited Legendary (Night City · Sealer, Wraith Awakened, Sorbet Queen): unique entrance, unique background, themed particles (snow / talismans / wraith fire), themed footsteps and KO effects',
+        'Legendary (Golden Foreman, Red Banner): unique entrance, a stronger halo and starlight bullet trails',
+        'Some Legendary and Limited Legendary skins have their own shot and hit sounds and a completely different feel: coin clinks for Golden Foreman, war drums with recoil kick for Red Banner and Martyr · Undying Banner, crystal chimes for Sorbet Queen, paper-talisman whooshes for Night City · Sealer and a wraith growl for Wraith Awakened',
+        'Season Legendary (Martyr · Undying Banner): unique entrance and background, with slightly lighter effects than Legendary',
+        'Epic (Midnight Channel, Surf Kid, Beach Idol, Night City · Student, Moonlit Charm Maiden): each one has its own entrance',
+        'See entrances on the pilot page (new “✦ Entrance” button), on the scouting screen, and in the drop-in effect when the match starts']],
+      ['Match ratings', [
+        'Everyone gets a rating from their performance score (takedowns, paint, objectives and assists, minus deaths): MVP, Diamond Badge, Gold Badge, Silver Badge or Bronze Badge',
+        'New Assists stat: hitting an enemy in the 8 seconds before they go down counts as an assist',
+        'The best player on the losing team is the losing-side MVP']],
+      ['Update reward', ['Your mailbox has an Update 1.9 gift: 100 gems + a Strike Team Chest + 5 Legend Shards']],
+    ] },
     { v: '1.8', date: '2026-11-15', title: '1.8 更新 · 夜都决战', en_title: 'Update 1.8 · Night City Showdown', sections: [
       ['联动活动「夜都决战」（14 天）', [
         '原创都市咒术风联动：午夜的夜都，咒灵从地铁站里涌了出来！',
