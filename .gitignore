@@ -8,3 +8,6 @@ site/downloads/
 _site/
 _zip/
 site/game/
+
+# e2e 截图（测试脚本有时写到仓库根目录）
+/*.png
