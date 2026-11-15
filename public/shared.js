@@ -520,7 +520,7 @@
   S.ESCORT_TARGET = 3; S.SOCCER_TARGET = 5; S.BATTERY_TARGET = 40;
   // 乐园模式：花车沿路线巡游（格子坐标），光圈半径、每秒得分、气球分数、目标分
   // 1.8：咒灵讨伐 / 封印争夺
-  S.RAID = { hp: 11000, r: 46, time: 240, rage: 0.5 };   // 百目（玩家方总是 4 人：真人 + AI 补位）
+  S.RAID = { hp: 10000, r: 46, time: 240, rage: 0.5 };   // 百目（玩家方总是 4 人：真人 + AI 补位）
   S.SEAL = { target: 25, carry: 6, spiritMax: 5, spiritT: 6, stoneT: 7, stoneMax: 8, drop: 2, team: 3 };
   S.PARK = { path: [[38, 22], [82, 22], [82, 58], [38, 58]], loop: 64, r: 92, tick: 1, balloon: 3, target: 100, maxBalloons: 6, balloonT: 3.5 };
 
@@ -1239,6 +1239,7 @@
         '岚：众志成城每名队友减伤 8% → 10%（最多 30%），范围 200 → 260',
         '韩冰：倒戈伤害 +8% → +14%；超载「反戈一击」减伤 20% → 25%、反弹 50% → 60%',
         '包大福：超载「满汉全席」每秒回复 8 → 10',
+        '咒灵讨伐：百目生命 11000 → 10000',
         '调整后驾驶员胜率从 39%–58% 收窄到约 46%–53%；AI 的排位禁用参考数据也同步更新']],
       ['更新奖励', ['信箱里有一份 1.9.1 更新礼包：80 宝石 + 3 个传说碎片']],
     ], en: [
@@ -1263,6 +1264,7 @@
         'Lan: Strength in Numbers damage reduction per ally 8% → 10% (up to 30%), range 200 → 260',
         'Han: Turncoat damage +8% → +14%; overload Turncoat Strike damage reduction 20% → 25%, reflect 50% → 60%',
         'Bao: overload Grand Feast healing per second 8 → 10',
+        'Curse Raid: Hundred-Eyes HP 11000 → 10000',
         'Pilot win rates went from 39%–58% to about 46%–53%; the AI’s ranked ban data was updated to match']],
       ['Update reward', ['Your mailbox has an Update 1.9.1 gift: 80 gems + 3 Legend Shards']],
     ] },

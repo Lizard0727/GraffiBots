@@ -30,7 +30,10 @@ for (const mode of S.MODE_ORDER) {
     const extra = r.place ? ` 名次 ${r.place.join('>')}` : r.rounds ? ` 回合 ${r.rounds[1]}:${r.rounds[2]}` : mode === 'zone' ? ` 倒计时 ${r.count[1]}/${r.count[2]}` : mode === 'turf' ? '' : ` 比分 ${r.score[1]}:${r.score[2]}`;
     let high = 0;
     for (let i = 0; i < g.grid.length; i++) if (g.grid[i] && g.M.top[i] > 0) high++;
-    const ok = g.over && kills > 0 && (S.MODES[mode].oneLife || paintless.length === 0) && (!r.place || r.place.length === r.teams);
+    // 咒灵讨伐：AI 小队偶尔会超时打不完百目（这是挑战玩法），只要求把百目打掉一半以上血
+    const boss = mode === 'raid' ? [...g.players.values()].find((q) => q.boss) : null;
+    const bossOk = !boss || r.winner === 1 || boss.hp < S.RAID.hp * 0.5;
+    const ok = g.over && (kills > 0 || (boss && bossOk)) && bossOk && (S.MODES[mode].oneLife || paintless.length === 0) && (!r.place || r.place.length === r.teams);
     if (!ok) failed++;
     console.log(`${ok ? '✓' : '✗'} ${S.MODES[mode].name.padEnd(5, '　')} @ ${S.MAPS[map].name}  用时 ${(ticks / S.TICK).toFixed(0)}s  胜方 ${r.winner} (${r.reason})  涂地 ${(r.turf[0] * 100).toFixed(1)}%/${(r.turf[1] * 100).toFixed(1)}%${extra}  击倒 ${kills}  高台涂色 ${high}格  模拟耗时 ${ms}ms${paintless.length ? '  ⚠ 几乎没涂地: ' + paintless.join(',') : ''}`);
   }
