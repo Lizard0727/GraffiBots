@@ -20,7 +20,7 @@ for (const mode of S.MODE_ORDER) {
     const g = new Game(room, { manual: true });
     let ticks = 0;
     const t0 = Date.now();
-    const cap = S.MODES[mode].oneLife ? 420 : 200;
+    const cap = S.MODES[mode].oneLife ? 420 : mode === 'raid' ? S.RAID.time + 20 : 200;
     while (!g.over && ticks < cap * S.TICK) { g.step(); ticks++; }
     if (!g.over) { console.log(`✗ ${S.MODES[mode].name} @ ${S.MAPS[map].name}：${cap} 秒内没打完`); failed++; continue; }
     const r = g.result;

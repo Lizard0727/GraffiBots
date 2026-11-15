@@ -17,6 +17,7 @@
     parts: { name: '零件', short: '零件', color: '#7af0ff' },
     crystals: { name: '能量结晶', short: '结晶', color: '#b78cff' },
     tickets: { name: '乐园票', short: '乐园票', color: '#ff6ec4' },   // 乐园祭活动代币
+    talismans: { name: '灵符', short: '灵符', color: '#b48cff' },   // 1.8：夜都决战活动代币
   };
   // 常驻角色：新手宝箱从这 5 位里给 1 位
   E.STARTER_PILOTS = ['blaze', 'frost', 'candy', 'titan', 'raven'];
@@ -47,6 +48,9 @@
   E.SEASON_MECHS = ['dozer', 'flamer', 'carrier', 'wrecker', 'megaphone'];
   E.QUEST_ONLY = ['han', 'riot'];   // 只能通过任务获得，不会从宝箱开出
   E.STRIKE_MECHS = ['blade', 'stinger', 'phantom'];   // 袭击！特攻队：只会从「特攻队补给箱」开出
+  // 1.8：夜都决战联动角色——不会从宝箱、限时购买里出现（符零 / 结界机兵：活动任务；赤镰 / 灵刃机兵：宝石购买）
+  E.COLLAB = { pilots: ['fu', 'aka'], mechs: ['warden', 'reaper'], quest: ['fu', 'warden'], shop: [{ k: 'pilot', id: 'aka', gems: 480 }, { k: 'mech', id: 'reaper', gems: 360 }], bundle: 720 };
+  E.noDrop = (id) => E.QUEST_ONLY.includes(id) || E.COLLAB.pilots.includes(id) || E.COLLAB.mechs.includes(id);
   E.NEW_OFFER = { pilot: 'kaka', mech: 'slinger', until: Date.UTC(2026, 10, 28, 16) };   // 新常驻角色上架期间，限时购买必出
   // ---------------- 限时活动 ----------------
   const RW = (k, n) => ({ k, n }), RC = (id) => ({ k: 'chest', id, n: 1 }), RS = (id) => ({ k: 'skin', id });
@@ -63,10 +67,21 @@
       quests: [['park', 3, RW('tickets', 60)], ['parkwin', 3, RW('tickets', 80)], ['balloons', 15, RW('tickets', 80)], ['float', 120, RW('tickets', 100)], ['play', 10, RW('tickets', 60)], ['park', 10, RW('tickets', 150)]],
       shop: [{ it: RC('strike'), cost: 120, limit: 5 }, { it: RS('candy_beach'), cost: 400, limit: 1 }, { it: RS('av_balloon'), cost: 60, limit: 1 }, { it: RC('airdrop'), cost: 200, limit: 2 },
         { it: RW('gems', 50), cost: 80, limit: 5 }, { it: RW('crystals', 1), cost: 150, limit: 2 }, { it: RW('coins', 800), cost: 60, limit: 5 }] },
+    // 1.8：夜都决战（原创都市咒术风联动活动）
+    { id: 'yato', name: '夜都决战', start: Date.UTC(2026, 10, 15, 0), end: Date.UTC(2026, 10, 29, 16), color: '#8a6bff', cur: 'talismans', collab: true,
+      desc: '午夜的夜都，咒灵从地铁站里涌了出来！玩限时玩法「咒灵讨伐」「封印争夺」赚取灵符：完成任务免费获得新驾驶员「符零」和结界机兵，在活动商店兑换联动皮肤。每局讨伐 / 封印都会额外给灵符，其它模式也有少量。',
+      curPer: { raid: 10, seal: 10 }, curWin: 5, curOther: 3,
+      quests: [['play', 3, RW('talismans', 60)], ['raid', 3, RW('talismans', 80)], ['raidwin', 1, { k: 'pilot', id: 'fu' }], ['seal', 3, RW('talismans', 80)], ['seals', 20, RW('talismans', 100)],
+        ['spirits', 25, { k: 'mech', id: 'warden' }], ['win', 8, RW('talismans', 120)], ['raidwin', 5, RW('talismans', 200)]],
+      shop: [{ it: RS('blaze_yato'), cost: 360, limit: 1 }, { it: RS('fu_moon'), cost: 420, limit: 1 }, { it: RS('m_talisman'), cost: 240, limit: 1 }, { it: RS('fr_yato'), cost: 150, limit: 1 },
+        { it: RS('av_talisman'), cost: 60, limit: 1 }, { it: RC('airdrop'), cost: 200, limit: 2 }, { it: RC('strike'), cost: 120, limit: 3 }, { it: RW('gems', 50), cost: 80, limit: 5 },
+        { it: RW('crystals', 1), cost: 150, limit: 2 }, { it: RW('coins', 800), cost: 60, limit: 5 }],
+      login: [RW('talismans', 50), RW('coins', 800), RW('talismans', 80), RC('military'), RW('talismans', 100), RW('gems', 80), RC('airdrop')] },
   ];
   E.EVENT_STAT = { play: '完成 {n} 局对战', win: '赢 {n} 局', kills: '击毁 / 击倒 {n} 次', paint: '涂地 {n} 格', elim: '玩 {n} 局生死之战', escape: '玩 {n} 局逃亡圈', top3: '逃亡圈进入前三名 {n} 次', crates: '逃亡圈捡 {n} 个空投箱',
     park: '玩 {n} 局乐园模式', parkwin: '乐园模式赢 {n} 局', balloons: '打爆 {n} 个气球', float: '在花车光圈里累计 {n} 秒', ranked: '玩 {n} 局排位赛', lvl: '账号升到 {n} 级',
-    lootex: '搜刮撤离成功撤离 {n} 次', lootv: '累计撤离价值 {n} 的物资', lootgold: '带出 {n} 件传说物资', loothi: '高危行动成功撤离 {n} 次', loot: '玩 {n} 局搜刮撤离' };
+    lootex: '搜刮撤离成功撤离 {n} 次', lootv: '累计撤离价值 {n} 的物资', lootgold: '带出 {n} 件传说物资', loothi: '高危行动成功撤离 {n} 次', loot: '玩 {n} 局搜刮撤离',
+    raid: '玩 {n} 局咒灵讨伐', raidwin: '咒灵讨伐成功 {n} 次', seal: '玩 {n} 局封印争夺', seals: '存入 {n} 个封印石', spirits: '打倒 {n} 只咒灵' };
   E.statName = (k, n) => E.EVENT_STAT[k].replace('{n}', n);
   E.activeEvents = (now) => E.EVENTS.filter((ev) => (now || Date.now()) >= ev.start && (now || Date.now()) < ev.end);
   // ---------------- 任务线：叛将档案（永久） ----------------
@@ -142,6 +157,7 @@
   // ---------------- 信箱（系统邮件：版本补偿 / 活动礼包） ----------------
   E.MAILS = [
     { id: 'v15', t: Date.UTC(2026, 10, 14, 4), from: '灰城反抗军指挥部', title: '1.5 更新礼包', body: '1.5 版本上线啦：点驾驶员和机体就能进入全新的角色页面，画面更精致，所有角色和机体都重新调整了平衡。这份更新礼包请收下！', items: [RW('gems', 150), RC('hero'), RW('coins', 1500)] },
+    { id: 'v18', t: Date.UTC(2026, 10, 15, 6), from: '夜都术师学院', title: '1.8 更新礼包 · 夜都决战', body: '午夜的夜都，咒灵从地铁站里涌了出来！联动活动「夜都决战」开幕：新驾驶员符零和赤镰、结界机兵和灵刃机兵、限时玩法「咒灵讨伐」「封印争夺」都上线了。这些灵符请收下，去活动商店看看联动皮肤吧！', items: [RW('talismans', 150), RW('gems', 100), RC('military')] },
     { id: 'v17', t: Date.UTC(2026, 10, 15, 5), from: '灰城反抗军指挥部', title: '1.7 更新礼包', body: '好友系统和组队开黑上线了！把你的好友码发给朋友，拉上他们一起打——所有模式都能组队，排位赛也行。人不够就让 AI 队友补位。', items: [RW('gems', 100), RW('coins', 1500), RC('military')] },
     { id: 'v16', t: Date.UTC(2026, 10, 15, 2), from: '灰城反抗军指挥部', title: '1.6 更新礼包', body: '全新玩法「搜刮撤离」上线！进入两张超大地图搜刮物资、和其他小队争夺，活着撤离就能把物资带回仓库。送你几件装备，去高危行动碰碰运气吧！', items: [RW('gems', 150), RW('coins', 2000), RC('military')] },
     { id: 'v141', t: Date.UTC(2026, 10, 14, 3), from: '灰城反抗军指挥部', title: '1.4.1 更新礼包', body: '对战里可以打字聊天啦！按 Enter（手机点 💬）就能和队友、对手说话。排位赛的对手也按段位重新划分了水平。这份小礼物请收下！', items: [RW('gems', 80), RW('coins', 1500), RW('tickets', 50)] },
@@ -162,8 +178,8 @@
     let h = (slot * 2654435761 + 97) >>> 0;
     const rnd = () => { h = (h * 1103515245 + 12345) >>> 0; return h / 4294967296; };
     const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    const pp = shuffle(S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.QUEST_ONLY.includes(id)));
-    const mm = shuffle(S.WEAPON_ORDER.filter((id) => !E.SEASON_MECHS.includes(id) && !E.QUEST_ONLY.includes(id) && !E.STRIKE_MECHS.includes(id)));
+    const pp = shuffle(S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.noDrop(id)));
+    const mm = shuffle(S.WEAPON_ORDER.filter((id) => !E.SEASON_MECHS.includes(id) && !E.noDrop(id) && !E.STRIKE_MECHS.includes(id)));
     // 新常驻角色 / 机体上架期间排在最前面
     if ((now || Date.now()) < E.NEW_OFFER.until) { pp.sort((a, b) => (b === E.NEW_OFFER.pilot) - (a === E.NEW_OFFER.pilot)); mm.sort((a, b) => (b === E.NEW_OFFER.mech) - (a === E.NEW_OFFER.mech)); }
     // 优先给还没有的；都有了就照常显示（标成已拥有）
@@ -228,8 +244,8 @@
   // ---------------- 资料 ----------------
   const POOL = {
     starter: () => E.STARTER_PILOTS,
-    standard: () => S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.QUEST_ONLY.includes(id)),
-    all: () => S.PILOTS.map((p) => p.id).filter((id) => !E.QUEST_ONLY.includes(id)),
+    standard: () => S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.noDrop(id)),
+    all: () => S.PILOTS.map((p) => p.id).filter((id) => !E.noDrop(id)),
   };
   const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(+v || 0)));
   E.newProfile = function (name) {
@@ -249,7 +265,7 @@
     if (!p || typeof p !== 'object' || p.v !== E.VERSION) return E.newProfile(name != null ? name : p && typeof p.name === 'string' ? p.name : '');
     const o = E.newProfile(typeof p.name === 'string' ? p.name : name || '');
     o.tut = p.tut ? 1 : 0;
-    for (const k of ['coins', 'gems', 'parts', 'crystals', 'tickets', 'trophies', 'xp', 'matches', 'wins', 'kills', 'paint', 'day', 'dayWin', 'tpBonus', 'streak', 'bestStreak']) o[k] = int(p[k], 0, 1e9);
+    for (const k of ['coins', 'gems', 'parts', 'crystals', 'tickets', 'talismans', 'trophies', 'xp', 'matches', 'wins', 'kills', 'paint', 'day', 'dayWin', 'tpBonus', 'streak', 'bestStreak']) o[k] = int(p[k], 0, 1e9);
     // 天赋：只保留按顺序点亮的（同一支必须先点前一级）
     const want = new Set(Array.isArray(p.talents) ? p.talents : []);
     o.talents = S.TALENTS.filter((t) => want.has(t.id)).filter((t, _, arr) => t.tier === 1 || arr.some((u) => u.br === t.br && u.tier === t.tier - 1)).map((t) => t.id);
@@ -283,6 +299,8 @@
     if (p.lootRec && typeof p.lootRec === 'object') for (const k of Object.keys(o.lootRec)) o.lootRec[k] = int(p.lootRec[k], 0, 1e9);
     o.mailGot = Array.isArray(p.mailGot) ? [...new Set(p.mailGot.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
     o.mailDel = Array.isArray(p.mailDel) ? [...new Set(p.mailDel.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
+    o.evLogin = {};   // 1.8：活动登录奖励 { 活动 id: { n 已领天数, d 最后领取的日期 } }
+    if (p.evLogin && typeof p.evLogin === 'object') for (const ev of E.EVENTS) { const L = p.evLogin[ev.id]; if (L && ev.login) o.evLogin[ev.id] = { n: int(L.n, 0, ev.login.length), d: Number.isInteger(L.d) ? L.d : -1 }; }
     o.ev = {};
     if (p.ev && typeof p.ev === 'object') for (const ev of E.EVENTS) { const q = p.ev[ev.id]; if (q) o.ev[ev.id] = { p: ev.quests.map((_, i) => int(Array.isArray(q.p) ? q.p[i] : 0, 0, 1e7)), c: ev.quests.map((_, i) => !!(Array.isArray(q.c) && q.c[i])), s: (ev.shop || []).map((_, i) => int(Array.isArray(q.s) ? q.s[i] : 0, 0, 999)) }; }
     o.tl = {};
@@ -363,7 +381,7 @@
       if (rand() >= d.p) continue;
       if (d.k === 'pilot' || d.k === 'mech') {
         const pool = d.k === 'pilot' ? POOL[d.pool]().filter((id) => !o.pilots[id])
-          : (d.pool === 'strike' ? E.STRIKE_MECHS : S.WEAPON_ORDER.filter((id) => !E.QUEST_ONLY.includes(id) && !E.STRIKE_MECHS.includes(id))).filter((id) => !o.mechs.includes(id));
+          : (d.pool === 'strike' ? E.STRIKE_MECHS : S.WEAPON_ORDER.filter((id) => !E.noDrop(id) && !E.STRIKE_MECHS.includes(id))).filter((id) => !o.mechs.includes(id));
         if (!pool.length) { items.push({ k: 'coins', n: C.dup, dup: d.k }); continue; }
         const id = pool[Math.floor(rand() * pool.length) % pool.length];
         items.push({ k: d.k, id });
@@ -373,7 +391,7 @@
   }
   function grant(o, items) {
     for (const it of items) {
-      if (it.k === 'pilot') { o.pilots[it.id] = { lv: 1, bt: 0 }; if (!o.pilots[o.pilot]) o.pilot = it.id; }
+      if (it.k === 'pilot') { if (!o.pilots[it.id]) o.pilots[it.id] = { lv: 1, bt: 0 }; if (!o.pilots[o.pilot]) o.pilot = it.id; }
       else if (it.k === 'mech') { if (!o.mechs.includes(it.id)) o.mechs.push(it.id); }
       else if (it.k === 'chest') o.chests[it.id] = (o.chests[it.id] || 0) + it.n;
       else if (it.k === 'skin') { if (!o.skins.includes(it.id)) o.skins.push(it.id); }
@@ -599,11 +617,35 @@
         if (!st.s) st.s = ev.shop.map(() => 0);
         if (st.s[i] >= item.limit) return no('已经兑换完了');
         if (item.it.k === 'skin' && o.skins.includes(item.it.id)) return no('已经拥有了');
-        if ((o.tickets || 0) < item.cost) return no(`乐园票不够（需要 ${item.cost}）`);
-        o.tickets -= item.cost; st.s[i]++;
+        const cur = ev.cur || 'tickets';
+        if ((o[cur] || 0) < item.cost) return no(`${E.CUR[cur].name}不够（需要 ${item.cost}）`);
+        o[cur] -= item.cost; st.s[i]++;
         const it = Object.assign({}, item.it);
         grant(o, [it]);
-        return { ok: true, items: [it], spent: { tickets: item.cost } };
+        return { ok: true, items: [it], spent: { [cur]: item.cost } };
+      }
+      case 'evLogin': {   // 1.8：活动登录奖励（每天领一次，共 7 天）
+        const ev = E.activeEvents(a.now).find((x) => x.id === a.id);
+        if (!ev || !ev.login) return no('活动已经结束了');
+        const LL = o.evLogin || (o.evLogin = {}), L = LL[ev.id] || (LL[ev.id] = { n: 0, d: -1 }), d = E.dayIndex(a.now);
+        if (L.n >= ev.login.length) return no('登录奖励已经全部领完了');
+        if (L.d === d) return no('今天已经领过了，明天再来');
+        const it = Object.assign({}, ev.login[L.n]);
+        L.n++; L.d = d;
+        grant(o, [it]);
+        return { ok: true, items: [it] };
+      }
+      case 'collabBuy': {   // 1.8：宝石购买联动角色 / 机体（id = 'bundle' 一起买更便宜）
+        const C2 = E.COLLAB, own = (x) => (x.k === 'pilot' ? !!o.pilots[x.id] : o.mechs.includes(x.id));
+        const list = a.id === 'bundle' ? C2.shop.filter((x) => !own(x)) : C2.shop.filter((x) => x.id === a.id);
+        if (!list.length) return no(a.id === 'bundle' ? '已经全部拥有了' : '没有这个商品');
+        if (a.id !== 'bundle' && own(list[0])) return no('已经拥有了');
+        const price = a.id === 'bundle' ? (list.length === C2.shop.length ? C2.bundle : list.reduce((m, x) => m + x.gems, 0)) : list[0].gems;
+        if (o.gems < price) return no(`宝石不够（需要 ${price}）`);
+        o.gems -= price;
+        const items = list.map((x) => ({ k: x.k, id: x.id }));
+        grant(o, items);
+        return { ok: true, items, spent: { gems: price } };
       }
       case 'claimTask': {
         const L = E.TASKLINES[a.id], i = a.i | 0;
@@ -674,9 +716,12 @@
     }
     // 乐园祭：乐园模式每局给乐园票
     for (const ev of evs) if (park && ev.ticketsPerPark) items.push({ k: 'tickets', n: ev.ticketsPerPark + (rw.won ? ev.ticketsWin || 0 : 0), why: ev.name });
+    // 1.8：夜都决战——讨伐 / 封印每局给灵符，其它模式少量
+    for (const ev of evs) if (ev.curPer) { const n = (ev.curPer[rw.mode] || ev.curOther || 0) + (rw.won && ev.curPer[rw.mode] ? ev.curWin || 0 : 0); if (n) items.push({ k: ev.cur, n, why: ev.name }); }
     const gainS = { play: 1, win: rw.won ? 1 : 0, kills: rw.kills, paint: rw.paint, elim: rw.mode === 'elim' ? 1 : 0, escape: esc ? 1 : 0, top3: esc && rw.rank && rw.rank <= 3 ? 1 : 0, crates: rw.cubes || 0,
       park: park ? 1 : 0, parkwin: park && rw.won ? 1 : 0, balloons: rw.balloons || 0, float: rw.float || 0, ranked: rw.ranked ? 1 : 0,
-      loot: rw.mode === 'loot' ? 1 : 0, lootex: lootInfo && lootInfo.ex ? 1 : 0, lootv: lootInfo && lootInfo.ex ? lootInfo.v : 0, lootgold: lootInfo && lootInfo.ex ? lootInfo.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r === 5).length : 0, loothi: lootInfo && lootInfo.ex && rw.loot.risk === 'high' ? 1 : 0 };
+      loot: rw.mode === 'loot' ? 1 : 0, lootex: lootInfo && lootInfo.ex ? 1 : 0, lootv: lootInfo && lootInfo.ex ? lootInfo.v : 0, lootgold: lootInfo && lootInfo.ex ? lootInfo.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r === 5).length : 0, loothi: lootInfo && lootInfo.ex && rw.loot.risk === 'high' ? 1 : 0,
+      raid: rw.mode === 'raid' ? 1 : 0, raidwin: rw.mode === 'raid' && rw.won ? 1 : 0, seal: rw.mode === 'seal' ? 1 : 0, seals: rw.seals || 0, spirits: rw.spirits || 0 };
     for (const ev of evs) {
       const st = o.ev[ev.id] || (o.ev[ev.id] = { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) });
       ev.quests.forEach((q, i) => { st.p[i] = Math.min(q[1], st.p[i] + (gainS[q[0]] || 0)); });

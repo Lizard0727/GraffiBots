@@ -16,6 +16,7 @@ for (let round = 0; round < 6; round++) {
   const g = new Game(room, { manual: true });
   let k = round * 8;
   for (const p of g.players.values()) {
+    if (p.npc) continue;   // 1.8：百目 / 咒灵不换
     p.pilot = S.PILOTS[k % S.PILOTS.length].id; p.weapon = S.WEAPON_ORDER[k % S.WEAPON_ORDER.length];
     p.maxHp = S.WEAPONS[p.weapon].hp; p.hp = p.maxHp; k++;
   }

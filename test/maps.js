@@ -32,6 +32,7 @@ for (let mi = 0; mi < S.MAPS.length; mi++) {
   // 连通性：允许跳上 80 以内的高差（滚轮跳）
   const seen = new Uint8Array(GW * GH);
   const sp = M.loot ? { x: M.loot.spawns[0][0] * CELL, y: M.loot.spawns[0][1] * CELL } : S.spawnPoint(1, 0), q = [Math.floor(sp.y / CELL) * GW + Math.floor(sp.x / CELL)];
+  const q0 = q[0];
   seen[q[0]] = 1;
   while (q.length) {
     const c = q.pop(), cx = c % GW, cy = (c / GW) | 0;
@@ -63,6 +64,22 @@ for (let mi = 0; mi < S.MAPS.length; mi++) {
     good &= ok(S.inBounds(tx, ty) && M.top[i] === H && walk[i], `${name}：楼梯 (${x},${y},${d}) 走不上高度 ${H} 的平台（顶端外是 ${S.inBounds(tx, ty) ? M.top[i] : '界外'}）`);
   }
   for (const [x, y] of M.pads) good &= ok(M.pad[y * GW + x] > 0, `${name}：弹跳板 (${x},${y}) 不在地面上`);
+  // 1.8：不能有「掉下去就上不来」的坑——只用走路、普通跳（能跳上 40 高的矮台）和往下跳，每块地面都要能回到出生点
+  {
+    const esc = new Uint8Array(GW * GH), eq = [q0];
+    esc[q0] = 1;
+    while (eq.length) {   // 反向搜索：n 能走到 c 的条件是 c 不比 n 高出普通跳的高度
+      const c = eq.pop(), cx = c % GW, cy = (c / GW) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = cx + dx, y = cy + dy, n = y * GW + x;
+        if (!S.inBounds(x, y) || esc[n] || M.solid[n] || M.top[c] > M.top[n] + 60) continue;
+        esc[n] = 1; eq.push(n);
+      }
+    }
+    let trapped = 0, ex = -1;
+    for (let i = 0; i < GW * GH; i++) if (!M.solid[i] && M.top[i] === 0 && !esc[i]) { trapped++; if (ex < 0) ex = i; }
+    good &= ok(trapped === 0, `${name}：有 ${trapped} 格地面掉下去就上不来（例如 (${ex % GW},${(ex / GW) | 0})）`);
+  }
   if (good) console.log(`✓ ${name}：${M.stairs.length} 段楼梯、${M.pads.length} 个弹跳板、${M.bushes.length} 片草丛，可走 ${reach}/${open} 格`);
 }
 console.log(failed ? `\n${failed} 项失败` : '\n地图检查全部通过');

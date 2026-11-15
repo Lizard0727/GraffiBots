@@ -342,6 +342,12 @@
         s += `<rect x="136" y="150" width="22" height="7" rx="3" fill="${a}" transform="rotate(-28 147 153)" ${ol(1.8)}/><rect x="140" y="164" width="22" height="7" rx="3" fill="#ffe14d" transform="rotate(-28 151 167)" ${ol(1.8)}/>`;
         break;
     }
+    // 1.8：符零——发侧插着一张红符 + 两根金发簪；赤镰——左眼下的红色咒纹
+    if (P.id === 'fu') {
+      s += `<g transform="rotate(-16 300 140)"><rect x="288" y="92" width="24" height="74" rx="2" fill="#f4e6c8" ${ol(2.4)}/><path d="M300,100 L300,158" stroke="#c8102e" stroke-width="5"/><path d="M292,118 L308,118 M292,138 L308,138" stroke="#c8102e" stroke-width="2.4"/></g>`;
+      for (const [x1, y1, x2, y2] of [[258, 92, 318, 64], [262, 104, 324, 84]]) s += `<path d="M${x1},${y1} L${x2},${y2}" stroke="#d8b25a" stroke-width="5" stroke-linecap="round"/><circle cx="${x2}" cy="${y2}" r="5" fill="#ff2d4b" ${ol(1.6)}/>`;
+    }
+    if (P.id === 'aka') s += `<path d="M146,238 l24,7 M150,251 l18,5" stroke="#ff2d4b" stroke-width="5" stroke-linecap="round"/><circle cx="252" cy="262" r="2.4" fill="#ff2d4b"/>`;
     // 1.4：卡卡的高礼帽；夏日皮肤配件
     if (P.id === 'kaka') {
       s += `<ellipse cx="200" cy="104" rx="118" ry="20" fill="#141018" ${ol(3)}/>`;
@@ -351,6 +357,18 @@
       s += `<path d="M154,40 L160,30 M168,34 L168,24" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.5"/>`;
     }
     const X = P.extra || [];
+    if (X.includes('moonpin')) s += `<path d="M118,112 A22,22 0 1,0 150,84 A16,16 0 1,1 118,112 Z" fill="#ffd35e" ${ol(2.4)}/>`;
+    if (X.includes('talismans')) for (const [x, y, r] of [[78, 150, -14], [326, 136, 12], [64, 268, -8], [340, 260, 10], [110, 70, -22]]) s += `<g transform="rotate(${r} ${x} ${y})"><rect x="${x - 11}" y="${y - 30}" width="22" height="60" rx="2" fill="#f4e6c8" ${ol(2)} opacity="0.95"/><path d="M${x},${y - 24} L${x},${y + 24}" stroke="#8a6bff" stroke-width="4"/></g>`;
+    if (X.includes('wraith')) {
+      for (const side of [-1, 1]) s += path(`M${200 + side * 120},120 Q${200 + side * 178},70 ${200 + side * 150},10 Q${200 + side * 196},84 ${200 + side * 150},150 Z`, '#ff2d4b', 'opacity="0.55"');
+      for (const side of [-1, 1]) s += path(`M${200 + side * 70},92 L${200 + side * 100},18 L${200 + side * 112},96 Z`, '#ff2d4b', ol(2.4) + ' opacity="0.9"');
+    }
+    if (X.includes('halfmask')) {
+      s += path('M204,150 C250,146 290,170 298,214 C302,254 284,292 250,306 C232,296 214,284 204,270 Z', '#ece6da', ol(3));
+      s += path('M222,206 L270,198 L268,214 L224,220 Z', '#ff2d4b', ol(2));
+      s += `<path d="M238,250 L246,282 M258,246 L266,276" stroke="#a89c88" stroke-width="3"/>`;
+    }
+    if (X.includes('sealband')) s += `<g transform="rotate(-10 300 470)"><rect x="276" y="452" width="56" height="20" fill="#c8102e" ${ol(2.4)}/><rect x="296" y="448" width="16" height="28" fill="#f4e6c8" ${ol(1.8)}/></g>`;
     if (X.includes('sunglasses')) {
       for (const x of [164, 236]) s += `<rect x="${x - 30}" y="190" width="60" height="38" rx="16" fill="#1b1530" ${ol(3)}/><path d="M${x - 18},198 l14,0" stroke="#7af0ff" stroke-width="4" stroke-linecap="round" opacity="0.85"/>`;
       s += `<path d="M194,204 Q200,198 206,204" fill="none" stroke="${LINE}" stroke-width="4"/>`;
@@ -534,6 +552,20 @@
         s += `<path d="M160,394 L170,340 M240,394 L230,340" stroke="#ff6ec4" stroke-width="8" stroke-linecap="round"/>`;
         for (const [x, y] of [[140, 450], [180, 480], [230, 446], [268, 486], [200, 432]]) s += `<circle cx="${x}" cy="${y}" r="6" fill="#fff"/>`;
         s += path('M200,408 L176,396 L178,422 Z', '#ffe14d', ol(2)) + path('M200,408 L224,396 L222,422 Z', '#ffe14d', ol(2)) + `<circle cx="200" cy="408" r="6" fill="#ffe14d" ${ol(2)}/>`;
+        break;
+      }
+      case 'academy': case 'academyW': case 'academyH': {   // 1.8 夜都术师学院制服：高立领 + 一排扣子（白色款有紫色镶边，连帽款背后有兜帽）
+        const Wt = P.outfit === 'academyW', Hd = P.outfit === 'academyH';
+        const top = Wt ? '#eef0fa' : Hd ? '#16141c' : '#1d2140', inner = Hd ? '#ff2d4b' : '#8a6bff', btn = Hd ? '#c8c8d0' : '#d8b25a';
+        if (Hd) s += path(shape([[84, 392], [112, 330], [200, 306], [288, 330], [316, 392], [200, 352]]), '#24202c', ol(3));
+        s += path(shape(SH), top, ol(3));
+        s += path('M162,336 L170,296 L230,296 L238,336 L200,352 Z', top, ol(3));
+        s += `<path d="M170,302 L230,302" stroke="${inner}" stroke-width="5"/>`;
+        s += `<path d="M200,352 L200,520" stroke="${LINE}" stroke-width="3"/>`;
+        for (const y of [384, 422, 460, 498]) s += `<circle cx="213" cy="${y}" r="6" fill="${btn}" ${ol(1.8)}/>`;
+        if (Wt) s += `<path d="M152,344 L134,520 M248,344 L266,520" stroke="${inner}" stroke-width="10"/>`;
+        s += `<path d="M64,472 L126,472 M274,472 L336,472" stroke="${inner}" stroke-width="5" opacity="0.8"/>`;
+        s += `<path d="M118,428 l10,-14 l10,14 l-10,14 Z" fill="${inner}" ${ol(2)}/>`;
         break;
       }
       case 'sorbet': {     // 冰沙女王：渐变冰裙 + 冰晶肩饰 + 宝石

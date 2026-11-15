@@ -264,8 +264,13 @@
   let lobbyTrack = Math.random() < 0.5 ? 'menu' : 'lobby2';   // 1.6：大厅两首曲子轮流放
   function menuMusic() { if (!G) { const cur = AU.current(); if (cur !== 'menu' && cur !== 'lobby2') { lobbyTrack = lobbyTrack === 'menu' ? 'lobby2' : 'menu'; AU.music(lobbyTrack); } } setTimeout(updateNowPlaying, 100); }
   // ================= 大厅 =================
-  const MODE_ICON = { park: 'park', turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery', elim: 'elim', escape4: 'escape', escape8: 'escape' };
-  const MODE_COL = { turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'],
+  // 1.8：联动角色怎么获得
+  const collabHow = (id) => E.COLLAB.quest.includes(id) ? '联动角色：完成「活动 → 夜都决战」的任务免费获得' : '联动角色：在「活动 → 夜都决战」用宝石购买';
+  const isCollab = (id) => E.COLLAB.pilots.includes(id) || E.COLLAB.mechs.includes(id);
+  const MODE_ICON = { park: 'park', turf: 'turf', zone: 'zone', escort: 'escort', soccer: 'soccer', battery: 'battery', elim: 'elim', escape4: 'escape', escape8: 'escape', raid: 'raid', seal: 'seal' };
+  // 1.8：限时玩法只在活动期间出现
+  const modeOn = (id) => { const L = S.MODES[id] && S.MODES[id].limited; return !L || E.activeEvents().some((ev) => ev.id === L); };
+  const MODE_COL = { raid: ['#24104a', '#ff2d4b'], seal: ['#1d2140', '#8a6bff'], turf: ['#ff3ea5', '#8c5cff'], zone: ['#ff8a1f', '#ff3b52'], escort: ['#b8860b', '#ffb000'], soccer: ['#1fbf6e', '#1f8fd6'], battery: ['#5a9a10', '#9fd42a'],
     park: ['#ff6ec4', '#1fd6ee'], elim: ['#2a1a1e', '#ff3b52'], escape4: ['#4a4d56', '#9cff2e'], escape8: ['#3a3d46', '#ff5a36'] };
   const ic = (n, c, size) => GI.svg(n, c, size);
   const mapName = (i) => (i < 0 ? '随机地图' : S.MAPS[i].name);
@@ -595,6 +600,7 @@
     openOv('hero');
   }
   function heroTag(kind, id) {
+    if (isCollab(id)) return ['夜都决战', 'collab'];
     if (kind === 'pilot') return E.SEASON_PILOTS.includes(id) ? ['S1 赛季', 's1'] : E.QUEST_ONLY.includes(id) ? ['任务角色', 'quest'] : NEW_PILOT(id) ? ['新角色', 'new'] : ['常驻', ''];
     return E.SEASON_MECHS.includes(id) ? ['S1 赛季', 's1'] : E.STRIKE_MECHS.includes(id) ? ['特攻队', 'strike'] : E.QUEST_ONLY.includes(id) ? ['任务机体', 'quest'] : ['常驻', ''];
   }
@@ -638,7 +644,7 @@
       heroWear(K.id);
     };
     for (const b of document.querySelectorAll('#ov-hero [data-hero]')) b.onclick = () => { const [k, id] = b.dataset.hero.split(':'); HERO.from = HERO.from || null; HERO.kind = k; HERO.id = id; HERO.skin = null; HERO.tab = k === 'pilot' ? 'abil' : 'stat'; if (k === 'mech') R3.previewMode('auto'); renderHero(); sfx.click(); };
-    for (const b of document.querySelectorAll('#ov-hero [data-go]')) b.onclick = () => { openOv(b.dataset.go); sfx.click(); };
+    for (const b of document.querySelectorAll('#ov-hero [data-go]')) b.onclick = () => { if (b.dataset.go === 'events' && HERO.id && isCollab(HERO.id)) { EVSEL.tab = 'limited'; EVSEL.id = 'ev:yato'; } openOv(b.dataset.go); sfx.click(); };
     const sel = $('hpSelect');
     if (sel) sel.onclick = () => {
       if (pilot) profile.pilot = HERO.id; else profile.weapon = HERO.id;
@@ -668,7 +674,7 @@
       <h1 class="hp-name">${P.name}</h1><div class="hp-code">「${P.code}」</div>
       ${own ? `<div class="hp-power"><div class="pw-lv"><small>等级</small><b>${q.lv}</b></div><div class="pw-main"><div class="pw-bar"><i style="width:${Math.round(q.lv / E.MAX_LV * 100)}%"></i><em style="left:${Math.round(cap / E.MAX_LV * 100)}%"></em><span>${q.lv} / ${cap}${cap < E.MAX_LV ? '（突破后上限更高）' : ''}</span></div>
         <div class="pw-bt">突破 ${[1, 2].map((i) => `<i class="bt ${q.bt >= i ? 'on' : ''}">${i === 1 ? 'Ⅰ' : 'Ⅱ'}</i>`).join('')}<small>生命 / 伤害 +${bonus}%</small></div></div></div>`
-        : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${E.QUEST_ONLY.includes(P.id) ? `完成「活动 → ${E.STORY.name}」全部任务免费获得` : E.SEASON_PILOTS.includes(P.id) ? '街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '角色宝箱、街头宝箱都可能开出，也可能出现在限时购买里'}</small></div></div>`}
+        : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${isCollab(P.id) ? collabHow(P.id) : E.QUEST_ONLY.includes(P.id) ? `完成「活动 → ${E.STORY.name}」全部任务免费获得` : E.SEASON_PILOTS.includes(P.id) ? '街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '角色宝箱、街头宝箱都可能开出，也可能出现在限时购买里'}</small></div></div>`}
       <div class="hp-mini">
         <div><small>技能</small><b>${sk.name}</b></div><div><small>被动</small><b>${P.passive.name}</b></div>
         <div><small>弹出武器</small><b>${SA.name}</b></div><div><small>擅长机体</small><b>${rec.name}</b></div>
@@ -707,7 +713,7 @@
     const using = profile.pilot === P.id;
     $('hpFoot').innerHTML = own
       ? `${profile.weapon !== P.weapon && E.hasMech(profile, P.weapon) ? `<button class="btn ghost" id="hpRec">换上擅长机体「${rec.name}」</button>` : ''}<button class="btn big hp-sel ${using ? 'on' : ''}" id="${using ? '' : 'hpSelect'}" ${using ? 'disabled' : ''}>${using ? '✓ 出战中' : '选择出战'}</button>`
-      : `<button class="btn big" data-go="${E.QUEST_ONLY.includes(P.id) ? 'events' : 'chests'}">${E.QUEST_ONLY.includes(P.id) ? '去完成任务' : '去开宝箱'}</button>`;
+      : `<button class="btn big" data-go="${E.QUEST_ONLY.includes(P.id) || isCollab(P.id) ? 'events' : 'chests'}">${isCollab(P.id) ? '去夜都决战' : E.QUEST_ONLY.includes(P.id) ? '去完成任务' : '去开宝箱'}</button>`;
   }
   function renderMechPage(tag) {
     const id = HERO.id, W = S.WEAPONS[id], sp = S.SPECIALS[W.special], own = E.hasMech(profile, id);
@@ -715,7 +721,7 @@
     $('ov-hero').style.setProperty('--pc', '#ffb000');
     $('hpLeft').innerHTML = `<div class="hp-tags"><span class="tag ${tag[1]}">${tag[0]}</span><span class="tag role">${W.role}</span></div>
       <h1 class="hp-name">${W.name}</h1><div class="hp-code">${W.short ? `「${W.short}」` : ''}</div>
-      ${own ? '' : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这台机体</b><small>${E.QUEST_ONLY.includes(id) ? `任务机体：完成「活动 → ${E.STORY.name}」3 个任务免费获得` : E.STRIKE_MECHS.includes(id) ? '特攻队补给箱（活动任务、乐园祭商店）有概率开出' : '街头宝箱（补给箱 / 军用箱 / 金色空投）或限时购买'}</small></div></div>`}
+      ${own ? '' : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这台机体</b><small>${isCollab(id) ? collabHow(id) : E.QUEST_ONLY.includes(id) ? `任务机体：完成「活动 → ${E.STORY.name}」3 个任务免费获得` : E.STRIKE_MECHS.includes(id) ? '特攻队补给箱（活动任务、乐园祭商店）有概率开出' : '街头宝箱（补给箱 / 军用箱 / 金色空投）或限时购买'}</small></div></div>`}
       <div class="statbars big">${mechStats(id).map(([k, v, f]) => `<div><span>${k}</span><i><em style="width:${Math.round(f * 100)}%"></em></i><b>${v}</b></div>`).join('')}</div>
       <div class="hp-mini"><div><small>攻击方式</small><b>${ATTACK_NAME[W.attack] || W.attack}</b></div><div><small>大招</small><b>${sp.name}</b></div></div>`;
     const tabs = [['stat', '武器'], ['super', '大招'], ['skin', '涂装'], ['pilots', '驾驶员']];
@@ -746,7 +752,7 @@
     const using = profile.weapon === id;
     $('hpFoot').innerHTML = own
       ? `<button class="btn big hp-sel ${using ? 'on' : ''}" id="${using ? '' : 'hpSelect'}" ${using ? 'disabled' : ''}>${using ? '✓ 出战中' : '换上这台机体'}</button>`
-      : `<button class="btn big" data-go="${E.QUEST_ONLY.includes(id) ? 'events' : 'chests'}">${E.QUEST_ONLY.includes(id) ? '去完成任务' : '去开宝箱'}</button>`;
+      : `<button class="btn big" data-go="${E.QUEST_ONLY.includes(id) || isCollab(id) ? 'events' : 'chests'}">${isCollab(id) ? '去夜都决战' : E.QUEST_ONLY.includes(id) ? '去完成任务' : '去开宝箱'}</button>`;
   }
   // ---------------- 机体选择 ----------------
   function mechStats(id) {
@@ -819,9 +825,10 @@
     box.innerHTML = '';
     for (const id of S.MODE_ORDER) {
       const m = S.MODES[id];
+      if (!modeOn(id)) continue;
       const el = document.createElement('button');
-      el.className = 'mode-tile m-' + id + (profile.mode === id ? ' sel' : '');
-      el.innerHTML = `<span class="mt-ico">${ic(MODE_ICON[id])}</span><b>${m.name}</b>${m.original ? '<span class="orig">原创</span>' : ''}<p>${m.desc}</p>`;
+      el.className = 'mode-tile m-' + id + (profile.mode === id ? ' sel' : '') + (m.limited ? ' limited' : '');
+      el.innerHTML = `<span class="mt-ico">${ic(MODE_ICON[id])}</span><b>${m.name}</b>${m.limited ? '<span class="orig lim">限时 · 夜都决战</span>' : m.original ? '<span class="orig">原创</span>' : ''}<p>${m.desc}</p>`;
       el.onclick = () => { profile.mode = id; saveProfile(); renderModes(); renderModeCard(); sfx.click(); };
       box.appendChild(el);
     }
@@ -842,6 +849,7 @@
   let quick = null, quickRoom = false;
   function quickPlay() {
     if (UPDATE_LOCK && mustUpdate()) { checkUpdate(); return; }
+    if (!modeOn(profile.mode)) { profile.mode = 'turf'; saveProfile(); renderModeCard(); }   // 限时玩法结束了
     if (needPilot()) return;
     ensureName();
     if (PARTY.on && room) { partyLaunch({ mode: profile.mode, map: profile.map, teamSize: profile.size, duration: profile.dur, lang: window.GBI18N ? GBI18N.lang : 'zh' }); return; }   // 1.7：组队开打
@@ -1764,7 +1772,8 @@
   function startGame(m) {
     const M = S.buildMap(m.map);
     const teams = m.teams || 2;
-    const colors = teams > 2 ? S.TEAM8.slice() : S.COLOR_SETS[m.colorSet].c;
+    const colors = teams > 2 ? S.TEAM8.slice() : S.COLOR_SETS[m.colorSet].c.slice();
+    if (m.mode === 'seal') colors[S.SEAL.team] = '#b48cff';   // 1.8：中立咒灵
     G = {
       map: m.map, mode: m.mode, colors, M, teams, grid: new Uint8Array(S.GW * S.GH), duration: m.duration,
       players: new Map(), snaps: [], projs: new Map(), fx: [], texts: [], feed: [], bombs: new Map(), missiles: [],
@@ -1798,7 +1807,7 @@
     chatReset();
     closeSettings();
     showScreen('game');
-    AU.music(m.mode === 'loot' ? 'loot' : 'battle');
+    AU.music(m.mode === 'loot' ? 'loot' : m.mode === 'raid' || m.mode === 'seal' ? 'yato' : 'battle');
     lockPointer();
     touchShow(true);
     document.body.classList.toggle('topcam', TOP());
@@ -2048,6 +2057,11 @@
       }
       case 'bs': { const p = G.players.get(e[1]); if (p && !silent) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 60, text: '背刺！', color: '#ff3b52', t: now }); break; }
       case 'bx':
+        if (e[6] === 3) {   // 1.8 百符结界：金色 + 队伍色的符咒圈
+          for (let i = 0; i < 2; i++) ringFx(e[1], e[2], e[3], e[5] * (0.6 + i * 0.4), i ? '#d8b25a' : G.colors[e[4]], 420, i * 90);
+          R3.emit(e[1], e[2], e[3] + 10, '#f4e6c8', 14, 220, 0.3, { sys: 'pg', size: 8, life: 0.4, grav: 0, drag: 3 });
+          break;
+        }
         if (e[6] === 2) {   // 音波：穿墙的大圈
           for (let i = 0; i < 3; i++) ringFx(e[1], e[2], e[3], e[5] * (0.5 + i * 0.25), i === 1 ? '#ffffff' : G.colors[e[4]], 420, i * 90);
           if (!silent && nearMe(e[1], e[2], 600)) { sfx.boom(); G.shake = Math.max(G.shake, 4); }
@@ -2078,9 +2092,34 @@
       case 'trr': if (!silent) announce('宝物重新出现在中央', '#ffd76b'); break;
       case 'goal': if (!silent) { announce(`${teamName(e[1])} 得分！`, G.colors[e[1]], true); sfx.goal(); } break;
       case 'bp': if (e[1] === myId && !silent) sfx.pick(); break;
+      case 'rend': {   // 1.8 裂空斩
+        const col = G.colors[e[7]] || '#ffffff', a = e[5], L = e[6];
+        G.fx.push({ k: 'cres', x: e[2], y: e[3], z: e[4], a, len: L, color: col, t0: now, dur: 420 });
+        G.fx.push({ k: 'line', x0: e[2], y0: e[3], z0: e[4] + 20, x1: e[2] + Math.cos(a) * L, y1: e[3] + Math.sin(a) * L, z1: e[4] + 20, color: '#ffffff', w: 9, t0: now + 60, dur: 360 });
+        if (!silent && (e[1] === myId || nearMe(e[2], e[3], 700))) { sfx.snipe(); sfx.boom(); G.shake = Math.max(G.shake, e[1] === myId ? 7 : 4); }
+        break;
+      }
+      case 'tg':   // 1.8 百目砸地预警
+        G.fx.push({ k: 'tele', x: e[1], y: e[2], z: e[3], r: e[4], t0: now, dur: e[5] * 1000 });
+        if (!silent && G.me && Math.hypot(G.me.px - e[1], G.me.py - e[2]) < e[4] + 20) announce('⚠ 快离开红圈！', '#ff2d4b');
+        break;
+      case 'summon':   // 1.8 咒灵出场
+        R3.emit(e[2], e[3], (e[4] || 0) + 10, '#2a0a3a', 24, 120, 1, { sys: 'pk', size: 30, life: 1, grav: -40, drag: 2, grow: 1.4 });
+        R3.emit(e[2], e[3], (e[4] || 0) + 10, '#b48cff', 18, 160, 1, { sys: 'pg', size: 10, life: 0.6, grav: -80, drag: 2 });
+        ringFx(e[2], e[3], e[4] || 0, 50, '#b48cff', 400);
+        break;
+      case 'boss': {   // 1.8 百目：狂暴 / 弹幕 / 召唤 / 冲撞 / 倒下
+        const kind = e[2], x = e[3], y = e[4], z = e[5] || 0;
+        if (kind === 'rage') { for (let i = 0; i < 3; i++) ringFx(x, y, z, 120 + i * 90, i === 1 ? '#ffffff' : '#ff2d4b', 600, i * 120); if (!silent) { bigText('百目狂暴了！', '#ff2d4b'); sfx.siren(); G.shake = Math.max(G.shake, 8); } }
+        else if (kind === 'ring') ringFx(x, y, z, 90, '#ff2d4b', 400);
+        else if (kind === 'summon') { ringFx(x, y, z, 120, '#b48cff', 500); if (!silent) announce('百目召唤了小咒灵！', '#b48cff'); }
+        else if (kind === 'dash') { ringFx(x, y, z, 70, '#ff2d4b', 300); if (!silent && nearMe(x, y, 700)) sfx.boom(); }
+        else if (kind === 'down') { for (let i = 0; i < 4; i++) ringFx(x, y, z, 120 + i * 80, i % 2 ? '#ffffff' : '#b48cff', 900, i * 150); R3.emit(x, y, z + 40, '#b48cff', 80, 380, 1, { sys: 'pg', size: 16, life: 1.2, grav: -60, drag: 2 }); R3.emit(x, y, z + 20, '#2a0a3a', 40, 200, 1, { sys: 'pk', size: 40, life: 1.6, grav: -30, drag: 2, grow: 1.6 }); if (!silent) { bigText('讨伐成功！', '#ffd35e'); G.shake = Math.max(G.shake, 10); } }
+        break;
+      }
       case 'dep': {
         const p = G.players.get(e[1]);
-        if (p) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 60, text: `+${e[2]} 电池`, color: G.colors[p.team], t: now });
+        if (p) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 60, text: `+${e[2]} ${G.mode === 'seal' ? '封印石' : '电池'}`, color: G.colors[p.team], t: now });
         if (e[1] === myId && !silent) sfx.goal();
         break;
       }
@@ -2168,6 +2207,8 @@
       case 'swarm': for (let i = 0; i < 3; i++) R3.emit(x, y, z + 40, '#ffc531', 10, 180, 1, { sys: 'pg', size: 9, life: 0.5, grav: 0, drag: 3 }); ringFx(x, y, z, 60, col, 300); break;
       case 'whirl': for (let i = 0; i < 4; i++) ringFx(x, y, z, 112, i % 2 ? '#ffffff' : col, 500, i * 500); break;
       case 'sonic': break;   // 音波大圈由 bx 事件画
+      case 'barrier': for (let i = 0; i < 3; i++) ringFx(x, y, z, 150 * (0.4 + i * 0.3), i === 1 ? '#d8b25a' : col, 600, i * 120); R3.emit(x, y, z + 30, '#f4e6c8', 26, 180, 1, { sys: 'pg', size: 9, life: 0.8, grav: -40, drag: 2 }); break;
+      case 'rend': ringFx(x, y, z, 70, '#ffffff', 350); R3.emit(x, y, z + 20, col, 20, 120, 1, { sys: 'pg', size: 12, life: 0.4, grav: -40, drag: 2 }); break;
     }
   }
   function skillFx(p, kind, x, y, z) {
@@ -2178,6 +2219,8 @@
         if (G.me && p.team !== G.me.team && Math.hypot(G.me.px - x, G.me.py - y) < 230) G.flashT = performance.now();
         break;
       }
+      case 'seal': ringFx(x, y, z, 50, '#d8b25a', 300); R3.emit(x, y, z + 20, '#f4e6c8', 12, 200, 0.4, { sys: 'pg', size: 8, life: 0.4, grav: 0, drag: 3 }); break;
+      case 'possess': for (let i = 0; i < 2; i++) ringFx(x, y, z, 80 + i * 40, i ? '#3a0a18' : '#ff2d4b', 500, i * 100); R3.emit(x, y, z + 16, '#ff2d4b', 30, 140, 1, { sys: 'pg', size: 13, life: 0.7, grav: -120, drag: 2 }); break;
       case 'rally': ringFx(x, y, z, 180, '#ff5a36', 600); R3.emit(x, y, z + 50, '#ff5a36', 26, 160, 1, { sys: 'pg', size: 12, life: 0.7, grav: 60, drag: 2 }); break;
       case 'blast': ringFx(x, y, z, 110, '#ff3b52', 1200); break;
       case 'jam': for (let i = 0; i < 3; i++) ringFx(x, y, z, 220 * (0.4 + i * 0.3), '#2ef0c8', 500, i * 110); break;
@@ -2715,9 +2758,11 @@
       G.lastFrame = now;
       updateGame(now, dt);
       renderGame(now, dt);
-    } else if (!$('title').classList.contains('hidden') && !ovOpen()) {
-      if (!loop.bgT || now - loop.bgT > 32) { menuBg(now); loop.bgT = now; }
-      if (PV_OK) R3.previewFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
+    } else if (!$('title').classList.contains('hidden')) {
+      const cover = ovOpen();
+      if (!cover && (!loop.bgT || now - loop.bgT > 32)) { menuBg(now); loop.bgT = now; }
+      // 机兵展示台：大厅里，或者角色 / 机体页面打开时（机体页面的 3D 模型也用这个渲染器）
+      if (PV_OK && (!cover || HERO.open)) R3.previewFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
     }
     // 3D 驾驶员展示台（驾驶员详情 / 结算 MVP）：画布不在页面上时会自己跳过
     if (R3.charFrame) R3.charFrame(now, Math.min(0.05, (now - (loop.charLast || now)) / 1000));
@@ -2726,7 +2771,39 @@
   }
 
   // 有全屏弹窗（商店、好友、通行证…）挡住大厅
-  const ovOpen = () => { if (ovOpen.t && performance.now() - ovOpen.t < 300) return ovOpen.v; ovOpen.t = performance.now(); return (ovOpen.v = !!document.querySelector('.ov:not(.hidden)')); };
+  const ovOpen = () => { if (ovOpen.t && performance.now() - ovOpen.t < 300) return ovOpen.v; ovOpen.t = performance.now(); return (ovOpen.v = !!document.querySelector('.ov:not(.hidden), #trailer:not(.hidden)')); };
+  // ---------------- 1.8：联动皮肤 3D 战斗动画 ----------------
+  const TRL = { id: null, t0: 0, timer: 0 };
+  function playTrailer(id) {
+    const K = S.skin(id); if (!K || !R3.trailerStart) return;
+    const el = $('trailer'), host = $('trStage');
+    for (const k of ['trCap', 'trName', 'trLine', 'trCut', 'trTitle']) { $(k).className = $(k).className.split(' ')[0]; $(k).innerHTML = ''; }
+    $('trFlash').className = 'tr-flash'; el.classList.remove('fade'); el.classList.remove('hidden');
+    TRL.id = id; TRL.t0 = performance.now();
+    AU.resume(); AU.music('yato');
+    const show = (k, html, cls) => { const e = $(k); e.innerHTML = html; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); if (cls) e.classList.add(cls); };
+    const hooks = { on(ev, d) {
+      if (ev === 'cap') { show('trCap', esc(L(d))); clearTimeout(TRL.capT); TRL.capT = setTimeout(() => $('trCap').classList.remove('on'), 2400); }
+      else if (ev === 'name') { const P = d.pilot; show('trName', `<small>${L('夜都决战 · 联动限定')}</small><b>${esc(L(d.skin))}</b><span>「${esc(L(P.code))}」${esc(L(P.name))} · ${esc(L(P.title))}</span>`); setTimeout(() => $('trName').classList.remove('on'), 2600); }
+      else if (ev === 'line') { show('trLine', `“${esc(L(d))}”`); setTimeout(() => $('trLine').classList.remove('on'), 1800); }
+      else if (ev === 'cut') { show('trCut', `<div class="tc-art">${GP.portrait(d.pilot)}</div><div class="tc-txt"><small>SUPER!</small><b>${esc(L(d.sup))}</b><span>${esc(L(d.mech))}</span></div>`); setTimeout(() => $('trCut').classList.remove('on'), 1200); }
+      else if (ev === 'flash') { const f = $('trFlash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+      else if (ev === 'title') { const R = S.RARE[d.skin.rare]; show('trTitle', `<small style="color:${R.c}">${L(R.name)} · ${L('夜都决战 · 联动限定')}</small><b>${esc(L(d.skin.name))}</b><span>${esc(L(d.pilot.name))}</span>`); }
+      else if (ev === 'fade') el.classList.add('fade');
+      else if (ev === 'sfx') { const f = sfx[d]; if (f) f(); }
+      else if (ev === 'end') closeTrailer();
+    } };
+    if (!R3.trailerStart(host, id, hooks)) { el.classList.add('hidden'); toast('你的浏览器不支持 WebGL，无法播放 3D 动画'); return; }
+    clearInterval(TRL.timer);
+    TRL.timer = setInterval(() => { const k = Math.min(1, (performance.now() - TRL.t0) / 20500); $('trProg').style.width = (k * 100).toFixed(1) + '%'; }, 120);
+  }
+  function closeTrailer() {
+    clearInterval(TRL.timer);
+    if (R3.trailerStop) R3.trailerStop(true);
+    $('trailer').classList.add('hidden');
+    TRL.id = null;
+    if (!G) menuMusic();
+  }
   // ---------------- 主界面背景：机兵四处涂鸦 ----------------
   //   1.7.1：画布用半分辨率（背景本来就很淡），30 帧
   const MB = { bots: [], last: 0, paint: null }, MBK = 0.5;
@@ -3040,6 +3117,7 @@
     } else if (G.mode === 'soccer') marker(o[0], o[1], 70, '', '#fff', '●');
     else if (G.mode === 'zone') { const Z = S.ZONE, C = S.CELL; marker((Z.x0 + Z.x1) * C / 2, (Z.y0 + Z.y1) * C / 2, 40, o[0] ? '' : '据点', o[0] ? G.colors[o[0]] : '#fff', '▣'); }
     else if (G.mode === 'battery' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '充电站', G.colors[myTeam], '⚡'); }
+    else if (G.mode === 'seal' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '祭坛', G.colors[myTeam], '◆'); }
     else if (G.loot && o[0]) {
       const ex = o[0];
       for (let i = 0; i < ex.length; i += 3) marker(ex[i], ex[i + 1], 60, ex[i + 2] <= 0 ? '撤离点' : `${ex[i + 2]} 秒后开放`, ex[i + 2] <= 0 ? '#5ee36a' : '#9aa0a8', '⬆');
@@ -3199,7 +3277,7 @@
     ctx.font = '32px GBNum, GBHead, Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = 5; ctx.strokeStyle = '#141018'; ctx.strokeText(fmtTime(G.tl), cx, 35);
     ctx.fillStyle = G.tl <= 30 && G.tl > 0 && Math.floor(now / 400) % 2 ? '#ffe600' : '#fff'; ctx.fillText(fmtTime(G.tl), cx, 35);
-    const roster = (t) => [...G.players.values()].filter((p) => p.team === t && G.cur.has(p.id));
+    const roster = (t) => [...G.players.values()].filter((p) => p.team === t && G.cur.has(p.id) && !p.npc);   // 1.8：百目 / 咒灵不进头像栏
     const chips = (t, side) => {
       const list = roster(t);
       list.forEach((p, i) => {
@@ -3297,16 +3375,24 @@
           txt(`${o[t - 1]}`, side < 0 ? x - 10 : x + w + 10, py, 16, G.colors[t], side < 0 ? 'right' : 'left', 3);
         }
         txt(o[4] ? (o[4] === myTeam ? '花车由我方控制' : '敌方控制花车！') : '花车无人控制', cx, py + 24, 13, o[4] ? G.colors[o[4]] : '#bbb', 'center', 3);
-      } else if (G.mode === 'battery') {
-        const w = 150;
+      } else if (G.mode === 'raid') {   // 1.8：百目血条
+        const w = Math.min(420, VW * 0.5), hp = o[3] || 0, max = o[4] || 1, v = Math.max(0, Math.min(1, hp / max));
+        ctx.fillStyle = '#000b'; rr(ctx, cx - w / 2 - 4, py - 13, w + 8, 26, 12); ctx.fill();
+        const gr = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0); gr.addColorStop(0, o[1] ? '#ff2d4b' : '#8a6bff'); gr.addColorStop(1, o[1] ? '#ff8a1f' : '#ff2d4b');
+        ctx.fillStyle = gr; ctx.fillRect(cx - w / 2, py - 8, w * v, 16);
+        ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1; for (let i = 1; i < 10; i++) { ctx.beginPath(); ctx.moveTo(cx - w / 2 + (w * i) / 10, py - 8); ctx.lineTo(cx - w / 2 + (w * i) / 10, py + 8); ctx.stroke(); }
+        txt(`百目 ${Math.ceil(hp)} / ${max}${o[1] ? ' · 狂暴' : ''}`, cx, py, 13, '#fff', 'center', 3);
+        if (o[2]) txt(`小咒灵 ×${o[2]}`, cx, py + 24, 12, '#b48cff', 'center', 3);
+      } else if (G.mode === 'battery' || G.mode === 'seal') {
+        const w = 150, target = G.mode === 'seal' ? S.SEAL.target : S.BATTERY_TARGET;
         for (const [t, side] of [[myTeam, -1], [otherTeam, 1]]) {
-          const v = Math.min(1, o[t - 1] / S.BATTERY_TARGET), x = side < 0 ? cx - 12 - w : cx + 12;
+          const v = Math.min(1, o[t - 1] / target), x = side < 0 ? cx - 12 - w : cx + 12;
           ctx.fillStyle = '#000a'; rr(ctx, x - 3, py - 11, w + 6, 22, 10); ctx.fill();
           ctx.fillStyle = G.colors[t];
           if (side < 0) ctx.fillRect(x + w * (1 - v), py - 7, w * v, 14); else ctx.fillRect(x, py - 7, w * v, 14);
           txt(`${o[t - 1]}`, side < 0 ? x - 10 : x + w + 10, py, 16, G.colors[t], side < 0 ? 'right' : 'left', 3);
         }
-        txt('⚡', cx, py, 16, '#b8ff3a', 'center', 3);
+        txt(G.mode === 'seal' ? '◆' : '⚡', cx, py, 16, G.mode === 'seal' ? '#b48cff' : '#b8ff3a', 'center', 3);
       }
     }
     G.miniFrame++;
@@ -3387,7 +3473,7 @@
     if (o && G.mode === 'escort' && !o[5]) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && G.mode === 'park') { ctx.fillStyle = o[4] ? G.colors[o[4]] : '#fff'; ctx.beginPath(); ctx.arc(mx + o[2] * ms, my + o[3] * ms, Math.max(4, S.PARK.r * ms), 0, 7); ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1; const f = o[5] || []; ctx.fillStyle = '#ffd23f'; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
     if (o && G.mode === 'soccer') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
-    if (o && G.mode === 'battery') { ctx.fillStyle = '#b8ff3a'; const f = o[2]; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
+    if (o && (G.mode === 'battery' || G.mode === 'seal')) { ctx.fillStyle = G.mode === 'seal' ? '#b48cff' : '#b8ff3a'; const f = o[2]; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
     if (o && G.loot) {   // 小地图：撤离点（绿 = 开放）+ 史诗 / 传说物资
       const ex = o[0] || [];
       for (let i = 0; i < ex.length; i += 3) {
@@ -3500,7 +3586,7 @@
   }
 
   function drawScoreboard() {
-    const rows = [...G.players.values()].filter((p) => G.cur.has(p.id));
+    const rows = [...G.players.values()].filter((p) => G.cur.has(p.id) && !p.npc);
     const myTeam = G.me ? G.me.team : 1;
     const w = Math.min(620, VW - 40), h = 70 + rows.length * 30 + 30;
     const x = (VW - w) / 2, y = (VH - h) / 2;
@@ -3565,7 +3651,7 @@
     // MVP
     const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
     const mvp = S.mvpOf(r);
-    const objLabel = { escort: '得分', battery: '电池', loot: '带出' }[r.mode] || '—';
+    const objLabel = { escort: '得分', battery: '电池', loot: '带出', seal: '封印石', raid: '讨伐' }[r.mode] || '—';
     const lootOf = (p) => (r.loot && r.loot.players[p.id]) || null;
     $('resBack').textContent = quickRoom ? '返回大厅' : '返回房间';
     // 1.5：数据卡片——每队一张卡，每人一行：头像、名字、机体、击毁 / 倒下 / 涂地条，MVP 金色标记
@@ -3746,9 +3832,11 @@
     }
   }
   // ---------------- 赛季通行证 ----------------
-  const rewardLabel = (it) => it.k === 'chest' ? E.CHESTS[it.id].name : it.k === 'skin' ? S.skin(it.id).name : it.k === 'tp' ? `天赋点 +${it.n}` : `${E.CUR[it.k].name} ×${it.n}`;
+  const rewardLabel = (it) => it.k === 'chest' ? E.CHESTS[it.id].name : it.k === 'skin' ? S.skin(it.id).name : it.k === 'tp' ? `天赋点 +${it.n}` : it.k === 'pilot' ? `驾驶员「${S.pilot(it.id).name}」` : it.k === 'mech' ? `机体「${S.WEAPONS[it.id].name}」` : `${E.CUR[it.k].name} ×${it.n}`;
   function rewardArt(it) {
     if (it.k === 'chest') return GI.chestArt(it.id);
+    if (it.k === 'pilot') return GP.portrait(S.pilot(it.id), { face: true });
+    if (it.k === 'mech') { const P = S.pilot(profile.pilot || 'blaze'), img = R3.mechThumb ? R3.mechThumb({ color: P.accent, head: profile.head, weapon: it.id, pilot: P.id }) : ''; return img ? `<img src="${img}" alt="">` : ic('mech'); }
     if (it.k === 'tp') return ic('star');
     if (it.k === 'skin') return skinArt(S.skin(it.id), true);
     return ic(it.k);
@@ -3898,6 +3986,7 @@
   function avatarSvg(a) {
     const st = 'stroke="#141018" stroke-width="3" stroke-linejoin="round"';
     if (a === 'flag') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#5b5e68" ${st}/><path d="M15,38 L15,10" ${st} stroke-width="4"/><path d="M15,11 C24,6 28,16 37,11 L37,26 C28,31 24,21 15,26 Z" fill="#ff5a36" ${st}/><path d="M24,16 l2,4 l4,0 l-3,3 l1,4 l-4,-2 l-4,2 l1,-4 l-3,-3 l4,0 Z" fill="#ffe14d"/></svg>`;
+    if (a === 'talisman') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#1d2140" ${st}/><path d="M16,8 L32,9 L31,40 L15,39 Z" fill="#f4e6c8" ${st} stroke-width="2"/><path d="M23.5,12 L23.5,35" stroke="#8a6bff" stroke-width="4"/><path d="M18,18 L29,18 M18,26 L29,26" stroke="#c8102e" stroke-width="2.4"/></svg>`;
     if (a === 'balloon') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#8fd0ff" ${st}/><path d="M22,30 L20,42 M28,28 L29,42" fill="none" ${st} stroke-width="2"/><ellipse cx="18" cy="18" rx="7" ry="9" fill="#ff3ea5" ${st}/><ellipse cx="30" cy="16" rx="7" ry="9" fill="#ffd23f" ${st}/><ellipse cx="25" cy="24" rx="6" ry="7" fill="#9cff2e" ${st}/></svg>`;
     if (a === 'can') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#ffe600" ${st}/><rect x="17" y="16" width="14" height="24" rx="3" fill="#ff3ea5" ${st}/><rect x="20" y="9" width="8" height="7" fill="#c9d3dc" ${st}/><circle cx="34" cy="10" r="2" fill="#1fd6ee"/><circle cx="38" cy="14" r="1.6" fill="#1fd6ee"/></svg>`;
     return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#9aa0a8" ${st}/><path d="M12,18 L14,8 L20,15 Q24,13 28,15 L34,8 L36,18 Q38,30 24,36 Q10,30 12,18 Z" fill="#5b5e68" ${st}/><circle cx="19" cy="22" r="2.4" fill="#ffe600"/><circle cx="29" cy="22" r="2.4" fill="#ffe600"/><path d="M22,27 l2,2 l2,-2" fill="none" ${st} stroke-width="2"/></svg>`;
@@ -3931,9 +4020,10 @@
       const who = K.kind === 'pilot' ? `${S.pilot(K.pilot).name}的服装${E.hasPilot(profile, K.pilot) ? '' : '（还没有这位驾驶员）'}` : { mech: '所有机体通用', fx: '子弹和命中特效', frame: '大厅名片边框', avatar: '大厅名片头像' }[K.kind];
       const btn = own ? `<button class="btn small ${on ? 'ghost' : ''}" data-act="wear">${on ? '卸下' : '装上'}</button>`
         : K.price ? `<button class="btn small" data-act="buy" ${profile.gems < price ? 'disabled' : ''}>${ic('gems')}${price}${price < K.price ? `<s>${K.price}</s>` : ''}</button>`
-        : `<span class="pass-only">${K.pass ? `通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级` : K.event ? '乐园祭活动商店' : K.rank ? '排位赛大师段位奖励' : '活动奖励'}</span>`;
-      el.innerHTML = `${K.id === deal.id && !own ? '<span class="deal">今日 7 折</span>' : ''}<span class="rare-tag">${S.RARE[K.rare].name}</span>
-        <div class="sk-art ${K.kind}">${skinArt(K)}</div><b>${K.name}</b><small>${who}</small>${btn}`;
+        : `<span class="pass-only">${K.pass ? `通行证 ${K.pass[0] === 'p' ? '高级' : '免费'}线 ${K.pass.slice(1)} 级` : K.event === 'yato' ? '夜都决战活动商店' : K.event ? '乐园祭活动商店' : K.rank ? '排位赛大师段位奖励' : '活动奖励'}</span>`;
+      el.innerHTML = `${K.id === deal.id && !own ? '<span class="deal">今日 7 折</span>' : ''}<span class="rare-tag">${S.RARE[K.rare].name}</span>${K.series === 'yato' ? '<span class="collab-tag">夜都决战</span>' : ''}
+        <div class="sk-art ${K.kind}">${skinArt(K)}</div><b>${K.name}</b><small>${who}</small>${K.trailer ? `<button class="btn small ghost sk-trailer" data-trailer="${K.id}">▶ 3D 战斗动画</button>` : ''}${btn}`;
+      const tb = el.querySelector('[data-trailer]'); if (tb) tb.onclick = () => playTrailer(K.id);
       const b = el.querySelector('[data-act]');
       if (b) b.onclick = async () => {
         if (b.dataset.act === 'wear') return toggleWear(K);
@@ -3949,7 +4039,7 @@
   const fmtLeft = (ms) => { const d = Math.floor(ms / 86400e3), h = Math.floor((ms % 86400e3) / 3600e3), m = Math.floor((ms % 3600e3) / 60e3); return d ? `${d} 天 ${h} 小时` : h ? `${h} 小时 ${m} 分` : `${m} 分 ${Math.floor((ms % 60e3) / 1000)} 秒`; };
   function evProgress() {
     let can = 0;
-    for (const ev of E.activeEvents()) { const st = profile.ev[ev.id]; if (st) ev.quests.forEach((q, i) => { if (st.p[i] >= q[1] && !st.c[i]) can++; }); }
+    for (const ev of E.activeEvents()) { const st = profile.ev[ev.id]; if (st) ev.quests.forEach((q, i) => { if (st.p[i] >= q[1] && !st.c[i]) can++; }); if (ev.login) { const L = (profile.evLogin || {})[ev.id] || { n: 0, d: -1 }; if (L.n < ev.login.length && L.d !== E.dayIndex()) can++; } }
     const done = E.STORY.steps.filter((st, i) => profile.story.p[i] >= st[1]).length;
     for (const [n] of E.STORY.rewards) if (done >= n && !profile.story.c.includes(n)) can++;
     for (const id of E.TASKLINE_ORDER) { const L = E.TASKLINES[id], st = (profile.tl || {})[id]; if (st) L.steps.forEach((q, i) => { if (st.p[i] >= q[1] && !st.c[i]) can++; }); }
@@ -3963,8 +4053,9 @@
       const on = now >= ev.start && now < ev.end, soon = now < ev.start;
       if (!on && !soon && now > ev.end + 3 * 86400e3) continue;
       const st = profile.ev[ev.id] || { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) };
-      const can = on && ev.quests.some((q, i) => st.p[i] >= q[1] && !st.c[i]);
-      out.limited.push({ id: 'ev:' + ev.id, name: ev.name, color: ev.color, sub: on ? `还剩 ${fmtLeft(ev.end - now)}` : soon ? `${fmtLeft(ev.start - now)} 后开始` : '已结束', can, off: !on });
+      const Lg = ev.login && (profile.evLogin || {})[ev.id] || { n: 0, d: -1 };
+      const can = on && (ev.quests.some((q, i) => st.p[i] >= q[1] && !st.c[i]) || (ev.login && Lg.n < ev.login.length && Lg.d !== E.dayIndex(now)));
+      out.limited.push({ id: 'ev:' + ev.id, name: ev.name, color: ev.color, sub: on ? `还剩 ${fmtLeft(ev.end - now)}` : soon ? `${fmtLeft(ev.start - now)} 后开始` : '已结束', can, off: !on, isNew: ev.collab });
     }
     const done = E.STORY.steps.filter((st, i) => profile.story.p[i] >= st[1]).length;
     out.task.push({ id: 'story', name: E.STORY.name, color: S.pilot('han').accent, sub: `${done} / ${E.STORY.steps.length} 完成`, can: E.STORY.rewards.some(([n]) => done >= n && !profile.story.c.includes(n)) });
@@ -3985,7 +4076,7 @@
     const list = ent[EVSEL.tab];
     if (!list.some((e) => e.id === EVSEL.id)) EVSEL.id = (list.find((e) => e.can) || list[0] || {}).id;
     $('evTabs').innerHTML = [['limited', '限时活动'], ['task', '任务']].map(([k, n]) => `<button data-evtab="${k}" class="${EVSEL.tab === k ? 'sel' : ''}">${n}${ent[k].some((e) => e.can) ? '<em class="dot"></em>' : ''}</button>`).join('');
-    box.innerHTML = list.map((e) => `<button class="ev-item ${e.id === EVSEL.id ? 'sel' : ''} ${e.off ? 'off' : ''}" data-evsel="${e.id}" style="--ec:${e.color}"><i class="ei-bar"></i><div><h3>${e.name}</h3><small>${e.sub}</small></div>${e.can ? '<em class="ei-can">!</em>' : e.isNew ? '<em class="ei-new">新</em>' : ''}</button>`).join('');
+    box.innerHTML = list.map((e) => `<button class="ev-item ${e.id === EVSEL.id ? 'sel' : ''} ${e.off ? 'off' : ''}" data-evsel="${e.id}" style="--ec:${e.color}"><i class="ei-bar"></i><div><h3>${e.name}</h3><small>${e.sub}</small></div>${e.can ? '<em class="ei-can">!</em>' : e.isNew ? '<em class="ei-new">NEW</em>' : ''}</button>`).join('');
     $('evPage').innerHTML = evPageHtml(EVSEL.id, now);
     $('evPage').scrollTop = 0;
     for (const b2 of $('evTabs').querySelectorAll('[data-evtab]')) b2.onclick = () => { EVSEL.tab = b2.dataset.evtab; EVSEL.id = null; renderEvents(); sfx.click(); };
@@ -4003,6 +4094,13 @@
       const r = await eco('eventShop', { id: b2.dataset.shop, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
       sfx.win(); showGain(r.items, '活动商店');
     };
+    for (const b2 of pg.querySelectorAll('[data-evlogin]')) b2.onclick = async () => { const r = await eco('evLogin', { id: b2.dataset.evlogin }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '登录奖励'); };
+    for (const b2 of pg.querySelectorAll('[data-collab]')) b2.onclick = async () => {
+      const r = await eco('collabBuy', { id: b2.dataset.collab }); if (!r.ok) return toast(r.err);
+      sfx.win(); showGain(r.items, '联动角色');
+    };
+    for (const b2 of pg.querySelectorAll('[data-gomode]')) b2.onclick = () => { profile.mode = b2.dataset.gomode; profile.map = -1; saveProfile(); sendLoadout(); closeOv(); renderProfile(); renderModeCard(); toast(`已切换到「${S.MODES[profile.mode].name}」`); };
+    for (const b2 of pg.querySelectorAll('[data-trailer]')) b2.onclick = () => playTrailer(b2.dataset.trailer);
     for (const b2 of pg.querySelectorAll('[data-park]')) b2.onclick = () => { profile.mode = 'park'; profile.map = -1; saveProfile(); sendLoadout(); closeOv(); renderProfile(); toast('已切换到乐园模式'); };
     for (const b2 of pg.querySelectorAll('[data-goloot]')) b2.onclick = () => openOv('loot');
     for (const b2 of pg.querySelectorAll('[data-ev]')) b2.onclick = async () => {
@@ -4031,10 +4129,20 @@
     const ev = E.EVENTS.find((x) => 'ev:' + x.id === id);
     if (!ev) return '';
     const on = now >= ev.start && now < ev.end, soon = now < ev.start, st = profile.ev[ev.id] || { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) };
-    return banner(ev.color, on ? `限时活动 · 还剩 ${fmtLeft(ev.end - now)}` : soon ? `即将开始 · ${fmtLeft(ev.start - now)} 后` : '已结束', ev.name, ev.desc, ev.id === 'parkfest' ? '<div class="eb-loot">🎡</div>' : '') +
+    const cur = ev.cur || 'tickets', have = profile[cur] || 0;
+    const L = ev.login && (profile.evLogin || {})[ev.id] || { n: 0, d: -1 }, today = E.dayIndex(now);
+    const yatoArt = ev.id === 'yato' ? `<div class="eb-duo">${GP.portrait(S.pilot('fu'))}${GP.portrait(S.pilot('aka'))}</div>` : '';
+    const login = ev.login && on ? `<div class="ev-sec ev-login"><h4>登录奖励<small>每天登录领一次，共 ${ev.login.length} 天</small></h4><div class="lg-days">${ev.login.map((it, i) => { const got = i < L.n, can = i === L.n && L.d !== today; return `<button class="lg-day ${got ? 'got' : ''} ${can ? 'can' : ''}" ${can ? `data-evlogin="${ev.id}"` : 'disabled'}><small>第 ${i + 1} 天</small><span class="ld-art">${rewardArt(it)}</span><b>${rewardLabel(it)}</b>${got ? '<em>✓</em>' : ''}</button>`; }).join('')}</div></div>` : '';
+    const collab = ev.collab && on ? (() => { const C2 = E.COLLAB, own = (x) => (x.k === 'pilot' ? E.hasPilot(profile, x.id) : profile.mechs.includes(x.id)), left = C2.shop.filter((x) => !own(x));
+      const bp = left.length === C2.shop.length ? C2.bundle : left.reduce((m, x) => m + x.gems, 0);
+      return `<div class="ev-sec ev-collab"><h4>联动角色<small>完成上面的任务免费获得符零和结界机兵；赤镰和灵刃机兵用宝石购买</small></h4><div class="cb-grid">${C2.shop.map((x) => { const o2 = own(x), nm = x.k === 'pilot' ? S.pilot(x.id).name : S.WEAPONS[x.id].name;
+        return `<div class="cb-card ${o2 ? 'own' : ''}"><div class="cb-art">${x.k === 'pilot' ? GP.portrait(S.pilot(x.id)) : rewardArt({ k: 'mech', id: x.id })}</div><b>${nm}</b><small>${x.k === 'pilot' ? S.pilot(x.id).title : S.WEAPONS[x.id].role}</small><button class="btn small" data-collab="${x.id}" ${o2 || profile.gems < x.gems ? 'disabled' : ''}>${o2 ? '已拥有' : `${ic('gems')}${x.gems}`}</button></div>`; }).join('')}
+        ${left.length > 1 ? `<div class="cb-card bundle"><div class="cb-art">✦</div><b>联动礼包</b><small>两个一起买更便宜</small><button class="btn small" data-collab="bundle" ${profile.gems < bp ? 'disabled' : ''}>${ic('gems')}${bp}<s>${left.reduce((m, x) => m + x.gems, 0)}</s></button></div>` : ''}</div>
+        <div class="cb-go"><button class="btn" data-gomode="raid">去玩「咒灵讨伐」</button><button class="btn" data-gomode="seal">去玩「封印争夺」</button></div></div>`; })() : '';
+    return banner(ev.color, on ? `限时活动 · 还剩 ${fmtLeft(ev.end - now)}` : soon ? `即将开始 · ${fmtLeft(ev.start - now)} 后` : '已结束', ev.name, ev.desc, ev.id === 'parkfest' ? '<div class="eb-loot">🎡</div>' : yatoArt) + login + collab +
       `<div class="ev-sec"><h4>活动任务</h4><div class="ev-quests">${ev.quests.map((q, i) => qrow(q, st.p[i], `<button class="btn small ${st.c[i] ? 'ghost' : ''}" data-ev="${ev.id}" data-i="${i}" ${on && st.p[i] >= q[1] && !st.c[i] ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button>`)).join('')}</div></div>
-      ${ev.shop && on ? `<div class="ev-sec ev-shop"><div class="ev-shop-h"><h4>活动商店</h4><span class="tk">${ic('tickets')}${profile.tickets || 0} 乐园票</span>${ev.id === 'parkfest' ? '<button class="btn small" data-park>去玩乐园模式</button>' : ''}</div><div class="ev-shop-grid">${ev.shop.map((it, i) => { const used = (st.s || [])[i] || 0, left = it.limit - used, own = it.it.k === 'skin' && profile.skins.includes(it.it.id);
-        return `<div class="shop-it ${left <= 0 || own ? 'sold' : ''}"><div class="si-art">${rewardArt(it.it)}</div><b>${rewardLabel(it.it)}</b><small>${own ? '已拥有' : `剩 ${left} / ${it.limit}`}</small><button class="btn small" data-shop="${ev.id}" data-i="${i}" ${left > 0 && !own && (profile.tickets || 0) >= it.cost ? '' : 'disabled'}>${ic('tickets')}${it.cost}</button></div>`; }).join('')}</div></div>` : ''}`;
+      ${ev.shop && on ? `<div class="ev-sec ev-shop"><div class="ev-shop-h"><h4>活动商店</h4><span class="tk">${ic(cur)}${have} ${E.CUR[cur].name}</span>${ev.id === 'parkfest' ? '<button class="btn small" data-park>去玩乐园模式</button>' : ''}</div><div class="ev-shop-grid">${ev.shop.map((it, i) => { const used = (st.s || [])[i] || 0, left = it.limit - used, own = it.it.k === 'skin' && profile.skins.includes(it.it.id), K = it.it.k === 'skin' && S.skin(it.it.id);
+        return `<div class="shop-it ${left <= 0 || own ? 'sold' : ''}"><div class="si-art">${rewardArt(it.it)}</div><b>${rewardLabel(it.it)}</b><small>${own ? '已拥有' : `剩 ${left} / ${it.limit}`}</small>${K && K.trailer ? `<button class="btn small ghost sk-trailer" data-trailer="${K.id}">▶ 动画</button>` : ''}<button class="btn small" data-shop="${ev.id}" data-i="${i}" ${left > 0 && !own && have >= it.cost ? '' : 'disabled'}>${ic(cur)}${it.cost}</button></div>`; }).join('')}</div></div>` : ''}`;
   }
 
   // ---------------- 信箱 ----------------
@@ -4384,6 +4492,7 @@
     const q = profile.pilots[P.id];
     if (!q) {
       const inStarter = E.STARTER_PILOTS.includes(P.id);
+      if (isCollab(P.id)) return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${collabHow(P.id)}</small></div><button class="btn small" id="goChest">去看看</button></div>`;
       if (E.QUEST_ONLY.includes(P.id)) return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>任务角色：在「活动 → ${E.STORY.name}」完成全部任务免费获得</small></div><button class="btn small" id="goChest">去看看</button></div>`;
       return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${inStarter ? '常驻角色：新手宝箱、角色宝箱、街头宝箱都可能开出' : E.SEASON_PILOTS.includes(P.id) ? '赛季角色：街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '常驻角色：角色宝箱、街头宝箱都可能开出'}</small></div><button class="btn small" id="goChest">去宝箱</button></div>`;
     }
@@ -4403,7 +4512,7 @@
       <div class="upg-act">${act}</div></div>`;
   }
   function bindUpgrade(P) {
-    const g = $('goChest'); if (g) g.onclick = () => { openOv(E.QUEST_ONLY.includes(P.id) ? 'events' : 'chests'); };
+    const g = $('goChest'); if (g) g.onclick = () => { if (isCollab(P.id)) { EVSEL.tab = 'limited'; EVSEL.id = 'ev:yato'; } openOv(E.QUEST_ONLY.includes(P.id) || isCollab(P.id) ? 'events' : 'chests'); };
     const u = $('doUp');
     if (u) u.onclick = async () => { const r = await eco('upgrade', { pilot: P.id }); if (!r.ok) return toast(r.err); sfx.win(); toast(`${P.name} 升到了 ${r.lv} 级！`); };
     const b = $('doBreak');
@@ -4599,7 +4708,9 @@
   $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 
   // ================= 启动 =================
-  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
+  $('trSkip').onclick = () => { closeTrailer(); sfx.click(); };
+  $('trReplay').onclick = () => { if (TRL.id) playTrailer(TRL.id); };
+  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, openHero, playTrailer, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
   boot().then(startAccount);
@@ -4608,6 +4719,7 @@
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.GB_SINGLE && !IN_APP) navigator.serviceWorker.register('sw.js').catch(() => {});
   // 安卓返回键：对战中打开 / 关闭暂停菜单，菜单里关掉弹窗
   window.GB_back = () => {
+    if (!$('trailer').classList.contains('hidden')) { closeTrailer(); return; }
     if (!$('settingsDlg').classList.contains('hidden')) closeSettings();
     else if (G && !G.over) openSettings();
   };

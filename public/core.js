@@ -272,7 +272,7 @@ class Game {
     const FAIR = { lv: E.FAIR_LV, bt: E.FAIR_BT };
     const humans = [];
     for (const c of room.members.values()) {
-      const team = this.teams > 2 ? c.gTeam : st.party ? 1 : c.team;   // 1.7：组队（好友开黑）时队友都在同一边
+      const team = this.teams > 2 ? c.gTeam : st.party || this.mode === 'raid' ? 1 : c.team;   // 1.7：组队（好友开黑）时队友都在同一边；1.8：讨伐全员在一边
       if (slots[team] >= teamCap) continue;
       const pw = this.fair ? FAIR : c.power || { lv: 1, bt: 0 };
       humans.push(pw);
@@ -290,10 +290,10 @@ class Game {
       const bannedP = new Set(this.bans.pilots || []), bannedM = new Set(this.bans.mechs || []);   // 排位赛被禁用的驾驶员 / 机体 AI 也不能选
       const mechPool = S.WEAPON_ORDER.filter((w) => !bannedM.has(w));
       const free = S.PILOTS.filter((pp) => !taken.has(pp.id) && !bannedP.has(pp.id)).sort(() => Math.random() - 0.5);
-      const perTeam = this.teams > 2 ? teamCap : Math.max(st.teamSize, st.party ? slots[1] : 0);
+      const perTeam = this.teams > 2 ? teamCap : this.mode === 'raid' ? 4 : Math.max(st.teamSize, st.party ? slots[1] : 0);
       const slotList = [];
       for (let team = 1; team <= this.teams; team++)
-        for (let s = slots[team]; s < perTeam && !(this.tutorial && team === 1) && !(this.loot && team === 1 && st.fill === false); s++) slotList.push({ team });   // 搜刮撤离：可以关掉 AI 队友
+        for (let s = slots[team]; s < perTeam && !(this.tutorial && team === 1) && !(this.loot && team === 1 && st.fill === false) && !(this.mode === 'raid' && team === 2); s++) slotList.push({ team });   // 搜刮撤离：可以关掉 AI 队友
       // 1.4.1：AI 性格（菜鸟 / 猪队友 / 挂机 / 不错 / 高手 / 顶尖 / 大神），排位赛按段位混合；名字像真人玩家
       const usePersona = st.personas !== false && !this.tutorial;
       const hTeams = {};
@@ -314,6 +314,9 @@ class Game {
         if (usePersona) { pl.looks = BOTS.looks(S, pl.pilot, pl.persona, tier == null ? 2 : tier); pl.chatty = Math.random() < 0.7 ? P.chat * rand(0.4, 1.6) : 0; }
       });
     }
+    // 1.8：咒灵讨伐的百目 + 小咒灵；封印争夺的游荡咒灵（都提前建好，需要时再「出场」）
+    if (this.mode === 'raid') this.setupRaid(humans.length, botPw);
+    if (this.mode === 'seal') this.setupSeal(botPw);
     // 1.6：搜刮撤离的中立守卫（守着中间的高级物资，谁靠近打谁）
     if (this.loot && st.bots !== false) {
       const GW_ = ['bucket', 'riot', 'blaster', 'fist', 'roller', 'flamer'];   // 守卫用短中程武器，不在远处狙人
@@ -364,7 +367,7 @@ class Game {
       quakeT: 0, quakeArm: 0,
       input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, qq: 0, gq: 0, aq: 0, oq: 0, ad: 200 },
       lastQq: 0, lastGq: 0, lastAq: 0, sync: 0, lastPosT: 0, hitCd: {},
-      stats: { kills: 0, deaths: 0, paint: 0, obj: 0, balloons: 0, float: 0 },
+      stats: { kills: 0, deaths: 0, paint: 0, obj: 0, balloons: 0, float: 0, seals: 0, spirits: 0 },
       bag: [], bagCap: S.LOOT.bag, exT: 0, extracted: false, pickT: 0,
     };
     this.players.set(id, p);
@@ -410,7 +413,7 @@ class Game {
   startMsg() {
     return {
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
-      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null, npc: p.npc ? 1 : 0 })),
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null, npc: p.npc ? 1 : 0, boss: p.boss ? 1 : 0, spirit: p.spirit ? 1 : 0 })),
       fair: this.fair, teams: this.teams, risk: this.loot ? this.risk : undefined, squad: this.squad,
       loot: this.loot ? this.lootList() : undefined,
     };
@@ -441,7 +444,7 @@ class Game {
       this.countdown -= dt;
     } else if (!this.over) {
       this.time += dt; if (!this.tutorial) this.timeLeft -= dt;
-      for (const p of this.players.values()) if (p.bot || p.away) botThink(this, p, dt);
+      for (const p of this.players.values()) if (p.boss) bossThink(this, p, dt); else if (p.bot || p.away) botThink(this, p, dt);
       for (const p of this.players.values()) this.updatePlayer(p, dt);
       this.updateProjs(dt);
       this.updateBombs(dt);
@@ -505,6 +508,7 @@ class Game {
     p.silenceT = Math.max(0, p.silenceT - dt); p.smokeT = Math.max(0, p.smokeT - dt);
     p.rallyT = Math.max(0, p.rallyT - dt); p.revealT = Math.max(0, p.revealT - dt);
     p.cloakT = Math.max(0, (p.cloakT || 0) - dt);
+    p.sealT = Math.max(0, (p.sealT || 0) - dt); p.possT = Math.max(0, (p.possT || 0) - dt); p.dslowT = Math.max(0, (p.dslowT || 0) - dt);   // 1.8
     if (p.poisonT > 0) {   // 中毒：每 0.5 秒掉 3 点生命并减速
       p.poisonT -= dt; p.poisonAcc = (p.poisonAcc || 0) + dt; p.slowT = Math.max(p.slowT, 0.15);
       if (p.poisonAcc >= 0.5) { p.poisonAcc -= 0.5; this.hurt(p, 3, this.players.get(p.poisonBy) || null, 0, 0); if (!p.alive) return; }
@@ -527,6 +531,8 @@ class Game {
     if (OV && OV.spd) sm *= OV.spd;
     if (p.rallyT > 0) sm *= 1.15;
     if (p.cloakT > 0 && p.cloakFast) sm *= 1.25;
+    if (p.possT > 0) sm *= 1.2;          // 赤镰：恶灵附身
+    if (p.dslowT > 0) sm *= 0.75;        // 敌方结界里
     if (own && p.tal.has('p2')) sm *= 1.06;
     if (own && wheel0(p) && p.tal.has('p6')) sm *= 1.1;
     p.sm = sm;
@@ -536,8 +542,8 @@ class Game {
 
     // 敌方涂料持续掉血；脱战 3 秒后快速回血（大厨更快）
     const maxHp = this.maxHpOf(p);
-    if (enemy && p.invulnT <= 0 && !(spAct && p.spKind === 'charge') && p.hp > maxHp * 0.3) p.hp = Math.max(maxHp * 0.3, p.hp - maxHp * 0.1 * dt);
-    if (!enemy && this.time - p.lastHurt > 3 && this.time - p.lastAtk > 2) {
+    if (enemy && !p.npc && p.invulnT <= 0 && !(spAct && p.spKind === 'charge') && p.hp > maxHp * 0.3) p.hp = Math.max(maxHp * 0.3, p.hp - maxHp * 0.1 * dt);
+    if (!enemy && !p.boss && this.time - p.lastHurt > 3 && this.time - p.lastAtk > 2) {   // 1.8：百目不会脱战回血
       const k = (wheel && own ? 0.32 : 0.16) * (p.pilot === 'chef' ? 2 : 1);
       p.hp = Math.min(maxHp, p.hp + maxHp * k * dt);
     }
@@ -566,11 +572,11 @@ class Game {
 
     if (inp.qq !== p.lastQq) {
       p.lastQq = inp.qq;
-      if (!p.foot && p.sp >= W.spNeed && !spAct && p.silenceT <= 0) this.activateSpecial(p);
+      if (!p.foot && p.sp >= W.spNeed && !spAct && p.silenceT <= 0 && !(p.sealT > 0)) this.activateSpecial(p);
     }
     if (inp.gq !== p.lastGq) {
       p.lastGq = inp.gq;
-      if (p.skillUses > 0 && p.skillCd <= 0 && p.silenceT <= 0) this.useSkill(p);
+      if (p.skillUses > 0 && p.skillCd <= 0 && p.silenceT <= 0 && !(p.sealT > 0)) this.useSkill(p);
     }
     if (inp.oq !== p.lastOq) {
       p.lastOq = inp.oq;
@@ -629,7 +635,7 @@ class Game {
       p.ammo -= 1; p.atkCd = W.atkCd / (OVr || 1); p.lastAtk = this.time; this.takeOverdrive(p);
       if (p.cloakT > 0) { if (W.special === 'cloak') p.dmgMul *= 1.5; p.cloakT = 0; p.cloakFast = false; }   // 攻击会现形；幻影隐身第一击 +50%
       switch (W.attack) {
-        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : null }; this.stepBurst(p, W, 0); break;
+        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : W.slowHit ? { fx: { slow: W.slowHit } } : null }; this.stepBurst(p, W, 0); break;
         case 'fan': this.fireSpread(p, W); break;
         case 'flick':
           this.fireSpread(p, W);
@@ -675,7 +681,7 @@ class Game {
     for (const t of this.players.values()) {
       if (!t.alive || t.team === p.team) continue;
       const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
-      if (d > A.range + (t.foot ? S.PILOT_R : S.R) + 6 || Math.abs(t.z - p.z) > 34) continue;
+      if (d > A.range + (t.rad || (t.foot ? S.PILOT_R : S.R)) + 6 || Math.abs(t.z - p.z) > (t.boss ? 120 : 34)) continue;
       let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
       if (Math.abs(da) > A.arc / 2) continue;
       this.hurt(t, A.dmg, p, dx, dy, A.kb / (A.dmg * 1.8), 80);
@@ -717,7 +723,7 @@ class Game {
     for (const t of this.players.values()) {
       if (!t.alive || t.team === p.team) continue;
       const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
-      if (d > W.range + S.R + 10 + (W.lunge || 0) * 0.1 || Math.abs(t.z - p.z) > 40) continue;   // 1.5：冲拳的前冲也算进攻击距离
+      if (d > W.range + (t.rad || S.R) + 10 + (W.lunge || 0) * 0.1 || Math.abs(t.z - p.z) > (t.boss ? 120 : 40)) continue;   // 1.5：冲拳的前冲也算进攻击距离
       let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
       if (Math.abs(da) > W.arc / 2) continue;
       const dmg = W.dmg * p.dmgMul;
@@ -725,6 +731,7 @@ class Game {
     }
     this.pushBall(p, fx, fy, W.range, 1100);
     if (this.mode === 'park') for (const b of this.obj.balloons.slice()) if (Math.hypot(b.x - fx, b.y - fy) < W.range + 20) this.popBalloon(b, p.team, p);
+    if (W.wave) { const V = W.wave; this.spawnProj(p, a, -0.03, V.speed, V.range, V.dmg, V.splat, 14, V.size, null, { kb: 1.4 }); }   // 1.8：灵刃的刀气
     this.ev(['pu', p.id, r2(a)]);
   }
 
@@ -845,6 +852,13 @@ class Game {
           e.sp = Math.max(0, e.sp - S.WEAPONS[e.weapon].spNeed * 0.3); e.revealT = 4;
         }
         break;
+      case 'seal': {   // 1.8 符零：封印符阵
+        const d = clamp(p.input.ad || 200, 60, 240), sx = clamp(p.x + Math.cos(p.input.a) * d, 20, S.W - 20), sy = clamp(p.y + Math.sin(p.input.a) * d, 20, S.H - 20);
+        this.helpers.push({ id: this.nextId++, kind: 'sealz', x: sx, y: sy, z: this.top(sx, sy), r: 105, team: p.team, owner: p.id, t: 3, cd: 0 });
+        this.paint(sx, sy, this.top(sx, sy), 50, p.team, p);
+        break;
+      }
+      case 'possess': p.possT = 4; break;   // 1.8 赤镰：恶灵附身
     }
     if (p.tal.has('s1')) p.skillCd *= 0.75;
   }
@@ -869,6 +883,14 @@ class Game {
     if (O.regen) {
       const list = O.burstHeal ? [p] : [...this.players.values()].filter((a) => a.alive && a.team === p.team && dist(a, p) < 200);
       for (const a of list) a.hp = Math.min(this.maxHpOf(a), a.hp + O.regen * k * dt);
+    }
+    if (O.sealPulse) {   // 1.8 符零超载：百符结界
+      p.ovPulse -= dt;
+      if (p.ovPulse <= 0) {
+        p.ovPulse = 1;
+        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 200) { e.slowT = Math.max(e.slowT, 1); this.hurt(e, O.sealPulse * k, p); }
+        this.ev(['bx', r1(p.x), r1(p.y), r1(p.z + 10), p.team, 200, 3]);
+      }
     }
     if (O.pulse) {
       p.ovPulse -= dt;
@@ -901,6 +923,20 @@ class Game {
         return true;
       }
       if (h.kind === 'wall') return true;   // 盾墙：挡子弹的判定在 updateProjs
+      if (h.kind === 'sealz') {    // 1.8 符零的封印符阵：减速 + 封印技能 / 大招 + 暴露
+        for (const e of this.players.values()) {
+          if (!e.alive || e.team === h.team || Math.hypot(e.x - h.x, e.y - h.y) > h.r || Math.abs(e.z - h.z) > 60) continue;
+          e.slowT = Math.max(e.slowT, 0.25); e.sealT = Math.max(e.sealT || 0, 0.25); e.revealT = Math.max(e.revealT, 0.5);
+        }
+        return true;
+      }
+      if (h.kind === 'dome') {     // 1.8 结界机兵的结界：队友减伤 + 回血，敌人减速（减伤在 hurt 里）
+        for (const a of this.players.values()) {
+          if (!a.alive || Math.hypot(a.x - h.x, a.y - h.y) > h.r || Math.abs(a.z - h.z) > 90) continue;
+          if (a.team === h.team) a.hp = Math.min(this.maxHpOf(a), a.hp + 10 * dt); else a.dslowT = Math.max(a.dslowT || 0, 0.25);
+        }
+        return true;
+      }
       if (h.kind === 'decoy') {    // 卡卡的替身：时间到就炸开
         if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 10, 90, 40, 20, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 10), h.team, 90, 0]); return false; }
         return true;
@@ -959,7 +995,7 @@ class Game {
   hitPlayerAt(team, x, y, z, pad) {
     for (const t of this.players.values()) {
       if (!t.alive || t.team === team) continue;
-      const R = t.foot ? S.PILOT_R : S.R, H = t.foot ? 22 : S.PH;
+      const R = t.rad || (t.foot ? S.PILOT_R : S.R), H = t.boss ? 120 : t.foot ? 22 : S.PH;
       if (Math.hypot(t.x - x, t.y - y) < R + pad && z > t.z - pad && z < t.z + H + pad) return t;
     }
     return null;
@@ -990,6 +1026,7 @@ class Game {
   }
 
   paint(x, y, z, r, team, owner) {
+    if (this.mode === 'seal' && team > 2) return 0;   // 1.8：中立咒灵不涂地
     if (owner && owner.tal && owner.tal.has('p1')) r *= 1.12;   // 天赋：大号喷嘴
     const n = S.paintCircle(this.grid, this.M, x, y, z, r, team, (i) => this.diff.push(i * 16 + team));
     if (owner && n) this.credit(owner, n);
@@ -1031,6 +1068,8 @@ class Game {
       if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
       if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
       if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.08;   // 韩冰被动：倒戈
+      if (by.pilot === 'fu' && t.slowT > 0) dmg *= 1.15;                       // 符零被动：符咒共鸣
+      if (by.pilot === 'aka' && by.hp < this.maxHpOf(by) * 0.4) dmg *= 1.2;   // 赤镰被动：恶灵低语
       const BW = !by.foot && S.WEAPONS[by.weapon];
       if (BW && BW.backstab && by.team !== t.team) {   // 刺客机体：从背后命中（在目标朝向 ±110° 以外）伤害提高
         let da = Math.atan2(by.y - t.y, by.x - t.x) - t.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
@@ -1048,12 +1087,14 @@ class Game {
     if (tOV && tOV.reflect && by && by !== t && by.team !== t.team && by.alive && !this._reflecting) { this._reflecting = true; this.hurt(by, dmg * tOV.reflect, t); this._reflecting = false; }
     if (!t.foot && S.WEAPONS[t.weapon].armor) dmg *= S.WEAPONS[t.weapon].armor;   // 重装机体减伤
     if (t.tal && t.tal.has('d4') && t.hp < this.maxHpOf(t) * 0.3) dmg *= 0.85;
+    if (t.possT > 0) dmg *= 0.85;   // 恶灵附身
+    for (const h of this.helpers) if (h.kind === 'dome' && h.team === t.team && Math.hypot(t.x - h.x, t.y - h.y) < h.r && Math.abs(t.z - h.z) < 90) { dmg *= 0.7; break; }   // 己方结界
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -5%
       let n = 0;
       for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 200) n++;
       dmg *= 1 - 0.08 * Math.min(3, n);
     }
-    if (kdx != null && !(tOV && tOV.noKb)) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
+    if (kdx != null && !(tOV && tOV.noKb) && !t.boss) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
       t.shield -= a; dmg -= a;
@@ -1067,6 +1108,11 @@ class Game {
     if (tOV && tOV.undying) dmg = Math.min(dmg, Math.max(0, t.hp - 1));         // 秦岳超载：老兵不死
     if (t.tal && t.tal.has('d5') && !t.foot && !t.d5used && dmg >= t.hp) { dmg = Math.max(0, t.hp - 1); t.d5used = true; t.invulnT = 1.5; this.ev(['blk', t.id]); }   // 天赋：不屈装甲
     t.hp -= dmg; t.lastHurt = this.time;
+    if (by && by !== t && by.team !== t.team && by.alive && this.players.has(by.id)) {   // 1.8：赤镰吸血（恶灵附身 / 灵化爆发）
+      const bo2 = by.ovT > 0 ? S.OVERLOADS[by.pilot] : null;
+      const heal = (by.possT > 0 ? dmg * 0.35 : 0) + (bo2 && bo2.hitHeal ? bo2.hitHeal : 0);
+      if (heal > 0) by.hp = Math.min(this.maxHpOf(by), by.hp + heal);
+    }
     // 打中敌人给大招充能
     if (by && by.team !== t.team && this.players.has(by.id) && !by.foot && !(by.spT > 0)) {
       const bo = by.ovT > 0 ? S.OVERLOADS[by.pilot] : null;
@@ -1075,7 +1121,7 @@ class Game {
     // 超载充能：突破 I 以后，每局一次
     if (by && by !== t && by.team !== t.team && by.bt >= 1 && !by.ovUsed && by.ovT <= 0 && this.players.has(by.id)) by.ov = Math.min(S.OV_NEED, by.ov + dmg * (by.tal.has('s3') ? 1.2 : 1));
     this.ev(['hit', t.id, by ? by.id : 0, 0, Math.round(dmg)]);
-    if (t.hp <= 0) { if (t.foot) this.kill(t, by); else this.wreck(t, by); }
+    if (t.hp <= 0) { if (t.boss) this.bossDown(t, by); else if (t.foot || t.spirit) this.kill(t, by); else this.wreck(t, by); }
   }
   onTakedown(by, t) {
     if (!by || !this.players.has(by.id)) return;
@@ -1120,6 +1166,13 @@ class Game {
       this.sendBag(t);
     }
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.foot = false;
+    if (t.spirit) {   // 1.8：咒灵不复活；封印争夺里掉落封印石
+      t.respawnT = 1e9;
+      if (by && by !== t && !by.npc && this.players.has(by.id)) by.stats.spirits++;
+      if (this.mode === 'seal') for (let i = 0; i < S.SEAL.drop; i++) this.dropStone(t.x, t.y, t.z);
+      this.ev(['kill', by ? by.id : 0, t.id, r1(t.x), r1(t.y), r1(t.z)]);
+      return;
+    }
     const team = by ? by.team : this.teams > 2 ? 0 : 3 - t.team;
     this.paint(t.x, t.y, this.top(t.x, t.y), 40, team, by && this.players.has(by.id) ? by : null);
     if (by && by !== t) this.onTakedown(by, t);
@@ -1189,7 +1242,8 @@ class Game {
     for (const t of this.players.values()) {
       if (!t.alive || t.team === team) continue;
       const d = Math.hypot(t.x - x, t.y - y, t.z + 18 - z - 10);
-      if (d < r + S.R && (noLos || S.los3(this.M, x, y, z + 10, t.x, t.y, t.z + 18))) { const k = Math.max(0, 1 - d / (r + S.R)); this.hurt(t, minD + (maxD - minD) * k, owner, t.x - x, t.y - y, 1.6, 90 + 160 * k); }
+      const tr = t.rad || S.R;
+      if (d < r + tr && (noLos || S.los3(this.M, x, y, z + 10, t.x, t.y, t.z + 18))) { const k = Math.max(0, 1 - d / (r + tr)); this.hurt(t, minD + (maxD - minD) * k, owner, t.x - x, t.y - y, 1.6, 90 + 160 * k); }
     }
     const b = this.obj.ball;
     if (b && this.obj.resetT <= 0) {
@@ -1264,7 +1318,7 @@ class Game {
         for (const t of this.players.values()) {
           if (!t.alive || t.team === p.team) continue;
           const dx = t.x - p.x, dy = t.y - p.y, along = dx * ux + dy * uy, across = Math.abs(-dx * uy + dy * ux);
-          if (along > -10 && along < d + 20 && across < 34 && Math.abs(t.z - p.z) < 40) this.hurt(t, 60, p, ux, uy, 1.2, 60);
+          if (along > -10 && along < d + 20 && across < 34 + (t.rad || 0) && Math.abs(t.z - p.z) < (t.boss ? 120 : 40)) this.hurt(t, 60, p, ux, uy, 1.2, 60);
         }
         this.paint(p.x + ux * d * 0.5, p.y + uy * d * 0.5, p.z, 40, p.team, p);
         this.knock(p, ux, uy, Math.min(1000, d * 3.6), 0);
@@ -1279,6 +1333,12 @@ class Game {
         break;
       }
       case 'cloak': p.spT = 0.3; p.cloakT = 4; p.cloakFast = true; break;
+      case 'barrier':   // 1.8 结界展开
+        p.spT = 0.4;
+        this.helpers.push({ id: this.nextId++, kind: 'dome', x: p.x, y: p.y, z: this.top(p.x, p.y), r: 150, team: p.team, owner: p.id, t: 6, cd: 0 });
+        this.paint(p.x, p.y, p.z, 80, p.team, p);
+        break;
+      case 'rend': p.spT = 0.5; p.rendArm = true; p.rendA = a; break;   // 1.8 裂空斩：蓄力 0.35 秒后出刀
       case 'missiles': {
         p.spT = 0.3;
         const targets = [];
@@ -1349,6 +1409,19 @@ class Game {
           if ((p.hitCd[t.id] || 0) > this.time) continue;
           p.hitCd[t.id] = this.time + 0.3;
           this.hurt(t, 17, p, t.x - p.x, t.y - p.y, 2.4, 80);
+        }
+        break;
+      case 'rend':
+        if (p.rendArm && p.spT <= 0.15) {
+          p.rendArm = false;
+          const a = p.rendA, ux = Math.cos(a), uy = Math.sin(a), L = 520;
+          for (const t of this.players.values()) {
+            if (!t.alive || t.team === p.team) continue;
+            const dx = t.x - p.x, dy = t.y - p.y, along = dx * ux + dy * uy, across = Math.abs(-dx * uy + dy * ux);
+            if (along > -10 && along < L && across < 40 + (t.boss ? t.rad || 0 : 0) && Math.abs(t.z - p.z) < 70) this.hurt(t, 85, p, ux, uy, 1.6, 120);
+          }
+          for (let d = 24; d < L; d += 26) { const x = p.x + ux * d, y = p.y + uy * d; if (x < 0 || y < 0 || x > S.W || y > S.H) break; this.paint(x, y, this.top(x, y), 26, p.team, p); }
+          this.ev(['rend', p.id, r1(p.x), r1(p.y), r1(p.z), r2(a), L, p.team]);
         }
         break;
       case 'charge':
@@ -1571,6 +1644,63 @@ class Game {
     }
     this.ev(['rs', o.round]);
   }
+  // ---------------- 1.8：咒灵讨伐 / 封印争夺 ----------------
+  setupRaid(nh, pw) {
+    const R = S.RAID;
+    const b = this.addPlayer(-900, '百目', 2, 'fist', 'antenna', true, 0, 'aka', { lv: pw.lv, bt: pw.bt });
+    b.boss = true; b.npc = true; b.rad = R.r; b.maxHp = R.hp; b.hp = b.maxHp; void nh;
+    b.x = S.W / 2 + 160; b.y = S.H / 2; b.z = this.top(b.x, b.y); b.sync++;
+    b.bossAI = { t: 3, i: 0, tele: [], rage: false, dash: 0, dx: 0, dy: 0, ring: null };
+    this.boss = b;
+    this.minions = [];
+    const MW = ['fist', 'bucket', 'blaster', 'fist'];
+    for (let k = 0; k < 4; k++) {
+      const m = this.addPlayer(-910 - k, '小咒灵', 2, MW[k], 'antenna', true, 1 + k, 'raven', { lv: Math.max(1, pw.lv - 2), bt: 0 });
+      m.npc = true; m.spirit = true; m.persona = 'decent'; m.maxHp = 80; m.alive = false; m.respawnT = 1e9;
+      this.minions.push(m);
+    }
+  }
+  setupSeal(pw) {
+    this.spirits = [];
+    const SW = ['fist', 'bucket', 'blaster', 'flamer', 'fist', 'gatling'];
+    for (let k = 0; k < 6; k++) {
+      const m = this.addPlayer(-920 - k, '游荡咒灵', S.SEAL.team, SW[k], 'antenna', true, k, 'raven', { lv: Math.max(1, pw.lv - 1), bt: 0 });
+      m.npc = true; m.spirit = true; m.persona = 'decent'; m.maxHp = 110; m.alive = false; m.respawnT = 1e9;
+      this.spirits.push(m);
+    }
+  }
+  spawnSpirit(m, pt) {
+    if (!pt) return;
+    m.x = pt.x; m.y = pt.y; m.z = pt.z; m.vx = m.vy = m.vz = 0; m.kx = m.ky = 0; m.hp = m.maxHp; m.alive = true; m.foot = false; m.invulnT = 0.6; m.ammo = S.AMMO;
+    m.guard = { x: pt.x, y: pt.y }; m.ai = null; m.sync++;
+    this.ev(['summon', m.id, r1(pt.x), r1(pt.y), r1(pt.z)]);
+  }
+  // 随机找一块空地（k = 离中心的最大比例）
+  randomOpen(k) {
+    for (let n = 0; n < 40; n++) {
+      const x = S.W / 2 + (Math.random() - 0.5) * S.W * k, y = (randInt(S.GH) + 0.5) * S.CELL, z = this.top(x, y);
+      if (z > 80 || S.collideTest(this.M, x, y, z)) continue;
+      if (dist({ x, y }, S.basePos(1)) < 260 || dist({ x, y }, S.basePos(2)) < 260) continue;
+      return { x, y, z };
+    }
+    return null;
+  }
+  dropStone(x0, y0, z0) {
+    const o = this.obj, a = rand(0, Math.PI * 2), r = rand(10, 40);
+    let x = clamp(x0 + Math.cos(a) * r, 20, S.W - 20), y = clamp(y0 + Math.sin(a) * r, 20, S.H - 20);
+    if (S.collideTest(this.M, x, y, z0) || this.top(x, y) > z0 + 5) { x = x0; y = y0; }
+    o.bats.push({ id: o.batId++, x, y, z: this.top(x, y) });
+  }
+  bossDown(b, by) {
+    b.alive = false; b.hp = 0; b.respawnT = 1e9;
+    if (by && !by.npc && this.players.has(by.id)) { by.stats.kills++; by.stats.spirits++; by.stats.obj += 5; }
+    this.paint(b.x, b.y, this.top(b.x, b.y), 140, 1, null);
+    this.ev(['kill', by ? by.id : 0, b.id, r1(b.x), r1(b.y), r1(b.z)]);
+    this.ev(['boss', b.id, 'down', r1(b.x), r1(b.y), r1(b.z)]);
+    for (const m of this.minions) if (m.alive) { m.alive = false; m.hp = 0; m.respawnT = 1e9; this.ev(['kill', 0, m.id, r1(m.x), r1(m.y), r1(m.z)]); }
+    this.finish(1);
+  }
+
   initMode() {
     const o = (this.obj = { score: [0, 0, 0], resetT: 0 });
     if (this.loot) {
@@ -1599,6 +1729,8 @@ class Game {
       case 'escort': o.tr = { x: S.W / 2, y: S.H / 2, z: this.top(S.W / 2, S.H / 2), carrier: 0, resetT: 0 }; break;
       case 'soccer': o.ball = { x: S.W / 2, y: S.H / 2, vx: 0, vy: 0, r: 26, last: 0, acc: 0 }; break;
       case 'battery': o.bats = []; o.batT = 2; o.batId = 1; break;
+      case 'seal': o.bats = []; o.batT = 2; o.batId = 1; o.spT = 1.5; break;
+      case 'raid': this.timeLeft = S.RAID.time; break;
       case 'park': o.fl = Object.assign({ k: 0, own: 0 }, this.parkPos(0)); o.balloons = []; o.balT = 1.5; o.balId = 1; o.acc = 0; break;
     }
   }
@@ -1797,6 +1929,34 @@ class Game {
         }
         break;
       }
+      case 'seal': {   // 1.8：封印争夺
+        const SE = S.SEAL;
+        o.batT -= dt;
+        if (o.batT <= 0 && o.bats.length < SE.stoneMax) { o.batT = SE.stoneT; const pt = this.randomOpen(0.55); if (pt) o.bats.push({ id: o.batId++, x: pt.x, y: pt.y, z: pt.z }); }
+        o.spT -= dt;
+        if (o.spT <= 0) {
+          o.spT = SE.spiritT;
+          const free = this.spirits.find((q) => !q.alive);
+          if (free && this.spirits.filter((q) => q.alive).length < SE.spiritMax) this.spawnSpirit(free, this.randomOpen(0.6));
+        }
+        for (const p of this.players.values()) {
+          if (!p.alive || p.npc) continue;
+          if (p.carry < SE.carry) {
+            for (let i = o.bats.length - 1; i >= 0; i--) {
+              const bt = o.bats[i];
+              if (Math.hypot(bt.x - p.x, bt.y - p.y) < 28 && Math.abs(bt.z - p.z) < 30) { p.carry++; o.bats.splice(i, 1); this.ev(['bp', p.id]); if (p.carry >= SE.carry) break; }
+            }
+          }
+          if (p.carry > 0 && dist(p, S.basePos(p.team)) < 120) {
+            o.score[p.team] += p.carry; p.stats.obj += p.carry; p.stats.seals += p.carry;
+            this.ev(['dep', p.id, p.carry]);
+            p.carry = 0;
+            if (o.score[p.team] >= SE.target) { this.finish(p.team); return; }
+          }
+        }
+        break;
+      }
+      case 'raid': break;   // 1.8：百目的招式在 bossThink 里
       case 'battery': {
         o.batT -= dt;
         if (o.batT <= 0 && o.bats.length < 12) {
@@ -1867,10 +2027,14 @@ class Game {
         for (const b of o.balloons) flat.push(b.id, r1(b.x), r1(b.y), r1(b.z));
         return [o.score[1], o.score[2], r1(o.fl.x), r1(o.fl.y), o.fl.own, flat];
       }
-      case 'battery': {
+      case 'battery': case 'seal': {
         const flat = [];
         for (const b of o.bats) flat.push(b.id, r1(b.x), r1(b.y), r1(b.z));
         return [o.score[1], o.score[2], flat];
+      }
+      case 'raid': {
+        const b = this.boss;
+        return [b ? b.id : 0, b && b.bossAI.rage ? 1 : 0, this.minions ? this.minions.filter((m) => m.alive).length : 0, b ? Math.max(0, Math.ceil(b.hp)) : 0, b ? b.maxHp : 1];
       }
       case 'elim': return [o.wins[1], o.wins[2], o.round, Math.ceil(o.pause * 10), this.aliveOf(1), this.aliveOf(2)];
       case 'escape4': case 'escape8': {
@@ -1931,6 +2095,7 @@ class Game {
       for (let t = 1; t <= this.teams; t++) { const n = this.aliveOf(t); if (n > bn) { bn = n; best = t; } }
       winner = best; reason = 'time';
     }
+    if (winner == null && this.mode === 'raid') { winner = 2; reason = 'time'; }   // 1.8：讨伐超时——百目获胜
     if (winner == null && this.loot) {
       // 撤离价值最高的小队算「赢」（用来显示 MVP 和标题）
       let best = 0, bv = 0;
@@ -1956,6 +2121,11 @@ class Game {
       for (const p of this.players.values()) if (!p.guard) lp[p.id] = { ex: !!p.extracted, items: p.extracted ? (o.banked[p.id] || []) : [], gear: p.gear || [] };
       result.loot = { risk: this.risk, players: lp };
       result.players = result.players.filter((q) => !this.players.get(q.id) || !this.players.get(q.id).guard);
+    }
+    if (this.mode === 'raid' || this.mode === 'seal') {   // 1.8：百目、小咒灵、游荡咒灵不进结算
+      const boss = [...this.players.values()].find((p) => p.boss);
+      if (boss) result.boss = { hp: Math.max(0, Math.round(boss.hp)), max: boss.maxHp, down: !boss.alive };
+      result.players = result.players.filter((q) => !this.players.get(q.id) || !this.players.get(q.id).npc);
     }
     this.result = result;
     if (this.chat) this.chat.onEnd(winner);
@@ -2178,7 +2348,7 @@ function botThink(g, p, dt) {
   // 大招
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
-    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450 }[sp];
+    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480 }[sp];
     if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < (P.waste ? 0.015 : P.smart ? 0 : 0.002)) {   // 猪队友乱放大招
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
@@ -2194,10 +2364,79 @@ function botThink(g, p, dt) {
       rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
       turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
       rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
+      seal: enemy && ed < 240, possess: fight && (hpK < 0.7 || ed < 120),
     }[sk] || (P.waste && Math.random() < 0.3);
     if (use) {
       if (sk === 'dash' && enemy && !p.foot) { inp.mx = Math.cos(aim.a); inp.my = Math.sin(aim.a); }
+      if (sk === 'seal' && enemy) { const a2 = aimAt(p, enemy.x + enemy.vx * 0.3, enemy.y + enemy.vy * 0.3, enemy.z); inp.a = a2.a; inp.ad = ed; }
       inp.gq++;
+    }
+  }
+}
+// 1.8：百目（咒灵讨伐的 Boss）：慢慢逼近最近的玩家，轮流使用 砸地 / 弹幕环 / 召唤小咒灵 / 冲撞；血量过半狂暴
+function bossThink(g, b, dt) {
+  const A = b.bossAI, inp = b.input, R = S.RAID;
+  if (!b.alive) return;
+  const rage = b.hp < b.maxHp * R.rage;
+  if (rage && !A.rage) { A.rage = true; A.t = Math.min(A.t, 0.8); g.ev(['boss', b.id, 'rage', r1(b.x), r1(b.y), r1(b.z)]); }
+  const foes = [...g.players.values()].filter((q) => q.alive && q.team !== b.team && !q.npc);
+  let tgt = null, td = Infinity;
+  for (const q of foes) { const d = dist(q, b); if (d < td) { td = d; tgt = q; } }
+  let mx = 0, my = 0;
+  if (A.dash > 0) {
+    A.dash -= dt; mx = A.dx; my = A.dy;
+    g.contactDamage(b, b.x, b.y, b.rad + 16, rage ? 45 : 35, 0.6);
+    g.paint(b.x, b.y, b.z, 46, b.team, null);
+  } else if (tgt && td > 110) { mx = ((tgt.x - b.x) / td) * 0.5; my = ((tgt.y - b.y) / td) * 0.5; }
+  const hd = Math.hypot(b.x - S.W / 2, b.y - S.H / 2);
+  if (hd > 460 && A.dash <= 0) { mx = ((S.W / 2 - b.x) / hd) * 0.6; my = ((S.H / 2 - b.y) / hd) * 0.6; }
+  inp.mx = mx; inp.my = my; inp.f = false; inp.w = A.dash > 0; inp.j = false;
+  if (tgt) inp.a = Math.atan2(tgt.y - b.y, tgt.x - b.x);
+  // 砸地：预警圈到时间就炸
+  A.tele = A.tele.filter((T) => {
+    T.t -= dt;
+    if (T.t > 0) return true;
+    g.explode(T.x, T.y, T.z + 6, T.r, rage ? 72 : 58, 24, b.team, b, true);
+    g.ev(['bx', r1(T.x), r1(T.y), r1(T.z + 6), b.team, T.r, 0]);
+    return false;
+  });
+  // 弹幕环：每 0.35 秒一圈
+  if (A.ring) {
+    A.ring.t -= dt;
+    if (A.ring.t <= 0) {
+      A.ring.t = 0.35; A.ring.n--;
+      const N = rage ? 22 : 18, off = Math.random() * 0.3;
+      for (let i = 0; i < N; i++) g.spawnProj(b, (i / N) * Math.PI * 2 + off, 0.02, 360, 560, rage ? 15 : 12, 22, 0, 9, { x: b.x, y: b.y, z: b.z + 40, r: b.rad + 4 });
+      if (A.ring.n <= 0) A.ring = null;
+    }
+  }
+  A.t -= dt * (rage ? 1.45 : 1);
+  if (A.t > 0 || !foes.length) return;
+  const seq = ['slam', 'ring', 'summon', 'slam', 'dash', 'ring'];
+  let mv = seq[A.i++ % seq.length];
+  if (mv === 'summon' && g.minions.filter((m) => m.alive).length >= 3) mv = 'slam';
+  switch (mv) {
+    case 'slam': {
+      const n = rage ? Math.min(3, foes.length) : Math.min(2, foes.length), pick = foes.slice().sort(() => Math.random() - 0.5).slice(0, n);
+      for (const q of pick) { const T = { x: q.x + q.vx * 0.4, y: q.y + q.vy * 0.4, z: g.top(q.x, q.y), r: 115, t: 1.15 }; T.x = clamp(T.x, 20, S.W - 20); T.y = clamp(T.y, 20, S.H - 20); A.tele.push(T); g.ev(['tg', r1(T.x), r1(T.y), r1(T.z), T.r, T.t]); }
+      A.t = 2.6; break;
+    }
+    case 'ring': A.ring = { n: rage ? 3 : 2, t: 0.5 }; g.ev(['boss', b.id, 'ring', r1(b.x), r1(b.y), r1(b.z)]); A.t = 3.2; break;
+    case 'summon': {
+      let n = rage ? 3 : 2;
+      for (const m of g.minions) {
+        if (m.alive || n <= 0) continue;
+        const a = Math.random() * Math.PI * 2, x = clamp(b.x + Math.cos(a) * 90, 30, S.W - 30), y = clamp(b.y + Math.sin(a) * 90, 30, S.H - 30);
+        if (S.collideTest(g.M, x, y, g.top(x, y))) continue;
+        g.spawnSpirit(m, { x, y, z: g.top(x, y) }); m.guard = null; n--;
+      }
+      g.ev(['boss', b.id, 'summon', r1(b.x), r1(b.y), r1(b.z)]); A.t = 3; break;
+    }
+    case 'dash': {
+      let far = null, fd = -1;
+      for (const q of foes) { const d = dist(q, b); if (d > fd) { fd = d; far = q; } }
+      if (far) { const l = Math.max(1, fd); A.dx = (far.x - b.x) / l; A.dy = (far.y - b.y) / l; A.dash = 1.0; g.knock(b, A.dx, A.dy, 640, 0); g.ev(['boss', b.id, 'dash', r1(b.x), r1(b.y), r1(b.z)]); }
+      A.t = 2.8; break;
     }
   }
 }
@@ -2334,6 +2573,22 @@ function chooseGoal(g, p) {
       const ownGoalX = p.team === 1 ? 0 : S.W;
       if (p.slot === 3 && Math.abs(b.x - ownGoalX) < S.W * 0.45) return { x: ownGoalX + (p.team === 1 ? 120 : -120), y: clamp(b.y, S.H / 2 - 120, S.H / 2 + 120) };
       return { x: b.x - dx * 90 + rand(-30, 30), y: b.y - dy * 90 + rand(-30, 30) };
+    }
+    case 'seal': {   // 1.8：捡封印石 → 回祭坛；没有封印石就去打咒灵
+      if (p.carry >= 3 || (p.carry > 0 && o.bats.length === 0)) return S.basePos(p.team);
+      let best = null, bd = Infinity;
+      for (const b of o.bats) { const d = dist(b, p) + rand(0, 120); if (d < bd) { bd = d; best = b; } }
+      for (const s of g.spirits || []) { if (!s.alive) continue; const d = dist(s, p) + 160; if (d < bd) { bd = d; best = s; } }
+      if (best) return { x: best.x, y: best.y };
+      break;
+    }
+    case 'raid': {   // 1.8：围着百目打；小咒灵冲最近的人
+      if (p.team === 1 && g.boss && g.boss.alive) {
+        const a = (p.slot / 4) * Math.PI * 2 + g.time * 0.15, rr = p.weapon === 'charger' || p.weapon === 'mortar' ? 330 : S.WEAPONS[p.weapon].attack === 'punch' ? 70 : 210;
+        return { x: clamp(g.boss.x + Math.cos(a) * rr, 40, S.W - 40), y: clamp(g.boss.y + Math.sin(a) * rr, 40, S.H - 40) };
+      }
+      if (p.team === 2) { let best = null, bd = Infinity; for (const q of g.players.values()) { if (!q.alive || q.team === 2) continue; const d = dist(q, p); if (d < bd) { bd = d; best = q; } } if (best) return { x: best.x, y: best.y }; }
+      break;
     }
     case 'battery': {
       if (p.carry >= 3 || (p.carry > 0 && o.bats.length === 0)) return S.basePos(p.team);

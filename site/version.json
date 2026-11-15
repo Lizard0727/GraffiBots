@@ -1,20 +1,26 @@
 {
-  "version": "1.7.1",
+  "version": "1.8",
   "date": "2026-11-15",
-  "title": "1.7.1 更新 · 断线重连 & 好友申请",
-  "en_title": "Update 1.7.1 · Reconnect & Friend Requests",
+  "title": "1.8 更新 · 夜都决战",
+  "en_title": "Update 1.8 · Night City Showdown",
   "page": "#updates",
   "force": true,
   "notes": [
-    "好友申请",
-    "声音卡顿 / 电脑变卡",
-    "断线重连",
-    "连接更稳定"
+    "联动活动「夜都决战」（14 天）",
+    "新驾驶员",
+    "新机体",
+    "联动皮肤（都带约 20 秒的 3D 战斗动画）",
+    "限时玩法",
+    "修复",
+    "更新奖励"
   ],
   "en_notes": [
-    "Friend requests",
-    "Audio stutter / slow computer",
-    "Reconnect",
-    "More stable connections"
+    "Collab event: Night City Showdown (14 days)",
+    "New pilots",
+    "New mechs",
+    "Collab skins (each with a ~20-second 3D battle trailer)",
+    "Limited modes",
+    "Fixes",
+    "Update rewards"
   ]
 }

@@ -226,6 +226,25 @@
     drumVol: { k: 0.72, s: 0.28, h: 0.06 },
   };
 
+  // 1.8 夜都决战：「午夜结界」D 小调 132 BPM——太鼓一样的低音鼓 + 拨弦琶音 + 竹笛般的旋律
+  TRACKS.yato = {
+    bpm: 132, swing: 0.04,
+    chords: [
+      { root: 38, pad: [62, 65, 69] }, { root: 34, pad: [62, 65, 70] }, { root: 36, pad: [60, 64, 67] }, { root: 33, pad: [61, 64, 69] },
+      { root: 38, pad: [62, 65, 69] }, { root: 41, pad: [60, 65, 69] }, { root: 43, pad: [62, 67, 70] }, { root: 45, pad: [61, 64, 69] },
+    ],
+    kick: 'X..x..x.X...x.x.', snare: '....x.......x..x', hat: '..x...x...x...xo',
+    fill: { snare: '....x...x.xxXXXX' },
+    bass: nums('0 . . 0 . . 7 . 0 . 12 . 10 . 7 .'), bassType: 'triangle', bassVol: 0.3,
+    lead: [
+      'D5 . . . F5 . G5 . A5 . . . . . G5 .', 'F5 . . . E5 . D5 . C5 . . . A4 . . .',
+      'D5 . . . F5 . G5 . A5 . . . C6 . A5 .', 'G5 . . . F5 . E5 . C#5 . . . . . . .',
+      'A5 . . . . . G5 . F5 . . . D5 . . .', 'C5 . . . D5 . F5 . A5 . . . G5 . F5 .',
+      'G5 . . . A5 . Bb5 . D6 . . . C6 . Bb5 .', 'A5 . . . . . E5 . A5 . . . . . . .',
+    ].map(melody),
+    leadType: 'sine', leadVol: 0.1, leadCut: 2600, padVol: 0.035, arp: true, arpVol: 0.035,
+    drumVol: { k: 0.78, s: 0.22, h: 0.045 },
+  };
   // ---------- 调度器 ----------
   let cur = null;
   function startTrack(name) {
@@ -357,7 +376,7 @@
   A.setSfx = (v) => { cfg.sfx = v; applyVol(); save(); };
   A.toggleMute = () => { cfg.muted = !cfg.muted; applyVol(); save(); return cfg.muted; };
   A.setMuted = (m) => { cfg.muted = m; applyVol(); save(); };
-  A.TRACK_NAMES = { menu: '霓虹喷漆街', lobby2: '晚风喷漆', battle: '涂装突击', final: '倒数冲刺', loot: '暗巷搜刮', extract: '撤离倒数' };
+  A.TRACK_NAMES = { menu: '霓虹喷漆街', lobby2: '晚风喷漆', battle: '涂装突击', final: '倒数冲刺', loot: '暗巷搜刮', extract: '撤离倒数', yato: '午夜结界' };
   addEventListener('pointerdown', A.resume); addEventListener('keydown', A.resume);
   window.GBAudio = A;
 })();

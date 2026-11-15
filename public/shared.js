@@ -120,8 +120,19 @@
       hp: 110, spd: 1.15, reload: 1.25, atkCd: 0.5, attack: 'fan', pellets: 4, arc: 0.36, speed: 560, range: 230, dmg: 20, backstab: 1.3,
       spread: 0.04, splat: 18, trail: 8, size: 6, special: 'cloak', spNeed: 220, strike: 1, isNew: true,
     },
+    // ---- 1.8：夜都决战（联动活动机体） ----
+    warden: {
+      name: '结界机兵', short: '结界', role: '结界支援', desc: '连发两枚符咒光弹，命中的敌人减速一小会儿；大招展开结界，保护里面的队友、拖慢闯进来的敌人。',
+      hp: 120, spd: 0.98, reload: 1.0, atkCd: 0.44, attack: 'burst', shots: 2, interval: 0.1, speed: 760, range: 330, dmg: 16, slowHit: 0.35,
+      spread: 0.03, splat: 18, trail: 8, size: 6, special: 'barrier', spNeed: 240, collab: 'yato', isNew: true,
+    },
+    reaper: {
+      name: '灵刃机兵', short: '灵刃', role: '灵能剑士', desc: '挥刀时向前斩出一道灵能刀气，贴身和中距离都能打；大招「裂空斩」蓄力后贯穿一整条直线。',
+      hp: 150, spd: 1.08, reload: 0.95, atkCd: 0.44, attack: 'punch', range: 64, arc: 2.0, dmg: 42, paintR: 48, kb: 110, lunge: 220,
+      wave: { dmg: 18, range: 230, speed: 820, size: 9, splat: 20 }, special: 'rend', spNeed: 220, collab: 'yato', isNew: true,
+    },
   };
-  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'slinger', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot', 'blade', 'stinger', 'phantom'];
+  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'slinger', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot', 'blade', 'stinger', 'phantom', 'warden', 'reaper'];
   S.weaponRange = function (id) {
     const w = S.WEAPONS[id];
     if (id === 'charger') return 620;
@@ -129,6 +140,7 @@
     if (id === 'fist') return 80;
     if (id === 'wrecker') return 108;
     if (id === 'blade') return 110;   // 算上突进距离
+    if (id === 'reaper') return 230;  // 刀气
     return w.range;
   };
 
@@ -150,9 +162,11 @@
     shadowstep: { name: '影袭', desc: '瞬间冲向瞄准方向，穿过路上的敌人造成 60 点伤害，随后隐身 1.5 秒。' },
     venom: { name: '毒雾', desc: '把毒雾罐扔到瞄准位置，5 秒内雾里的敌人持续中毒、减速并暴露位置。' },
     cloak: { name: '光学迷彩', desc: '隐身 4 秒，移动速度 +25%；隐身时的第一击伤害 +50%（攻击后现形）。' },
+    barrier: { name: '结界展开', desc: '以自己为中心展开 6 秒的半透明结界：里面的队友受到的伤害 -30%、每秒回复 10 生命，闯进来的敌人减速 25%。' },
+    rend: { name: '裂空斩', desc: '蓄力 0.35 秒，朝瞄准方向斩出一道巨大的灵能刀气：贯穿 520 距离内的所有敌人，造成 85 点伤害并击退，沿路涂满。' },
   };
-  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis', 'cluster', 'shadowstep', 'venom', 'cloak'];
-  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm' || sp === 'cluster' || sp === 'shadowstep' || sp === 'venom';
+  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis', 'cluster', 'shadowstep', 'venom', 'cloak', 'barrier', 'rend'];
+  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm' || sp === 'cluster' || sp === 'shadowstep' || sp === 'venom' || sp === 'rend';
 
   // ---------------- 驾驶员技能（每局 3 次，冷却 6 秒；驾驶员弹出后也能用） ----------------
   S.SKILL_USES = 3; S.SKILL_CD = 6;
@@ -173,6 +187,8 @@
     jam: { short: '干扰', name: '声波干扰', desc: '附近敌人的大招充能减少 30%，并暴露位置 4 秒（草丛里也藏不住）。' },
     decoy: { short: '替身', name: '魔术替身', desc: '原地留下一个替身，2 秒后炸开造成 40 点伤害；自己隐身 2 秒。' },
     flash: { short: '闪光', name: '闪光弹', desc: '朝前方扔出闪光弹：扇形范围内的敌人受到 10 点伤害、减速 1.2 秒、0.8 秒内无法攻击，并暴露 4 秒。' },
+    seal: { short: '封印', name: '封印符', desc: '朝瞄准方向甩出一张封印符，落地展开 3 秒符阵：阵里的敌人减速 40%、不能放技能和大招，并暴露位置。' },
+    possess: { short: '附身', name: '恶灵附身', desc: '4 秒内攻击吸血 35%，移动速度 +20%，受到的伤害 -15%。' },
   };
   // ---------------- 超载技能（突破 I 解锁，每局 1 次，打出伤害充能） ----------------
   // dmg / def：伤害倍率 / 受伤倍率；spd：移速倍率；其余字段是专属效果
@@ -195,6 +211,8 @@
     echo: { name: '音浪风暴', desc: '每秒向四周放出一圈音波，穿墙造成 22 点伤害。', pulse: 22 },
     han: { name: '反戈一击', desc: '受到的伤害 -20%，并把受到伤害的 50% 反弹给攻击者。', def: 0.8, reflect: 0.5 },
     kaka: { name: '魔术秀', desc: '攻击速度 +45%，大招充能 +70%。', rof: 1.45, spGain: 1.7 },
+    fu: { name: '百符结界', desc: '每秒向四周放出一圈符咒：200 范围内的敌人受到 14 点伤害并减速 1 秒；自己伤害 +15%。', dmg: 1.15, sealPulse: 14 },
+    aka: { name: '灵化爆发', desc: '伤害 +35%，受到的伤害 -20%，每次命中回复 6 生命。', dmg: 1.35, def: 0.8, hitHeal: 6 },
   };
   // ---------------- 天赋树（账号共用；每局最多装 3 个已点亮的天赋） ----------------
   S.TALENT_BRANCHES = [
@@ -265,6 +283,14 @@
     { id: 'av_cat', kind: 'avatar', name: '灰城猫', rare: 2, price: 90, avatar: 'cat' },
     { id: 'av_balloon', kind: 'avatar', name: '乐园气球', rare: 2, price: 0, event: 'parkfest', avatar: 'balloon' },
     { id: 'fr_master', kind: 'frame', name: '大师段位框', rare: 4, price: 0, rank: 'master', frame: 'master' },
+    // ---- 1.8：夜都决战联动系列（每套驾驶员皮肤都有一段约 20 秒的 3D 战斗动画） ----
+    { id: 'blaze_yato', kind: 'pilot', pilot: 'blaze', name: '夜都·学院生', rare: 3, price: 0, event: 'yato', series: 'yato', trailer: 1, over: { hair: '#e8382f', hair2: '#8f1022', accent: '#ff4d3d', outfit: 'academy', extra: ['sealband'] } },
+    { id: 'fu_moon', kind: 'pilot', pilot: 'fu', name: '月下符姬', rare: 3, price: 0, event: 'yato', series: 'yato', trailer: 1, over: { hair: '#2a2f5a', hair2: '#0d1030', accent: '#ffd35e', eye: '#ffd35e', outfit: 'academyW', extra: ['moonpin'] } },
+    { id: 'frost_yato', kind: 'pilot', pilot: 'frost', name: '夜都·封咒师', rare: 4, price: 880, series: 'yato', trailer: 1, over: { hair: '#f2f6ff', hair2: '#9aa6c8', accent: '#8a6bff', eye: '#b48cff', outfit: 'academyW', extra: ['talismans'] } },
+    { id: 'aka_wraith', kind: 'pilot', pilot: 'aka', name: '恶灵觉醒', rare: 4, price: 880, series: 'yato', trailer: 1, over: { hair: '#14101a', hair2: '#ff2d4b', accent: '#ff2d4b', eye: '#ff2d4b', outfit: 'academyH', extra: ['wraith', 'halfmask'] } },
+    { id: 'm_talisman', kind: 'mech', name: '符纹', rare: 3, price: 0, event: 'yato', series: 'yato', paint: { frame: '#1d2140', light: '#d8b25a', joint: '#8a6bff', glow: 1 } },
+    { id: 'fr_yato', kind: 'frame', name: '夜都结界框', rare: 3, price: 0, event: 'yato', frame: 'yato' },
+    { id: 'av_talisman', kind: 'avatar', name: '封印符', rare: 2, price: 0, event: 'yato', avatar: 'talisman' },
   ];
   S.skin = (id) => S.SKINS.find((k) => k.id === id);
   S.SKIN_KINDS = [['pilot', '驾驶员服装'], ['mech', '机甲涂装'], ['fx', '涂料特效'], ['frame', '名片框'], ['avatar', '头像']];
@@ -306,6 +332,8 @@
     echo:   { name: '口袋音箱', desc: '短距离音波，可以穿过墙壁。', kind: 'gun', ghost: true, dmg: 9, range: 180, speed: 520, reload: 0.85, atkCd: 0.4, size: 7 },
     kaka:   { name: '扑克飞牌', desc: '一次甩出 3 张飞牌，扇形散开。', kind: 'gun', pellets: 3, arc: 0.32, dmg: 5, range: 240, speed: 700, reload: 0.8, atkCd: 0.36, size: 4 },
     han:    { name: '警用电棍', desc: '近身电击，命中让敌人减速 0.6 秒。', kind: 'melee', dmg: 14, range: 44, arc: 1.5, kb: 110, lunge: 130, fx: { slow: 0.6 }, reload: 0.75, atkCd: 0.38 },
+    fu:     { name: '符纸飞镖', desc: '一次甩出 2 张符纸，命中的敌人减速 0.5 秒。', kind: 'gun', pellets: 2, arc: 0.18, dmg: 8, range: 260, speed: 760, fx: { slow: 0.5 }, reload: 0.85, atkCd: 0.36, size: 4 },
+    aka:    { name: '断骨短镰', desc: '近身横扫一大片，刃口比别的近战武器更宽。', kind: 'melee', dmg: 15, range: 52, arc: 2.3, kb: 150, lunge: 150, reload: 0.8, atkCd: 0.42 },
   };
   S.sidearm = (pid) => Object.assign({ kind: 'gun', size: 5, splat: 12, trail: 0, cost: 1, spread: 0.04 }, S.PISTOL, S.SIDEARMS[String(pid || '').split('@')[0]] || {});
   S.BUSH_DETECT = 90;       // 草丛里的敌人在这个距离内会被看见
@@ -393,6 +421,15 @@
       hair: '#2a1f3a', hair2: '#120b1e', skin: '#ffe1cc', eye: '#ffd23f', style: 'swept', eyeShape: 'round', mouth: 'smirk', outfit: 'magician',
       skill: 'decoy', passive: { name: '惊喜礼盒', desc: '击毁机体或击倒驾驶员时掉落一个礼盒，第一个碰到的队友回复 60 生命。' },
       line: '看好了——涂料会从帽子里飞出来！', bio: '灰城夜市最受欢迎的街头魔术师，能把一罐喷漆变成一群鸽子。灰石集团没收了他的舞台，于是他把整座城市变成了舞台。' },
+    // ---- 1.8：夜都决战（联动活动驾驶员，原创角色） ----
+    { id: 'fu', name: '符零', code: '符咒', title: '夜都符术师', weapon: 'warden', accent: '#8a6bff', isNew: true, collab: 'yato',
+      hair: '#1b1d33', hair2: '#0a0b16', skin: '#fde3d2', eye: '#b48cff', style: 'ponytail', eyeShape: 'cool', mouth: 'calm', outfit: 'academy',
+      skill: 'seal', passive: { name: '符咒共鸣', desc: '对减速中的敌人伤害 +15%。' },
+      line: '一张符，镇一方。', bio: '夜都术师学院最年轻的符术讲师，袖子里永远藏着几百张亲手写的符。她能用一张纸符封住整条街，却总是忘记带伞。' },
+    { id: 'aka', name: '赤镰', code: '恶灵', title: '恶灵宿主', weapon: 'reaper', accent: '#ff2d4b', isNew: true, collab: 'yato',
+      hair: '#2a2430', hair2: '#ff2d4b', skin: '#f6d6c2', eye: '#ff3b52', style: 'spiky', eyeShape: 'sharp', mouth: 'grin', outfit: 'academyH',
+      skill: 'possess', passive: { name: '恶灵低语', desc: '生命低于 40% 时伤害 +20%。' },
+      line: '别靠太近……它会饿。', bio: '在废弃地铁站里误吞了一枚封着恶灵的符核，从此影子会自己动，镰刃上的红光也越来越亮。学院决定让他上前线——赶在恶灵醒来之前。' },
   ];
   const pilotCache = new Map();
   S.pilot = (id) => {
@@ -421,8 +458,11 @@
     park: { name: '乐园模式', short: '乐园', desc: '嘉年华花车沿着环形路线巡游：花车光圈里人多的队伍每秒得 1 分，打爆飘着的气球再得 3 分。先到 100 分获胜。', original: true, isNew: true },
     loot: { name: '搜刮撤离', short: '撤离', desc: '超大地图上搜刮物资、和其他小队争夺，在撤离点读条 10 秒成功撤离，带出来的物资存进仓库。只有一条命，阵亡或没来得及撤离，这局搜到的东西全部丢失。', original: true, oneLife: true, teams: 4, size: 3, isNew: true },
     escape8: { name: '逃亡圈 · 单人', short: '单人逃亡', desc: '8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。', original: true, oneLife: true, teams: 8, size: 1, isNew: true },
+    // ---- 1.8：夜都决战限时玩法 ----
+    raid: { name: '咒灵讨伐', short: '讨伐', desc: '最多 4 人合作讨伐巨型咒灵「百目」：它会砸地、放弹幕、召唤小咒灵、冲撞，血量过半后进入狂暴。4 分钟内打倒它就赢了！', original: true, coop: true, size: 4, isNew: true, limited: 'yato' },
+    seal: { name: '封印争夺', short: '封印', desc: '打倒四处游荡的咒灵会掉落封印石，地图上也会不时出现。把封印石带回己方祭坛存起来，被击倒会掉落身上全部封印石。先存满 25 个获胜！', original: true, isNew: true, limited: 'yato' },
   };
-  S.MODE_ORDER = ['park', 'turf', 'zone', 'escort', 'soccer', 'battery', 'elim', 'escape4', 'escape8'];
+  S.MODE_ORDER = ['raid', 'seal', 'park', 'turf', 'zone', 'escort', 'soccer', 'battery', 'elim', 'escape4', 'escape8'];
   S.teamsOf = (mode) => (S.MODES[mode] && S.MODES[mode].teams) || 2;
   S.isEscape = (mode) => mode === 'escape4' || mode === 'escape8';
   // ---------------- 1.6：搜刮撤离 ----------------
@@ -471,6 +511,9 @@
   S.SOCCER_GOAL = { depth: 56, half: 140 };                // 球门：距边缘深度、半高
   S.ESCORT_TARGET = 3; S.SOCCER_TARGET = 5; S.BATTERY_TARGET = 40;
   // 乐园模式：花车沿路线巡游（格子坐标），光圈半径、每秒得分、气球分数、目标分
+  // 1.8：咒灵讨伐 / 封印争夺
+  S.RAID = { hp: 11000, r: 46, time: 240, rage: 0.5 };   // 百目（玩家方总是 4 人：真人 + AI 补位）
+  S.SEAL = { target: 25, carry: 6, spiritMax: 5, spiritT: 6, stoneT: 7, stoneMax: 8, drop: 2, team: 3 };
   S.PARK = { path: [[38, 22], [82, 22], [82, 58], [38, 58]], loop: 64, r: 92, tick: 1, balloon: 3, target: 100, maxBalloons: 6, balloonT: 3.5 };
 
   // ---------------- 3D 参数 ----------------
@@ -599,6 +642,15 @@
       bush: [[44, 26, 6, 3], [44, 51, 6, 3], [22, 12, 4, 6], [6, 32, 4, 8], [30, 64, 8, 3]],
     },
   ];
+  // 1.8：夜都决战的地图（插在普通地图的最后）
+  S.MAPS.push({
+    name: '夜都十字路口', desc: '深夜的夜都十字路口：四栋高楼夹着空旷的路口，两侧有天桥和神社石台，翻倒的车辆是最好的掩体。', goalX: 26, sky: 11, isNew: true, event: 'yato',
+    rects: [[18, 8, 8, 8, 3], [18, 64, 8, 8, 3], [34, 20, 10, 6, 3], [34, 54, 10, 6, 3], [46, 36, 3, 8, 1], [10, 30, 6, 6, 2], [10, 44, 6, 6, 2],
+      [28, 36, 4, 3, 1], [28, 41, 4, 3, 1], [50, 10, 8, 3, 2], [50, 67, 8, 3, 2], [40, 4, 3, 3, 1], [40, 73, 3, 3, 1]],
+    stairs: [[11, 23, 4, 7, 'S', 2], [11, 50, 4, 7, 'N', 2], [52, 13, 4, 7, 'N', 2], [52, 60, 4, 7, 'S', 2]],
+    pads: [[44, 30, 0], [24, 28, 330]],
+    bush: [[26, 18, 6, 4], [26, 58, 6, 4], [44, 22, 4, 5], [44, 53, 4, 5], [4, 6, 5, 5], [4, 69, 5, 5]],
+  });
   S.MAP_N = S.MAPS.length;   // 普通地图数量（之后追加的是搜刮撤离用的超大地图）
   // ---------------- 1.6：地图尺寸切换 ----------------
   const DIM_HOOKS = [];
@@ -648,10 +700,11 @@
       // 两座吊臂（高墙）
       add(sx + 8, sy - 10, 2, 6, 3); add(sx + 34, sy + 18, 2, 6, 3);
     } else {
-      // 反应堆大厅：中间一圈矮台围着反应堆（高墙），四个方向有楼梯和弹跳板
+      // 反应堆大厅：中间一圈高台围着反应堆（高墙），外面有楼梯和弹跳板
+      //   1.8：东西两边各开一个 4 格宽的门洞（地面直接走进走出），里面也有两段楼梯上高台——不会再掉进去出不来
       add(cx - 4, cy - 4, 8, 8, 3);
-      for (const [x, y, w, h] of [[cx - 16, cy - 16, 32, 6], [cx - 16, cy + 10, 32, 6], [cx - 16, cy - 10, 6, 20], [cx + 10, cy - 10, 6, 20]]) add(x, y, w, h, 2);
-      stairs.push([cx - 3, cy - 23, 3, 7, 'S', 2], [cx, cy + 16, 3, 7, 'N', 2]);
+      for (const [x, y, w, h] of [[cx - 16, cy - 16, 32, 6], [cx - 16, cy + 10, 32, 6], [cx - 16, cy - 10, 6, 8], [cx - 16, cy + 2, 6, 8], [cx + 10, cy - 10, 6, 8], [cx + 10, cy + 2, 6, 8]]) add(x, y, w, h, 2);
+      stairs.push([cx - 3, cy - 23, 3, 7, 'S', 2], [cx, cy + 16, 3, 7, 'N', 2], [cx - 9, cy - 10, 3, 6, 'N', 2], [cx + 6, cy + 4, 3, 6, 'S', 2]);
       mark(cx - 3, cy - 23, 3, 7); mark(cx, cy + 16, 3, 7);
       pads.push([cx - 24, cy - 1, 0], [cx + 22, cy - 1, 180]);
       keep.push([cx - 28, cy - 26, 56, 52]);
@@ -1105,7 +1158,9 @@
     }
     const xp = 60 + (won ? 60 : draw ? 30 : 0) + me.kills * 10 + Math.floor(me.paint / 25) + me.obj * 12 + (isMvp ? 40 : 0);
     const trophies = won ? S.TROPHY_WIN : draw ? S.TROPHY_DRAW : -S.TROPHY_LOSS;
-    return { xp: xp + Math.min(60, me.float || 0), trophies, won, draw, mvp: isMvp, kills: me.kills, paint: me.paint, mode: result.mode, balloons: me.balloons || 0, float: me.float || 0, ranked: !!result.ranked };
+    const raid = result.mode === 'raid';   // 1.8：合作讨伐不扣奖杯
+    return { xp: xp + Math.min(60, me.float || 0), trophies: raid ? (won ? 5 : 0) : trophies, won, draw, mvp: isMvp, kills: me.kills, paint: me.paint, mode: result.mode, balloons: me.balloons || 0, float: me.float || 0, ranked: !!result.ranked,
+      seals: me.seals || 0, spirits: me.spirits || 0 };
   };
   // 强度参考（AI 在排位赛禁用阶段用）：tools/balance.js 跑出来的胜率
   S.META = {"pilots": {"raven": 0.507, "han": 0.493, "frost": 0.521, "yuzu": 0.515, "echo": 0.515, "blaze": 0.52, "aurora": 0.543, "candy": 0.515, "hex": 0.505, "chef": 0.468, "hammer": 0.484, "titan": 0.497, "vet": 0.502, "gale": 0.504, "flag": 0.467, "kaka": 0.428}, "mechs": {"charger": 0.592, "gatling": 0.544, "bucket": 0.573, "mortar": 0.515, "blaster": 0.527, "roller": 0.564, "dozer": 0.523, "megaphone": 0.491, "stinger": 0.498, "flamer": 0.495, "carrier": 0.459, "fist": 0.457, "slinger": 0.462, "riot": 0.46, "wrecker": 0.463, "phantom": 0.433, "blade": 0.391}};
@@ -1133,9 +1188,64 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.7.1';
+  S.VERSION = '1.8';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.8', date: '2026-11-15', title: '1.8 更新 · 夜都决战', en_title: 'Update 1.8 · Night City Showdown', sections: [
+      ['联动活动「夜都决战」（14 天）', [
+        '原创都市咒术风联动：午夜的夜都，咒灵从地铁站里涌了出来！',
+        '新代币「灵符」：限时玩法每局给 10 灵符（赢了再 +5），其它模式每局 3 灵符',
+        '活动任务：完成「咒灵讨伐成功 1 次」免费获得新驾驶员符零，打倒 25 只咒灵免费获得结界机兵',
+        '7 天登录奖励：灵符、金币、军用箱、宝石、金色空投',
+        '活动商店：联动皮肤、符纹机甲涂装、夜都结界框、封印符头像、宝箱和资源']],
+      ['新驾驶员', [
+        '符零「符咒」夜都符术师——技能「封印符」：甩出符阵，阵里的敌人减速、不能放技能和大招；被动「符咒共鸣」：打减速中的敌人伤害 +15%；超载「百符结界」：每秒放出一圈符咒',
+        '赤镰「恶灵」恶灵宿主——技能「恶灵附身」：4 秒吸血 35%、加速、减伤；被动「恶灵低语」：残血时伤害 +20%；超载「灵化爆发」：伤害 +35%、每次命中回血',
+        '两位都有全新的学院制服 3D 模型、立绘和随身武器（符纸飞镖 / 断骨短镰）']],
+      ['新机体', [
+        '结界机兵：连发两枚会减速的符咒光弹；大招「结界展开」——队友在结界里减伤 30%、每秒回血，敌人进来会减速',
+        '灵刃机兵：挥刀时斩出灵能刀气，近身和中距离都能打；大招「裂空斩」——蓄力后一刀贯穿 520 距离的直线',
+        '符零和结界机兵：活动任务免费获得；赤镰（480 宝石）和灵刃机兵（360 宝石）在活动页购买，一起买只要 720 宝石']],
+      ['联动皮肤（都带约 20 秒的 3D 战斗动画）', [
+        '传说：白夜「夜都·封咒师」、赤镰「恶灵觉醒」（皮肤商店，880 宝石）',
+        '史诗：凌焰「夜都·学院生」、符零「月下符姬」（活动商店，灵符兑换）',
+        '在皮肤商店或活动商店点「▶ 3D 战斗动画」：夜都街头 → 角色登场 → 打倒小咒灵 → 百目现身、机兵空降 → 大招 → 胜利定格，每套皮肤的招式都不一样']],
+      ['限时玩法', [
+        '咒灵讨伐：最多 4 人合作（人不够 AI 补位）讨伐巨型咒灵「百目」——它会砸地（红圈预警）、放弹幕环、召唤小咒灵、冲撞，血量过半进入狂暴；4 分钟内打倒它就赢，输了不扣奖杯',
+        '封印争夺：打倒游荡的中立咒灵会掉落封印石，地图上也会刷出封印石；带回己方祭坛存起来，先存满 25 个获胜',
+        '新地图「夜都十字路口」：紫色午夜、霓虹招牌、飘起的灵火，两侧有天桥和神社石台；新曲「午夜结界」']],
+      ['修复', [
+        '修复机体页面的 3D 模型不会刷新的问题（换机体后展示台一直停在上一台）',
+        '修复「地下研究所」中央反应堆大厅：围着反应堆的高台中间没有楼梯，掉进去就上不来。现在东西两边开了门洞，里面也加了两段楼梯；地图检查也会自动找出这种坑']],
+      ['更新奖励', ['信箱里有一份 1.8 更新礼包：150 灵符 + 100 宝石 + 军用箱']],
+    ], en: [
+      ['Collab event: Night City Showdown (14 days)', [
+        'An original urban-sorcery collab: at midnight, curse spirits pour out of the Night City subway!',
+        'New currency, Talismans: each limited-mode match gives 10 (+5 for a win), other modes give 3',
+        'Event quests: clear one Curse Raid to get the new pilot Sigil for free, and defeat 25 curse spirits to get the Warden mech for free',
+        '7-day login rewards: Talismans, coins, a Military Crate, gems and a Golden Airdrop',
+        'Event shop: collab skins, the Talisman Runes mech paint, the Night City Ward frame, the Seal Talisman avatar, chests and resources']],
+      ['New pilots', [
+        'Sigil "Charm", Night City talisman mage. Skill Seal Talisman: throws a circle that slows enemies and stops their skills and supers. Passive Charm Resonance: +15% damage to slowed enemies. Overload Hundred-Talisman Ward: releases a ring of talismans every second',
+        'Crimson "Wraith", wraith host. Skill Wraith Possession: 4 s of 35% lifesteal, extra speed and damage reduction. Passive Wraith Whisper: +20% damage at low HP. Overload Spirit Burst: +35% damage and every hit heals',
+        'Both come with new academy-uniform 3D models, portraits and sidearms (Talisman Darts / Bonebreaker Sickle)']],
+      ['New mechs', [
+        'Warden: fires two slowing talisman orbs. Super Barrier Unfold: allies inside take 30% less damage and heal every second, and enemies who enter are slowed',
+        'Spiritblade: every swing also sends a spirit wave, so it fights up close and at mid range. Super Skyrend Slash: charges up, then cuts through a 520-long line',
+        'Sigil and the Warden are free from event quests. Crimson (480 gems) and the Spiritblade (360 gems) are on the event page, or 720 gems for both']],
+      ['Collab skins (each with a ~20-second 3D battle trailer)', [
+        'Legendary: Frost "Night City · Sealer" and Crimson "Wraith Awakened" (skin shop, 880 gems)',
+        'Epic: Blaze "Night City · Student" and Sigil "Moonlit Charm Maiden" (event shop, for Talismans)',
+        'Tap "▶ 3D battle trailer" in the skin shop or event shop: Night City streets → the hero arrives → spirits defeated → Hundred-Eyes appears and the mech drops in → super → victory pose. Every skin fights differently']],
+      ['Limited modes', [
+        'Curse Raid: up to 4 players team up (AI fills empty slots) against the giant curse spirit Hundred-Eyes. It slams the ground (watch the red circles), fires bullet rings, summons minions and charges, and enrages below half HP. Win within 4 minutes; losing costs no trophies',
+        'Seal Clash: neutral wandering spirits drop seal stones when defeated, and more stones appear on the map. Bank them at your altar; first to 25 wins',
+        'New map Night City Crossing: purple midnight, neon signs and drifting wisps, with overpasses and shrine platforms. New track: Midnight Ward']],
+      ['Fixes', [
+        'Fixed the 3D model on mech pages not updating (the stage kept showing the previous mech after you switched)',
+        'Fixed the reactor hall in the middle of Underground Lab: the high platforms around the reactor had no stairs on the inside, so you couldn\'t get out once you dropped in. There are now openings on the east and west sides and two inner staircases, and the map checks now catch this kind of pit automatically']],
+      ['Update rewards', ['There is an Update 1.8 gift in your mailbox: 150 Talismans + 100 gems + a Military Crate']],
+    ] },
     { v: '1.7.1', date: '2026-11-15', title: '1.7.1 更新 · 断线重连 & 好友申请', en_title: 'Update 1.7.1 · Reconnect & Friend Requests', sections: [
       ['好友申请', [
         '好友页新增「好友申请」分页：每个申请显示头像、名字、奖杯、段位、好友码和申请时间，可以一个个「通过」或「拒绝」，也可以「全部通过」/「全部拒绝」',
