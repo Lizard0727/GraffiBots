@@ -1,26 +1,22 @@
 {
-  "version": "1.9",
+  "version": "1.9.1",
   "date": "2026-11-15",
-  "title": "1.9 更新 · 排位赛第一赛季「烈士」",
-  "en_title": "Update 1.9 · Ranked Season 1 “Martyr”",
+  "title": "1.9.1 更新 · 简易领域 & 战力平衡",
+  "en_title": "Update 1.9.1 · Simple Domain & Balance",
   "page": "#updates",
   "force": true,
   "notes": [
-    "排位赛第一赛季「烈士」",
-    "夺冠之路",
-    "MLBB 式禁用 / 选人",
-    "开局观察界面",
-    "皮肤品质重做",
-    "结算评级",
+    "符零新超载「简易领域」（替换「百符结界」）",
+    "新机体机制优化",
+    "机体战力平衡（根据 2100 局 AI 对战模拟）",
+    "驾驶员平衡",
     "更新奖励"
   ],
   "en_notes": [
-    "Ranked Season 1 “Martyr”",
-    "Road to Glory",
-    "MLBB-style bans and picks",
-    "Pre-match scouting screen",
-    "Skin rarity rework",
-    "Match ratings",
+    "Sigil’s new overload: Simple Domain (replaces Hundred-Talisman Ward)",
+    "New mech mechanics",
+    "Mech balance (based on 2,100 simulated AI matches)",
+    "Pilot balance",
     "Update reward"
   ]
 }

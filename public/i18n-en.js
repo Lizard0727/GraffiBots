@@ -1,6 +1,21 @@
 // 涂鸦机兵 — 英文词典（中文原文 → English）。新增界面文字时在这里补一条即可
 // 带数字的句式写在 i18n.js 的 PATTERNS 里
 window.GB_EN = {
+  "连发两枚符咒光弹，命中的敌人减速；同一个敌人连中 4 发会被符印束缚 0.7 秒。大招展开结界：把里面的敌人弹开，队友获得护盾、减伤并持续回血。": "Fires two slowing talisman orbs; an enemy hit 4 times in a row is bound in place for 0.7 s. Super: unfold a barrier that knocks enemies out, shields allies and keeps healing them while reducing their damage taken.",
+  "挥刀时向前斩出一道灵能刀气；连续第 3 刀是回旋斩（360° + 三道刀气）。大招「裂空斩」蓄力后贯穿一整条直线，人也跟着刀光冲过去。": "Each swing sends a spirit wave forward; every third swing in a row is a spinning slash (360° plus three waves). Super Rift Slash: after a short wind-up, cut through a whole line and dash along with the blade.",
+  // ---- 1.9.1 ----
+  "1.9.1 更新礼包 · 简易领域": "Update 1.9.1 gift · Simple Domain",
+  "符零学会了新的超载「简易领域」：踏进领域的敌人会被自动反击，飞进来的子弹全部被中和！结界机兵和灵刃机兵也有了新机制，所有机体和驾驶员都做了一轮战力平衡。这份礼包请收下！": "Sigil has learned a new overload, Simple Domain: enemies who step in are countered automatically and incoming shots are neutralized! Warden and Reaper got new mechanics too, and every mech and pilot went through a balance pass. Please accept this gift!",
+  "1.9.1 更新 · 简易领域 & 战力平衡": "Update 1.9.1 · Simple Domain & Balance",
+  "受到的伤害 -25%，并把受到伤害的 60% 反弹给攻击者。": "Take 25% less damage and reflect 60% of the damage you take back at the attacker.",
+  "简易领域": "Simple Domain",
+  "以自己为中心展开半径 170 的简易领域（跟着自己移动）：飞进领域的敌方子弹全部被中和；闯进领域的敌人会被自动反击——符咒斩 22 伤害、往外弹开、减速并封住技能；自己减伤 25%、伤害 +15%。": "Unfolds a Simple Domain with a 170 radius around yourself that moves with you. Enemy shots that fly in are neutralized, and enemies who step in are countered automatically: a 22-damage talisman slash that knocks them out, slows them and seals their skills. You also take 25% less damage and deal 15% more.",
+  "立刻为自己和附近队友回复 50 生命，之后每秒回复 10。": "Instantly heals you and nearby allies for 50, then 10 per second.",
+  "对 60% 射程以外的目标伤害 +15%。": "+15% damage to targets beyond 60% of your range.",
+  "附近每有 1 名队友，受到的伤害 -10%（最多 -30%）。": "Take 10% less damage for each nearby ally (up to 30%).",
+  "对生命高于 90% 的敌人伤害 +14%。": "+14% damage to enemies above 90% HP.",
+  "涂地给大招的充能 +70%。": "Painting charges your Super 70% faster.",
+  "被符印束缚了！": "Bound by talismans!",
   // ---- 1.9 排位赛「烈士」
   "赢": "Win",
   "输": "Loss",
@@ -1552,12 +1567,10 @@ window.GB_EN = {
   "结界机兵": "Warden",
   "结界": "Ward",
   "结界支援": "Barrier support",
-  "连发两枚符咒光弹，命中的敌人减速一小会儿；大招展开结界，保护里面的队友、拖慢闯进来的敌人。": "Fires two talisman orbs that briefly slow what they hit. Its super raises a barrier that protects allies inside and slows enemies who walk in.",
-  "灵刃机兵": "Spiritblade",
+    "灵刃机兵": "Spiritblade",
   "灵刃": "Spiritblade",
   "灵能剑士": "Spirit swordsman",
-  "挥刀时向前斩出一道灵能刀气，贴身和中距离都能打；大招「裂空斩」蓄力后贯穿一整条直线。": "Each swing also sends a spirit wave forward, so it fights up close and at mid range. Its super, Skyrend Slash, charges up and cuts through a whole line.",
-  "结界展开": "Barrier Unfold",
+    "结界展开": "Barrier Unfold",
   "以自己为中心展开 6 秒的半透明结界：里面的队友受到的伤害 -30%、每秒回复 10 生命，闯进来的敌人减速 25%。": "Raises a barrier around you for 6 s: allies inside take 30% less damage and heal 10 HP per second, and enemies inside are slowed by 25%.",
   "裂空斩": "Skyrend Slash",
   "蓄力 0.35 秒，朝瞄准方向斩出一道巨大的灵能刀气：贯穿 520 距离内的所有敌人，造成 85 点伤害并击退，沿路涂满。": "Charges for 0.35 s, then sends a huge spirit wave where you aim: it pierces every enemy within 520, dealing 85 damage with knockback and painting the whole path.",

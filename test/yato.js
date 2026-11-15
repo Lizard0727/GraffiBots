@@ -56,9 +56,13 @@ const steps = (g, n) => { for (let i = 0; i < n; i++) g.step(); };
 // 结界展开：队友减伤 + 回血，敌人减速
 {
   const { g, A, B } = duel({ pilot: 'blaze', weapon: 'warden' }, { pilot: 'blaze', weapon: 'blaster' }, { gap: 80 });
+  const kbs = []; { const ev0 = g.ev.bind(g); g.ev = (e) => { if (e[0] === 'kb') kbs.push(e); ev0(e); }; }
   A.sp = S.WEAPONS.warden.spNeed; A.input.qq++; steps(g, 2);
   const dome = g.helpers.find((h) => h.kind === 'dome');
   ok(!!dome && A.spKind === 'barrier', '结界机兵：大招「结界展开」生成结界');
+  ok(A.shield >= 40, `1.9.1：结界展开时自己 / 队友得到护盾（${A.shield}）`);
+  ok(kbs.some((e) => e[1] === B.id && e[2] > 100), '1.9.1：结界展开把里面的敌人弹出去');
+  A.shield = 0; A.shieldT = 0;
   A.hp = 50; const h0 = A.hp; g.lastHurtFake = 0; steps(g, S.TICK);
   ok(A.hp > h0 + 8, `结界里队友每秒回血（${h0} → ${Math.round(A.hp)}）`);
   A.hp = 100; g.hurt(A, 40, B);
@@ -211,5 +215,37 @@ ok(raidWins >= 1, `4 个 AI 合作讨伐：${RUNS} 局赢 ${raidWins} 局（不�
   ok(sk.length === 4 && sk.every((k) => k.trailer), `联动驾驶员皮肤 ${sk.length} 套，都有 3D 战斗动画`);
 }
 
+
+// 1.9.1：符零超载「简易领域」——跟着自己走，中和子弹、自动反击闯入者
+{
+  const { g, A, B } = duel({ pilot: 'fu', weapon: 'blaster' }, { pilot: 'blaze', weapon: 'blaster' }, { gap: 120 });
+  A.bt = 1; A.ov = S.OV_NEED; g.activateOverload(A);
+  const dm = g.helpers.find((h) => h.kind === 'domain');
+  ok(!!dm && dm.owner === A.id && dm.r === 170, '简易领域：展开半径 170 的领域');
+  const hp0 = B.hp; steps(g, 3);
+  ok(B.hp < hp0 && B.sealT > 0 && B.slowT > 0, `简易领域：闯进来的敌人被自动反击（${hp0} → ${Math.round(B.hp)}），减速并封住技能`);
+  A.x += 60; steps(g, 1);
+  ok(Math.abs(dm.x - A.x) < 1, '简易领域：跟着符零移动');
+  const n0 = g.projs.length; g.spawnProj(B, Math.atan2(A.y - B.y, A.x - B.x), 0, 700, 400, 20, 10, 8, 6, null, null);
+  const hpA = A.hp; steps(g, 20);
+  ok(A.hp >= hpA - 0.01 && g.projs.length <= n0, '简易领域：飞进领域的敌方子弹被中和');
+  A.ovT = 0; steps(g, 2);
+  ok(!g.helpers.some((h) => h.kind === 'domain'), '简易领域：超载结束后领域消失');
+}
+// 1.9.1：结界机兵——连中 4 发符印束缚
+{
+  const { g, A, B } = duel({ pilot: 'blaze', weapon: 'warden' }, { pilot: 'blaze', weapon: 'blaster' }, { gap: 100 });
+  for (let i = 0; i < 4; i++) g.sideFx(B, { slow: 0.35, ward: 4, by: A.id });
+  ok(B.bindT > 0 && B.wardN === 0, `结界机兵：连中 4 发符印 → 束缚 ${B.bindT} 秒`);
+}
+// 1.9.1：灵刃机兵——第 3 刀回旋斩、裂空斩人跟着冲过去
+{
+  const { g, A, B } = duel({ pilot: 'blaze', weapon: 'reaper' }, { pilot: 'blaze', weapon: 'blaster' }, { gap: 60 });
+  const W = S.WEAPONS.reaper; let spins = 0, dash = 0; const ev0 = g.ev.bind(g); g.ev = (e) => { if (e[0] === 'spin') spins++; if (e[0] === 'kb' && e[1] === A.id && e[2] > 300) dash = e[2]; ev0(e); };
+  for (let i = 0; i < 3; i++) g.punch(A, W);
+  ok(spins === 1, '灵刃机兵：连续第 3 刀是回旋斩');
+  A.input.a = 0; A.sp = W.spNeed; A.input.qq++; steps(g, S.TICK);
+  ok(dash > 300, `灵刃机兵：裂空斩出刀时人跟着冲出去（冲量 ${dash}）`);
+}
 console.log(failed ? `\n${failed} 项失败` : '\n夜都决战测试全部通过');
 process.exit(failed ? 1 : 0);

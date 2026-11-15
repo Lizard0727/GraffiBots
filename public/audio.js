@@ -363,6 +363,8 @@
     siren() { for (let i = 0; i < 3; i++) { tone(660, 0.35, 'sawtooth', 0.035, 1.5, i * 0.4); } },
     extracted() { arp([523, 659, 784, 1046, 1318, 1568], 0.08, 0.3, 'square', 0.05); tone(784, 1.2, 'triangle', 0.05, 0, 0.5); noise(0.8, 0.03, 1500, 'bandpass', 0.4, 6000); },
     coin() { tone(1568, 0.06, 'square', 0.04); tone(2093, 0.12, 'square', 0.035, 0, 0.06); },
+    domain() { tone(523, 0.5, 'triangle', 0.05, 1, 0); tone(784, 0.5, 'triangle', 0.04, 1, 0.08); tone(1046, 0.7, 'sine', 0.04, 1, 0.16); noise(0.6, 0.05, 600, 'bandpass', 0, 3200); },   // 1.9.1 简易领域展开
+    domainHit() { if (rl('dmn', 80)) { noise(0.08, 0.06, 3000, 'bandpass', 0, 800); tone(1568, 0.06, 'triangle', 0.03, 0.6); } },
     // 1.9：部分传说 / 限定传说皮肤有专属的开火声和命中声（手感完全不同）
     skinShoot(k) {
       if (!rl('shoot', 70)) return;

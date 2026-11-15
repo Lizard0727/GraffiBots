@@ -512,6 +512,8 @@ class Game {
     p.rallyT = Math.max(0, p.rallyT - dt); p.revealT = Math.max(0, p.revealT - dt);
     p.cloakT = Math.max(0, (p.cloakT || 0) - dt);
     p.sealT = Math.max(0, (p.sealT || 0) - dt); p.possT = Math.max(0, (p.possT || 0) - dt); p.dslowT = Math.max(0, (p.dslowT || 0) - dt);   // 1.8
+    p.bindT = Math.max(0, (p.bindT || 0) - dt); p.comboT = Math.max(0, (p.comboT || 0) - dt);   // 1.9.1：符印束缚 / 灵刃连斩
+    if (p.wardN && (p.wardT = (p.wardT || 0) - dt) <= 0) p.wardN = 0;
     if (p.poisonT > 0) {   // 中毒：每 0.5 秒掉 3 点生命并减速
       p.poisonT -= dt; p.poisonAcc = (p.poisonAcc || 0) + dt; p.slowT = Math.max(p.slowT, 0.15);
       if (p.poisonAcc >= 0.5) { p.poisonAcc -= 0.5; this.hurt(p, 3, this.players.get(p.poisonBy) || null, 0, 0); if (!p.alive) return; }
@@ -536,6 +538,7 @@ class Game {
     if (p.cloakT > 0 && p.cloakFast) sm *= 1.25;
     if (p.possT > 0) sm *= 1.2;          // 赤镰：恶灵附身
     if (p.dslowT > 0) sm *= 0.75;        // 敌方结界里
+    if (p.bindT > 0) sm *= 0.12;         // 1.9.1：被结界机兵的符印束缚
     if (own && p.tal.has('p2')) sm *= 1.06;
     if (own && wheel0(p) && p.tal.has('p6')) sm *= 1.1;
     p.sm = sm;
@@ -638,7 +641,7 @@ class Game {
       p.ammo -= 1; p.atkCd = W.atkCd / (OVr || 1); p.lastAtk = this.time; this.takeOverdrive(p);
       if (p.cloakT > 0) { if (W.special === 'cloak') p.dmgMul *= 1.5; p.cloakT = 0; p.cloakFast = false; }   // 攻击会现形；幻影隐身第一击 +50%
       switch (W.attack) {
-        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : W.slowHit ? { fx: { slow: W.slowHit } } : null }; this.stepBurst(p, W, 0); break;
+        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : W.slowHit ? { fx: { slow: W.slowHit, ward: W.ward || 0 } } : null }; this.stepBurst(p, W, 0); break;
         case 'fan': this.fireSpread(p, W); break;
         case 'flick':
           this.fireSpread(p, W);
@@ -700,6 +703,12 @@ class Game {
     if (fx.slow) t.slowT = Math.max(t.slowT, fx.slow);
     if (fx.reveal) t.revealT = Math.max(t.revealT || 0, fx.reveal);
     if (fx.poison) { t.poisonT = Math.max(t.poisonT || 0, fx.poison); t.poisonBy = fx.by || t.poisonBy; }
+    if (fx.ward && fx.by) {   // 1.9.1 结界机兵：同一个人连中 4 发符印 → 束缚 0.7 秒 + 额外伤害
+      if (t.wardBy !== fx.by) { t.wardBy = fx.by; t.wardN = 0; }
+      t.wardN = (t.wardN || 0) + 1; t.wardT = 2.5;
+      this.ev(['wd', t.id, t.wardN]);
+      if (t.wardN >= fx.ward) { t.wardN = 0; t.bindT = 0.7; t.slowT = Math.max(t.slowT, 1); const o = this.players.get(fx.by); this.hurt(t, 16, o || null, 0, 0); this.ev(['bind', t.id]); }
+    }
   }
   stepBurst(p, W, dt) {
     const b = p.burst;
@@ -720,6 +729,9 @@ class Game {
   }
   punch(p, W) {
     const a = p.input.a;
+    const spin = !!W.combo && !p.foot && (p.combo = p.comboT > 0 ? (p.combo || 0) + 1 : 1) >= W.combo;   // 1.9.1 灵刃：第 3 刀是回旋斩
+    p.comboT = 1.3; if (spin) p.combo = 0;
+    if (spin) W = Object.assign({}, W, { arc: Math.PI * 2, dmg: W.dmg * 1.3, range: W.range + 14, lunge: W.lunge * 0.5 });
     this.knock(p, Math.cos(a), Math.sin(a), W.lunge, 0);
     const fx = p.x + Math.cos(a) * 30, fy = p.y + Math.sin(a) * 30;
     this.paint(fx, fy, p.z, W.paintR || 30, p.team, p);
@@ -734,8 +746,9 @@ class Game {
     }
     this.pushBall(p, fx, fy, W.range, 1100);
     if (this.mode === 'park') for (const b of this.obj.balloons.slice()) if (Math.hypot(b.x - fx, b.y - fy) < W.range + 20) this.popBalloon(b, p.team, p);
-    if (W.wave) { const V = W.wave; this.spawnProj(p, a, -0.03, V.speed, V.range, V.dmg, V.splat, 14, V.size, null, { kb: 1.4 }); }   // 1.8：灵刃的刀气
+    if (W.wave) { const V = W.wave; for (const da of spin ? [-0.45, 0, 0.45] : [0]) this.spawnProj(p, a + da, -0.03, V.speed, V.range, V.dmg, V.splat, 14, V.size, null, { kb: 1.4 }); }   // 1.8：灵刃的刀气（1.9.1 回旋斩三道）
     this.ev(['pu', p.id, r2(a)]);
+    if (spin) this.ev(['spin', p.id, r1(p.x), r1(p.y), r1(p.z), p.team]);
   }
 
   fireSpread(p, W) {
@@ -786,10 +799,15 @@ class Game {
     this.shells.push(sh);
     this.ev(['lb', sh.id, r1(sh.x0), r1(sh.y0), r1(sh.z0), r1(x1), r1(y1), r1(z1), r2(T), p.team]);
   }
+  domainBlocks(team, x, y, z) {   // 1.9.1：落在敌方简易领域里的炮弹 / 导弹被中和
+    for (const h of this.helpers) if (h.kind === 'domain' && h.team !== team && Math.hypot(x - h.x, y - h.y) < h.r && Math.abs(z - h.z) < 130) return true;
+    return false;
+  }
   updateShells(dt) {
     this.shells = this.shells.filter((s) => {
       s.t += dt;
       if (s.t < s.T) return true;
+      if (this.domainBlocks(s.team, s.x1, s.y1, s.z1)) { this.ev(['blk', 0, r1(s.x1), r1(s.y1), r1(s.z1 + 10)]); return false; }
       this.explode(s.x1, s.y1, s.z1, s.r, s.dmg, s.dmg * 0.45, s.team, this.players.get(s.owner));
       this.ev(['bx', r1(s.x1), r1(s.y1), r1(s.z1), s.team, s.r, 0]);
       if (s.bounce) {   // 弹弓：落地后沿原方向再弹一次
@@ -880,20 +898,16 @@ class Game {
     if (O.burstHeal) for (const a of near(220)) { a.hp = Math.min(this.maxHpOf(a), a.hp + O.burstHeal); this.ev(['heal', a.id, O.burstHeal]); }
     if (O.drones) for (let i = 0; i < O.drones; i++) this.helpers.push({ id: this.nextId++, kind: 'drone', x: p.x, y: p.y, z: p.z + 40, team: p.team, owner: p.id, t: p.ovT, cd: 0.3 + i * 0.2, ang: i * Math.PI });
     if (O.rally) for (const a of near(300)) a.rallyT = Math.max(a.rallyT, p.ovT);
+    if (O.domain) {   // 1.9.1 符零超载：简易领域——跟着自己走的领域，中和子弹、自动反击闯入者
+      this.helpers = this.helpers.filter((h) => !(h.kind === 'domain' && h.owner === p.id));
+      this.helpers.push({ id: this.nextId++, kind: 'domain', x: p.x, y: p.y, z: p.z, r: O.domain.r, team: p.team, owner: p.id, t: p.ovT + 0.2, cd: 99, hits: {}, k: p.bt >= 2 ? 1.25 : 1 });
+    }
   }
   overloadTick(p, O, dt) {
     const k = p.bt >= 2 ? 1.25 : 1;
     if (O.regen) {
       const list = O.burstHeal ? [p] : [...this.players.values()].filter((a) => a.alive && a.team === p.team && dist(a, p) < 200);
       for (const a of list) a.hp = Math.min(this.maxHpOf(a), a.hp + O.regen * k * dt);
-    }
-    if (O.sealPulse) {   // 1.8 符零超载：百符结界
-      p.ovPulse -= dt;
-      if (p.ovPulse <= 0) {
-        p.ovPulse = 1;
-        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 200) { e.slowT = Math.max(e.slowT, 1); this.hurt(e, O.sealPulse * k, p); }
-        this.ev(['bx', r1(p.x), r1(p.y), r1(p.z + 10), p.team, 200, 3]);
-      }
     }
     if (O.pulse) {
       p.ovPulse -= dt;
@@ -930,6 +944,23 @@ class Game {
         for (const e of this.players.values()) {
           if (!e.alive || e.team === h.team || Math.hypot(e.x - h.x, e.y - h.y) > h.r || Math.abs(e.z - h.z) > 60) continue;
           e.slowT = Math.max(e.slowT, 0.25); e.sealT = Math.max(e.sealT || 0, 0.25); e.revealT = Math.max(e.revealT, 0.5);
+        }
+        return true;
+      }
+      if (h.kind === 'domain') {   // 1.9.1 简易领域：跟着符零移动；闯进来的敌人被自动反击（每人 0.7 秒一次）
+        const ow = this.players.get(h.owner);
+        if (!ow || !ow.alive || ow.foot || !(ow.ovT > 0)) return false;
+        h.x = ow.x; h.y = ow.y; h.z = ow.z;
+        const D = S.OVERLOADS.fu.domain;
+        for (const e of this.players.values()) {
+          if (!e.alive || e.team === h.team) continue;
+          const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy);
+          if (d > h.r + 8 || Math.abs(e.z - h.z) > 90) continue;
+          if ((h.hits[e.id] || 0) > this.time) continue;
+          h.hits[e.id] = this.time + D.cd;
+          e.slowT = Math.max(e.slowT, 0.8); e.sealT = Math.max(e.sealT || 0, 0.8);
+          this.hurt(e, D.counter * h.k, ow, dx || 1, dy, 1.6);
+          this.ev(['dmn', h.id, e.id, r1(h.x), r1(h.y), r1(h.z)]);
         }
         return true;
       }
@@ -1020,7 +1051,7 @@ class Game {
       return false;
     });
     if (victim) {
-      if (p.pilot === 'frost' && hitT > W.range * 0.6) dmg *= 1.12;
+      if (p.pilot === 'frost' && hitT > W.range * 0.6) dmg *= 1.08;
       this.hurt(victim, dmg, p, mz.d.x, mz.d.y);
     }
     this.paint(end.x, end.y, this.top(end.x, end.y), 18 + 12 * ch, p.team, p);
@@ -1038,7 +1069,7 @@ class Game {
   credit(owner, n) {
     if (!this.players.has(owner.id)) return;
     owner.stats.paint += n;
-    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 2 : 1) * (owner.tal.has('p3') ? 1.25 : 1));
+    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 1.7 : 1) * (owner.tal.has('p3') ? 1.25 : 1));
   }
 
   // 冲量：AI 直接作用在服务器状态上；真人玩家的位置由客户端预测，所以发事件让客户端施加
@@ -1070,7 +1101,7 @@ class Game {
       if (by.tal.has('a5') && by.team !== t.team) { by.hitN = (by.hitN || 0) + 1; if (by.hitN % 5 === 0) dmg *= 1.6; }
       if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
       if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
-      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.08;   // 韩冰被动：倒戈
+      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.14;   // 韩冰被动：倒戈
       if (by.pilot === 'fu' && t.slowT > 0) dmg *= 1.15;                       // 符零被动：符咒共鸣
       if (by.pilot === 'aka' && by.hp < this.maxHpOf(by) * 0.4) dmg *= 1.2;   // 赤镰被动：恶灵低语
       const BW = !by.foot && S.WEAPONS[by.weapon];
@@ -1092,10 +1123,10 @@ class Game {
     if (t.tal && t.tal.has('d4') && t.hp < this.maxHpOf(t) * 0.3) dmg *= 0.85;
     if (t.possT > 0) dmg *= 0.85;   // 恶灵附身
     for (const h of this.helpers) if (h.kind === 'dome' && h.team === t.team && Math.hypot(t.x - h.x, t.y - h.y) < h.r && Math.abs(t.z - h.z) < 90) { dmg *= 0.7; break; }   // 己方结界
-    if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -5%
+    if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -10%（1.9.1：-8% → -10%，范围 200 → 260）
       let n = 0;
-      for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 200) n++;
-      dmg *= 1 - 0.08 * Math.min(3, n);
+      for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 260) n++;
+      dmg *= 1 - 0.1 * Math.min(3, n);
     }
     if (kdx != null && !(tOV && tOV.noKb) && !t.boss) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
@@ -1236,6 +1267,7 @@ class Game {
     this.missiles = this.missiles.filter((m) => {
       m.t -= dt;
       if (m.t > 0) return true;
+      if (this.domainBlocks(m.team, m.x, m.y, m.z)) { this.ev(['blk', 0, r1(m.x), r1(m.y), r1(m.z + 10)]); return false; }
       this.explode(m.x, m.y, m.z, 80, 140, 50, m.team, this.players.get(m.owner));
       this.ev(['bx', r1(m.x), r1(m.y), r1(m.z), m.team, 80, 0]);
       return false;
@@ -1342,6 +1374,11 @@ class Game {
         p.spT = 0.4;
         this.helpers.push({ id: this.nextId++, kind: 'dome', x: p.x, y: p.y, z: this.top(p.x, p.y), r: 150, team: p.team, owner: p.id, t: 6, cd: 0 });
         this.paint(p.x, p.y, p.z, 80, p.team, p);
+        for (const a of this.players.values()) {   // 1.9.1：展开瞬间把里面的敌人弹出去，队友得到 40 点护盾
+          if (!a.alive || Math.hypot(a.x - p.x, a.y - p.y) > 150 || Math.abs(a.z - p.z) > 90) continue;
+          if (a.team === p.team) { a.shield = Math.max(a.shield, 40); a.shieldT = Math.max(a.shieldT, 4); }
+          else if (!a.boss) { const dx = a.x - p.x, dy = a.y - p.y, l = Math.hypot(dx, dy) || 1; this.knock(a, dx / l, dy / l, 300, 60); a.slowT = Math.max(a.slowT, 1); }
+        }
         break;
       case 'rend': p.spT = 0.5; p.rendArm = true; p.rendA = a; break;   // 1.8 裂空斩：蓄力 0.35 秒后出刀
       case 'missiles': {
@@ -1427,6 +1464,7 @@ class Game {
           }
           for (let d = 24; d < L; d += 26) { const x = p.x + ux * d, y = p.y + uy * d; if (x < 0 || y < 0 || x > S.W || y > S.H) break; this.paint(x, y, this.top(x, y), 26, p.team, p); }
           this.ev(['rend', p.id, r1(p.x), r1(p.y), r1(p.z), r2(a), L, p.team]);
+          this.knock(p, ux, uy, 420, 0); p.invulnT = Math.max(p.invulnT, 0.35);   // 1.9.1：裂空斩出刀时人跟着刀光冲过去
         }
         break;
       case 'charge':
@@ -1489,6 +1527,7 @@ class Game {
         // 敌方盾墙挡住子弹
         let blocked = false;
         for (const h of this.helpers) {
+          if (h.kind === 'domain') { if (h.team !== pr.team && pr.z < h.z + 130 && Math.hypot(pr.x - h.x, pr.y - h.y) < h.r) { blocked = true; break; } continue; }   // 1.9.1 简易领域：中和子弹
           if (h.kind !== 'wall' || h.team === pr.team || pr.z > h.z + 80) continue;
           const ux = Math.cos(h.ang), uy = Math.sin(h.ang), dx = pr.x - h.x, dy = pr.y - h.y, along = dx * ux + dy * uy, across = -dx * uy + dy * ux;
           if (Math.abs(along) <= h.half && Math.abs(across) < 9 + pr.size) { blocked = true; break; }
@@ -1497,8 +1536,8 @@ class Game {
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
-          this.hurt(victim, pr.dmg * (far ? 1.2 : 1), owner, pr.vx, pr.vy, pr.kb);
-          if (pr.fx) this.sideFx(victim, pr.fx.poison ? Object.assign({ by: pr.owner }, pr.fx) : pr.fx);
+          this.hurt(victim, pr.dmg * (far ? 1.15 : 1), owner, pr.vx, pr.vy, pr.kb);
+          if (pr.fx) this.sideFx(victim, pr.fx.poison || pr.fx.ward ? Object.assign({ by: pr.owner }, pr.fx) : pr.fx);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
         }
@@ -2819,6 +2858,7 @@ function handle(hub, c, m) {
       break;
     }
     case 'ping': c.conn.send({ t: 'pong', ts: m.ts }); break;
+    case 'dbgOv': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) { me.bt = Math.max(me.bt, 1); me.ovUsed = false; me.ov = S.OV_NEED; r.game.activateOverload(me); } } break;   // 调试：立刻放超载
     case 'dbgFinish': if (hub.debug && r && r.game && r.hostId === c.id) { const g = r.game, me = g.players.get(c.id); if (g.loot) { me.extracted = true; me.out = true; me.alive = false; g.obj.banked[c.id] = ['scrap']; } g.finish(me ? me.team : 1); } break;   // 只在测试服务器（GB_DEBUG=1）里可用
     // ---------------- 1.7：好友（服务器转发：好友码 → 连接）----------------
     case 'socHello': {   // 上线 / 更新状态：{ fid, card: { name, pilot, tr, rank, st, code, n } }

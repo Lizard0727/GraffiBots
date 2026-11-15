@@ -972,6 +972,33 @@
         return g;
       });
     }
+    // 1.9.1：符零的简易领域（每队一个颜色）：地面符阵 + 半透明边界墙 + 旋转的八芒星 + 一圈立着的符纸
+    for (const t of TEAMS) {
+      const R0 = 170;
+      P['domain' + t] = pool(() => {
+        const g = new T.Group();
+        g.add(flat(new T.Mesh(new T.CircleGeometry(R0, 48), basic(cs[t], { transparent: true, opacity: 0.1, depthWrite: false, blending: T.AdditiveBlending })), 0, 0, 0.8));
+        const wall = new T.Mesh(new T.CylinderGeometry(R0, R0, 70, 48, 1, true), basic(cs[t], { transparent: true, opacity: 0.16, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending }));
+        wall.position.y = 35; g.add(wall);
+        const gold = basic(0xd8b25a, { transparent: true, opacity: 0.9, side: T.DoubleSide, depthWrite: false });
+        const star = new T.Group(); g.add(star);
+        star.add(flat(part(SH.ring, gold, R0, R0, 1), 0, 0, 1.4));
+        star.add(flat(part(SH.ring, basic(cs[t], { transparent: true, opacity: 0.7, side: T.DoubleSide, depthWrite: false }), R0 - 22, R0 - 22, 1), 0, 0, 1.5));
+        star.add(flat(part(SH.ring, gold, 56, 56, 1), 0, 0, 1.6));
+        for (let i = 0; i < 8; i++) {   // 八芒星：每个点连到隔 3 个的点
+          const a = (i / 8) * Math.PI * 2, b = ((i + 3) / 8) * Math.PI * 2, r = R0 - 30, x0 = Math.cos(a) * r, y0 = Math.sin(a) * r, x1 = Math.cos(b) * r, y1 = Math.sin(b) * r;
+          const ln = part(SH.box, gold, Math.hypot(x1 - x0, y1 - y0), 0.6, 2.2, (x0 + x1) / 2, 1.7, (y0 + y1) / 2); ln.rotation.y = -Math.atan2(y1 - y0, x1 - x0); star.add(ln);
+        }
+        const tal = new T.Group(); g.add(tal);
+        for (let i = 0; i < 14; i++) {
+          const a = (i / 14) * Math.PI * 2, tg = part(SH.box, basic(0xf4e6c8), 1, 16, 7, Math.cos(a) * (R0 - 2), 12, Math.sin(a) * (R0 - 2)); tg.rotation.y = -a; tal.add(tg);
+          const st2 = part(SH.box, basic(0xc8102e), 1.2, 9, 2, Math.cos(a) * (R0 - 1.4), 12, Math.sin(a) * (R0 - 1.4)); st2.rotation.y = -a; tal.add(st2);
+        }
+        const orb = new T.Group(); g.add(orb);
+        for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2; orb.add(part(SH.box, basic(0xffe9a8), 5, 9, 1, Math.cos(a) * 60, 48, Math.sin(a) * 60)); }
+        return g;
+      });
+    }
     // 1.8：符零的封印符阵（金色符纹 + 红色五角星线 + 漂浮的符纸）
     P.sealz = pool(() => {
       const g = new T.Group(), gm = basic(0xd8b25a, { transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false });
@@ -3407,6 +3434,12 @@
       }
       if (kind === 'fog') continue;    // 毒雾用粒子画（client 收到 fg 事件）
       if (kind === 'dome') { const g = P['dome' + team].next(); g.position.set(x, z, y); g.children[0].material.opacity = 0.13 + 0.05 * Math.sin(now / 220); g.children[1].rotation.y = now / 1600; continue; }
+      if (kind === 'domain') {   // 1.9.1 简易领域
+        const g = P['domain' + team].next(); g.position.set(x, z + 0.5, y);
+        g.children[1].material.opacity = 0.13 + 0.06 * Math.sin(now / 180);
+        g.children[2].rotation.y = now / 2400; g.children[3].rotation.y = -now / 1500; g.children[4].rotation.y = now / 700; g.children[4].position.y = Math.sin(now / 300) * 4;
+        continue;
+      }
       if (kind === 'sealz') { const g = P.sealz.next(); g.position.set(x, z + 1, y); g.rotation.y = now / 900; continue; }
       if (kind === 'decoy') { const g = P.decoy.next(); g.position.set(x, z + Math.sin(now / 160) * 1.5, y); g.rotation.y = now / 260; continue; }
       if (kind === 'bento' && h[6] === 7) { const g = P.gift.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }

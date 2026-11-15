@@ -2187,10 +2187,44 @@
         if (!p) break;
         const O = S.OVERLOADS[e[2]], P = S.pilot(e[2]);
         for (let i = 0; i < 3; i++) ringFx(e[3], e[4], e[5], 90 + i * 80, i ? P.accent : '#ffffff', 600, i * 120);
+        if (O.domain) {   // 1.9.1 简易领域：展开时符纸从中心一圈圈铺到边界
+          for (let i = 0; i < 5; i++) ringFx(e[3], e[4], e[5] || 0, 40 + i * 33, i % 2 ? '#d8b25a' : '#f4e6c8', 520, i * 70);
+          for (let i = 0; i < 16; i++) { const a = (i / 16) * 6.283; G.fx.push({ k: 'line', x0: e[3], y0: e[4], z0: (e[5] || 0) + 4, x1: e[3] + Math.cos(a) * O.domain.r, y1: e[4] + Math.sin(a) * O.domain.r, z1: (e[5] || 0) + 4, color: '#d8b25a', w: 2, t0: now + i * 18, dur: 380 }); }
+          if (!silent && nearMe(e[3], e[4], 700)) sfx.domain();
+        }
         R3.emit(e[3], e[4], (e[5] || 0) + 20, P.accent, 50, 320, 1, { sys: 'pg', size: 14, life: 0.7, grav: -60, drag: 2 });
         if (silent) break;
         if (e[1] === myId) { cutinBig(p, O.name, 'OVERLOAD!', `${P.name} · 超载技能`); G.camPunch = 1; G.flashT = now; G.speedLines = now; G.shake = Math.max(G.shake, 7); sfx.special(); }
         else cutinSide(p, O.name, '超载');
+        break;
+      }
+      case 'wd': {   // 1.9.1 结界机兵：符印层数（头顶一圈小符纸）
+        const t = G.players.get(e[1]); if (!t) break;
+        R3.emit(t.x, t.y, (t.z || 0) + 46, '#f4e6c8', e[2], 30, 0.4, { sys: 'pg', size: 7, life: 0.5, grav: 0, drag: 3 });
+        break;
+      }
+      case 'bind': {   // 1.9.1 符印束缚：四道符链锁住目标
+        const t = G.players.get(e[1]); if (!t) break;
+        const z = (t.z || 0) + 18;
+        ringFx(t.x, t.y, t.z || 0, 46, '#d8b25a', 500); ringFx(t.x, t.y, t.z || 0, 30, '#ff2d4b', 420, 80);
+        for (let i = 0; i < 4; i++) { const a = (i / 4) * 6.283 + 0.4; G.fx.push({ k: 'line', x0: t.x + Math.cos(a) * 70, y0: t.y + Math.sin(a) * 70, z0: z + 30, x1: t.x, y1: t.y, z1: z, color: '#f4e6c8', w: 3, t0: now + i * 30, dur: 600 }); }
+        if (!silent && (e[1] === myId || nearMe(t.x, t.y, 500))) sfx.domainHit();
+        if (e[1] === myId && !silent) toast('被符印束缚了！', 900);
+        break;
+      }
+      case 'spin': {   // 1.9.1 灵刃回旋斩
+        ringFx(e[2], e[3], (e[4] || 0) + 10, 92, '#ffffff', 260); ringFx(e[2], e[3], (e[4] || 0) + 8, 76, G.colors[e[5]] || '#b48cff', 320, 40);
+        for (let i = 0; i < 10; i++) { const a = (i / 10) * 6.283; R3.emit(e[2] + Math.cos(a) * 70, e[3] + Math.sin(a) * 70, (e[4] || 0) + 20, '#d9c8ff', 1, 120, 0.3, { sys: 'pg', size: 8, life: 0.3, grav: 0, drag: 4 }); }
+        if (!silent && nearMe(e[2], e[3], 500)) sfx.snipe();
+        break;
+      }
+      case 'dmn': {   // 1.9.1 简易领域的自动反击：从领域边缘斩出一道符咒刀光
+        const t = G.players.get(e[2]); if (!t) break;
+        const tz = (t.z || 0) + 22, a = Math.atan2(t.y - e[4], t.x - e[3]);
+        G.fx.push({ k: 'line', x0: t.x - Math.sin(a) * 40, y0: t.y + Math.cos(a) * 40, z0: tz + 18, x1: t.x + Math.sin(a) * 40, y1: t.y - Math.cos(a) * 40, z1: tz - 10, color: '#fff4d0', w: 7, t0: now, dur: 220 });
+        G.fx.push({ k: 'line', x0: e[3] + Math.cos(a) * 30, y0: e[4] + Math.sin(a) * 30, z0: (e[5] || 0) + 20, x1: t.x, y1: t.y, z1: tz, color: '#d8b25a', w: 2, t0: now, dur: 200 });
+        R3.emit(t.x, t.y, tz, '#f4e6c8', 10, 200, 0.6, { sys: 'pg', size: 9, life: 0.35, grav: 0, drag: 4 });
+        if (!silent && (e[2] === myId || nearMe(t.x, t.y, 500))) sfx.domainHit();
         break;
       }
       case 'blk': {   // 盾牌 / 盾墙 / 不屈装甲挡住伤害
