@@ -200,6 +200,7 @@
 
   // ================= 界面 =================
   let ws = null, myId = 0, room = null, ping = 0, lanInfo = null;
+  let fpsCap = store.get('fpsCap', 60);   // 1.7.1：帧率上限（0 = 不限制）
   let wantRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase() || null;
 
   function showScreen(name) {
@@ -220,6 +221,7 @@
       <label class="set-row toggle"><span>瞄准辅助（鼠标附近的敌人会把准星吸过去一点）</span><input type="checkbox" data-set="aimAssist" ${store.get('aimAssist', true) ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>帧率太低时自动切换流畅画质</span><input type="checkbox" data-set="autoQ" ${store.get('autoQ', true) ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>显示帧率</span><input type="checkbox" data-set="showFps" ${store.get('showFps', false) ? 'checked' : ''}></label>
+      <label class="set-row"><span>帧率上限（电脑发热 / 卡顿时调低）</span><select data-set="fpsCap">${[[30, '30'], [60, '60'], [120, '120'], [0, '不限制']].map(([v, n]) => `<option value="${v}" ${fpsCap === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
       <label class="set-row toggle"><span>显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）</span><input type="checkbox" data-set="chat" ${store.get('chat', true) ? 'checked' : ''}></label>
       <label class="set-row"><span>语言 / Language</span><select data-set="lang"><option value="zh" ${window.GBI18N && GBI18N.lang === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${window.GBI18N && GBI18N.lang === 'en' ? 'selected' : ''}>English</option></select></label>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
@@ -245,6 +247,8 @@
           renderSettings();
         };
       }
+      const fc = box.querySelector('select[data-set=fpsCap]');
+      if (fc) fc.onchange = () => { fpsCap = +fc.value; store.set('fpsCap', fpsCap); };
       const ls = box.querySelector('select[data-set=lang]');
       if (ls) ls.onchange = () => { if (G && !G.over) { toast('对战结束后再切换语言'); ls.value = GBI18N.lang; return; } GBI18N.set(ls.value); };
       for (const btn of box.querySelectorAll('[data-track]')) btn.onclick = () => { AU.resume(); AU.music(btn.dataset.track); setTimeout(renderSettings, 50); updateNowPlaying(); };
@@ -339,7 +343,7 @@
     if (name === 'pilots') renderPilots();
     if (name === 'hero') renderHero();
     if (name === 'loot') renderLoot();
-    if (name === 'friends') renderFriends();
+    if (name === 'friends') { FRTAB.t = SOC.reqIn.length ? 'req' : 'list'; renderFriends(); renderReqPop(); }   // 有待处理的好友申请：直接打开申请页
     if (name === 'stash') renderStash();
     if (name === 'chests') { renderChests(); const r = $('offerRow'); if (r) r.dataset.slot = ''; renderOffers(); }
     if (name === 'talents') renderTalents();
@@ -1117,7 +1121,45 @@
   let wsEverOpen = false;
   const PEER_PREFIX = 'graffibots-v1-';
   let net = null, localHub = null, peerHost = null, hostCode = null, p2pStatus = { text: '', cls: '' };
-  const deliver = (str) => { let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
+  const deliver = (str) => { lastMsgAt = performance.now(); let m; try { m = JSON.parse(str); } catch (e) { return; } onMsg(m); };
+  // ---------------- 1.7.1：断线重连 ----------------
+  //   服务器会把断线的玩家保留一会儿（对局 60 秒、大厅 20 秒，期间 AI 接管），用 welcome 里的 token 发 resume 就能接回去
+  //   心跳：8 秒收不到任何消息（服务器 / 房主每 2 秒回一次 pong，对局中每秒 30 个快照）就当连接已断，马上重连
+  let lastMsgAt = performance.now(), sess = null, resumeSess = null, rcTry = 0, rcTimer = 0, rcSince = 0, p2pCode = null, p2pRetry = null;
+  const RC_DELAYS = [300, 800, 1500, 2500, 4000];
+  function netLostShow(on) {
+    const el = $('netLost'); if (!el) return;
+    if (!on) { el.classList.add('hidden'); return; }
+    const secs = rcSince ? Math.floor((performance.now() - rcSince) / 1000) : 0;
+    el.innerHTML = `<b>${L('网络断开，正在重连…')}</b><small>${L('对局会为你保留 60 秒，期间 AI 暂时帮你操作')}${secs ? ` · ${secs}s` : ''}</small>`;
+    el.classList.remove('hidden');
+  }
+  function lostBegin() {
+    if (!resumeSess && sess && (room || G)) { resumeSess = { id: sess.id, token: sess.token }; rcSince = performance.now(); }
+    if (resumeSess) netLostShow(true);
+  }
+  function lostEnd() { resumeSess = null; rcTry = 0; rcSince = 0; netLostShow(false); }
+  //   防误判：计时器自己晚到了很多（主线程被加载 / 建场景卡住）→ 不算断线；超时后先补发一次 ping 再等 2.5 秒，期间收到任何消息就取消
+  let hbTick = performance.now(), hbProbe = 0;
+  setInterval(() => {
+    const now = performance.now();
+    if (resumeSess) netLostShow(true);
+    if (now - hbTick > 2500) lastMsgAt = Math.max(lastMsgAt, now - 2000);   // 刚从卡顿中恢复，排队的消息还没处理
+    hbTick = now;
+    if (!net || document.visibilityState !== 'visible' || now - lastMsgAt < 8000) { hbProbe = 0; return; }
+    if (!hbProbe) { hbProbe = now; send({ t: 'ping', ts: now }); return; }
+    if (now - hbProbe < 2500) return;
+    hbProbe = 0; lastMsgAt = now;
+    if (net.kind === 'ws' && ws && ws.readyState === 1) wsLost(ws);
+    else if (net.kind === 'peer' && p2pCode) { const code = p2pCode; net.close(); p2pLost(code); }
+  }, 1000);
+  function reconnectNow() {
+    if (net && net.kind === 'ws' && rcTimer) { clearTimeout(rcTimer); rcTimer = 0; connectWS(); }
+    if (p2pRetry && !joining) { clearTimeout(p2pRetry.t); p2pRetry.go(); }
+  }
+  addEventListener('online', () => { toast('网络恢复了，正在重连…'); reconnectNow(); });
+  addEventListener('offline', () => { if (room || G) toast('网络断开了'); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { lastMsgAt = performance.now(); reconnectNow(); } });
   const send = (o) => { if (net) net.send(o); };
   const loadoutMsg = (t) => ({ t, name: profile.name || '机兵', weapon: profile.weapon, head: profile.head, pilot: profile.pilot || 'blaze', level: level(), power: E.power(profile, profile.pilot), looks: E.looks(profile), rk: { tier: E.rankTier(profile.rank.rp), ok: E.canRanked(profile) } });
   const sendHello = () => send(loadoutMsg('hello'));
@@ -1131,24 +1173,47 @@
   function connectWS() {
     setConn('正在连接服务器…', '');
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    rcTimer = 0;
+    const sock = ws = new WebSocket(`${proto}://${location.host}/ws`);
     net = { kind: 'ws', send: (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); } };
-    ws.onopen = () => {
-      wsEverOpen = true;
+    const openT = setTimeout(() => { if (sock.readyState === 0) { try { sock.close(); } catch (e) { /* ignore */ } wsLost(sock); } }, 8000);   // 连接卡住
+    sock.onopen = () => {
+      clearTimeout(openT);
+      wsEverOpen = true; rcTry = 0; lastMsgAt = performance.now();
       setConn('已连接服务器 ✓', 'ok');
+      if (resumeSess) send({ t: 'resume', id: resumeSess.id, token: resumeSess.token });   // 先接回旧身份，再发其它消息
       sendHello();
       setTimeout(socProbe, 200);
-      if (wantRoom) { send({ t: 'join', code: wantRoom }); wantRoom = null; }
+      if (wantRoom && !resumeSess) { send({ t: 'join', code: wantRoom }); wantRoom = null; }
     };
-    ws.onmessage = (e) => deliver(e.data);
-    ws.onclose = () => {
-      if (!wsEverOpen) { FILE_MODE = true; ws = null; startLocal(); return; }   // 没有 Node 服务器（静态网页托管）
-      onlineReady = false;
-      setConn('与服务器断开，正在重连…', 'bad');
-      if (room) { toast('与服务器断开连接，正在重连…'); wantRoom = room.code; }
-      resetToTitle();
-      setTimeout(connectWS, 2000);
-    };
+    sock.onmessage = (e) => { if (ws === sock) deliver(e.data); };
+    sock.onclose = () => { clearTimeout(openT); wsLost(sock); };
+  }
+  function wsLost(sock) {
+    if (ws !== sock) return;   // 早就换成新连接了
+    sock.onclose = null; sock.onmessage = null;
+    try { if (sock.readyState < 2) sock.close(); } catch (e) { /* ignore */ }
+    ws = null;
+    if (!wsEverOpen) { FILE_MODE = true; startLocal(); return; }   // 没有 Node 服务器（静态网页托管）
+    onlineReady = false;
+    setConn('与服务器断开，正在重连…', 'bad');
+    lostBegin();
+    if (!resumeSess && room) wantRoom = room.code;
+    const d = RC_DELAYS[Math.min(rcTry++, RC_DELAYS.length - 1)];
+    clearTimeout(rcTimer);
+    rcTimer = setTimeout(connectWS, d);
+  }
+  // 重连失败（保留时间过了 / 服务器重启过）：回到大厅
+  function resumeFailed() {
+    const had = !!(G || room);
+    const code = room && !G ? room.code : null;
+    lostEnd();
+    if (!had) return;
+    if (PARTY.on) { PARTY.on = false; PARTY.pending = null; }
+    resetToTitle();
+    renderParty(); renderModeCard();
+    toast('断线时间太长，已退出房间', 4000);
+    if (code && net && net.kind === 'ws') send({ t: 'join', code });
   }
   function resetToTitle() {
     room = null; G = null; R3.clear();
@@ -1167,7 +1232,7 @@
       sendRaw(s) { if (this.open) Promise.resolve().then(() => { if (conn.open) deliver(s); }); },
     };
     const c = localHub.connect(conn);
-    net = { kind: 'local', send: (o) => localHub.message(c, JSON.parse(JSON.stringify(o))), close: () => { conn.open = false; localHub.disconnect(c); } };
+    net = { kind: 'local', send: (o) => localHub.message(c, JSON.parse(JSON.stringify(o))), close: () => { conn.open = false; localHub.drop(c); } };
     setConn(LOCAL_TEXT(), 'ok');
     sendHello();
     setTimeout(() => { socPeerStart(); socProbe(); }, 400);
@@ -1189,14 +1254,16 @@
     peer.on('connection', (dc) => {
       dc.on('open', () => {
         const conn = {
-          open: true,
+          open: true, lastRecv: Date.now(),
           send(o) { this.sendRaw(JSON.stringify(o)); },
           sendRaw(s) { if (this.open && dc.open) { try { dc.send(s); } catch (e) { /* ignore */ } } },
           get congested() { return !!(dc.dataChannel && dc.dataChannel.bufferedAmount > 256 * 1024); },
+          close() { try { dc.close(); } catch (e) { /* ignore */ } },
         };
         const c = localHub.connect(conn);
-        dc.on('data', (d) => { let m; try { m = typeof d === 'string' ? JSON.parse(d) : d; } catch (e) { return; } localHub.message(c, m); });
-        const bye = () => { if (!conn.open) return; conn.open = false; localHub.disconnect(c); };
+        dc.on('data', (d) => { conn.lastRecv = Date.now(); let m; try { m = typeof d === 'string' ? JSON.parse(d) : d; } catch (e) { return; } localHub.message(c, m); });
+        const bye = () => { if (!conn.open) return; conn.open = false; hostConns.delete(conn); localHub.disconnect(c, conn); };
+        conn.bye = bye; hostConns.add(conn);
         dc.on('close', bye); dc.on('error', bye);
       });
     });
@@ -1205,27 +1272,42 @@
       if (err.type === 'unavailable-id') setP2P('房间码被占用，请离开后重新创建房间', 'bad');
       else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) setP2P('连不上联机服务（请检查网络），仍可和 AI 对战', 'bad');
     });
-    peer.on('disconnected', () => { if (peerHost === peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) { /* ignore */ } } });
+    peer.on('disconnected', () => peerKeep(peer, () => peerHost === peer));
   }
+  // 1.7.1：和信令服务器断开后一直重试（已经连上的玩家不受影响，但新玩家 / 重连的玩家要靠它找到房主）
+  function peerKeep(peer, alive) {
+    const tryIt = (n) => {
+      if (!alive() || peer.destroyed || !peer.disconnected) return;
+      try { peer.reconnect(); } catch (e) { /* ignore */ }
+      setTimeout(() => tryIt(n + 1), Math.min(10000, 1500 * (n + 1)));
+    };
+    tryIt(0);
+  }
+  // 房主：20 秒没收到某个玩家的任何消息（对方每 2 秒 ping 一次）→ 当他断线了，进入保留 / 重连流程
+  const hostConns = new Set();
+  setInterval(() => { const now = Date.now(); for (const cn of [...hostConns]) if (now - cn.lastRecv > 20000) { cn.close(); cn.bye(); } }, 3000);
 
   // 加入别人的 P2P 房间
   let joining = false;
-  function joinP2P(code) {
-    if (localHub && localHub.rooms.has(code) && net && net.kind === 'local') { send({ t: 'join', code }); return; }
+  // opt.retry：断线重连（失败不弹提示，交给 p2pLost 继续重试）
+  function joinP2P(code, opt) {
+    opt = opt || {};
+    if (!opt.retry && localHub && localHub.rooms.has(code) && net && net.kind === 'local') { send({ t: 'join', code }); return; }
     if (!window.Peer) { toast(NO_P2P); return; }
     if (joining) return;
     joining = true;
-    setConn(`正在连接房间 ${code}…`, '');
+    if (!opt.retry) setConn(`正在连接房间 ${code}…`, '');
     const peer = new window.Peer(PEER_PREFIX + 'p' + Math.random().toString(36).slice(2, 10), { debug: 0 });
     let done = false, closing = false;
     const fail = (msg) => {
       if (done) return;
       done = true; joining = false;
       try { peer.destroy(); } catch (e) { /* ignore */ }
+      if (opt.retry) { if (opt.onFail) opt.onFail(); return; }
       toast(msg, 4500);
       setConn(net && net.kind === 'local' ? LOCAL_TEXT() : '', 'ok');
     };
-    const timer = setTimeout(() => fail(`连接房间 ${code} 超时（检查房间码和网络，房主需保持游戏页面打开）`), 15000);
+    const timer = setTimeout(() => fail(`连接房间 ${code} 超时（检查房间码和网络，房主需保持游戏页面打开）`), opt.retry ? 7000 : 15000);
     peer.on('open', () => {
       const dc = peer.connect(PEER_PREFIX + code, { serialization: 'raw', reliable: true });
       dc.on('open', () => {
@@ -1233,22 +1315,39 @@
         done = true; joining = false;
         if (net && net.close) net.close();
         stopHost();
-        room = null;
-        net = { kind: 'peer', send: (o) => { if (dc.open) dc.send(JSON.stringify(o)); }, close: () => { closing = true; try { dc.close(); peer.destroy(); } catch (e) { /* ignore */ } } };
+        if (!opt.retry) room = null;
+        p2pCode = code; p2pRetry = null; lastMsgAt = performance.now();
+        net = { kind: 'peer', send: (o) => { if (dc.open) { try { dc.send(JSON.stringify(o)); } catch (e) { /* ignore */ } } }, close: () => { closing = true; try { dc.close(); peer.destroy(); } catch (e) { /* ignore */ } } };
         setConn(`已连接到房间 ${code} ✓（P2P）`, 'ok');
+        if (resumeSess) send({ t: 'resume', id: resumeSess.id, token: resumeSess.token });
         sendHello();
-        send({ t: 'join', code });
+        if (!resumeSess) send({ t: 'join', code });
       });
-      dc.on('data', (d) => deliver(typeof d === 'string' ? d : String(d)));
-      dc.on('close', () => { if (!closing && net && net.kind === 'peer') { toast('与房主的连接断开了'); backToLocal(); } });
+      dc.on('data', (d) => { if (!closing) deliver(typeof d === 'string' ? d : String(d)); });
+      dc.on('close', () => { if (!closing && net && net.kind === 'peer') { closing = true; try { peer.destroy(); } catch (e) { /* ignore */ } p2pLost(code); } });
     });
     peer.on('error', (err) => {
       clearTimeout(timer);
       if (!done) fail(err.type === 'peer-unavailable' ? `找不到房间 ${code}（房主需要先创建房间并保持游戏页面打开）` : '连不上联机服务，请检查网络');
-      else if (net && net.kind === 'peer' && !closing) { toast('与房主的连接断开了'); backToLocal(); }
+      else if (net && net.kind === 'peer' && !closing) { closing = true; try { peer.destroy(); } catch (e) { /* ignore */ } p2pLost(code); }
     });
   }
+  // 1.7.1：和房主的连接断了——45 秒内每隔几秒重连一次，房主那边会帮你保留位置
+  function p2pLost(code) {
+    lostBegin();
+    if (!resumeSess) { toast('与房主的连接断开了'); backToLocal(); return; }
+    setConn('与房主的连接断开，正在重连…', 'bad');
+    const until = performance.now() + 45000;
+    const R = p2pRetry = { t: 0, go: null };
+    R.go = () => {
+      if (p2pRetry !== R) return;
+      if (performance.now() > until) { p2pRetry = null; lostEnd(); toast('连不上房主了，已回到单机模式', 4000); backToLocal(); return; }
+      joinP2P(code, { retry: true, onFail: () => { if (p2pRetry === R) R.t = setTimeout(R.go, 2500); } });
+    };
+    R.t = setTimeout(R.go, 600);
+  }
   function backToLocal() {
+    p2pCode = null; p2pRetry = null;
     if (net && net.close) net.close();
     resetToTitle();
     startLocal();
@@ -1256,7 +1355,14 @@
 
   function onMsg(m) {
     switch (m.t) {
-      case 'welcome': myId = m.id; break;
+      case 'welcome': myId = m.id; sess = m.token ? { id: m.id, token: m.token } : null; break;
+      case 'resumed':
+        lostEnd();
+        toast('已重新连接 ✓');
+        if (!m.game && G && $('results').classList.contains('hidden')) { G = null; R3.clear(); showScreen('title'); menuMusic(); }   // 对局在断线期间结束了，结算会紧跟着发过来
+        break;
+      case 'resumeFail': if (resumeSess) resumeFailed(); break;
+      case 'grid': if (G) applyGrid(m.g); break;
       case 'caps': onCaps(m); break;
       case 'auth': onAuth(m); break;
       case 'profile': onServerProfile(m); break;
@@ -1269,7 +1375,7 @@
       case 'socWho': {
         const now = Date.now();
         for (const f of SOC.friends) { if (m.on[f.fid]) onSoc(f.fid, { t: 'hiR', card: m.on[f.fid] }); else delete SOC.on[f.fid]; }
-        for (const r of SOC.reqOut) if (m.on[r.fid] && (!r.sent || now - r.sent > 30000)) { r.sent = now; socSend(r.fid, { t: 'req', card: myCard() }); }   // 对方上线了：重新发申请
+        for (const r of SOC.reqOut) if (m.on[r.fid] && (!r.sent || now - r.sent > 30000 || r.lost)) { r.sent = now; r.lost = false; socSend(r.fid, { t: 'req', card: myCard() }); }   // 对方上线了：重新发申请
         renderFriends(); renderParty();
         break;
       }
@@ -1305,7 +1411,7 @@
         if (net && net.kind === 'peer') backToLocal(); else if (net && net.kind === 'local') stopHost();
         break;
       case 'err': toast(m.msg); break;
-      case 'start': startGame(m); setTimeout(socHello, 100); break;
+      case 'start': startGame(m); setTimeout(socHello, 100); renderReqPop(); break;
       case 'bag': if (G && G.loot) { const before = G.bag.items.length; G.bag = { items: m.items || [], cap: m.cap || S.LOOT.bag, gear: m.gear || [] }; if (G.bag.items.length < before) G.bagFlash = performance.now(); } break;
       case 's': onSnap(m); break;
       case 'over':
@@ -1343,7 +1449,7 @@
   const socUseWs = () => !FILE_MODE && net && net.kind === 'ws' && ws && ws.readyState === 1;
   // ---- 发消息 ----
   function socSend(to, m) {
-    if (socUseWs()) { send({ t: 'soc', to, m }); return; }
+    if (socUseWs()) { if (!(ws && ws.readyState === 1) && m.t === 'req') { const r = SOC.reqOut.find((x) => x.fid === to); if (r) r.lost = true; } send({ t: 'soc', to, m }); return; }   // 断线时没发出去的申请，重连后补发
     socP2P(to, m);
   }
   let socLast = '', socLastT = 0;
@@ -1361,7 +1467,7 @@
     SOC.peer = peer;
     peer.on('connection', (dc) => { dc.on('data', (d) => { let x; try { x = JSON.parse(d); } catch (e) { return; } if (x && x.from) { SOC.conns[x.from] = dc; onSoc(x.from, x.m); } }); });
     peer.on('error', (err) => { if (err.type === 'unavailable-id') { /* 同一台设备开了两个窗口 */ } });
-    peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) { /* ignore */ } });
+    peer.on('disconnected', () => peerKeep(peer, () => SOC.peer === peer));
   }
   function socP2P(to, m) {
     if (!SOC.peer || SOC.peer.destroyed) { socPeerStart(); if (!SOC.peer) return; }
@@ -1397,8 +1503,13 @@
       case 'req':
         if (!card || isFriend(from)) { if (isFriend(from)) socSend(from, { t: 'acc', card: myCard() }); break; }
         if (SOC.reqOut.some((r) => r.fid === from)) { addFriend(from, card); socSend(from, { t: 'acc', card: myCard() }); break; }   // 互相加：直接成为好友
-        if (!SOC.reqIn.some((r) => r.fid === from)) { SOC.reqIn.push({ fid: from, name: card.name, pilot: card.pilot, tr: card.tr, t: Date.now() }); socSave(); sfx.pick(); toast(`${card.name} 想加你为好友`); }
+        if (!SOC.reqIn.some((r) => r.fid === from)) {
+          if (SOC.reqIn.length >= 30) SOC.reqIn.shift();
+          SOC.reqIn.push({ fid: from, name: card.name, pilot: card.pilot, tr: card.tr, rank: card.rank, t: Date.now() }); socSave(); sfx.pick();
+          REQPOP.q.push(from); renderReqPop();
+        }
         break;
+      case 'rej': if (SOC.reqOut.some((r) => r.fid === from)) { SOC.reqOut = SOC.reqOut.filter((r) => r.fid !== from); socSave(); toast('有一个好友申请没有通过'); } break;
       case 'acc': if (card && (SOC.reqOut.some((r) => r.fid === from) || isFriend(from))) { const was = isFriend(from); addFriend(from, card); upd(); if (!was) { sfx.win(); toast(`${card.name} 通过了你的好友申请`); } } break;
       case 'del': SOC.friends = SOC.friends.filter((f) => f.fid !== from); delete SOC.on[from]; socSave(); break;
       case 'inv':
@@ -1519,8 +1630,55 @@
     }
     const fb = $('friendBadge'); if (fb) { const k = SOC.reqIn.length + SOC.invites.length; fb.textContent = k; fb.classList.toggle('hidden', !k); }
   }
+  // ---- 1.7.1：通过 / 拒绝好友申请 ----
+  function acceptReq(fid, quiet) {
+    const r = SOC.reqIn.find((x) => x.fid === fid); if (!r) return false;
+    if (SOC.friends.length >= 50) { toast('好友最多 50 个'); return false; }
+    addFriend(r.fid, r); socSend(r.fid, { t: 'acc', card: myCard() });
+    if (!quiet) { sfx.win(); toast(`已通过「${r.name}」的好友申请`); }
+    REQPOP.q = REQPOP.q.filter((x) => x !== fid);
+    return true;
+  }
+  function rejectReq(fid) {
+    if (!SOC.reqIn.some((x) => x.fid === fid)) return;
+    SOC.reqIn = SOC.reqIn.filter((x) => x.fid !== fid); socSave();
+    socSend(fid, { t: 'rej' });
+    REQPOP.q = REQPOP.q.filter((x) => x !== fid);
+  }
+  const reqDone = () => { renderFriends(); renderParty(); renderReqPop(); };
+  const agoText = (t) => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? '刚刚' : s < 3600 ? `${Math.floor(s / 60)} 分钟前` : s < 86400 ? `${Math.floor(s / 3600)} 小时前` : `${Math.floor(s / 86400)} 天前`; };
+  // 收到好友申请时的弹窗（可以直接通过，或者去好友页查看）
+  const REQPOP = { q: [] };
+  function renderReqPop() {
+    const pop = $('reqPop'); if (!pop) return;
+    REQPOP.q = REQPOP.q.filter((f) => SOC.reqIn.some((r) => r.fid === f));
+    const fid = REQPOP.q[REQPOP.q.length - 1], r = fid && SOC.reqIn.find((x) => x.fid === fid);
+    clearTimeout(renderReqPop.h);
+    if (!r || G || !$('ov-friends').classList.contains('hidden')) { pop.classList.add('hidden'); pop.dataset.f = ''; return; }
+    if (pop.dataset.f !== fid) {
+      pop.dataset.f = fid;
+      const more = SOC.reqIn.length - 1;
+      pop.innerHTML = `<div class="ip-face">${GP.portrait(S.pilot(r.pilot), { face: true })}</div><div class="ip-txt"><small>好友申请${more > 0 ? ` · 还有 ${more} 个` : ''}</small><b><span data-noi18n>${esc(r.name)}</span> 想加你为好友</b><span>🏆 ${r.tr}${r.rank != null && E.RANK.tiers[r.rank] ? ` · ${E.RANK.tiers[r.rank].name}` : ''}</span></div><button class="btn" id="rpOk">通过</button><button class="btn ghost small" id="rpView">查看</button><button class="rp-x" id="rpX" title="稍后再说">✕</button>`;
+      pop.classList.remove('hidden');
+      $('rpOk').onclick = () => { acceptReq(fid); reqDone(); };
+      $('rpView').onclick = () => { REQPOP.q = []; FRTAB.t = 'req'; openOv('friends'); renderReqPop(); sfx.click(); };
+      $('rpX').onclick = () => { REQPOP.q = REQPOP.q.filter((x) => x !== fid); renderReqPop(); };
+      renderReqPop.h = setTimeout(() => { REQPOP.q = REQPOP.q.filter((x) => x !== fid); renderReqPop(); }, 12000);   // 12 秒后自动收起（申请还留在好友页）
+    }
+  }
   // ---- 界面：好友页 ----
   const FRTAB = { t: 'list' };
+  function reqHtml() {
+    const rows = SOC.reqIn.slice().reverse().map((r) => `<div class="fr-req">
+        <div class="fr-face big">${GP.portrait(S.pilot(r.pilot), { face: true })}</div>
+        <div class="fr-txt"><b data-noi18n>${esc(r.name)}</b><small>🏆 ${r.tr}${r.rank != null && E.RANK.tiers[r.rank] ? ` · ${E.RANK.tiers[r.rank].name}` : ''} · ${agoText(r.t)}</small><small class="fr-rcode">好友码 <span data-noi18n>${r.fid}</span>${SOC.on[r.fid] ? ' · 在线' : ''}</small></div>
+        <button class="btn fr-ok" data-racc="${r.fid}">✔ 通过</button><button class="btn ghost fr-no" data-rno="${r.fid}">拒绝</button></div>`).join('');
+    const out = SOC.reqOut.map((r) => `<div class="fr-row out"><span class="fr-code" data-noi18n>${r.fid}</span><small>${SOC.on[r.fid] ? '对方在线 · 等待通过' : '对方上线后会收到'} · ${agoText(r.t)}</small><button class="btn small ghost" data-rcancel="${r.fid}">取消</button></div>`).join('');
+    return `<div class="fr-reqhead"><h4>收到的申请 <small>${SOC.reqIn.length} 个</small></h4>${SOC.reqIn.length > 1 ? '<button class="btn small" id="reqAll">全部通过</button><button class="btn small ghost" id="reqNone">全部拒绝</button>' : ''}</div>
+      ${rows || '<p class="fr-empty">暂时没有新的好友申请。朋友输入你的好友码后，申请会出现在这里。</p>'}
+      <h4 class="fr-outh">我发出的申请 <small>${SOC.reqOut.length} 个</small></h4>
+      ${out || '<p class="fr-empty">没有等待中的申请。</p>'}`;
+  }
   function renderFriends() {
     const fb = $('friendBadge'); if (fb) { const k = SOC.reqIn.length + SOC.invites.length; fb.textContent = k; fb.classList.toggle('hidden', !k); }
     const box = $('friendsBody'); if (!box || $('ov-friends').classList.contains('hidden')) return;
@@ -1531,22 +1689,27 @@
         <div class="fr-me"><small>我的好友码</small><b id="myFid" data-noi18n>${SOC.fid}</b><button class="btn small" id="copyFid">复制</button><p>把好友码发给朋友，对方在这里输入就能加你</p></div>
         <div class="fr-add"><input id="frCode" maxlength="6" placeholder="输入好友码" autocomplete="off" spellcheck="false"><button class="btn" id="frAdd">加好友</button></div>
         ${SOC.invites.length ? `<div class="fr-sec"><h4>组队邀请</h4>${SOC.invites.map((v, i) => `<div class="fr-row inv"><div class="fr-face">${GP.portrait(S.pilot(v.card.pilot), { face: true })}</div><div class="fr-txt"><b data-noi18n>${esc(v.card.name)}</b><small>邀请你一起玩「${S.MODES[v.mode] ? S.MODES[v.mode].name : ''}」</small></div><button class="btn small" data-invok="${i}">加入</button><button class="btn small ghost" data-invno="${i}">拒绝</button></div>`).join('')}</div>` : ''}
-        ${SOC.reqIn.length ? `<div class="fr-sec"><h4>好友申请</h4>${SOC.reqIn.map((r) => `<div class="fr-row"><div class="fr-face">${GP.portrait(S.pilot(r.pilot), { face: true })}</div><div class="fr-txt"><b data-noi18n>${esc(r.name)}</b><small>🏆 ${r.tr}</small></div><button class="btn small" data-racc="${r.fid}">同意</button><button class="btn small ghost" data-rno="${r.fid}">忽略</button></div>`).join('')}</div>` : ''}
-        ${SOC.reqOut.length ? `<div class="fr-sec"><h4>等待对方同意</h4>${SOC.reqOut.map((r) => `<div class="fr-row out"><span class="fr-code" data-noi18n>${r.fid}</span><small>${SOC.on[r.fid] ? '对方在线' : '对方上线后会收到'}</small><button class="btn small ghost" data-rcancel="${r.fid}">取消</button></div>`).join('')}</div>` : ''}
+        ${SOC.reqIn.length && FRTAB.t !== 'req' ? `<button class="fr-reqlink" id="frReqLink"><b>${SOC.reqIn.length}</b><span>个好友申请等待通过</span><i>›</i></button>` : ''}
       </div>
-      <div class="fr-main"><h4>好友 <small>${SOC.friends.length} 人 · 在线 ${SOC.friends.filter((f) => SOC.on[f.fid]).length} 人</small></h4>
+      <div class="fr-main">
+        <div class="fr-tabs"><button class="fr-tab${FRTAB.t === 'list' ? ' on' : ''}" data-frtab="list">好友列表 <small>${SOC.friends.length}</small></button><button class="fr-tab${FRTAB.t === 'req' ? ' on' : ''}" data-frtab="req">好友申请${SOC.reqIn.length ? ` <em>${SOC.reqIn.length}</em>` : ''}</button></div>
+        ${FRTAB.t === 'req' ? reqHtml() : `<h4>好友 <small>${SOC.friends.length} 人 · 在线 ${SOC.friends.filter((f) => SOC.on[f.fid]).length} 人</small></h4>
         ${order.length ? order.map((f) => { const o = SOC.on[f.fid], inMine = PARTY.on && room && room.players.some((p) => p.fid === f.fid);
           return `<div class="fr-row ${o ? 'on' : 'off'}"><div class="fr-face">${GP.portrait(S.pilot(f.pilot), { face: true })}<i class="dot ${o ? o.st : ''}"></i></div><div class="fr-txt"><b data-noi18n>${esc(f.name)}</b><small>${stName(o)} · 🏆 ${f.tr}${o && o.rank != null ? ` · ${E.RANK.tiers[o.rank].name}` : ''}</small></div>
             ${inMine ? '<span class="fr-tag">队伍中</span>' : o && o.st === 'party' && o.host && o.n < PARTY.max && !PARTY.on ? `<button class="btn small" data-ask="${f.fid}">加入</button>` : ''}
             ${!inMine && o && o.st !== 'game' && canInvite ? `<button class="btn small" data-inv="${f.fid}">邀请</button>` : ''}
-            <button class="btn small ghost fr-del" data-del="${f.fid}" title="删除好友">✕</button></div>`; }).join('') : '<p class="fr-empty">还没有好友。把你的好友码发给朋友，或者输入朋友的好友码！</p>'}
+            <button class="btn small ghost fr-del" data-del="${f.fid}" title="删除好友">✕</button></div>`; }).join('') : '<p class="fr-empty">还没有好友。把你的好友码发给朋友，或者输入朋友的好友码！</p>'}`}
         <p class="fr-note">${FILE_MODE ? '下载版 / 官网：好友之间通过网络直连，双方都需要打开游戏并联网。' : '已连接服务器：好友在同一个服务器上就能互相邀请。'}没有好友在线也没关系——点「对战」就会和 AI 队友一起单排。</p>
       </div>`;
     $('copyFid').onclick = () => { try { navigator.clipboard.writeText(SOC.fid); toast('好友码已复制'); } catch (e) { toast('好友码：' + SOC.fid); } };
     $('frAdd').onclick = () => sendFriendReq($('frCode').value);
     $('frCode').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') sendFriendReq($('frCode').value); };
-    for (const b of box.querySelectorAll('[data-racc]')) b.onclick = () => { const r = SOC.reqIn.find((x) => x.fid === b.dataset.racc); if (!r) return; addFriend(r.fid, r); socSend(r.fid, { t: 'acc', card: myCard() }); sfx.win(); renderFriends(); };
-    for (const b of box.querySelectorAll('[data-rno]')) b.onclick = () => { SOC.reqIn = SOC.reqIn.filter((x) => x.fid !== b.dataset.rno); socSave(); renderFriends(); renderParty(); };
+    for (const b of box.querySelectorAll('[data-frtab]')) b.onclick = () => { FRTAB.t = b.dataset.frtab; sfx.click(); renderFriends(); };
+    const rl = $('frReqLink'); if (rl) rl.onclick = () => { FRTAB.t = 'req'; sfx.click(); renderFriends(); };
+    for (const b of box.querySelectorAll('[data-racc]')) b.onclick = () => { acceptReq(b.dataset.racc); reqDone(); };
+    for (const b of box.querySelectorAll('[data-rno]')) b.onclick = () => { rejectReq(b.dataset.rno); sfx.click(); reqDone(); };
+    const ra = $('reqAll'); if (ra) ra.onclick = () => { let n = 0; for (const r of SOC.reqIn.slice()) if (acceptReq(r.fid, true)) n++; if (n) { sfx.win(); toast(`已通过 ${n} 个好友申请`); } reqDone(); };
+    const rn = $('reqNone'); if (rn) rn.onclick = () => { if (!confirm(`拒绝全部 ${SOC.reqIn.length} 个好友申请？`)) return; for (const r of SOC.reqIn.slice()) rejectReq(r.fid); reqDone(); };
     for (const b of box.querySelectorAll('[data-rcancel]')) b.onclick = () => { SOC.reqOut = SOC.reqOut.filter((x) => x.fid !== b.dataset.rcancel); socSave(); renderFriends(); };
     for (const b of box.querySelectorAll('[data-inv]')) b.onclick = () => inviteFriend(b.dataset.inv);
     for (const b of box.querySelectorAll('[data-ask]')) b.onclick = () => askJoin(b.dataset.ask);
@@ -1640,7 +1803,16 @@
     touchShow(true);
     document.body.classList.toggle('topcam', TOP());
     G.camF = null;
-    showVs(m.players, colors);
+    if (!m.resume) showVs(m.players, colors);
+    else { G.cd = 0; $('vsSplash').classList.add('hidden'); }
+  }
+  // 1.7.1：重连后收到整张涂料图（游程编码：值, 个数, 值, 个数…）
+  function applyGrid(rle) {
+    let i = 0;
+    for (let k = 0; k + 1 < rle.length && i < G.grid.length; k += 2) {
+      const v = rle[k] | 0, n = rle[k + 1] | 0;
+      for (let j = 0; j < n && i < G.grid.length; j++, i++) { if (G.grid[i] !== v) { G.grid[i] = v; if (v) paintCell(i, v); } }
+    }
   }
   // 开局对阵画面：两队驾驶员立绘滑入
   function showVs(players, colors) {
@@ -2531,15 +2703,20 @@
   }
 
   // ================= 主循环 =================
+  // 1.7.1：帧率上限（设置里可改，默认 60）。高刷新率显示器上不再每秒渲染 144 / 240 帧，显卡和 CPU 都轻松很多
+  //   大厅：最多 60 帧；被全屏弹窗挡住时不画大厅；背景涂鸦 30 帧、半分辨率
   function loop(now) {
     requestAnimationFrame(loop);
+    const cap = G ? fpsCap : Math.min(fpsCap || 60, 60), iv = cap ? 1000 / cap : 0;
+    if (iv && loop.drawn && now - loop.drawn < iv - 1.5) return;
+    loop.drawn = iv && loop.drawn && now - loop.drawn < iv * 2 ? loop.drawn + iv : now;   // 按固定间隔累加，平均正好是上限帧率
     if (G) {
       const dt = Math.min(0.05, (now - G.lastFrame) / 1000);
       G.lastFrame = now;
       updateGame(now, dt);
       renderGame(now, dt);
-    } else if (!$('title').classList.contains('hidden')) {
-      menuBg(now);
+    } else if (!$('title').classList.contains('hidden') && !ovOpen()) {
+      if (!loop.bgT || now - loop.bgT > 32) { menuBg(now); loop.bgT = now; }
       if (PV_OK) R3.previewFrame(now, Math.min(0.05, (now - (loop.last || now)) / 1000));
     }
     // 3D 驾驶员展示台（驾驶员详情 / 结算 MVP）：画布不在页面上时会自己跳过
@@ -2548,15 +2725,19 @@
     loop.charLast = now; loop.last = now;
   }
 
+  // 有全屏弹窗（商店、好友、通行证…）挡住大厅
+  const ovOpen = () => { if (ovOpen.t && performance.now() - ovOpen.t < 300) return ovOpen.v; ovOpen.t = performance.now(); return (ovOpen.v = !!document.querySelector('.ov:not(.hidden)')); };
   // ---------------- 主界面背景：机兵四处涂鸦 ----------------
-  const MB = { bots: [], last: 0, paint: null };
+  //   1.7.1：画布用半分辨率（背景本来就很淡），30 帧
+  const MB = { bots: [], last: 0, paint: null }, MBK = 0.5;
   function menuBg(now) {
     const bg = $('menuBg');
     const w = innerWidth, h = innerHeight;
     if (!w || !h) return;
-    if (bg.width !== w || bg.height !== h || !MB.paint) {
-      bg.width = w; bg.height = h;
-      MB.paint = document.createElement('canvas'); MB.paint.width = w; MB.paint.height = h;
+    const cw = Math.ceil(w * MBK), ch = Math.ceil(h * MBK);
+    if (bg.width !== cw || bg.height !== ch || !MB.paint) {
+      bg.width = cw; bg.height = ch;
+      MB.paint = document.createElement('canvas'); MB.paint.width = cw; MB.paint.height = ch;
       MB.bots = [];
       const cols = S.COLOR_SETS.flatMap((cs) => [cs.c[1], cs.c[2]]);
       for (let i = 0; i < 7; i++) {
@@ -2567,7 +2748,8 @@
     }
     const dt = Math.min(0.05, (now - MB.last) / 1000); MB.last = now;
     const pc = MB.paint.getContext('2d'), c = bg.getContext('2d');
-    pc.globalCompositeOperation = 'destination-out'; pc.fillStyle = 'rgba(0,0,0,0.006)'; pc.fillRect(0, 0, w, h);
+    pc.setTransform(MBK, 0, 0, MBK, 0, 0);
+    pc.globalCompositeOperation = 'destination-out'; pc.fillStyle = 'rgba(0,0,0,0.012)'; pc.fillRect(0, 0, w, h);
     pc.globalCompositeOperation = 'source-over';
     for (const b of MB.bots) {
       b.turn += (Math.random() - 0.5) * dt * 6; b.turn *= 0.97;
@@ -2592,8 +2774,10 @@
         for (let k = 0; k < 6; k++) { const aa = Math.random() * 6.28, r2 = r * (0.8 + Math.random() * 0.9); pc.beginPath(); pc.arc(sx + Math.cos(aa) * r2, sy + Math.sin(aa) * r2, 3 + Math.random() * 7, 0, 7); pc.fill(); }
       }
     }
-    c.clearRect(0, 0, w, h);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cw, ch);
     c.globalAlpha = 0.5; c.drawImage(MB.paint, 0, 0); c.globalAlpha = 1;
+    c.setTransform(MBK, 0, 0, MBK, 0, 0);
     for (const b of MB.bots) drawBot(c, b.x, b.y, b.a, b.color, b.head, b.weapon, { wheel: b.wheel, spin: b.spin, moveA: b.a, scale: 1.4, alpha: 0.85, gspin: now / 50 });
     c.fillStyle = 'rgba(15,16,23,0.35)'; c.fillRect(0, 0, w, h);
   }
@@ -4415,7 +4599,7 @@
   $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 
   // ================= 启动 =================
-  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
+  window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
   boot().then(startAccount);

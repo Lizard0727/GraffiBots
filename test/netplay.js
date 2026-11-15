@@ -2,7 +2,7 @@
 // 运行：node test/netplay.js
 'use strict';
 const S = require('../public/shared.js');
-const { createServer } = require('../server.js');
+const { createServer, hub } = require('../server.js');
 
 const PORT = 3999;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -23,7 +23,8 @@ class Bot {
     });
   }
   onMsg(m) {
-    if (m.t === 'welcome') this.id = m.id;
+    if (m.t === 'welcome') { this.id = m.id; this.token = m.token; }
+    if (m.t === 'grid') { let i = 0; for (let k = 0; k < m.g.length; k += 2) { this.grid.fill(m.g[k], i, i + m.g[k + 1]); i += m.g[k + 1]; } this.gridN = i; }
     if (m.t === 'start') { this.game = m; this.grid = new Uint8Array(S.GW * S.GH); this.M = S.buildMap(m.map); this.sync = -1; this.gq = 0; }
     if (m.t === 's') {
       this.snaps++;
@@ -58,7 +59,7 @@ class Bot {
   let ok = true;
   const check = (cond, msg) => { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) ok = false; };
   try {
-    const A = new Bot('测试A'), B = new Bot('测试B');
+    let A = new Bot('测试A'); const B = new Bot('测试B');
     await A.open(); await B.open();
     A.send({ t: 'create' });
     const j = await A.wait('joined');
@@ -117,9 +118,34 @@ class Bot {
     const qc = await B.wait('qc');
     check(qc.id === A.id && qc.k === 1, `快捷语音广播：「${S.QUICK_CHAT[qc.k]}」`);
     check(A.snaps > 150, `收到快照 ${A.snaps} 个（约 30/s）`);
-    // 离开：房主转移
+    // 1.7.1 断线重连：断开后先保留（AI 接管），用 token 接回同一局
+    const aid = A.id, tok = A.token, room0 = [...hub.rooms.values()].find((r) => r.members.has(aid));
     A.ws.close();
-    await sleep(300);
+    await sleep(400);
+    const gp = room0 && room0.game && room0.game.players.get(aid);
+    check(!!gp && gp.away === true && room0.members.has(aid), '断线后：玩家还在对局里，由 AI 暂时接管');
+    check(B.last.p.some((a) => a[0] === aid), '断线后：队友那边还能看到他');
+    const x0 = gp.x, y0 = gp.y;
+    await sleep(1500);
+    check(Math.hypot(gp.x - x0, gp.y - y0) > 5 || !gp.alive, `AI 接管时会移动（${Math.round(Math.hypot(gp.x - x0, gp.y - y0))}）`);
+    const bad = new Bot('X'); await bad.open(); bad.send({ t: 'resume', id: aid, token: 'wrong' });
+    await bad.wait('resumeFail'); check(true, '错误的 token 不能接管别人的身份'); bad.ws.close();
+    const A2 = new Bot('A'); await A2.open();
+    const pr = Promise.all([A2.wait('resumed'), A2.wait('start'), A2.wait('grid'), A2.wait('lobby')]);
+    A2.send({ t: 'resume', id: aid, token: tok });
+    const [rs, st2] = await pr;
+    check(rs.game && A2.id === aid && st2.resume === true, `重连成功：接回身份 ${A2.id}、回到对局`);
+    check(A2.gridN === S.GW * S.GH, `重连后收到整张涂料图（${A2.gridN} 格）`);
+    let same = 0; await sleep(100); for (let i = 0; i < A2.grid.length; i++) if (A2.grid[i] === B.grid[i]) same++;
+    check(same / A2.grid.length > 0.97, `涂料图和队友一致（${(same / A2.grid.length * 100).toFixed(1)}%）`);
+    check(gp.away === false, '重连后 AI 交还控制权');
+    await A2.drive(400, 1, 0, false, 0);
+    check(A2.snaps > 5 && A2.last.p.some((a) => a[0] === aid), `重连后继续收到快照（${A2.snaps}）`);
+    A = A2;
+    // 离开：房主转移（缩短保留时间）
+    hub.grace = { game: 300, lobby: 300 };
+    A.ws.close();
+    await sleep(900);
     check(B.room.hostId === B.id, '房主离开后，房主自动转给 B');
     B.ws.close();
   } catch (e) {

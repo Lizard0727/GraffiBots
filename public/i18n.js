@@ -28,6 +28,8 @@
     [/^「(.+)」每队 (\d+) 人：队伍里多出来的人会分到别的队$/g, (m, t, n) => `${tr(t)} has ${n} per team: extra party members go to other teams`],
     [/^(.+) 还没凑齐 3 位驾驶员和 3 台机体，不能组队排位$/g, "$1 doesn't have 3 pilots and 3 mechs yet, so the party can't play Ranked"],
     [/^(.+) 正在对局中$/g, '$1 is in a match'], [/^(.+) 的队伍已满$/g, "$1's party is full"], [/^(.+) 拒绝了邀请$/g, '$1 declined the invite'],
+    [/^已通过「(.+)」的好友申请$/g, "Accepted $1's friend request"], [/^已通过 (\d+) 个好友申请$/g, 'Accepted $1 friend requests'],
+    [/^拒绝全部 (\d+) 个好友申请？$/g, 'Decline all $1 friend requests?'], [/^好友申请 · 还有 (\d+) 个$/g, 'Friend request · $1 more'], [/^(\d+) 个$/g, '$1'],
     [/^好友码：(.+)$/g, 'Friend code: $1'], [/^删除好友「(.+)」？$/g, 'Remove friend $1?'], [/^队伍最多 (\d+) 人$/g, 'Parties can have up to $1 players'],
     [/^(\d+) 件物资 · 点击进入$/g, '$1 items · tap to open'],
     [/^你排第 (\d+) 名$/g, "You're #$1"],

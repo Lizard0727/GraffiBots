@@ -174,13 +174,15 @@ function lanAddresses() {
 // =====================================================================
 class WSConn {
   constructor(socket) {
-    this.socket = socket; this.buf = Buffer.alloc(0); this.open = true; this.frag = null;
+    this.socket = socket; this.buf = Buffer.alloc(0); this.open = true; this.frag = null; this.lastRecv = Date.now();
+    WSConn.all.add(this);
     this.onmessage = null; this.onclose = null;
     socket.on('data', (d) => this.onData(d));
     socket.on('close', () => this.close());
     socket.on('error', () => this.close());
   }
   onData(d) {
+    this.lastRecv = Date.now();
     this.buf = this.buf.length ? Buffer.concat([this.buf, d]) : d;
     while (this.open) {
       if (this.buf.length < 2) return;
@@ -229,10 +231,19 @@ class WSConn {
   close() {
     if (!this.open) return;
     this.open = false;
+    WSConn.all.delete(this);
     try { this.socket.destroy(); } catch (e) { /* ignore */ }
     if (this.onclose) this.onclose();
   }
 }
+
+// 1.7.1 心跳：客户端每 2 秒 ping 一次；40 秒什么都没收到就当断线（手机切后台、网络掉了的半开连接）
+WSConn.all = new Set();
+WSConn.TIMEOUT = 40000;
+setInterval(() => {
+  const now = Date.now();
+  for (const c of [...WSConn.all]) if (now - c.lastRecv > WSConn.TIMEOUT) c.close();
+}, 5000).unref();
 
 // =====================================================================
 // HTTP + WebSocket 服务器
@@ -268,7 +279,7 @@ function createServer() {
     const conn = new WSConn(socket);
     const c = hub.connect(conn);
     conn.onmessage = (txt) => { let m; try { m = JSON.parse(txt); } catch (e) { return; } hub.message(c, m); };
-    conn.onclose = () => hub.disconnect(c);
+    conn.onclose = () => hub.disconnect(c, conn);
   });
   return server;
 }

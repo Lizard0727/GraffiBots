@@ -278,6 +278,7 @@ class Game {
       humans.push(pw);
       const pl = this.addPlayer(c.id, c.name, team, c.weapon, c.head, false, slots[team]++, c.pilot, pw);
       pl.looks = c.looks || null;
+      if (c.conn && c.conn.held) pl.away = true;   // 1.7.1：断线中的队员开局就由 AI 接管
       if (this.loot && this.risk === 'high' && c.power && Array.isArray(c.power.gear)) this.applyGear(pl, c.power.gear);
     }
     const avgLv = humans.length ? Math.round(humans.reduce((a, b) => a + b.lv, 0) / humans.length) : 1;
@@ -330,12 +331,7 @@ class Game {
       for (let y = S.ZONE.y0; y < S.ZONE.y1; y++)
         for (let x = S.ZONE.x0; x < S.ZONE.x1; x++) if (!this.M.solid[y * S.GW + x]) this.zoneCells.push(y * S.GW + x);
     }
-    room.broadcast({
-      t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
-      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null, npc: p.npc ? 1 : 0 })),
-      fair: this.fair, teams: this.teams, risk: this.loot ? this.risk : undefined, squad: this.squad,
-      loot: this.loot ? this.lootList() : undefined,
-    });
+    room.broadcast(this.startMsg());
     // 1.6：按真实时间补帧——浏览器里画面卡的时候模拟也不会变慢（最多一次补 4 帧）
     if (!opts.manual) {
       const ms = 1000 / S.TICK;
@@ -411,6 +407,28 @@ class Game {
     this.players.delete(id);
   }
   humanCount() { let n = 0; for (const p of this.players.values()) if (!p.bot) n++; return n; }
+  startMsg() {
+    return {
+      t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null, npc: p.npc ? 1 : 0 })),
+      fair: this.fair, teams: this.teams, risk: this.loot ? this.risk : undefined, squad: this.squad,
+      loot: this.loot ? this.lootList() : undefined,
+    };
+  }
+  // 1.7.1：断线重连——把整张涂料图（游程编码）发给重新连上的玩家
+  gridMsg() {
+    const g = this.grid, rle = [];
+    for (let i = 0; i < g.length;) { const v = g[i]; let n = 1; while (i + n < g.length && g[i + n] === v) n++; rle.push(v, n); i += n; }
+    return { t: 'grid', g: rle };
+  }
+  // 断线期间由 AI 暂时接管（不会站着挨打），重连后交还
+  setAway(id, on) {
+    const p = this.players.get(id);
+    if (!p || p.bot) return;
+    p.away = !!on; p.ai = null;
+    const inp = p.input; inp.mx = 0; inp.my = 0; inp.f = false; inp.w = false;
+    if (!on) { p.sync++; this.sendBag(p); }
+  }
   ev(e) { this.events.push(e); }
   top(x, y) { return S.topAt(this.M, x, y); }
 
@@ -423,7 +441,7 @@ class Game {
       this.countdown -= dt;
     } else if (!this.over) {
       this.time += dt; if (!this.tutorial) this.timeLeft -= dt;
-      for (const p of this.players.values()) if (p.bot) botThink(this, p, dt);
+      for (const p of this.players.values()) if (p.bot || p.away) botThink(this, p, dt);
       for (const p of this.players.values()) this.updatePlayer(p, dt);
       this.updateProjs(dt);
       this.updateBombs(dt);
@@ -440,7 +458,7 @@ class Game {
 
   input(id, m) {
     const p = this.players.get(id);
-    if (!p || p.bot) return;
+    if (!p || p.bot || p.away) return;
     const inp = p.input;
     inp.mx = clamp(+m.mx || 0, -1, 1); inp.my = clamp(+m.my || 0, -1, 1);
     if (Number.isFinite(m.a)) inp.a = m.a;
@@ -514,7 +532,7 @@ class Game {
     p.sm = sm;
     const wheel = !!inp.w && !p.foot && !(spAct && p.spKind === 'beam');
     p.wheel = wheel;
-    if (p.bot) { S.stepMove(p, inp, dt, this.grid, this.M, S.moveMul(p.weapon, p.firing && !wheel, spAct ? p.spKind : null)); inp.j = false; }
+    if (p.bot || p.away) { S.stepMove(p, inp, dt, this.grid, this.M, S.moveMul(p.weapon, p.firing && !wheel, spAct ? p.spKind : null)); inp.j = false; }
 
     // 敌方涂料持续掉血；脱战 3 秒后快速回血（大厨更快）
     const maxHp = this.maxHpOf(p);
@@ -2577,19 +2595,81 @@ function handle(hub, c, m) {
 // Hub：一个"服务器"（Node 服务器、或房主浏览器里的内置服务器）
 // conn 需要实现 send(obj) / sendRaw(str) / congested
 // =====================================================================
+// 1.7.1 断线重连：连接断开时先不移出房间——对局中保留 60 秒（AI 暂时接管），大厅 / 组队保留 20 秒；
+//   客户端用 welcome 里的 token 发 resume，就接回原来的身份、房间和对局（重发开局信息 + 整张涂料图 + 断线期间错过的结算）
+const KEEP_WHILE_AWAY = ['end', 'over', 'profile', 'soc', 'left'];
+function holdConn() {
+  const buf = [];
+  const keep = (t) => KEEP_WHILE_AWAY.includes(t) && buf.length < 40;
+  return {
+    open: false, congested: true, held: true, buf,
+    send(o) { if (o && keep(o.t)) buf.push(JSON.stringify(o)); },
+    sendRaw(s) { const t = /^\{"t":"(\w+)"/.exec(s); if (t && keep(t[1])) buf.push(s); },
+  };
+}
+function newToken() {
+  const A = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let s = '';
+  for (let i = 0; i < 20; i++) s += A[randInt(A.length)];
+  return s;
+}
 class Hub {
-  constructor() { this.clients = new Map(); this.rooms = new Map(); this.fids = new Map(); this.nextId = 1; }
+  constructor() { this.clients = new Map(); this.rooms = new Map(); this.fids = new Map(); this.nextId = 1; this.grace = { game: 60000, lobby: 20000 }; }
   connect(conn) {
-    const c = { id: this.nextId++, conn, name: '机兵', weapon: 'blaster', head: 'antenna', pilot: 'blaze', level: 1, room: null, team: 1 };
+    const c = { id: this.nextId++, conn, token: newToken(), name: '机兵', weapon: 'blaster', head: 'antenna', pilot: 'blaze', level: 1, room: null, team: 1 };
     this.clients.set(c.id, c);
-    conn.send({ t: 'welcome', id: c.id });
+    conn.send({ t: 'welcome', id: c.id, token: c.token });
     return c;
   }
-  message(c, m) { if (this.clients.has(c.id)) handle(this, c, m); }
-  disconnect(c) {
+  message(c, m) {
+    if (c.alias) c = c.alias;   // 这条连接已经接回了旧身份
+    if (!this.clients.has(c.id) || c.conn.held) return;
+    if (m && m.t === 'resume') return this.resume(c, m);
+    handle(this, c, m);
+  }
+  // conn：是哪条连接断开了（旧连接晚到的断开事件直接忽略）
+  disconnect(c, conn) {
+    if (c.alias) { const o = c.alias; if (!conn || o.conn === conn) this.disconnect(o, conn || o.conn); return; }
+    if (conn && c.conn !== conn) return;
+    if (!this.clients.has(c.id) || c.conn.held) return;
+    const r = c.room, inGame = !!(r && r.game && r.game.players.has(c.id) && !r.game.over);
+    const ms = r && !r.manual && this.grace ? (inGame ? this.grace.game : this.grace.lobby) : 0;
+    if (ms > 0) {
+      c.conn = holdConn();
+      if (inGame) r.game.setAway(c.id, true);
+      clearTimeout(c.graceT);
+      c.graceT = setTimeout(() => this.drop(c), ms);
+      if (c.graceT && c.graceT.unref) c.graceT.unref();
+      return;
+    }
+    this.drop(c);
+  }
+  drop(c) {
+    clearTimeout(c.graceT);
     if (!this.clients.delete(c.id)) return;
     if (c.fid && this.fids.get(c.fid)) { this.fids.get(c.fid).delete(c); if (!this.fids.get(c.fid).size) this.fids.delete(c.fid); }
     if (c.room) c.room.remove(c);
+  }
+  // nc：新连接上的临时身份；m：{ id, token }
+  resume(nc, m) {
+    const c = this.clients.get(m.id | 0);
+    if (!c || c === nc || typeof m.token !== 'string' || c.token !== m.token || c.alias) { nc.conn.send({ t: 'resumeFail' }); return; }
+    const old = c.conn, missed = old.held ? old.buf : [];
+    if (!old.held) { old.open = false; try { if (old.close) old.close(); } catch (e) { /* ignore */ } }   // 旧连接其实还挂着（半开连接）
+    clearTimeout(c.graceT);
+    c.conn = nc.conn;
+    this.clients.delete(nc.id);
+    nc.alias = c;
+    const r = c.room, g = r && r.game;
+    c.conn.send({ t: 'welcome', id: c.id, token: c.token });
+    c.conn.send({ t: 'resumed', room: r ? r.code : null, game: !!(g && g.players.has(c.id)) });
+    if (g && g.players.has(c.id) && !g.over) {
+      c.conn.send(Object.assign(g.startMsg(), { resume: true }));
+      c.conn.send(g.gridMsg());
+      g.setAway(c.id, false);
+    }
+    for (const s of missed) c.conn.sendRaw(s);
+    if (r) c.conn.send({ t: 'lobby', room: r.lobbyInfo() });
   }
 }
 

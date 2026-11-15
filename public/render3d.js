@@ -2463,7 +2463,7 @@
   }
   function pvResize() {
     const w = PV.host.clientWidth || 200, h = PV.host.clientHeight || 200;
-    PV.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    PV.r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));   // 1.7.1：2 倍分辨率 + 抗锯齿太吃显卡
     PV.r.setSize(w, h, false);
     PV.cam.aspect = w / Math.max(1, h); PV.cam.updateProjectionMatrix();
     const d = PV.big ? 132 : 104;
@@ -2564,7 +2564,7 @@
     CP.ch.act = { name: 'show', t: 0 };   // 选中驾驶员：播一整套展示动作
   }
   function cpSize(w, h) {
-    CP.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); CP.r.setSize(w, h, false);
+    CP.r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); CP.r.setSize(w, h, false);
     CP.cam.aspect = w / Math.max(1, h); CP.cam.updateProjectionMatrix();
     const far = h > w * 1.15 ? 88 : 98;   // 留出跳跃和帽子的空间
     CP.cam.position.set(far * 0.8, 23, far * 0.6); CP.cam.lookAt(0, 16.5, 0);
@@ -2661,7 +2661,7 @@
   }
   function tsSize() {
     const w = TS.host.clientWidth || 600, h = TS.host.clientHeight || 300;
-    TS.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); TS.r.setSize(w, h, false);
+    TS.r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); TS.r.setSize(w, h, false);
     TS.cam.aspect = w / Math.max(1, h); TS.cam.updateProjectionMatrix();
     // 让整排人都在画面里：宽度不够时拉远镜头
     const span = (TS.n >= 4 ? 120 : TS.n === 3 ? 100 : TS.n === 2 ? 70 : 46);

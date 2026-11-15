@@ -1,24 +1,20 @@
 {
-  "version": "1.7",
+  "version": "1.7.1",
   "date": "2026-11-15",
-  "title": "1.7 更新 · 开黑",
-  "en_title": "Update 1.7 · Squad Up",
+  "title": "1.7.1 更新 · 断线重连 & 好友申请",
+  "en_title": "Update 1.7.1 · Reconnect & Friend Requests",
   "page": "#updates",
   "force": true,
   "notes": [
-    "好友系统",
-    "组队开黑",
-    "所有模式都能组队",
-    "单排",
-    "AI 对手调整",
-    "更新奖励"
+    "好友申请",
+    "声音卡顿 / 电脑变卡",
+    "断线重连",
+    "连接更稳定"
   ],
   "en_notes": [
-    "Friends",
-    "Party play",
-    "Parties in every mode",
-    "Solo play",
-    "AI opponent changes",
-    "Update rewards"
+    "Friend requests",
+    "Audio stutter / slow computer",
+    "Reconnect",
+    "More stable connections"
   ]
 }

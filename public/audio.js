@@ -1,7 +1,8 @@
 // 涂鸦机兵 GraffiBots — 原创音乐与音效（全部由 WebAudio 实时合成，无外部音频文件）
 (function () {
   'use strict';
-  const AC = window.AudioContext ? new window.AudioContext() : null;
+  // 1.7.1：latencyHint 'balanced'——音频缓冲大一点，电脑忙（加载、开局建场景）时不会因为来不及出声而一卡一卡
+  const AC = (() => { if (!window.AudioContext) return null; try { return new window.AudioContext({ latencyHint: 'balanced' }); } catch (e) { return new window.AudioContext(); } })();
   const load = () => { try { return JSON.parse(localStorage.getItem('gb_audio')) || {}; } catch (e) { return {}; } };
   const cfg = Object.assign({ music: 0.55, sfx: 0.8, muted: false }, load());
   const save = () => { try { localStorage.setItem('gb_audio', JSON.stringify(cfg)); } catch (e) { /* ignore */ } };
@@ -270,16 +271,18 @@
     if (s === 0) pad(out, ch.pad, t, spb * 16, T.padVol);
     if (T.arp && s % 2 === 1) pluck(out, c.send, ch.pad[(step >> 1) % 3] + 12, t, T.arpVol);
   }
+  // 1.7.1：提前排 1.2 秒的音符（以前只排 0.15 秒）——主线程被加载 / 建 3D 场景卡住时，音乐照样连续播放
+  const AHEAD = 1.2;
   setInterval(() => {
     if (!cur || AC.state !== 'running') return;
     const spb = 60 / cur.T.bpm / 4;
     if (cur.next < AC.currentTime - 0.2) cur.next = AC.currentTime + 0.05;
-    while (cur.next < AC.currentTime + 0.15) {
+    while (cur.next < AC.currentTime + AHEAD) {
       const swing = cur.step % 2 ? cur.T.swing * spb : 0;
       scheduleStep(cur, cur.step, cur.next + swing);
       cur.step++; cur.next += spb;
     }
-  }, 25);
+  }, 90);
 
   // ---------- 音效 ----------
   function tone(freq, dur, type = 'square', vol = 0.05, slide = 0, when = 0) {

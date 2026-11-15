@@ -1133,9 +1133,48 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.7';
+  S.VERSION = '1.7.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '1.7.1', date: '2026-11-15', title: '1.7.1 更新 · 断线重连 & 好友申请', en_title: 'Update 1.7.1 · Reconnect & Friend Requests', sections: [
+      ['好友申请', [
+        '好友页新增「好友申请」分页：每个申请显示头像、名字、奖杯、段位、好友码和申请时间，可以一个个「通过」或「拒绝」，也可以「全部通过」/「全部拒绝」',
+        '收到好友申请时会弹出提示，可以直接点「通过」，也可以点「查看」去申请页；有待处理的申请时，打开好友页会直接进入申请页',
+        '拒绝后对方那边的「等待通过」会消失；你发出的申请也在申请页里，显示对方是否在线']],
+      ['声音卡顿 / 电脑变卡', [
+        '修复打开游戏时音乐一卡一卡：音乐会提前准备好 1.2 秒（以前只有 0.15 秒），加载和进入对局时电脑再忙也不会断断续续；音频缓冲也加大了',
+        '新增「帧率上限」设置（30 / 60 / 120 / 不限制，默认 60）：高刷新率显示器上不会再每秒渲染 144 帧以上，显卡和 CPU 占用大幅降低',
+        '大厅最多 60 帧；背景涂鸦动画改成 30 帧、半分辨率；打开商店、好友、通行证等全屏页面时，后面的大厅不再继续渲染',
+        '展示台 3D 模型的渲染分辨率上限从 2 倍降到 1.5 倍']],
+      ['断线重连', [
+        '网络断开时不会再直接退回大厅：画面停在对局里，显示「网络断开，正在重连…」，网络一恢复就自动接回原来的对局',
+        '对局中断线会为你保留 60 秒，期间由 AI 暂时帮你操作（不会站着被打）；大厅和组队中断线保留 20 秒，回来时还在原来的队伍里',
+        '重连后会重新同步整张地图的涂料、背包和比分；如果对局在断线期间打完了，重连后照样能看到结算、拿到奖励',
+        '下载版 / 官网的 P2P 联机：和房主断开后会在 45 秒内自动重试，不会马上退回单机']],
+      ['连接更稳定', [
+        '新增心跳检测：8 秒收不到任何数据就判定连接已断，马上重连（以前手机切后台、Wi-Fi 换 4G 时可能会卡住很久）',
+        '重连间隔从固定 2 秒改成逐步增加（0.3 秒起）；网络恢复、切回游戏页面时立刻重连',
+        'P2P 房主和联机服务器断开后会一直自动重试，朋友仍然能用房间码找到你']],
+    ], en: [
+      ['Friend requests', [
+        'New Requests tab on the Friends screen: each request shows the avatar, name, trophies, rank, friend code and when it was sent. Accept or decline them one by one, or use Accept all / Decline all',
+        'A pop-up appears when someone sends you a request: accept it right there or tap View to open the Requests tab. If you have pending requests, the Friends screen opens on that tab',
+        'Declining removes the request from the sender\'s pending list. Your own sent requests are listed in the Requests tab too, with whether the other player is online']],
+      ['Audio stutter / slow computer', [
+        'Fixed choppy music when the game starts: music is now queued 1.2 seconds ahead (it was 0.15 s), so it keeps playing smoothly while the game loads or builds a match, and the audio buffer is larger',
+        'New Frame rate cap setting (30 / 60 / 120 / Unlimited, default 60): high-refresh monitors no longer render 144+ frames a second, which greatly cuts GPU and CPU use',
+        'The lobby runs at up to 60 fps, the graffiti background animates at 30 fps and half resolution, and the lobby stops rendering behind full-screen pages such as the Shop, Friends or Pass',
+        'The 3D showroom now renders at up to 1.5× resolution instead of 2×']],
+      ['Reconnect', [
+        'Losing your connection no longer throws you back to the lobby. You stay in the match with a "Connection lost, reconnecting…" notice and rejoin the same match as soon as the network is back',
+        'In a match your spot is held for 60 seconds and an AI plays for you meanwhile, so you are not a sitting duck. In the lobby or a party it is held for 20 seconds and you come back to the same party',
+        'After reconnecting, the whole paint map, your bag and the score are re-synced. If the match ended while you were away, you still see the results and get your rewards',
+        'Download / website P2P games: if you lose the host, the game keeps retrying for 45 seconds instead of dropping you to offline mode right away']],
+      ['More stable connections', [
+        'New heartbeat check: if no data arrives for 8 seconds the connection is treated as lost and reconnects right away (before, switching apps on a phone or moving from Wi-Fi to mobile data could leave you stuck for a long time)',
+        'Reconnect attempts now start after 0.3 s and back off gradually instead of a fixed 2 s, and they fire immediately when the network comes back or you return to the game',
+        'A P2P host that loses the signalling server keeps retrying, so friends can still find you by room code']],
+    ] },
     { v: '1.7', date: '2026-11-15', title: '1.7 更新 · 开黑', en_title: 'Update 1.7 · Squad Up', sections: [
       ['好友系统', [
         '大厅右上角新增「好友」：每个人都有一个 6 位好友码，把它发给朋友，对方输入后发出好友申请，同意后就成为好友',
