@@ -183,6 +183,17 @@
 - **只保留俯视视角**：第三人称视角下线（狙击、迫击等机体在第三人称下优势过大）。
 - **平衡调整**：用 `node tools/balance.js [局数]` 让 AI 随机搭配打几百局，统计每个驾驶员 / 机体的胜率和 K/D，再按数据调整（具体数值见游戏内公告）。机体胜率差距从 34%–62% 缩小到大致 39%–60%，同时改进了近战机体的 AI。
 
+## 2.0 更新 · 机兵个性
+
+- **Windows 启动器**（仓库根目录 `涂鸦机兵.bat`，CRLF）：找 Edge / Chrome，用 `--app` 独立窗口 + 独立用户目录 + 显卡加速 / 后台不降速参数打开游戏；有 `server.js` 和 Node.js 时先开本地服务器（端口 3000），窗口关掉后顺便关服务器；否则打开同目录的 `GraffiBots.html` / `涂鸦机兵-单文件版.html`。CI 另外打一个 `GraffiBots-Windows.zip`（bat + 单文件版），官网下载区新增「Windows 版」。
+- **机体个性**：`S.TRAITS`（每台机体的攻击特性，机体页面显示），数值在 `S.WEAPONS`（`finale` / `spinup` / `pierce` / `close` / `sticky` / `combo + comboKind` / `burn` / `stagger` / `reveal`），实现在 `core.js` 的 `stepBurst` / `fireCharger` / `updateProjs` / `punch` / `sideFx` / `updateShells`。新事件 `fin` / `upper` / `prc`，`bx` 第 7 位 = 4 是黏稠墨水；`buffs` 新增 512 着火、1024 束缚。
+- **声音**：`audio.js` 的 `FIRE` / `HIT` / `SUPER` / `SKILL` 配方，`AU.mechFire(id, vol)`（别人的开火按距离 `mechVol` 调音量）、`AU.mechHit`、`AU.superSfx`、`AU.skillSfx`。
+- **画面**：`client.js` 的 `FEEL` 表（`mz` 枪口 / `tr` 弹道 / `imp` 命中 / `kick` 后坐 / `sw` 近战样式）、`muzzleFx` / `trailFx` / `impactFx` / `swingFx`；近战命中扇形是 `G.fx` 的 `arc`，敌方近战攻击距离是每帧算的 `G.reach`（`render3d.js` 用 `W.wedgeOf(arc)` 缓存扇形几何体，注意它不在 `W.pools` 里）。
+- **修复**：1.9 的倒计时改动把 `this.tick = 0; this.over = false;` 写进了注释，tick 一直是 NaN → 记分板 `sb`、物资 `lt` 不再同步、快照时间戳是 null（插值失效）。`test/mechanics.js` 加了回归测试。
+- **自适应画质**：`client.js` 的 `autoQuality` 每秒统计帧率，`R3.setDyn(scale, pk)` 调渲染分辨率和粒子倍率（设置项 `autoQ`）。
+- 表现评分 `S.perfScore`：涂地 ×0.2、助攻 60。大招横幅（`.cutin`）改到右上角斜放。
+- 测试：新增 `test/traits.js`。调试：`{t:'dbgSp'}` 大招充满。
+
 ## 1.9.1 更新 · 简易领域 & 战力平衡
 
 - **符零超载「简易领域」**（`S.OVERLOADS.fu.domain`）：`activateOverload` 生成跟着符零走的 `domain` 召唤物（半径 170）。`updateProjs` 里飞进敌方领域的子弹被挡下（`blk` 事件），`domainBlocks` 中和落进领域的炮弹 / 导弹；`updateHelpers` 对闯入的敌人自动反击（每人 0.7 秒一次，`dmn` 事件）。3D 画面是 `render3d.js` 的 `P.domain<队伍>`。

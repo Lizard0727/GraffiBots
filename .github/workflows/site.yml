@@ -37,6 +37,11 @@ jobs:
           git ls-files -z | xargs -0 -I{} cp --parents {} _zip/GraffiBots/
           cp dist/涂鸦机兵-单文件版.html _zip/GraffiBots/
           (cd _zip && zip -qr ../dist/GraffiBots.zip GraffiBots)
+          # 2.0：Windows 版——启动器 bat + 单文件版（用 Edge / Chrome 应用窗口打开，更流畅）
+          mkdir -p _win/GraffiBots
+          cp 涂鸦机兵.bat _win/GraffiBots/
+          cp dist/涂鸦机兵-单文件版.html _win/GraffiBots/GraffiBots.html
+          (cd _win && zip -qr ../dist/GraffiBots-Windows.zip GraffiBots)
 
       # 安卓 APK 打包失败也不影响官网发布（官网上会显示「暂未提供」）
       - uses: actions/setup-java@v4

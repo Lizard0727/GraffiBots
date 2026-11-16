@@ -66,5 +66,16 @@ for (const sk of Object.keys(S.SKILLS)) ok(count['skill:' + sk] > 0, `技能「$
   ok(!a.alive && a.respawnT > 0, '驾驶员也被击倒后才算倒下，回基地复活');
 }
 
+// 2.0 回归：对局的 tick 计数器必须是数字（1.9 曾因注释吞掉初始化变成 NaN，导致记分板 / 物资同步全部失效）
+{
+  const room = new Room('TICK', null, { manual: true });
+  room.settings = { mode: 'turf', map: 0, duration: 120, teamSize: 2, bots: true };
+  const g = new Game(room, { manual: true });
+  ok(g.tick === 0 && g.over === false, `开局 tick = ${g.tick}，over = ${g.over}`);
+  room.manual = false; let sb = 0; room.members.set(99, { conn: { congested: false, sendRaw(s) { if (s.includes('"sb"')) sb++; } } });
+  for (let i = 0; i < 45; i++) g.step();
+  ok(Number.isFinite(g.tick) && sb >= 3, `记分板数据每 15 tick 同步一次（45 tick 收到 ${sb} 次）`);
+}
+
 console.log(failed ? `\n${failed} 项失败` : '\n玩法机制测试全部通过');
 process.exit(failed ? 1 : 0);

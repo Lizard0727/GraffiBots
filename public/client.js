@@ -219,7 +219,7 @@
       <div class="set-row"><span>鼠标灵敏度</span><input type="range" min="20" max="300" data-set="sens" value="${Math.round(sens * 100)}"><output>${Math.round(sens * 100)}</output></div>
       <label class="set-row toggle"><span>屏幕震动</span><input type="checkbox" data-set="shake" ${shakeOn ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>瞄准辅助（鼠标附近的敌人会把准星吸过去一点）</span><input type="checkbox" data-set="aimAssist" ${store.get('aimAssist', true) ? 'checked' : ''}></label>
-      <label class="set-row toggle"><span>帧率太低时自动切换流畅画质</span><input type="checkbox" data-set="autoQ" ${store.get('autoQ', true) ? 'checked' : ''}></label>
+      <label class="set-row toggle"><span>自动调节画质（卡顿时降低分辨率和特效，保持流畅）</span><input type="checkbox" data-set="autoQ" ${store.get('autoQ', true) ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>显示帧率</span><input type="checkbox" data-set="showFps" ${store.get('showFps', false) ? 'checked' : ''}></label>
       <label class="set-row"><span>帧率上限（电脑发热 / 卡顿时调低）</span><select data-set="fpsCap">${[[30, '30'], [60, '60'], [120, '120'], [0, '不限制']].map(([v, n]) => `<option value="${v}" ${fpsCap === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
       <label class="set-row toggle"><span>显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）</span><input type="checkbox" data-set="chat" ${store.get('chat', true) ? 'checked' : ''}></label>
@@ -855,6 +855,7 @@
     if (HERO.tab === 'stat') {
       const perAtk = { burst: W.shots * W.dmg, fan: W.pellets * W.dmg, flick: W.pellets * W.dmg + W.rollDmg, charge: W.dmg, lob: W.dmg, punch: W.dmg }[W.attack];
       body = `<div class="hp-story"><p>${W.desc}</p></div>
+        ${S.TRAITS[id] ? `<div class="abil trait"><b>${ic('passive')}攻击特性 · ${S.TRAITS[id].name}</b><p>${S.TRAITS[id].desc}</p></div>` : ''}
         <div class="kv"><div><small>生命</small><b>${W.hp}</b></div><div><small>每次攻击伤害</small><b>${Math.round(perAtk)}</b></div><div><small>射程</small><b>${S.weaponRange(id)}</b></div>
         <div><small>移动速度</small><b>${Math.round(W.spd * 100)}%</b></div><div><small>弹药装填</small><b>${W.reload} 秒</b></div><div><small>攻击间隔</small><b>${W.atkCd} 秒</b></div></div>
         <p class="hp-note">数值为 1 级；驾驶员每升 1 级，生命和伤害 +4%。</p>`;
@@ -2015,7 +2016,9 @@
   const SND_FEEL = { gold: { kick: 0.4, col: '#ffd23f' }, flag: { kick: 1.1, col: '#ff3b30' }, martyr: { kick: 1.3, col: '#ffd35e' }, ice: { kick: 0, col: '#bff6ff' }, yato: { kick: 0.2, col: '#f4e6c8' }, wraith: { kick: 0.9, col: '#ff2d4b' } };
   function myShotFx(e) {
     const me = G.players.get(myId), sk = G.mySk || (me && (G.mySk = skinInfo(me)));
-    if (!sk || !sk.snd) return sfx.shoot();
+    const w = wOf(me), MF = w && FEEL[w];
+    if (MF && MF.kick) G.shake = Math.max(G.shake || 0, MF.kick);   // 2.0：每台机体的后坐力不一样
+    if (!sk || !sk.snd) return w ? AU.mechFire(w, 1) : sfx.shoot();
     sfx.skinShoot(sk.snd);
     const F = SND_FEEL[sk.snd]; if (!F) return;
     if (F.kick) G.shake = Math.max(G.shake || 0, F.kick);
@@ -2101,7 +2104,7 @@
           const tx = e[1] === myId && G.me ? G.me.px : t.x, ty = e[1] === myId && G.me ? G.me.py : t.y, tz = (e[1] === myId && G.me ? G.me.pz : t.z) || 0;
           R3.emit(tx, ty, tz + 18, e[3] ? '#bef6ff' : '#ffffff', e[4] > 30 ? 8 : 4, 200, 0.8, { sys: 'pg', size: 8, life: 0.2, grav: 0, drag: 5 });
         }
-        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; G.hitPulse = 1; sfx.hit(); const msk = G.mySk; if (msk && msk.snd) { sfx.skinHit(msk.snd); const tp = G.players.get(e[1]); if (tp) R3.emit(tp.x, tp.y, (tp.z || 0) + 20, (THEME_COL[msk.bg] || [msk.col])[0], 6, 160, 1, { sys: 'pg', size: 8, life: 0.35, grav: 0, drag: 3 }); } else sfx.hitConfirm(); if (e[4] > 40) G.shake = Math.max(G.shake, 3); else if (e[4] > 15) G.shake = Math.max(G.shake, 1.2); }
+        if (e[2] === myId && e[1] !== myId && !silent) { G.hitMark = 0.18; G.hitPulse = 1; sfx.hit(); const msk = G.mySk; if (msk && msk.snd) { sfx.skinHit(msk.snd); const tp = G.players.get(e[1]); if (tp) R3.emit(tp.x, tp.y, (tp.z || 0) + 20, (THEME_COL[msk.bg] || [msk.col])[0], 6, 160, 1, { sys: 'pg', size: 8, life: 0.35, grav: 0, drag: 3 }); } else { const mw = wOf(G.players.get(myId)); if (mw) AU.mechHit(mw); else sfx.hitConfirm(); } if (e[4] > 40) G.shake = Math.max(G.shake, 3); else if (e[4] > 15) G.shake = Math.max(G.shake, 1.2); }
         // 伤害数字：只显示和自己有关的
         if (t && e[4] > 0 && !silent && (e[2] === myId || e[1] === myId)) G.dmgTexts.push({ id: e[1], dx: (Math.random() - 0.5) * 24, text: String(e[4]), color: e[1] === myId ? '#ff5a6a' : '#fff', t: now });
         break;
@@ -2141,14 +2144,19 @@
         if (e[2] === 'smoke') R3.burst(e[3], e[4], (e[5] || 0) + 10, '#2a1f3a', 40, 160);
         skillFx(p, e[2], e[3], e[4], e[5] || 0);
         if (silent) break;
-        if (e[1] === myId) { cutinSide(p, sk.name, '技能'); sfx.special(); G.camPunch = Math.max(G.camPunch || 0, 0.4); }
+        if (e[1] === myId) { cutinSide(p, sk.name, '技能'); AU.skillSfx(e[2]); G.camPunch = Math.max(G.camPunch || 0, 0.4); }
         else if (G.me && p.team === G.me.team && e[2] === 'scan') announce('全队可以看见所有敌人了！', P.accent);
-        else if (nearMe(e[3], e[4], 400)) sfx.pick();
+        else if (nearMe(e[3], e[4], 400)) AU.skillSfx(e[2]);
         break;
       }
-      case 'lb': G.shells.set(e[1], { x0: e[2], y0: e[3], z0: e[4], x1: e[5], y1: e[6], z1: e[7], T: e[8], team: e[9], t0: now, r: 54 }); if (!silent && nearMe(e[2], e[3], 500)) sfx.throw(); break;
+      case 'lb': G.shells.set(e[1], { x0: e[2], y0: e[3], z0: e[4], x1: e[5], y1: e[6], z1: e[7], T: e[8], team: e[9], t0: now, r: 54 }); if (!silent) { const th = [...G.players.values()].find((q) => q.team === e[9] && Math.hypot(q.x - e[2], q.y - e[3]) < 40), w = wOf(th); if (w && (S.WEAPONS[w].attack === 'lob')) { const v = th.id === myId ? 1 : mechVol(e[2], e[3]); if (v > 0) AU.mechFire(w, v); if (th.id === myId) G.shake = Math.max(G.shake, FEEL[w].kick); } else if (nearMe(e[2], e[3], 500)) sfx.throw(); } break;
       case 'pu': {
         const p = G.players.get(e[1]);
+        if (p && !e[4] && wOf(p) && S.WEAPONS[p.weapon].attack === 'punch') {   // 2.0：机体近战——画出真实的命中扇形 + 各自的挥击样式和声音
+          swingFx(p, e[2], S.WEAPONS[p.weapon], false);
+          if (!silent) { if (e[1] === myId) { AU.mechFire(p.weapon, 1); G.shake = Math.max(G.shake, (FEEL[p.weapon] || {}).kick || 1); } else { const v = mechVol(p.x, p.y); if (v > 0) AU.mechFire(p.weapon, v); } }
+          break;
+        }
         if (p) { const rr = e[4] ? e[3] * 0.7 : 34, off = e[4] ? e[3] * 0.6 : 34; G.fx.push({ k: 'ring', x: p.x + Math.cos(e[2]) * off, y: p.y + Math.sin(e[2]) * off, z: (p.z || 0) + (e[4] ? 8 : 14), r: rr, color: G.colors[p.team], t0: now, dur: 200 }); if (!silent && nearMe(p.x, p.y, 400)) sfx.hit(); }
         break;
       }
@@ -2178,7 +2186,7 @@
         const col = G.colors[e[7]];
         G.fx.push({ k: 'line', x0: e[1], y0: e[2], z0: e[3], x1: e[4], y1: e[5], z1: e[6], color: col, w: 1.5 + 3 * e[8], t0: now, dur: 320 });
         R3.burst(e[4], e[5], e[6], col, 8, 140);
-        if (!silent && (e[9] === myId || nearMe(e[1], e[2], 600))) sfx.snipe();
+        if (!silent && (e[9] === myId || nearMe(e[1], e[2], 600))) { const sp2 = G.players.get(e[9]); if (wOf(sp2) === 'charger') { AU.mechFire('charger', e[9] === myId ? 1 : mechVol(e[1], e[2]) || 0.2); if (e[9] === myId) G.shake = Math.max(G.shake, 1 + 2.5 * (e[8] || 0)); } else sfx.snipe(); }
         break;
       }
       case 'bm': addBomb(e); break;
@@ -2212,7 +2220,22 @@
         if (e[1] === myId && !silent) toast('被符印束缚了！', 900);
         break;
       }
+      case 'fin': {   // 2.0 喷罐：爆裂收尾——更大的枪口火光和声音
+        const p = G.players.get(e[1]); if (!p || silent) break;
+        R3.emit(p.x, p.y, (p.z || 0) + S.MUZZLE, '#ffffff', 1, 0, 0, { sys: 'pg', size: 26, life: 0.1, grav: 0 });
+        AU.mechFire('blaster', e[1] === myId ? 1 : mechVol(p.x, p.y), true); if (e[1] === myId) G.shake = Math.max(G.shake, 2);
+        const pr = G.projs.get(e[2]); if (pr) { pr.imp = 'big'; pr.tr = 'drop'; }
+        break;
+      }
+      case 'upper': {   // 2.0 重拳：上勾拳
+        ringFx(e[2], e[3], (e[4] || 0) + 4, 54, '#ffffff', 300); ringFx(e[2], e[3], (e[4] || 0) + 4, 40, G.colors[e[5]] || '#fff', 360, 60);
+        R3.emit(e[2], e[3], (e[4] || 0) + 10, '#ffffff', 10, 120, 1, { sys: 'pg', size: 8, life: 0.4, grav: -500, drag: 2 });
+        if (!silent) { const v = e[1] === myId ? 1 : mechVol(e[2], e[3]); if (v > 0) AU.mechFire('fistUp', v); if (e[1] === myId) G.shake = Math.max(G.shake, 4); }
+        break;
+      }
+      case 'prc': { const t = G.players.get(e[1]); if (t) { R3.emit(t.x, t.y, (t.z || 0) + 22, '#ffffff', 10, 260, 0.3, { sys: 'pg', size: 5, life: 0.2, grav: 0 }); ringFx(t.x, t.y, (t.z || 0) + 10, 30, '#ffffff', 220); } break; }   // 2.0 狙击穿甲
       case 'spin': {   // 1.9.1 灵刃回旋斩
+        { const sp0 = G.players.get(e[1]); if (sp0) swingFx(sp0, 0, S.WEAPONS.reaper, true); }
         ringFx(e[2], e[3], (e[4] || 0) + 10, 92, '#ffffff', 260); ringFx(e[2], e[3], (e[4] || 0) + 8, 76, G.colors[e[5]] || '#b48cff', 320, 40);
         for (let i = 0; i < 10; i++) { const a = (i / 10) * 6.283; R3.emit(e[2] + Math.cos(a) * 70, e[3] + Math.sin(a) * 70, (e[4] || 0) + 20, '#d9c8ff', 1, 120, 0.3, { sys: 'pg', size: 8, life: 0.3, grav: 0, drag: 4 }); }
         if (!silent && nearMe(e[2], e[3], 500)) sfx.snipe();
@@ -2276,6 +2299,12 @@
       }
       case 'bs': { const p = G.players.get(e[1]); if (p && !silent) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 60, text: '背刺！', color: '#ff3b52', t: now }); break; }
       case 'bx':
+        if (e[6] === 4) {   // 2.0 迫击：黏稠墨水——炸开后留下一滩会粘人的墨水
+          ringFx(e[1], e[2], e[3], e[5], G.colors[e[4]], 700); G.fx.push({ k: 'goo', x: e[1], y: e[2], z: e[3], r: e[5], color: G.colors[e[4]], t0: now, dur: 1200 });
+          R3.emit(e[1], e[2], e[3] + 6, G.colors[e[4]], 14, 140, 0.8, { sys: 'ps', size: 11, life: 0.8, grav: 250, drag: 3 });
+          if (!silent && nearMe(e[1], e[2], 600)) sfx.boom();
+          break;
+        }
         if (e[6] === 3) {   // 1.8 百符结界：金色 + 队伍色的符咒圈
           for (let i = 0; i < 2; i++) ringFx(e[1], e[2], e[3], e[5] * (0.6 + i * 0.4), i ? '#d8b25a' : G.colors[e[4]], 420, i * 90);
           R3.emit(e[1], e[2], e[3] + 10, '#f4e6c8', 14, 220, 0.3, { sys: 'pg', size: 8, life: 0.4, grav: 0, drag: 3 });
@@ -2302,7 +2331,7 @@
           cutinBig(p, sp.name, 'SUPER!', `${S.pilot(p.pilot).name} · ${S.WEAPONS[p.weapon].name}`);
           G.camPunch = 1; G.flashT = now; G.speedLines = now; G.shake = Math.max(G.shake, 5);
         } else cutinSide(p, sp.name, (G.me && p.team !== G.me.team ? '敌方 ' : '队友 ') + p.name + ' · 大招');
-        sfx.special();
+        AU.superSfx(e[2], e[1] === myId ? 1 : Math.max(0.35, mechVol(p.x, p.y)));   // 2.0：每个大招自己的声音
         break;
       }
       case 'zn': if (!silent) { announce(e[1] ? `${teamName(e[1])} 占领了据点！` : '据点恢复中立', e[1] ? G.colors[e[1]] : '#fff', true); sfx.capture(); } break;
@@ -2344,15 +2373,105 @@
       }
     }
   }
+  // ================= 2.0：机体个性——枪口火光 / 弹道 / 命中 / 后坐力 / 挥击范围 =================
+  //   mz 枪口：spray 喷雾 / flick 甩刷 / slosh 泼溅 / tracer 曳光 / smoke 硝烟 / fire 火焰 / launch 发射 / sonic 音波 / zap 电击 / needle 毒针 / silent 消音 / charm 符光
+  //   tr 弹道拖尾，imp 命中效果，kick 自己开火时的震屏，sw 近战挥击样式
+  const FEEL = {
+    blaster: { kick: 0.7, mz: 'spray', tr: 'drip', imp: 'splash' }, roller: { kick: 1.3, mz: 'flick', tr: 'drip', imp: 'splash' },
+    charger: { kick: 3.2 }, bucket: { kick: 2, mz: 'slosh', tr: 'drop', imp: 'big' }, gatling: { kick: 0.3, mz: 'tracer', tr: 'tracer', imp: 'spark' },
+    mortar: { kick: 1.6 }, fist: { kick: 1.8, sw: 'punch' }, slinger: { kick: 0.9 }, dozer: { kick: 2.2, mz: 'smoke', tr: 'drop', imp: 'big' },
+    flamer: { kick: 0.2, mz: 'fire', tr: 'fire', imp: 'fire' }, carrier: { kick: 0.7, mz: 'launch', tr: 'smoke', imp: 'pop' }, wrecker: { kick: 3.4, sw: 'hammer' },
+    megaphone: { kick: 1, mz: 'sonic', tr: 'ring', imp: 'ring' }, riot: { kick: 1.7, mz: 'zap', tr: 'zap', imp: 'zap' }, blade: { kick: 0.9, sw: 'slash' },
+    stinger: { kick: 0.35, mz: 'needle', tr: 'needle', imp: 'toxic' }, phantom: { kick: 0.6, mz: 'silent', tr: 'shadow', imp: 'shadow' },
+    warden: { kick: 0.5, mz: 'charm', tr: 'charm', imp: 'charm' }, reaper: { kick: 1, sw: 'spirit' },
+  };
+  const wOf = (p) => (p && !p.foot && !(p.flags & 512) ? p.weapon : null);   // 机体形态才有机体手感（弹出来的驾驶员用随身武器）
+  function mechVol(x, y) { const me = G.me; if (!me) return 0; const d = Math.hypot(me.px - x, me.py - y); return d > 560 ? 0 : 0.12 + 0.38 * (1 - d / 560); }
+  function muzzleFx(style, x, y, z, dir, col) {
+    const E = (c, n, sp, o) => R3.emit(x, y, z, c, n, sp, 0, Object.assign({ sys: 'pg', grav: 0, drag: 5, dir, spread: 0.6 }, o));
+    switch (style) {
+      case 'fire': E('#fff2a8', 2, 220, { size: 12, life: 0.18, grow: 1.4 }); E('#ff7a1a', 4, 260, { size: 14, life: 0.3, grow: 1.6, spread: 0.45 }); return;
+      case 'smoke': E('#ffffff', 1, 0, { size: 22, life: 0.08 }); E('#9a9aa8', 5, 90, { sys: 'ps', size: 14, life: 0.5, grow: 1.5, spread: 1 }); return;
+      case 'slosh': E(col, 6, 200, { sys: 'ps', size: 9, life: 0.35, grav: 500, spread: 0.8 }); return;
+      case 'tracer': E('#fff3a0', 1, 0, { size: 10, life: 0.05 }); E('#ffcf3a', 2, 300, { size: 4, life: 0.08, spread: 0.2 }); R3.emit(x, y, z, '#c9a24a', 1, 120, 1, { sys: 'ps', size: 3, life: 0.5, grav: 600 }); return;
+      case 'launch': E('#ffffff', 1, 0, { size: 14, life: 0.08 }); R3.emit(x, y, z, '#8a8a96', 4, 70, 0.4, { sys: 'ps', size: 12, life: 0.6, grav: -40, grow: 1.4 }); return;
+      case 'sonic': ringFx(x, y, z - 10, 26, '#ffffff', 220); ringFx(x, y, z - 10, 40, col, 300, 60); return;
+      case 'zap': E('#e8f6ff', 1, 0, { size: 16, life: 0.06 }); E('#7ad8ff', 5, 320, { size: 4, life: 0.1, spread: 0.9 }); return;
+      case 'needle': E('#d8ff6a', 1, 0, { size: 8, life: 0.06 }); E('#7dff5a', 2, 200, { size: 4, life: 0.12, spread: 0.15 }); return;
+      case 'silent': E('#6b5a8a', 2, 60, { sys: 'ps', size: 8, life: 0.25 }); return;
+      case 'charm': E('#ffe9a8', 3, 120, { size: 7, life: 0.3 }); return;
+      case 'flick': E(col, 7, 240, { sys: 'ps', size: 8, life: 0.3, grav: 400, spread: 1.1 }); return;
+      default: E('#ffffff', 1, 0, { size: 16, life: 0.07 }); E(col, 3, 160, { size: 7, life: 0.14, spread: 0.7 });
+    }
+  }
+  function trailFx(pr, q, col) {
+    switch (pr.tr) {
+      case 'fire': if (Math.random() < 0.85) R3.emit(q.x, q.y, q.z, Math.random() < 0.5 ? '#ff9a2a' : '#ffd23f', 1, 30, 0.3, { sys: 'pg', size: 10 + Math.random() * 6, life: 0.28, grav: -80, drag: 2, grow: 1.6 }); return;
+      case 'tracer': R3.emit(q.x, q.y, q.z, '#fff0a0', 1, 0, 0, { sys: 'pg', size: 5, life: 0.07, grav: 0 }); return;
+      case 'smoke': if (Math.random() < 0.6) R3.emit(q.x, q.y, q.z, '#9a9aa8', 1, 10, 0.2, { sys: 'ps', size: 9, life: 0.5, grav: -30, grow: 1.3 }); return;
+      case 'needle': R3.emit(q.x, q.y, q.z, '#9dff6a', 1, 0, 0, { sys: 'pg', size: 4, life: 0.12, grav: 0 }); return;
+      case 'ring': if ((pr.n = (pr.n || 0) + 1) % 4 === 0) ringFx(q.x, q.y, q.z - 8, 14 + pr.s, col, 200); return;
+      case 'zap': if (Math.random() < 0.5) R3.emit(q.x, q.y, q.z, '#9ae4ff', 1, 60, 0, { sys: 'pg', size: 4, life: 0.08, grav: 0 }); return;
+      case 'shadow': if (Math.random() < 0.5) R3.emit(q.x, q.y, q.z, '#3a2a55', 1, 8, 0, { sys: 'ps', size: 8, life: 0.3, grav: 0 }); return;
+      case 'charm': if (Math.random() < 0.6) R3.emit(q.x, q.y, q.z, '#ffe9a8', 1, 12, 0, { sys: 'pg', size: 6, life: 0.3, grav: 0 }); return;
+      case 'drop': if (Math.random() < 0.35) R3.emit(q.x, q.y, q.z, col, 1, 20, 0, { sys: 'ps', size: 6, life: 0.4, grav: 500 }); return;
+      case 'drip': if (Math.random() < 0.15) R3.emit(q.x, q.y, q.z, col, 1, 10, 0, { sys: 'ps', size: 4, life: 0.35, grav: 500 }); return;
+    }
+  }
+  function impactFx(style, x, y, z, col) {
+    switch (style) {
+      case 'fire': R3.emit(x, y, z + 6, '#ff8a1f', 5, 80, 0.6, { sys: 'pg', size: 12, life: 0.4, grav: -120, grow: 1.4 }); R3.emit(x, y, z + 10, '#5a5a66', 2, 30, 0.5, { sys: 'ps', size: 12, life: 0.7, grav: -60, grow: 1.5 }); return;
+      case 'spark': R3.emit(x, y, z + 4, '#ffe08a', 4, 200, 0.6, { sys: 'pg', size: 4, life: 0.18, grav: 300 }); return;
+      case 'toxic': R3.emit(x, y, z + 6, '#7dff5a', 6, 50, 0.4, { sys: 'ps', size: 10, life: 0.6, grav: -20, grow: 1.4 }); return;
+      case 'ring': ringFx(x, y, z, 34, col, 260); ringFx(x, y, z, 20, '#ffffff', 200); return;
+      case 'zap': R3.emit(x, y, z + 6, '#bfefff', 6, 240, 0.5, { sys: 'pg', size: 4, life: 0.12, grav: 0 }); return;
+      case 'shadow': R3.emit(x, y, z + 6, '#4a3a6a', 5, 70, 0.4, { sys: 'ps', size: 10, life: 0.5, grav: 0 }); return;
+      case 'charm': R3.emit(x, y, z + 6, '#ffe9a8', 6, 110, 0.6, { sys: 'pg', size: 6, life: 0.4, grav: 0 }); return;
+      case 'pop': ringFx(x, y, z, 26, col, 240); R3.emit(x, y, z + 6, '#ffd23f', 5, 160, 0.6, { sys: 'pg', size: 6, life: 0.2, grav: 200 }); return;
+      case 'big': R3.emit(x, y, z + 2, col, 8, 170, 0.9, { sys: 'ps', size: 9, life: 0.45, grav: 400 }); return;
+    }
+  }
+  // 近战挥击：地上画出真实的命中范围（扇形 = 机体的攻击距离 + 攻击角度），其他玩家也看得到
+  function swingFx(p, a, W, spin) {
+    const F = FEEL[p.weapon] || {}, col = G.colors[p.team], z = p.z || 0;
+    const reach = (spin ? W.range + 14 : W.range) + S.R + 10 + (W.lunge || 0) * 0.1, arc = spin ? Math.PI * 2 : W.arc;
+    const heavy = F.sw === 'hammer' ? 1 : 0;
+    G.fx.push({ k: 'arc', x: p.x, y: p.y, z, a, arc, r: reach, color: col, t0: performance.now(), dur: heavy ? 420 : 300, heavy });
+    const L = (a0, r0, r1, c, w, d) => G.fx.push({ k: 'line', x0: p.x + Math.cos(a0) * r0, y0: p.y + Math.sin(a0) * r0, z0: z + 16, x1: p.x + Math.cos(a0) * r1, y1: p.y + Math.sin(a0) * r1, z1: z + 16, color: c, w, t0: performance.now(), dur: d });
+    switch (F.sw) {
+      case 'hammer': for (let i = -3; i <= 3; i++) L(a + i * arc / 7, reach * 0.4, reach, '#ffffff', 5, 260); R3.emit(p.x + Math.cos(a) * reach * 0.7, p.y + Math.sin(a) * reach * 0.7, z + 4, '#b8a890', 10, 160, 0.8, { sys: 'ps', size: 10, life: 0.5, grav: 200 }); break;
+      case 'slash': L(a - arc / 2.4, reach * 0.3, reach, '#e7d4ff', 3, 160); L(a + arc / 2.4, reach * 0.3, reach, '#e7d4ff', 3, 160); R3.emit(p.x + Math.cos(a) * 40, p.y + Math.sin(a) * 40, z + 18, '#b48cff', 6, 220, 0.3, { sys: 'pg', size: 5, life: 0.18, grav: 0 }); break;
+      case 'spirit': for (let i = -2; i <= 2; i++) L(a + i * arc / 5, reach * 0.5, reach, '#d9c8ff', 2.5, 220); break;
+      default: ringFx(p.x + Math.cos(a) * reach * 0.6, p.y + Math.sin(a) * reach * 0.6, z + 10, 30, '#ffffff', 220); R3.emit(p.x + Math.cos(a) * reach * 0.6, p.y + Math.sin(a) * reach * 0.6, z + 14, col, 8, 180, 0.4, { sys: 'pg', size: 7, life: 0.2, grav: 0 });
+    }
+  }
+  // 2.0：附近敌方近战机体的攻击距离（脚下的圈 + 朝向扇形），大摆锤 / 回旋中显示旋转范围
+  const WHIRL_I = S.SPECIAL_IDS.indexOf('whirl');
+  function computeReach() {
+    const out = G.reach || (G.reach = []); out.length = 0;
+    const me = G.me; if (!me) return;
+    for (const p of G.players.values()) {
+      if (!G.cur.has(p.id) || !(p.flags & 1) || p.npc) continue;
+      const w = wOf(p); if (!w) continue;
+      const W = S.WEAPONS[w], enemy = p.team !== me.team && p.id !== myId;
+      if ((p.flags & 128) && p.spk === WHIRL_I) { out.push({ x: p.x, y: p.y, z: p.z || 0, r: 112, color: G.colors[p.team], op: 0.55, arc: Math.PI * 2, a: 0 }); continue; }
+      if (W.attack !== 'punch' || !enemy || (p.flags & 4)) continue;   // 躲在草丛 / 隐身的不画
+      const d = Math.hypot(p.x - me.px, p.y - me.py), reach = W.range + S.R + 10 + (W.lunge || 0) * 0.1;
+      if (d > reach + 260) continue;
+      out.push({ x: p.x, y: p.y, z: p.z || 0, r: reach, color: G.colors[p.team], op: d < reach + 40 ? 0.5 : 0.28, arc: W.arc, a: p.a || 0 });
+    }
+  }
   function addProj(e, mine) {
     const own = G.players.get(e[11]), osk = own ? skinInfo(own) : null;
-    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12], fx: fxOf(e[11]), sk: osk && osk.rare >= 5 ? osk : null });
+    G.projs.set(e[1], { id: e[1], x0: e[2], y0: e[3], z0: e[4], vx: e[5], vy: e[6], vz: e[7], ts: e[8], team: e[9], s: e[10], t0: performance.now(), mine, x: e[2], y: e[3], z: e[4], ghost: !!e[12], fx: fxOf(e[11]), sk: osk && osk.rare >= 5 ? osk : null, w: wOf(own) });
+    const pw = G.projs.get(e[1]); const PF = pw.w && FEEL[pw.w]; if (PF) { pw.tr = PF.tr; pw.imp = PF.imp; }
     if (G.projs.get(e[1]).fx && G.projs.get(e[1]).fx.rare >= 3) { const F = G.projs.get(e[1]).fx; R3.emit(e[2], e[3], e[4], F.fx.cols[0], F.rare >= 4 ? 6 : 3, 140, 0, { sys: 'pg', size: 9, life: 0.25, grav: 0, drag: 5 }); }
     // 枪口火光：白色核心 + 队伍色火花，沿射击方向喷出
     const L = Math.hypot(e[5], e[6], e[7]) || 1, dir = { x: e[5] / L, y: e[6] / L, z: e[7] / L };
-    R3.emit(e[2], e[3], e[4], '#ffffff', 1, 0, 0, { sys: 'pg', size: 16, life: 0.07, grav: 0 });
-    R3.emit(e[2], e[3], e[4], G.colors[e[9]], 3, 160, 0, { sys: 'pg', size: 7, life: 0.14, grav: 0, drag: 6, dir, spread: 0.7 });
+    muzzleFx(PF && PF.mz, e[2], e[3], e[4], dir, G.colors[e[9]]);
+    if (!mine && pw.w && !silentEv) { const v = mechVol(e[2], e[3]); if (v > 0) AU.mechFire(pw.w, v); }   // 2.0：听得见别人的机体（越近越响）
   }
+  let silentEv = false;
   // 皮肤等级（驾驶员服装 / 机甲涂装里更高的那个）与颜色
   const pk = (p) => (p && p.looks && p.looks.pskin ? p.pilot + '@' + p.looks.pskin : p.pilot);   // 带服装的驾驶员
   function skinInfo(p) {
@@ -2381,6 +2500,7 @@
     if (pr.fx) { const F = pr.fx.fx, n = F.n + pr.fx.rare * 2; for (let i = 0; i < n; i++) R3.emit(px, py, pz + 4, F.cols[i % F.cols.length], 1, 90 + pr.fx.rare * 30, 1, { sys: pr.fx.rare >= 2 ? 'pg' : 'ps', size: 6 + pr.fx.rare * 1.5, life: 0.5, grav: -200, drag: 2 }); }
     R3.emit(px, py, pz + 2, G.colors[pr.team], 6, 120, 0.8, { size: 6, life: 0.4 });
     R3.emit(px, py, pz + 3, G.colors[pr.team], 1, 0, 0, { sys: 'pg', size: 18, life: 0.12, grav: 0 });
+    if (pr.imp) impactFx(pr.imp, px, py, pz, G.colors[pr.team]);
   }
   // ---------------- 演出：大招横幅 / 侧边横幅 ----------------
   function cutinBig(p, title, small, sub) {
@@ -2976,6 +3096,20 @@
   // ================= 主循环 =================
   // 1.7.1：帧率上限（设置里可改，默认 60）。高刷新率显示器上不再每秒渲染 144 / 240 帧，显卡和 CPU 都轻松很多
   //   大厅：最多 60 帧；被全屏弹窗挡住时不画大厅；背景涂鸦 30 帧、半分辨率
+  // 2.0：自适应画质——对局中帧率持续低于目标就逐步降低分辨率 / 粒子，回升后再慢慢调回（设置里可以关）
+  const AQ = { acc: 0, n: 0, t0: 0, low: 0, high: 0, scale: 1, pk: 1, on: store.get('autoQ', true) };
+  function autoQuality(now, ft) {
+    if (!R3.setDyn || document.hidden || ft > 250) return;
+    AQ.acc += ft; AQ.n++;
+    if (now - AQ.t0 < 1000) return;
+    AQ.on = store.get('autoQ', true);
+    if (!AQ.on) { AQ.t0 = now; AQ.acc = 0; AQ.n = 0; if (AQ.scale < 1 || AQ.pk < 1) { AQ.scale = AQ.pk = 1; R3.setDyn(1, 1); } return; }
+    const fps = AQ.n * 1000 / Math.max(1, AQ.acc), target = Math.min(fpsCap || 60, 60);
+    AQ.t0 = now; AQ.acc = 0; AQ.n = 0;
+    if (fps < target * 0.8) { AQ.high = 0; if (++AQ.low >= 2) { AQ.low = 0; AQ.scale = Math.max(0.55, AQ.scale - 0.1); AQ.pk = Math.max(0.35, AQ.pk - 0.15); R3.setDyn(AQ.scale, AQ.pk); } }
+    else if (fps > target * 0.95) { AQ.low = 0; if (++AQ.high >= 5 && (AQ.scale < 1 || AQ.pk < 1)) { AQ.high = 0; AQ.scale = Math.min(1, AQ.scale + 0.05); AQ.pk = Math.min(1, AQ.pk + 0.1); R3.setDyn(AQ.scale, AQ.pk); } }
+    else { AQ.low = 0; AQ.high = 0; }
+  }
   function loop(now) {
     requestAnimationFrame(loop);
     const cap = G ? fpsCap : Math.min(fpsCap || 60, 60), iv = cap ? 1000 / cap : 0;
@@ -2983,6 +3117,7 @@
     loop.drawn = iv && loop.drawn && now - loop.drawn < iv * 2 ? loop.drawn + iv : now;   // 按固定间隔累加，平均正好是上限帧率
     if (G) {
       const dt = Math.min(0.05, (now - G.lastFrame) / 1000);
+      autoQuality(now, now - G.lastFrame);
       G.lastFrame = now;
       updateGame(now, dt);
       renderGame(now, dt);
@@ -3173,6 +3308,7 @@
       const gh = S.topAt(G.M, q.x, q.y);
       if (t > 3.2 || (pr.ghost ? t > pr.ts : q.z < gh - 1)) { killProj(pr, q.x, q.y, gh < 1e3 ? Math.max(gh, q.z) : q.z); continue; }
       pr.x = q.x; pr.y = q.y; pr.z = q.z;
+      if (pr.tr) trailFx(pr, q, G.colors[pr.team]);
       if (pr.sk && Math.random() < 0.55) { const tc = THEME_COL[pr.sk.bg]; R3.emit(q.x, q.y, q.z, tc && pr.sk.rare >= 6 ? tc[(Math.random() * 2) | 0] : pr.sk.col, 1, 12, 1, { sys: 'pg', size: 8, life: 0.35, grav: 0, drag: 2 }); }   // 1.9 传说 / 限定传说：子弹星光拖尾
       if (pr.fx && pr.fx.rare >= 4 && Math.random() < 0.6) R3.emit(q.x, q.y, q.z, pr.fx.fx.cols[(Math.random() * pr.fx.fx.cols.length) | 0], 1, 10, 1, { sys: 'pg', size: 7, life: 0.3, grav: 0, drag: 2 });   // 传说：子弹拖尾
     }
@@ -3240,6 +3376,7 @@
       ctx.fillText(L('同步对局中…'), VW / 2, VH / 2);
       return;
     }
+    computeReach();
     R3.render(G, now, dt, myId);
     drawHUD(now);
   }
@@ -3816,28 +3953,36 @@
     }
   }
 
-  function drawScoreboard() {
+  function drawScoreboard() {   // 2.0：手机上放在左边、避开右侧的触控按钮；行高按人数自动缩，保证整张表放得下
     const rows = [...G.players.values()].filter((p) => G.cur.has(p.id) && !p.npc);
-    const myTeam = G.me ? G.me.team : 1;
-    const w = Math.min(620, VW - 40), h = 70 + rows.length * 30 + 30;
-    const x = (VW - w) / 2, y = (VH - h) / 2;
-    ctx.fillStyle = 'rgba(12,13,20,.92)'; rr(ctx, x, y, w, h, 16); ctx.fill();
+    const myTeam = G.me ? G.me.team : 1, touch = TOUCH && TT.on, order = teamOrder(myTeam);
+    const nT = order.filter((t) => rows.some((q) => q.team === t)).length;
+    const w = touch ? Math.min(560, VW * 0.6) : Math.min(660, VW - 40);
+    const maxH = VH - (touch ? 24 : 40), head = 64;
+    const rowH = Math.max(16, Math.min(30, (maxH - head - 16 - nT * 8) / Math.max(1, rows.length)));
+    const fs = Math.max(10, Math.min(14, rowH * 0.5)), h = head + rows.length * rowH + nT * 8 + 14;
+    const x = touch ? Math.max(12, VW * 0.03) : (VW - w) / 2, y = Math.max(touch ? 12 : 20, (VH - h) / 2);
+    ctx.fillStyle = 'rgba(12,13,20,.92)'; rr(ctx, x, y, w, h, 14); ctx.fill();
     ctx.strokeStyle = '#34374d'; ctx.lineWidth = 2; ctx.stroke();
-    txt('记分板', VW / 2, y + 26, 20, '#ffdf2e', 'center', 0);
-    const cols = [x + 20, x + w * 0.42, x + w * 0.6, x + w * 0.72, x + w * 0.85];
-    ['机兵', '武器', '击倒', '倒下', '涂地'].forEach((s, i) => txt(s, cols[i], y + 56, 12, '#9a9db5', 'left', 0));
-    let ry = y + 84;
-    for (const t of teamOrder(myTeam)) {
-      for (const p of rows.filter((q) => q.team === t)) {
-        const sb = G.sb.get(p.id) || [0, 0, 0, 0];
-        txt(p.name + (p.id === myId ? L('（你）') : ''), cols[0], ry, 14, G.colors[t], 'left', 0, true);
-        txt(S.WEAPONS[p.weapon].name, cols[1], ry, 13, '#ddd', 'left', 0);
-        txt(String(sb[1]), cols[2], ry, 14, '#fff', 'left', 0);
-        txt(String(sb[2]), cols[3], ry, 14, '#fff', 'left', 0);
-        txt(String(sb[3]), cols[4], ry, 14, '#fff', 'left', 0);
-        ry += 30;
+    txt('记分板', x + w / 2, y + 22, 18, '#ffdf2e', 'center', 0);
+    const cols = [x + 14, x + w * 0.38, x + w * 0.58, x + w * 0.68, x + w * 0.78, x + w * 0.88];
+    ['机兵', '武器', '击倒', '助攻', '倒下', '涂地'].forEach((s2, i2) => txt(s2, cols[i2], y + 48, 11, '#9a9db5', 'left', 0));
+    let ry = y + head + rowH * 0.5;
+    for (const t of order) {
+      const list = rows.filter((q) => q.team === t);
+      if (!list.length) continue;
+      for (const p of list) {
+        const sb = G.sb.get(p.id) || [0, 0, 0, 0, 0, 0];
+        if (p.id === myId) { ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(x + 6, ry - rowH / 2, w - 12, rowH); }
+        txt(p.name + (p.id === myId ? L('（你）') : ''), cols[0], ry, fs, G.colors[t], 'left', 0, true);
+        txt(S.WEAPONS[p.weapon].short || S.WEAPONS[p.weapon].name, cols[1], ry, fs - 1, '#ddd', 'left', 0);
+        txt(String(sb[1]), cols[2], ry, fs, '#fff', 'left', 0);
+        txt(String(sb[5] || 0), cols[3], ry, fs, '#fff', 'left', 0);
+        txt(String(sb[2]), cols[4], ry, fs, '#fff', 'left', 0);
+        txt(String(sb[3]), cols[5], ry, fs, '#fff', 'left', 0);
+        ry += rowH;
       }
-      ry += 10;
+      ry += 8;
     }
   }
 
@@ -3887,7 +4032,7 @@
     if (LR) score = LR.ex ? `带出物资价值 ${fmtV(S.lootValue(LR.items))}` : '阵亡或没来得及撤离：这局搜到的物资全部丢失';
     $('resScore').textContent = score;
     // MVP
-    const val = (p) => p.kills * 100 + p.paint + p.obj * 150;
+    const val = (p) => S.perfScore(p);   // 2.0：结算排序和评级用同一套表现评分
     const mvp = S.mvpOf(r);
     const objLabel = { escort: '得分', battery: '电池', loot: '带出', seal: '封印石', raid: '讨伐' }[r.mode] || '—';
     const lootOf = (p) => (r.loot && r.loot.players[p.id]) || null;

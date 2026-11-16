@@ -34,80 +34,80 @@
     blaster: {
       name: '喷罐机兵', short: '喷罐', role: '均衡射手', desc: '每次攻击连射 5 发涂料弹，射程中等、上手简单，适合任何场合。',
       hp: 100, spd: 1, reload: 1.4, atkCd: 0.42, attack: 'burst', shots: 5, interval: 0.07,
-      speed: 650, range: 325, dmg: 10.9, spread: 0.05, splat: 22, trail: 13, size: 6, special: 'storm', spNeed: 260,
+      speed: 650, range: 325, dmg: 9.7, spread: 0.05, splat: 22, trail: 13, size: 6, special: 'storm', spNeed: 260, finale: 1.4,
     },
     roller: {
       name: '滚刷机兵', short: '滚刷', role: '冲锋开路', desc: '甩出一扇涂料并向前突进滚压，碾过的敌人受到伤害。生命值高。',
-      hp: 110, spd: 1, reload: 1.15, atkCd: 0.5, attack: 'flick', pellets: 5, arc: 0.7, speed: 520, range: 200, dmg: 23,
+      hp: 110, spd: 1, reload: 1.15, atkCd: 0.5, attack: 'flick', pellets: 5, arc: 0.7, speed: 520, range: 200, dmg: 22,
       spread: 0.05, splat: 20, trail: 0, size: 7, rollWidth: 26, rollDmg: 19, lunge: 280, special: 'charge', spNeed: 230,
     },
     charger: {
       name: '狙击机兵', short: '狙击', role: '远程狙击', desc: '按住蓄力、松开射出贯穿直线，满蓄力伤害极高。蓄力时移动变慢，生命值低。',
-      hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.95, range: 720, dmg: 92, minDmg: 32,
-      special: 'missiles', spNeed: 240,
+      hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.95, range: 720, dmg: 88, minDmg: 32,
+      special: 'missiles', spNeed: 240, pierce: 0.7,
     },
     bucket: {
       name: '泼桶机兵', short: '泼桶', role: '近距爆发', desc: '近距离泼出一大片涂料弹，覆盖面积大，贴脸伤害很高。',
-      hp: 115, spd: 0.95, reload: 1.6, atkCd: 0.55, attack: 'fan', pellets: 7, arc: 0.6, speed: 480, range: 240, dmg: 12.7,
-      spread: 0.06, splat: 26, trail: 12, size: 7, special: 'bubble', spNeed: 250,
+      hp: 115, spd: 0.95, reload: 1.6, atkCd: 0.55, attack: 'fan', pellets: 7, arc: 0.6, speed: 480, range: 240, dmg: 12.3,
+      spread: 0.06, splat: 26, trail: 12, size: 7, special: 'bubble', spNeed: 250, close: 1.2,
     },
     gatling: {
       name: '旋转机兵', short: '旋转', role: '持续压制', desc: '每次攻击持续扫射 1 秒，射程远、火力持续，但装填慢。',
       hp: 100, spd: 0.88, reload: 2.8, atkCd: 0.3, attack: 'burst', shots: 12, interval: 0.075,
-      speed: 700, range: 380, dmg: 4.7, spread: 0.13, splat: 13, trail: 9, size: 5, special: 'beam', spNeed: 300,
+      speed: 700, range: 380, dmg: 4.7, spread: 0.13, splat: 13, trail: 9, size: 5, special: 'beam', spNeed: 300, spinup: [0.72, 1.1],
     },
     mortar: {
       name: '迫击机兵', short: '迫击', role: '曲射炮手', desc: '把涂料炮弹抛到瞄准的位置，能越过墙壁和掩体，落地爆炸涂一大片。',
       hp: 85, spd: 0.95, reload: 1.6, atkCd: 0.5, attack: 'lob', range: 420, minRange: 70, dmg: 45, blast: 62, flight: 0.68,
-      special: 'barrage', spNeed: 250, isNew: true,
+      special: 'barrage', spNeed: 250, isNew: true, sticky: 1.2,
     },
     fist: {
       name: '重拳机兵', short: '重拳', role: '贴身格斗', desc: '向前冲出一记重拳，伤害高并把敌人击飞。厚重装甲减伤 25%，移动最快，但只能近身。',
-      hp: 185, spd: 1.12, reload: 0.85, atkCd: 0.38, attack: 'punch', range: 68, arc: 1.7, dmg: 57, kb: 260, lunge: 240,
-      armor: 0.75, special: 'quake', spNeed: 180, isNew: true,
+      hp: 185, spd: 1.12, reload: 0.85, atkCd: 0.38, attack: 'punch', range: 68, arc: 1.7, dmg: 60, kb: 260, lunge: 240,
+      armor: 0.75, special: 'quake', spNeed: 180, isNew: true, combo: 3, comboKind: 'upper',
     },
     // ---- 1.1：任务奖励机甲 ----
     riot: {
       name: '防暴盾卫', short: '盾卫', role: '护盾前排', desc: '举着灰石集团的防暴盾牌：正面受到的伤害 -40%，电击警棍近距离放电。大招立起一面能挡住子弹的盾墙。',
-      hp: 160, spd: 0.96, reload: 1.25, atkCd: 0.45, attack: 'fan', pellets: 4, arc: 0.5, speed: 520, range: 190, dmg: 21.5, front: 0.6,
+      hp: 160, spd: 0.96, reload: 1.25, atkCd: 0.45, attack: 'fan', pellets: 4, arc: 0.5, speed: 520, range: 190, dmg: 23, front: 0.6,
       spread: 0.04, splat: 22, trail: 12, size: 7, special: 'aegis', spNeed: 230, quest: 1,
     },
     // ---- S1 灰城重涂：赛季机甲 ----
     dozer: {
       name: '推土机兵', short: '推土', role: '前排推进', desc: '铲斗推出一排厚重涂料，近距离把敌人推开。生命值极高，是冲在最前面的墙。',
-      hp: 165, spd: 0.94, reload: 1.35, atkCd: 0.5, attack: 'fan', pellets: 6, arc: 0.95, speed: 480, range: 175, dmg: 15, kb: 2.2,
+      hp: 165, spd: 0.94, reload: 1.35, atkCd: 0.5, attack: 'fan', pellets: 6, arc: 0.95, speed: 480, range: 175, dmg: 16, kb: 2.2,
       spread: 0.04, splat: 24, trail: 14, size: 8, special: 'bulldoze', spNeed: 240, season: 1,
     },
     flamer: {
       name: '喷火罐车', short: '喷火', role: '近距压制', desc: '持续喷出一道滚烫的涂料火焰，射程短但覆盖面极大，能把整条巷子烧成你的颜色。',
       hp: 120, spd: 0.97, reload: 1.7, atkCd: 0.3, attack: 'burst', shots: 12, interval: 0.055, speed: 430, range: 215, dmg: 8.5,
-      spread: 0.24, splat: 25, trail: 15, size: 7, special: 'napalm', spNeed: 260, season: 1,
+      spread: 0.24, splat: 25, trail: 15, size: 7, special: 'napalm', spNeed: 260, season: 1, burn: 2,
     },
     carrier: {
       name: '无人机母舰', short: '母舰', role: '追踪骚扰', desc: '放出会自动追踪敌人的小型涂装无人机，打不准也能命中，适合远距离骚扰。',
-      hp: 130, spd: 0.96, reload: 1.35, atkCd: 0.45, attack: 'burst', shots: 4, interval: 0.13, speed: 400, range: 500, dmg: 26, homing: 2.6,
+      hp: 130, spd: 0.96, reload: 1.35, atkCd: 0.45, attack: 'burst', shots: 4, interval: 0.13, speed: 400, range: 500, dmg: 27, homing: 2.6,
       spread: 0.12, splat: 22, trail: 10, size: 6, special: 'swarm', spNeed: 270, season: 1,
     },
     wrecker: {
       name: '拆楼锤', short: '拆楼', role: '重型挥击', desc: '抡起拆楼大锤横扫一大片，命中的敌人被狠狠砸飞。厚重装甲减伤 25%，一锤定音。',
       hp: 200, spd: 1.12, reload: 1.15, atkCd: 0.5, attack: 'punch', range: 104, arc: 2.6, dmg: 78, kb: 340, lunge: 170,
-      armor: 0.75, special: 'whirl', spNeed: 190, season: 1,
+      armor: 0.75, special: 'whirl', spNeed: 190, season: 1, stagger: 0.8,
     },
     megaphone: {
       name: '喇叭车', short: '喇叭', role: '穿墙音波', desc: '用巨型喇叭放出音波涂料，音波能穿过墙壁和掩体，专治躲在墙后的敌人。',
       hp: 105, spd: 1, reload: 1.3, atkCd: 0.45, attack: 'fan', pellets: 3, arc: 0.42, speed: 560, range: 350, dmg: 25, ghost: true,
-      spread: 0.02, splat: 16, trail: 10, size: 10, special: 'sonic', spNeed: 250, season: 1,
+      spread: 0.02, splat: 16, trail: 10, size: 10, special: 'sonic', spNeed: 250, season: 1, reveal: 2,
     },
     // ---- 1.4：常驻新机体 ----
     slinger: {
       name: '弹弓机兵', short: '弹弓', role: '弹跳炮手', desc: '弹射一颗会弹跳的涂料球：落地爆炸后再往前弹出去炸第二次，能越过掩体打击后排。',
-      hp: 100, spd: 1, reload: 1.1, atkCd: 0.5, attack: 'lob', range: 360, minRange: 60, dmg: 46, blast: 58, flight: 0.55, bounce: 1,
+      hp: 100, spd: 1, reload: 1.1, atkCd: 0.5, attack: 'lob', range: 360, minRange: 60, dmg: 49, blast: 58, flight: 0.55, bounce: 1,
       special: 'cluster', spNeed: 250, isNew: true,
     },
     // ---- 1.4：袭击！特攻队（刺客型机体，只能从「特攻队补给箱」开出） ----
     blade: {
       name: '影刃机兵', short: '影刃', role: '突袭刺客', desc: '高速突进挥出一记影刃，从背后命中伤害 +30%。移动极快，但生命值低，一定要找准时机切入。',
-      hp: 145, spd: 1.22, reload: 0.95, atkCd: 0.33, attack: 'punch', range: 62, arc: 1.9, dmg: 63, paintR: 54, kb: 120, lunge: 330, backstab: 1.4,
+      hp: 160, spd: 1.22, reload: 0.95, atkCd: 0.33, attack: 'punch', range: 62, arc: 1.9, dmg: 66, paintR: 54, kb: 120, lunge: 330, backstab: 1.4,
       special: 'shadowstep', spNeed: 180, strike: 1, isNew: true,
     },
     stinger: {
@@ -117,13 +117,13 @@
     },
     phantom: {
       name: '幻影机兵', short: '幻影', role: '隐形刺客', desc: '近距离霰弹，从背后命中伤害 +30%；大招让自己隐身，隐身状态下的第一击伤害再 +50%。',
-      hp: 110, spd: 1.15, reload: 1.25, atkCd: 0.5, attack: 'fan', pellets: 4, arc: 0.36, speed: 560, range: 230, dmg: 21, backstab: 1.3,
+      hp: 118, spd: 1.15, reload: 1.25, atkCd: 0.5, attack: 'fan', pellets: 4, arc: 0.36, speed: 560, range: 230, dmg: 22, backstab: 1.3,
       spread: 0.04, splat: 18, trail: 8, size: 6, special: 'cloak', spNeed: 220, strike: 1, isNew: true,
     },
     // ---- 1.8：夜都决战（联动活动机体） ----
     warden: {
       name: '结界机兵', short: '结界', role: '结界支援', desc: '连发两枚符咒光弹，命中的敌人减速；同一个敌人连中 4 发会被符印束缚 0.7 秒。大招展开结界：把里面的敌人弹开，队友获得护盾、减伤并持续回血。',
-      hp: 120, spd: 0.98, reload: 1.0, atkCd: 0.44, attack: 'burst', shots: 2, interval: 0.1, speed: 760, range: 330, dmg: 17, slowHit: 0.35, ward: 4,
+      hp: 120, spd: 0.98, reload: 1.0, atkCd: 0.44, attack: 'burst', shots: 2, interval: 0.1, speed: 760, range: 330, dmg: 18, slowHit: 0.35, ward: 4,
       spread: 0.03, splat: 18, trail: 8, size: 6, special: 'barrier', spNeed: 240, collab: 'yato', isNew: true,
     },
     reaper: {
@@ -131,6 +131,28 @@
       hp: 150, spd: 1.08, reload: 0.95, atkCd: 0.44, attack: 'punch', range: 64, arc: 2.0, dmg: 42, paintR: 48, kb: 110, lunge: 220,
       wave: { dmg: 18, range: 230, speed: 820, size: 9, splat: 20 }, special: 'rend', combo: 3, spNeed: 220, collab: 'yato', isNew: true,
     },
+  };
+  // 2.0：每台机体的攻击特性（机体页面显示；数值写在 S.WEAPONS 里）
+  S.TRAITS = {
+    blaster: { name: '爆裂收尾', desc: '每轮 5 连发的最后一发是爆裂弹：伤害 ×1.4、涂地范围更大。' },
+    roller: { name: '甩刷冲锋', desc: '甩刷时向前冲一小步，冲刺中撞到的敌人会被滚压。' },
+    charger: { name: '穿甲弹', desc: '蓄力到 90% 以上的一枪会贯穿第一个敌人，继续命中后面的敌人（第二个目标伤害 ×0.7）。' },
+    bucket: { name: '近身爆发', desc: '在 110 距离以内命中的涂料伤害 +20%。' },
+    gatling: { name: '枪管预热', desc: '一轮 12 发越打越狠：伤害从 72% 一路涨到 110%。' },
+    mortar: { name: '黏稠墨水', desc: '炮弹炸开的地方会粘住敌人，减速 1.2 秒。' },
+    fist: { name: '三连上勾拳', desc: '连续第 3 拳是上勾拳：伤害 ×1.3，把敌人打飞到空中。' },
+    slinger: { name: '弹跳炮弹', desc: '炮弹落地爆炸后会沿原方向再弹一次。' },
+    dozer: { name: '推土铲', desc: '涂料把敌人推得特别远，适合把人推出据点。' },
+    flamer: { name: '点燃', desc: '被火焰命中的敌人会着火 2 秒，每 0.5 秒受到 3 点伤害。' },
+    carrier: { name: '追踪弹', desc: '无人机弹会自动转向附近的敌人。' },
+    wrecker: { name: '震荡', desc: '被大锤砸中的敌人头晕眼花，减速 0.8 秒。' },
+    megaphone: { name: '声纳', desc: '被音波打中的敌人暴露位置 2 秒，躲进草丛也没用。' },
+    riot: { name: '正面护盾', desc: '正面受到的伤害 -40%，从侧面和背后打才有效。' },
+    blade: { name: '背刺', desc: '从背后命中伤害 ×1.4。' },
+    stinger: { name: '毒素', desc: '毒针让敌人中毒：持续掉血并减速。' },
+    phantom: { name: '伏击', desc: '隐身状态下的第一击伤害 ×1.5。' },
+    warden: { name: '符印束缚', desc: '同一个敌人连中 4 发会被束缚 0.7 秒，并额外受到 16 伤害。' },
+    reaper: { name: '三连回旋斩', desc: '连续第 3 刀是 360° 回旋斩：伤害 ×1.3，一次斩出三道刀气。' },
   };
   S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'slinger', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot', 'blade', 'stinger', 'phantom', 'warden', 'reaper'];
   S.weaponRange = function (id) {
@@ -1141,7 +1163,8 @@
 
   // ---------------- 比赛奖励（客户端显示和服务器结算用同一套算法） ----------------
   // 1.9：表现评分（击毁 / 涂地 / 目标 / 助攻 − 倒下）和结算评级：MVP > 钻石标 > 黄金标 > 白银标 > 青铜标
-  S.perfScore = (p) => Math.max(0, (p.kills || 0) * 100 + (p.paint || 0) + (p.obj || 0) * 150 + (p.assists || 0) * 50 - (p.deaths || 0) * 40);
+  // 2.0：涂地占比下调（每 5 格涂地 = 1 分；一局涂 2500 格约等于 5 次击倒）
+  S.perfScore = (p) => Math.max(0, Math.round((p.kills || 0) * 100 + (p.paint || 0) * 0.2 + (p.obj || 0) * 150 + (p.assists || 0) * 60 - (p.deaths || 0) * 40));
   S.BADGES = [
     { id: 'bronze', name: '青铜标', c: '#c27a3e' }, { id: 'silver', name: '白银标', c: '#cfd8e2' }, { id: 'gold', name: '黄金标', c: '#ffcf3a' },
     { id: 'diamond', name: '钻石标', c: '#7ae0ff' }, { id: 'mvp', name: 'MVP', c: '#ff5aa8' },
@@ -1158,7 +1181,7 @@
   };
   S.mvpOf = function (result, team) {   // 默认是胜方 MVP；传 team 就是那一队的最佳（1.9：败方 MVP）
     if (team == null) team = result.winner;
-    const val = (p) => S.perfScore(p) + 0.001 * (p.kills * 100 + p.paint + p.obj * 150);
+    const val = (p) => S.perfScore(p) + 0.001 * (p.kills * 100 + p.paint * 0.2 + p.obj * 150);
     let mvp = null;
     for (const p of result.players) if (p.team === team && !p.npc && (!mvp || val(p) > val(mvp))) mvp = p;
     return mvp;
@@ -1189,7 +1212,7 @@
       seals: me.seals || 0, spirits: me.spirits || 0 };
   };
   // 强度参考（AI 在排位赛禁用阶段用）：tools/balance.js 跑出来的胜率
-  S.META = {"pilots":{"blaze":0.534,"hex":0.53,"vet":0.527,"echo":0.526,"fu":0.518,"hammer":0.515,"aurora":0.511,"yuzu":0.507,"gale":0.506,"candy":0.498,"raven":0.495,"titan":0.493,"han":0.486,"aka":0.482,"frost":0.481,"flag":0.469,"kaka":0.468,"chef":0.457},"mechs":{"blaster":0.562,"gatling":0.561,"roller":0.551,"bucket":0.521,"dozer":0.521,"mortar":0.518,"charger":0.514,"phantom":0.513,"riot":0.5,"reaper":0.489,"stinger":0.488,"flamer":0.484,"slinger":0.481,"carrier":0.474,"warden":0.469,"fist":0.461,"blade":0.454,"megaphone":0.449,"wrecker":0.439}};
+  S.META = {"pilots":{"fu":0.558,"yuzu":0.534,"aurora":0.532,"flag":0.527,"hex":0.521,"candy":0.521,"gale":0.521,"blaze":0.517,"frost":0.512,"vet":0.508,"titan":0.497,"chef":0.478,"raven":0.477,"aka":0.475,"kaka":0.472,"echo":0.46,"hammer":0.459,"han":0.434},"mechs":{"blaster":0.574,"gatling":0.569,"charger":0.555,"dozer":0.553,"stinger":0.548,"roller":0.541,"megaphone":0.525,"bucket":0.523,"blade":0.521,"mortar":0.5,"reaper":0.476,"slinger":0.462,"fist":0.461,"wrecker":0.449,"flamer":0.448,"carrier":0.445,"phantom":0.438,"warden":0.438,"riot":0.428}};
   // ---------------- 账号规则 ----------------
   S.ACCOUNT = {
     nameOk: (n) => typeof n === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,12}$/.test(n),
@@ -1214,9 +1237,82 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '1.9.1';
+  S.VERSION = '2.0';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '2.0', date: '2026-11-16', title: '2.0 更新 · 机兵个性', en_title: 'Update 2.0 · Mech Identity', sections: [
+      ['每台机体都不一样了', [
+        '19 台机体各自有了专属的开火声、命中声和大招声：喷罐的嘶啪、旋转机兵的哒哒哒、狙击的轨道炮、拆楼锤的沉重一抡、喇叭车的嗡鸣……别人开火也听得见，越近越响',
+        '每台机体的手感不同：后坐力震屏从旋转机兵的轻微抖动到拆楼锤、狙击的重重一震',
+        '专属的枪口火光、弹道和命中效果：喷火罐车喷出火焰和黑烟、毒针拖着绿色毒线、喇叭车一圈圈音波、旋转机兵曳光弹和弹壳、母舰的发射硝烟、盾卫的电火花、结界机兵的金色符光',
+        '近战挥击也各有样子：重拳的冲击波、拆楼锤的大范围扫击和尘土、影刃的紫色细斩、灵刃的灵气刀光',
+        '每个驾驶员技能也有了自己的音效']],
+      ['新的攻击特性（机体页面可以看到）', [
+        '喷罐机兵「爆裂收尾」：每轮第 5 发是爆裂弹，伤害 ×1.4、涂地更大',
+        '旋转机兵「枪管预热」：一轮 12 发伤害从 72% 涨到 110%',
+        '狙击机兵「穿甲弹」：蓄力 90% 以上贯穿第一个敌人，后面的敌人受到 70% 伤害',
+        '泼桶机兵「近身爆发」：110 距离内命中伤害 +20%',
+        '迫击机兵「黏稠墨水」：炸开的地方让敌人减速 1.2 秒',
+        '重拳机兵「三连上勾拳」：连续第 3 拳伤害 ×1.3，把敌人打飞到空中',
+        '喷火罐车「点燃」：命中的敌人着火 2 秒，每 0.5 秒掉 3 血',
+        '拆楼锤「震荡」：砸中的敌人减速 0.8 秒',
+        '喇叭车「声纳」：被音波打中的敌人暴露 2 秒',
+        '其余机体原有的特点也整理成了特性：甩刷冲锋、弹跳炮弹、推土铲、追踪弹、正面护盾、背刺、毒素、伏击、符印束缚、三连回旋斩']],
+      ['攻击范围看得见', [
+        '近战机体每次挥击都会在地上画出真实的命中扇形，其他玩家也看得到',
+        '敌方近战机体靠近你时，脚下会显示它的攻击距离和朝向；大摆锤旋转时显示旋转范围',
+        '着火、被符印束缚的敌人身上有明显的特效']],
+      ['界面与修复', [
+        '大招 / 超载横幅移到屏幕右上角斜放，不再挡住中间的视线',
+        '修复记分板（Tab / 手机记分板按钮）的数据一直是 0：1.9 版本的开局倒计时改动不小心让对局计时器失效了，这也让其他玩家的移动不够平滑、搜刮撤离的物资同步变慢。现在全部恢复',
+        '记分板在手机上放到左边、避开触控按钮，人多时自动缩小行高，新增「助攻」一栏',
+        '表现评分下调涂地的占比：每 5 格涂地算 1 分（以前 1 格 1 分），助攻 60 分；击倒和目标更重要了']],
+      ['更流畅', [
+        '新增 Windows 版：解压后双击「涂鸦机兵.bat」，用 Edge / Chrome 的独立应用窗口打开游戏，显卡加速、没有地址栏和插件拖慢；装了 Node.js 会自动开本地服务器',
+        '自动调节画质：对局中帧率持续不够时，自动降低渲染分辨率和粒子数量，恢复后再调回来（设置里可以关）',
+        '修复对局计时器后，其他玩家的移动恢复平滑插值']],
+      ['平衡调整', [
+        '喷罐机兵伤害 10.9 → 9.7（第 5 发爆裂弹 ×1.4），狙击机兵 92 → 88，滚刷机兵 23 → 22，泼桶机兵 12.7 → 12.3',
+        '重拳机兵 57 → 60，弹弓机兵 46 → 49，推土机兵 15 → 16，母舰 26 → 27，防暴盾卫 21.5 → 23，结界机兵 17 → 18',
+        '影刃机兵伤害 63 → 66、生命 145 → 160；幻影机兵伤害 21 → 22、生命 110 → 118']],
+      ['更新奖励', ['信箱里有一份 2.0 更新礼包：150 宝石 + 军用箱 + 5 个传说碎片']],
+    ], en: [
+      ['Every mech feels different now', [
+        'All 19 mechs have their own shot, hit and Super sounds — the Spray Bot’s hiss-pop, the Gatling Bot’s rattle, the Sniper Bot’s railgun, the Wrecking Hammer’s heavy swing, the Megaphone Truck’s hum… and you can hear other players’ mechs too, louder when they’re close',
+        'Each mech has its own feel: recoil shake ranges from a light buzz on the Gatling Bot to a heavy kick on the Wrecking Hammer and Sniper Bot',
+        'Unique muzzle flashes, projectile trails and impacts: flames and black smoke for the Flame Tanker, green toxin trails for the Venom Stinger, sound rings for the Megaphone Truck, tracers and shell casings for the Gatling Bot, launch smoke for the Drone Carrier, sparks for the Riot Guard, golden talisman light for the Warden',
+        'Melee swings look different too: a shockwave for the Fist Bot, a wide sweep with dust for the Wrecking Hammer, thin purple slashes for the Shadow Blade and spirit arcs for the Spiritblade',
+        'Every pilot skill has its own sound as well']],
+      ['New attack traits (shown on each mech page)', [
+        'Spray Bot “Explosive Finale”: the 5th shot of each burst is an explosive round, ×1.4 damage and bigger paint',
+        'Gatling Bot “Spin-Up”: damage ramps from 72% to 110% across the 12-shot burst',
+        'Sniper Bot “Armor Piercing”: shots charged above 90% pierce the first enemy and hit the one behind for 70%',
+        'Bucket Bot “Point Blank”: +20% damage on hits within 110',
+        'Mortar Bot “Sticky Ink”: the blast slows enemies for 1.2 s',
+        'Fist Bot “Triple Uppercut”: every third punch in a row deals ×1.3 and launches the enemy into the air',
+        'Flame Tanker “Ignite”: enemies hit catch fire for 2 s, losing 3 HP every 0.5 s',
+        'Wrecking Hammer “Concussion”: enemies hit are slowed for 0.8 s',
+        'Megaphone Truck “Sonar”: enemies hit by sound waves are revealed for 2 s',
+        'The other mechs’ existing quirks are now listed as traits too: Flick Charge, Bouncing Shells, Dozer Blade, Homing Rounds, Front Shield, Backstab, Toxin, Ambush, Talisman Bind and Triple Spin Slash']],
+      ['Visible attack ranges', [
+        'Every melee swing now draws its real hit area on the ground, visible to everyone',
+        'When an enemy melee mech gets close, its reach and facing show under it; the Wrecking Hammer’s spin shows its radius',
+        'Burning and talisman-bound enemies have clear status effects']],
+      ['UI and fixes', [
+        'The Super / overload banner now sits diagonally in the top-right corner instead of covering the middle of the screen',
+        'Fixed the scoreboard (Tab / phone scoreboard button) always showing 0: a 1.9 countdown change accidentally broke the match tick counter, which also made other players’ movement less smooth and slowed loot syncing in Extraction. All of that works again',
+        'On phones the scoreboard now sits on the left, clear of the touch buttons, shrinks its rows when there are many players, and has a new Assists column',
+        'Performance score: paint counts for less — 1 point per 5 cells painted (it used to be 1 per cell), assists are 60; takedowns and objectives matter more']],
+      ['Smoother', [
+        'New Windows download: unzip and double-click the launcher .bat file to open the game in its own Edge / Chrome app window with GPU acceleration and no toolbar or extensions; if Node.js is installed it starts a local server automatically',
+        'Auto quality: if the frame rate stays low during a match, render resolution and particle count drop automatically and come back when things recover (can be turned off in Settings)',
+        'With the match tick fixed, other players’ movement is smoothly interpolated again']],
+      ['Balance', [
+        'Spray Bot damage 10.9 → 9.7 (5th shot ×1.4), Sniper Bot 92 → 88, Roller Bot 23 → 22, Bucket Bot 12.7 → 12.3',
+        'Fist Bot 57 → 60, Slinger Bot 46 → 49, Dozer Bot 15 → 16, Drone Carrier 26 → 27, Riot Guard 21.5 → 23, Warden 17 → 18',
+        'Shadow Blade damage 63 → 66 and HP 145 → 160; Phantom damage 21 → 22 and HP 110 → 118']],
+      ['Update reward', ['Your mailbox has an Update 2.0 gift: 150 gems + a Military Crate + 5 Legend Shards']],
+    ] },
     { v: '1.9.1', date: '2026-11-15', title: '1.9.1 更新 · 简易领域 & 战力平衡', en_title: 'Update 1.9.1 · Simple Domain & Balance', sections: [
       ['符零新超载「简易领域」（替换「百符结界」）', [
         '以自己为中心展开半径 170 的领域，跟着符零移动：地上铺开金色符阵、八芒星和一圈立着的符纸，边缘有半透明的结界墙',

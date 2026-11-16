@@ -249,7 +249,7 @@ class Game {
     this.risk = this.loot && st.risk === 'high' ? 'high' : 'normal';
     if (this.loot) st = Object.assign({}, st, { duration: S.LOOT.duration });
     this.duration = st.duration; this.timeLeft = st.duration;
-    this.countdown = st.tutorial ? 3.5 : 6; this.time = 0;   // 1.9：开局多给 2.5 秒看观察界面 this.tick = 0; this.over = false;
+    this.countdown = st.tutorial ? 3.5 : 6; this.time = 0; this.tick = 0; this.over = false;   // 1.9：开局多给 2.5 秒看观察界面（2.0 修复：注释曾把 tick / over 的初始化吞掉）
     this.players = new Map(); this.projs = []; this.bombs = []; this.missiles = []; this.shells = []; this.helpers = [];
     this.reveal = new Array(this.teams + 1).fill(0);   // 全队扫描（义眼扫描）结束时间
     this.nextId = 1; this.diff = []; this.events = [];
@@ -514,6 +514,10 @@ class Game {
     p.sealT = Math.max(0, (p.sealT || 0) - dt); p.possT = Math.max(0, (p.possT || 0) - dt); p.dslowT = Math.max(0, (p.dslowT || 0) - dt);   // 1.8
     p.bindT = Math.max(0, (p.bindT || 0) - dt); p.comboT = Math.max(0, (p.comboT || 0) - dt);   // 1.9.1：符印束缚 / 灵刃连斩
     if (p.wardN && (p.wardT = (p.wardT || 0) - dt) <= 0) p.wardN = 0;
+    if (p.burnT > 0) {   // 2.0 着火：每 0.5 秒掉 3 点生命（不减速）
+      p.burnT -= dt; p.burnAcc = (p.burnAcc || 0) + dt;
+      if (p.burnAcc >= 0.5) { p.burnAcc -= 0.5; this.hurt(p, 3, this.players.get(p.burnBy) || null, 0, 0); if (!p.alive) return; }
+    }
     if (p.poisonT > 0) {   // 中毒：每 0.5 秒掉 3 点生命并减速
       p.poisonT -= dt; p.poisonAcc = (p.poisonAcc || 0) + dt; p.slowT = Math.max(p.slowT, 0.15);
       if (p.poisonAcc >= 0.5) { p.poisonAcc -= 0.5; this.hurt(p, 3, this.players.get(p.poisonBy) || null, 0, 0); if (!p.alive) return; }
@@ -641,7 +645,7 @@ class Game {
       p.ammo -= 1; p.atkCd = W.atkCd / (OVr || 1); p.lastAtk = this.time; this.takeOverdrive(p);
       if (p.cloakT > 0) { if (W.special === 'cloak') p.dmgMul *= 1.5; p.cloakT = 0; p.cloakFast = false; }   // 攻击会现形；幻影隐身第一击 +50%
       switch (W.attack) {
-        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : W.slowHit ? { fx: { slow: W.slowHit, ward: W.ward || 0 } } : null }; this.stepBurst(p, W, 0); break;
+        case 'burst': p.burst = { n: W.shots, t: 0, aim: W.homing ? this.autoAim(p, W) : null, fl: W.poison ? { fx: { poison: W.poison } } : W.slowHit ? { fx: { slow: W.slowHit, ward: W.ward || 0 } } : W.burn ? { fx: { burn: W.burn } } : null }; this.stepBurst(p, W, 0); break;
         case 'fan': this.fireSpread(p, W); break;
         case 'flick':
           this.fireSpread(p, W);
@@ -651,6 +655,7 @@ class Game {
           const d = clamp(inp.ad || 200, W.minRange, W.range);
           const sh = this.spawnShellRet(p, p.x + Math.cos(inp.a) * d, p.y + Math.sin(inp.a) * d, W.dmg * p.dmgMul, W.blast, W.flight);
           if (W.bounce && sh) sh.bounce = 1;
+          if (W.sticky && sh) sh.sticky = W.sticky;   // 2.0 迫击：黏稠墨水
           break;
         }
         case 'punch': this.punch(p, W); break;
@@ -703,6 +708,7 @@ class Game {
     if (fx.slow) t.slowT = Math.max(t.slowT, fx.slow);
     if (fx.reveal) t.revealT = Math.max(t.revealT || 0, fx.reveal);
     if (fx.poison) { t.poisonT = Math.max(t.poisonT || 0, fx.poison); t.poisonBy = fx.by || t.poisonBy; }
+    if (fx.burn) { t.burnT = Math.max(t.burnT || 0, fx.burn); t.burnBy = fx.by || t.burnBy; }   // 2.0 喷火罐车：点燃
     if (fx.ward && fx.by) {   // 1.9.1 结界机兵：同一个人连中 4 发符印 → 束缚 0.7 秒 + 额外伤害
       if (t.wardBy !== fx.by) { t.wardBy = fx.by; t.wardN = 0; }
       t.wardN = (t.wardN || 0) + 1; t.wardT = 2.5;
@@ -715,7 +721,11 @@ class Game {
     b.t -= dt;
     while (b.t <= 0 && b.n > 0) {
       const ya = b.aim ? b.aim.a : p.input.a, pa = b.aim ? b.aim.pt : p.input.pt;
-      this.spawnProj(p, ya + (Math.random() - 0.5) * W.spread, pa + (Math.random() - 0.5) * W.spread * 0.4, W.speed, W.range, W.dmg, W.splat, W.trail, W.size, null, b.fl);
+      // 2.0 攻击特性：喷罐最后一发是爆裂弹，旋转机兵越打越狠
+      const i = W.shots - b.n, fin = W.finale && b.n === 1 && !p.foot;
+      const mul = (fin ? W.finale : 1) * (W.spinup ? W.spinup[0] + (W.spinup[1] - W.spinup[0]) * i / Math.max(1, W.shots - 1) : 1);
+      const pr = this.spawnProj(p, ya + (Math.random() - 0.5) * W.spread, pa + (Math.random() - 0.5) * W.spread * 0.4, W.speed, W.range, W.dmg * mul, W.splat * (fin ? 1.5 : 1), W.trail, W.size + (fin ? 3 : 0), null, b.fl);
+      if (fin && pr) this.ev(['fin', p.id, pr.id]);
       b.n--; b.t += W.interval;
     }
     if (b.n <= 0) p.burst = null;
@@ -729,9 +739,11 @@ class Game {
   }
   punch(p, W) {
     const a = p.input.a;
-    const spin = !!W.combo && !p.foot && (p.combo = p.comboT > 0 ? (p.combo || 0) + 1 : 1) >= W.combo;   // 1.9.1 灵刃：第 3 刀是回旋斩
-    p.comboT = 1.3; if (spin) p.combo = 0;
+    const fin = !!W.combo && !p.foot && (p.combo = p.comboT > 0 ? (p.combo || 0) + 1 : 1) >= W.combo;   // 连击第 3 下：灵刃回旋斩 / 重拳上勾拳
+    p.comboT = 1.3; if (fin) p.combo = 0;
+    const spin = fin && W.comboKind !== 'upper', upper = fin && W.comboKind === 'upper';
     if (spin) W = Object.assign({}, W, { arc: Math.PI * 2, dmg: W.dmg * 1.3, range: W.range + 14, lunge: W.lunge * 0.5 });
+    if (upper) W = Object.assign({}, W, { dmg: W.dmg * 1.3, range: W.range + 8 });
     this.knock(p, Math.cos(a), Math.sin(a), W.lunge, 0);
     const fx = p.x + Math.cos(a) * 30, fy = p.y + Math.sin(a) * 30;
     this.paint(fx, fy, p.z, W.paintR || 30, p.team, p);
@@ -742,13 +754,15 @@ class Game {
       let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
       if (Math.abs(da) > W.arc / 2) continue;
       const dmg = W.dmg * p.dmgMul;
-      this.hurt(t, dmg, p, dx, dy, W.kb / (dmg * 1.8), 120);
+      this.hurt(t, dmg, p, dx, dy, W.kb / (dmg * 1.8), upper ? 420 : 120);
+      if (W.stagger) t.slowT = Math.max(t.slowT, W.stagger);   // 2.0 拆楼锤：震荡
     }
     this.pushBall(p, fx, fy, W.range, 1100);
     if (this.mode === 'park') for (const b of this.obj.balloons.slice()) if (Math.hypot(b.x - fx, b.y - fy) < W.range + 20) this.popBalloon(b, p.team, p);
     if (W.wave) { const V = W.wave; for (const da of spin ? [-0.45, 0, 0.45] : [0]) this.spawnProj(p, a + da, -0.03, V.speed, V.range, V.dmg, V.splat, 14, V.size, null, { kb: 1.4 }); }   // 1.8：灵刃的刀气（1.9.1 回旋斩三道）
     this.ev(['pu', p.id, r2(a)]);
     if (spin) this.ev(['spin', p.id, r1(p.x), r1(p.y), r1(p.z), p.team]);
+    if (upper) this.ev(['upper', p.id, r1(p.x + Math.cos(a) * 40), r1(p.y + Math.sin(a) * 40), r1(p.z), p.team]);
   }
 
   fireSpread(p, W) {
@@ -758,7 +772,7 @@ class Game {
       const off = n > 1 ? (i / (n - 1) - 0.5) * W.arc : 0;
       const k = n > 1 ? rand(0.85, 1.12) : 1;
       this.spawnProj(p, a + off + (Math.random() - 0.5) * W.spread, pt + (Math.random() - 0.5) * W.spread * 0.6 + (n > 1 ? rand(-0.02, 0.04) : 0),
-        W.speed * k, W.range * k, W.dmg, W.splat, W.trail, W.size, null, { ghost: W.ghost, kb: W.kb });
+        W.speed * k, W.range * k, W.dmg, W.splat, W.trail, W.size, null, { ghost: W.ghost, kb: W.kb, fx: W.reveal ? { reveal: W.reveal } : null });
     }
   }
 
@@ -784,7 +798,7 @@ class Game {
     const x = o.x + d.x * (o.r || 0), y = o.y + d.y * (o.r || 0), z = o.z + d.z * (o.r || 0);
     if (S.insideAt(this.M, x, y, z)) { this.paint(o.x, o.y, o.z - 10, splat * 0.7, p.team, p); return; }
     const pr = { id: this.nextId++, x0: x, y0: y, z0: z, x, y, z, vx: d.x * speed, vy: d.y * speed, vz: d.z * speed, ts: range / speed, t: 0, team: p.team, owner: p.id,
-      dmg: dmg * (origin ? 1 : p.dmgMul || 1), splat, trail, size, acc: 0, range, ghost: !!(fl && fl.ghost), kb: (fl && fl.kb) || 1, fx: (fl && fl.fx) || null };
+      dmg: dmg * (origin ? 1 : p.dmgMul || 1), splat, trail, size, acc: 0, range, w: origin || p.foot ? null : p.weapon, ghost: !!(fl && fl.ghost), kb: (fl && fl.kb) || 1, fx: (fl && fl.fx) || null };
     this.projs.push(pr);
     this.ev(['pj', pr.id, r1(x), r1(y), r1(z), r1(pr.vx), r1(pr.vy), r1(pr.vz), r2(pr.ts), p.team, size, p.id, pr.ghost ? 1 : 0]);
     return pr;
@@ -809,7 +823,8 @@ class Game {
       if (s.t < s.T) return true;
       if (this.domainBlocks(s.team, s.x1, s.y1, s.z1)) { this.ev(['blk', 0, r1(s.x1), r1(s.y1), r1(s.z1 + 10)]); return false; }
       this.explode(s.x1, s.y1, s.z1, s.r, s.dmg, s.dmg * 0.45, s.team, this.players.get(s.owner));
-      this.ev(['bx', r1(s.x1), r1(s.y1), r1(s.z1), s.team, s.r, 0]);
+      this.ev(['bx', r1(s.x1), r1(s.y1), r1(s.z1), s.team, s.r, s.sticky ? 4 : 0]);
+      if (s.sticky) for (const t of this.players.values()) if (t.alive && t.team !== s.team && Math.hypot(t.x - s.x1, t.y - s.y1) < s.r + 10 && Math.abs(t.z - s.z1) < 60) t.slowT = Math.max(t.slowT, s.sticky);
       if (s.bounce) {   // 弹弓：落地后沿原方向再弹一次
         const dx = s.x1 - s.x0, dy = s.y1 - s.y0, l = Math.hypot(dx, dy) || 1, d2 = 95;
         const x2 = clamp(s.x1 + (dx / l) * d2, 10, S.W - 10), y2 = clamp(s.y1 + (dy / l) * d2, 10, S.H - 10);
@@ -1041,18 +1056,20 @@ class Game {
     let dmg = (W.minDmg + (W.dmg - W.minDmg) * ch) * p.dmgMul;
     const pr = 10 + 6 * ch;
     let victim = null, lastPaint = -99, hitT = 0;
+    const pierce = W.pierce && ch >= 0.9 && !p.foot, hits = [];   // 2.0 狙击：蓄满的一枪贯穿第一个敌人
     const b = this.obj.ball && this.obj.resetT <= 0 ? this.obj.ball : null;
     const end = this.trace(mz.x, mz.y, mz.z, mz.d, range, (x, y, z, t) => {
       const gh = this.top(x, y);
       if (z - gh < 45 && t - lastPaint > 12) { lastPaint = t; this.paint(x, y, gh, pr, p.team, p); }
-      victim = this.hitPlayerAt(p.team, x, y, z, 5);
-      if (victim) { hitT = t; return true; }
+      const v = this.hitPlayerAt(p.team, x, y, z, 5);
+      if (v && !hits.includes(v)) { hits.push(v); victim = hits[0]; hitT = hitT || t; if (!pierce || hits.length >= 2) return true; }
       if (b && Math.hypot(b.x - x, b.y - y, b.r - z) < b.r + 4) { b.vx += mz.d.x * (250 + 450 * ch); b.vy += mz.d.y * (250 + 450 * ch); b.last = p.team; return true; }
       return false;
     });
     if (victim) {
       if (p.pilot === 'frost' && hitT > W.range * 0.6) dmg *= 1.08;
       this.hurt(victim, dmg, p, mz.d.x, mz.d.y);
+      if (hits[1]) { this.hurt(hits[1], dmg * W.pierce, p, mz.d.x, mz.d.y); this.ev(['prc', hits[1].id]); }
     }
     this.paint(end.x, end.y, this.top(end.x, end.y), 18 + 12 * ch, p.team, p);
     this.ev(['ln', r1(mz.x), r1(mz.y), r1(mz.z), r1(end.x), r1(end.y), r1(end.z), p.team, r2(ch), p.id]);
@@ -1536,8 +1553,9 @@ class Game {
         const victim = this.hitPlayerAt(pr.team, pr.x, pr.y, pr.z, pr.size);
         if (victim) {
           const far = owner && owner.pilot === 'frost' && pr.t * Math.hypot(pr.vx, pr.vy) > pr.range * 0.6;
-          this.hurt(victim, pr.dmg * (far ? 1.15 : 1), owner, pr.vx, pr.vy, pr.kb);
-          if (pr.fx) this.sideFx(victim, pr.fx.poison || pr.fx.ward ? Object.assign({ by: pr.owner }, pr.fx) : pr.fx);
+          const close = pr.w && S.WEAPONS[pr.w].close && Math.hypot(pr.x - pr.x0, pr.y - pr.y0) < 110 ? S.WEAPONS[pr.w].close : 1;   // 2.0 泼桶：近身爆发
+          this.hurt(victim, pr.dmg * close * (far ? 1.15 : 1), owner, pr.vx, pr.vy, pr.kb);
+          if (pr.fx) this.sideFx(victim, pr.fx.poison || pr.fx.ward || pr.fx.burn ? Object.assign({ by: pr.owner }, pr.fx) : pr.fx);
           this.paint(pr.x, pr.y, victim.z, pr.splat * 0.6, pr.team, owner);
           dead = true; break;
         }
@@ -2108,7 +2126,7 @@ class Game {
       if (p.sp >= W.spNeed) flags |= 256;
       if (p.foot) flags |= 512;
       const buffs = (p.rushT > 0 ? 1 : 0) | (p.slowT > 0 ? 2 : 0) | (p.silenceT > 0 ? 4 : 0) | (p.smokeT > 0 ? 8 : 0) | (p.odN > 0 ? 16 : 0) | (p.quakeT > 0 ? 32 : 0)
-        | (p.ovT > 0 ? 64 : 0) | (p.rallyT > 0 ? 128 : 0) | (p.revealT > 0 ? 256 : 0);
+        | (p.ovT > 0 ? 64 : 0) | (p.rallyT > 0 ? 128 : 0) | (p.revealT > 0 ? 256 : 0) | (p.burnT > 0 ? 512 : 0) | (p.bindT > 0 ? 1024 : 0);
       pl.push([p.id, r1(p.x), r1(p.y), r2(p.input.a), Math.ceil(p.hp), Math.round(p.ammo * 100), Math.round(p.sp), flags,
         Math.ceil((p.foot ? p.rebuildT : p.respawnT) * 10), p.carry, Math.round(p.sm * 100), Math.round(p.charge * 100), r1(p.shield), p.sync,
         r1(p.vx + (p.kx || 0)), r1(p.vy + (p.ky || 0)), S.SPECIAL_IDS.indexOf(p.spKind), r1(p.z), r2(p.input.pt), Math.round(p.vz || 0),
@@ -2118,7 +2136,7 @@ class Game {
     const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState(),
       rv: [0, this.reveal[1] > this.time ? 1 : 0, this.reveal[2] > this.time ? 1 : 0],
       h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team, h.ang != null ? r2(h.ang) : 0]).concat(this.obj.crates ? this.obj.crates.map((k) => [k.id, 'crate', r1(k.x), r1(k.y), r1(k.z), 0]) : []) };
-    if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj]);
+    if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj, p.stats.assists || 0]);
     if (this.loot && this.tick % 60 === 0) msg.lt = this.lootList();   // 物资全量（每 2 秒一次，防止丢包后对不上）
     this.room.broadcast(msg, true);
     this.diff = []; this.events = [];
@@ -2858,6 +2876,7 @@ function handle(hub, c, m) {
       break;
     }
     case 'ping': c.conn.send({ t: 'pong', ts: m.ts }); break;
+    case 'dbgSp': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) me.sp = S.WEAPONS[me.weapon].spNeed; } break;   // 调试：大招充满
     case 'dbgOv': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) { me.bt = Math.max(me.bt, 1); me.ovUsed = false; me.ov = S.OV_NEED; r.game.activateOverload(me); } } break;   // 调试：立刻放超载
     case 'dbgFinish': if (hub.debug && r && r.game && r.hostId === c.id) { const g = r.game, me = g.players.get(c.id); if (g.loot) { me.extracted = true; me.out = true; me.alive = false; g.obj.banked[c.id] = ['scrap']; } g.finish(me ? me.team : 1); } break;   // 只在测试服务器（GB_DEBUG=1）里可用
     // ---------------- 1.7：好友（服务器转发：好友码 → 连接）----------------

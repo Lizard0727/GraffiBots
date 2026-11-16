@@ -1,22 +1,26 @@
 {
-  "version": "1.9.1",
-  "date": "2026-11-15",
-  "title": "1.9.1 更新 · 简易领域 & 战力平衡",
-  "en_title": "Update 1.9.1 · Simple Domain & Balance",
+  "version": "2.0",
+  "date": "2026-11-16",
+  "title": "2.0 更新 · 机兵个性",
+  "en_title": "Update 2.0 · Mech Identity",
   "page": "#updates",
   "force": true,
   "notes": [
-    "符零新超载「简易领域」（替换「百符结界」）",
-    "新机体机制优化",
-    "机体战力平衡（根据 2100 局 AI 对战模拟）",
-    "驾驶员平衡",
+    "每台机体都不一样了",
+    "新的攻击特性（机体页面可以看到）",
+    "攻击范围看得见",
+    "界面与修复",
+    "更流畅",
+    "平衡调整",
     "更新奖励"
   ],
   "en_notes": [
-    "Sigil’s new overload: Simple Domain (replaces Hundred-Talisman Ward)",
-    "New mech mechanics",
-    "Mech balance (based on 2,100 simulated AI matches)",
-    "Pilot balance",
+    "Every mech feels different now",
+    "New attack traits (shown on each mech page)",
+    "Visible attack ranges",
+    "UI and fixes",
+    "Smoother",
+    "Balance",
     "Update reward"
   ]
 }

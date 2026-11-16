@@ -18,7 +18,7 @@
     try {
       renderer = new T.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, powerPreference: 'high-performance' });
     } catch (e) { failed = true; console.error(e); return false; }
-    renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1));
+    renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1) * (typeof DYN === 'object' ? DYN.scale : 1));
     renderer.shadowMap.enabled = HQ;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     camera = new T.PerspectiveCamera(72, 1, 2, 7000);
@@ -1018,6 +1018,13 @@
     });
     // 1.8：百目砸地的预警圈（实心圆从中间慢慢填满）
     P.disc = pool(() => new T.Mesh(new T.CircleGeometry(1, 32), basic(0xff2d4b, { transparent: true, opacity: 0.3, depthWrite: false, side: T.DoubleSide })));
+    // 2.0：近战命中扇形（按角度缓存几何体）+ 敌方近战的攻击距离圈
+    W.wedge = {};   // 不放进 P：P 里每一项都是 pool（每帧 begin / end）
+    W.wedgeOf = (arc) => {
+      const key = Math.round(arc * 20);
+      if (!W.wedge[key]) { const g = new T.CircleGeometry(1, 28, -arc / 2, arc); W.wedge[key] = pool(() => { const m = new T.Mesh(g, basic(0xffffff, { transparent: true, depthWrite: false, side: T.DoubleSide })); m.rotation.x = -Math.PI / 2; m.renderOrder = 4; return m; }); W.wedge[key].begin(); }
+      return W.wedge[key].next();
+    };
     // 1.8：裂空斩的月牙刀气
     P.cres = pool(() => new T.Mesh(new T.TorusGeometry(26, 4, 6, 18, Math.PI), basic(0xffffff, { transparent: true, opacity: 0.85, depthWrite: false, blending: T.AdditiveBlending })));
     // 逃亡圈：空投箱（金色补给箱 + 降落伞）
@@ -1158,8 +1165,16 @@
   }
   const _c = new T.Color();
   // opt: { size, life, grav, drag, grow, sys: 'ps'|'pg'|'pk', spread, dir: {x,y,z} }
+  // 2.0：自适应画质——帧率不够时降低渲染分辨率和粒子数量，恢复后再调回来
+  const DYN = { scale: 1, pk: 1 };
+  function setDyn(scale, pk) {
+    scale = Math.max(0.5, Math.min(1, scale)); DYN.pk = Math.max(0.3, Math.min(1, pk));
+    if (Math.abs(scale - DYN.scale) < 0.01) return; DYN.scale = scale;
+    if (renderer) { renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1) * DYN.scale); resize(); }
+  }
   function emit(x, y, z, color, n, spd = 220, up = 1, opt = {}) {
     if (!W) return;
+    if (DYN.pk < 1) { n *= DYN.pk; n = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0); if (!n) return; }
     const S2 = W[opt.sys || 'ps'];
     _c.set(color);
     for (let k = 0; k < n; k++) {
@@ -1508,7 +1523,7 @@
     HQ = !!hq;
     OUTLINE.visible = HQ;
     if (renderer) {
-      renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1));
+      renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1) * (typeof DYN === 'object' ? DYN.scale : 1));
       resize();
       if (renderer.shadowMap.enabled !== HQ) {
         renderer.shadowMap.enabled = HQ;
@@ -2743,6 +2758,8 @@
           b.stepAcc = (b.stepAcc || 0) + 0.03;
           if (Math.hypot(p.vx || 0, p.vy || 0) > 60 && b.stepAcc > 0.15 && (p.z || 0) < (W.M ? S.topAt(W.M, p.x, p.y) : 0) + 2) { b.stepAcc = 0; emit(p.x, p.y, z + 1, TC[0], 1, 0, 0, { sys: 'pg', size: 12, life: 1.1, grav: 0, drag: 8 }); }
         }
+        if ((bf & 512) && Math.random() < 0.7) emit(p.x + (Math.random() - 0.5) * 22, p.y + (Math.random() - 0.5) * 22, z + 8 + Math.random() * 24, Math.random() < 0.5 ? '#ff7a1a' : '#ffd23f', 1, 20, 1, { sys: 'pg', size: 10, life: 0.4, grav: -160, drag: 2, grow: 1.3 });   // 2.0 着火
+        if (bf & 1024) { const a = now / 160; for (let k = 0; k < 2; k++) emit(p.x + Math.cos(a + k * Math.PI) * 24, p.y + Math.sin(a + k * Math.PI) * 24, z + 14, '#f4e6c8', 1, 0, 0, { sys: 'pg', size: 8, life: 0.25, grav: 0 }); }   // 2.0 符印束缚
         if (bf & 64) for (let k = 0; k < 2; k++) emit(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 30, z + 4 + Math.random() * 36, k ? '#b78cff' : '#ffffff', 1, 30, 1, { sys: 'pg', size: 12, life: 0.45, grav: -140, drag: 2 });   // 超载
         if (bf & 128) emit(p.x, p.y, z + 44, '#ff5a36', 1, 20, 0.3, { sys: 'pg', size: 8, life: 0.3, grav: -40 });   // 集结
       }
@@ -3384,6 +3401,7 @@
   function syncWorld(G, now, dt) {
     const P = W.pools, cs = G.colors;
     for (const k in P) P[k].begin();
+    for (const k in W.wedge || {}) W.wedge[k].begin();
     // 子弹
     for (const pr of G.projs.values()) {
       const m = P['proj' + pr.team].next();
@@ -3484,6 +3502,11 @@
       else if (A.kind === 'circle') { const m = W.aimCircle; m.visible = true; m.position.set(A.x, y, A.y); m.scale.set(A.len, A.len, 1); }
       if (A.tx != null) { const r = W.aimRing; r.visible = true; r.position.set(A.tx, A.tz + 1.8, A.ty); r.scale.setScalar(A.tr || 20); r.material.color.set(A.color || '#ffffff'); }
     }
+    // 2.0：敌方近战机体靠近时，脚下显示它的攻击距离（圈 + 朝向扇形）；大摆锤显示旋转范围
+    for (const q of G.reach || []) {
+      const o = P.ring.next(); flat(o, q.x, q.y, q.z + 1.2); o.scale.setScalar(q.r); o.material.color.set(q.color); o.material.opacity = q.op;
+      if (q.arc) { const m = W.wedgeOf(q.arc); m.position.set(q.x, q.z + 1.1, q.y); m.rotation.z = -q.a; m.scale.set(q.r, q.r, 1); m.material.color.set(q.color); m.material.opacity = q.op * 0.45; }
+    }
     // 特效
     for (const f of G.fx) {
       const k = (now - f.t0) / f.dur;
@@ -3497,6 +3520,13 @@
         const m = P.line.next();
         placeTube(m, f.x0, f.y0, f.z0, f.x1, f.y1, f.z1, f.w * (1 - k * 0.6));
         m.material.color.set(f.color); m.material.opacity = 0.9 * (1 - k);
+      } else if (f.k === 'arc') {   // 2.0 近战挥击：真实命中范围的扇形，先亮后淡
+        const m = W.wedgeOf(f.arc); m.position.set(f.x, (f.z || 0) + 1.8, f.y); m.rotation.z = -f.a;
+        const s2 = f.r * (0.82 + 0.18 * Math.min(1, k * 3)); m.scale.set(s2, s2, 1);
+        m.material.color.set(f.color); m.material.opacity = (f.heavy ? 0.5 : 0.38) * (1 - k);
+        const o = P.ring.next(); flat(o, f.x, f.y, (f.z || 0) + 2); o.scale.setScalar(f.r); o.material.color.set('#ffffff'); o.material.opacity = (f.arc > 6 ? 0.6 : 0) * (1 - k);
+      } else if (f.k === 'goo') {   // 2.0 迫击黏稠墨水
+        const d = P.disc.next(); flat(d, f.x, f.y, (f.z || 0) + 1.4); d.scale.setScalar(f.r * (0.8 + 0.2 * Math.min(1, k * 4))); d.material.color.set(f.color); d.material.opacity = 0.32 * (1 - k * k);
       } else if (f.k === 'tele') {   // 1.8 预警：外圈闪烁，里面的实心圆慢慢长满
         const o2 = P.ring.next(); flat(o2, f.x, f.y, (f.z || 0) + 2); o2.scale.setScalar(f.r); o2.material.color.set('#ff2d4b'); o2.material.opacity = 0.5 + 0.4 * Math.abs(Math.sin(now / 90));
         const d = P.disc.next(); flat(d, f.x, f.y, (f.z || 0) + 1.6); d.scale.setScalar(f.r * k); d.material.opacity = 0.18 + 0.25 * k;
@@ -3617,6 +3647,7 @@
       for (const m of W.zonePosts) m.color.set(c);
     }
     for (const k2 in P) P[k2].end();
+    for (const k2 in W.wedge || {}) W.wedge[k2].end();
   }
 
   // =====================================================================
@@ -3730,6 +3761,7 @@
     setPost(on, o) { POST.off = !on; if (o && POST.comp) for (const k in o) { if (POST.comp.uniforms[k]) POST.comp.uniforms[k].value = o[k]; if (k === 'th') POST.bright.uniforms.th.value = o[k]; } },
     teamShow, teamFrame, teamSlots,
     build, paintCell, burst, emit, trailerStart, trailerStop, TRAILERS, __trT: () => (TR.on ? TR.t : -1), setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
+    setDyn, dyn: () => DYN,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();

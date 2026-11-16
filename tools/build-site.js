@@ -55,6 +55,7 @@ const maps = S.MAPS.map((m, i) => ({ name: m.name, en: tr(m.name), isNew: i >= S
 const apk = opt('--apk') || ['涂鸦机兵-GraffiBots.apk', 'GraffiBots.apk'].map((f) => path.join(DIST, f)).find((f) => fs.existsSync(f));
 const DL = [
   { id: 'offline', src: path.join(DIST, '涂鸦机兵-单文件版.html'), file: `graffibots-${S.VERSION}-offline.html` },
+  { id: 'win', src: path.join(DIST, 'GraffiBots-Windows.zip'), file: `graffibots-${S.VERSION}-windows.zip` },
   { id: 'full', src: path.join(DIST, 'GraffiBots.zip'), file: `graffibots-${S.VERSION}-full.zip` },
   { id: 'apk', src: apk, file: `graffibots-${S.VERSION}.apk` },
 ];
