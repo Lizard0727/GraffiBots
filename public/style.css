@@ -2195,3 +2195,45 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
 .lb-exts span { border-left: 4px solid var(--ec); background: #0005; border-radius: 6px; padding: 4px 8px; text-align: left; }
 .lb-exts b { display: block; font-size: 13px; color: var(--ec); }
 .lb-exts small { font-size: 11px; opacity: .85; }
+/* 2.1：S2 雇佣兵撤离——豪华版专属名片框 + 赛季传说背景 */
+.frame-merc, .me-chip.frame-merc .avatar { background: conic-gradient(from 0deg, #e0a030, #3a3d48, #ff4d3d, #e8d8a8, #e0a030); animation: spin 3s linear infinite; box-shadow: 0 0 16px #e0a030aa, 0 0 4px #fff inset; }
+.hp-stage.bg-merc { background: radial-gradient(circle at 50% 30%, #ffb42e44, transparent 60%), linear-gradient(180deg, #2a2418, #6a4a20 60%, #b8742a); border-radius: 22px; }
+.hp-stage.bg-merc::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(100deg, transparent 0 40px, #ffe0a01a 40px 44px); animation: stripeMove 3s linear infinite; border-radius: 22px; pointer-events: none; }
+/* ============ 2.1：S2 雇佣兵撤离通行证界面 ============ */
+.pass-body.s2 { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.ps-hero { position: relative; border-radius: 22px; overflow: hidden; padding: 18px; color: #fff; min-height: 460px;
+  background: radial-gradient(circle at 50% 22%, #ffb42e55, transparent 55%), linear-gradient(170deg, #2a2418 0%, #5a3e1a 55%, #b8742a 100%); box-shadow: 0 18px 40px #0007, inset 0 1px 0 #ffffff22; }
+.ps-hero::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(100deg, transparent 0 46px, #ffe0a014 46px 50px); animation: stripeMove 4s linear infinite; pointer-events: none; }
+.ps-art { position: relative; height: 280px; display: flex; justify-content: center; filter: drop-shadow(0 12px 18px #0008); animation: psFloat 4s ease-in-out infinite; }
+.ps-art svg { height: 100%; width: auto; }
+@keyframes psFloat { 50% { transform: translateY(-8px); } }
+.ps-tag { position: relative; display: inline-block; background: linear-gradient(90deg, #ff9a3d, #ffd35e); color: #2a1a08; font-weight: 900; border-radius: 999px; padding: 3px 12px; font-size: 12px; letter-spacing: 1px; }
+.ps-hero h3 { position: relative; margin: 8px 0 10px; font-size: 20px; text-shadow: 0 2px 8px #000a; }
+.ps-ms { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ps-ms li { display: grid; grid-template-columns: 54px 1fr auto; align-items: center; gap: 8px; background: #0006; border: 1px solid #ffffff22; border-radius: 12px; padding: 6px 10px; font-size: 13px; }
+.ps-ms li b { color: #ffd35e; } .ps-ms li small { opacity: .7; font-size: 11px; }
+.ps-ms li.prem { border-color: #ffd35e66; } .ps-ms li.ok { background: #5ee36a33; border-color: #5ee36a; }
+.ps-state { position: relative; font-size: 12px; opacity: .85; margin: 10px 0 0; }
+.ps-main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.ps-bottom { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, 1.3fr); gap: 14px; }
+.ps-bonus { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; background: linear-gradient(135deg, #1f2436f0, #161a28f0); color: #e8ecff; border: 1px solid #ffd35e55; border-radius: 16px; padding: 12px 14px; }
+.ps-bonus small { display: block; font-size: 12px; opacity: .8; margin: 2px 0 6px; }
+.ps-bonus i { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ffd35e calc(var(--k) * 100%), #ffffff22 0); }
+.pb-chest { width: 60px; height: 60px; } .pb-chest svg { width: 100%; height: 100%; } .pb-chest.can { animation: badgePop 1.1s infinite; }
+.pt-col.ms .pt-num { background: linear-gradient(90deg, #ff9a3d, #ffd35e) !important; color: #2a1a08 !important; box-shadow: 0 0 14px #ffd35e; }
+.pt-col.ms .pt-cell { outline: 3px solid #ffd35e; outline-offset: 2px; }
+.ps-shop { position: fixed; inset: 0; z-index: 80; background: #05070cd8; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ps-cards { position: relative; display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.ps-x { position: absolute; top: -14px; right: -14px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid #fff6; background: #000a; color: #fff; font-size: 18px; cursor: pointer; z-index: 2; }
+.ps-card { position: relative; width: 300px; border-radius: 22px; padding: 22px 20px; color: #fff; text-align: center; box-shadow: 0 18px 40px #000a; overflow: hidden; }
+.ps-card.prem { background: linear-gradient(160deg, #3a3060, #1d1838); border: 2px solid #b78cff; }
+.ps-card.dlx { background: linear-gradient(160deg, #5a3e1a, #2a1a08); border: 2px solid #ffd35e; }
+.ps-card h3 { margin: 0 0 6px; font-size: 24px; letter-spacing: 2px; }
+.ps-price { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 28px; margin-bottom: 10px; } .ps-price small { font-size: 12px; opacity: .75; }
+.ps-card ul { text-align: left; font-size: 13px; padding-left: 18px; line-height: 1.8; min-height: 120px; }
+.ps-card.owned { filter: saturate(.6); } .ps-card .btn { width: 100%; }
+.ps-ribbon { position: absolute; top: 14px; right: -34px; transform: rotate(40deg); background: #ff4d3d; padding: 3px 40px; font-size: 12px; font-weight: 900; }
+@media (max-width: 900px) { .pass-body.s2 { grid-template-columns: 1fr; } .ps-hero { min-height: 0; display: grid; grid-template-columns: 140px 1fr; gap: 10px; } .ps-art { height: 160px; grid-row: span 4; } .ps-bottom { grid-template-columns: 1fr; } }
+.trailer.s2 .tr-title b { color: #ffd35e; text-shadow: 0 0 24px #ff8a1f, 0 4px 0 #2a1a08; }
+.trailer.s2 .tr-name b { color: #ffb42e; }
+.ps-bottom { align-items: start; }

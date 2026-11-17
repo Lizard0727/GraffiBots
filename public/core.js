@@ -532,6 +532,10 @@ class Game {
     p.silenceT = Math.max(0, p.silenceT - dt); p.smokeT = Math.max(0, p.smokeT - dt);
     p.rallyT = Math.max(0, p.rallyT - dt); p.revealT = Math.max(0, p.revealT - dt);
     p.cloakT = Math.max(0, (p.cloakT || 0) - dt);
+    if (p.jamT > 0) p.jamT -= dt;
+    if (p.supT > 0) p.supT -= dt;
+    if (p.blindT > 0) p.blindT -= dt;
+    if (p.repT > 0) { p.repT -= dt; if (!p.foot) p.hp = Math.min(this.maxHpOf(p), p.hp + this.maxHpOf(p) * 0.03 * dt); }   // 2.1 母舰：维修无人机
     p.sealT = Math.max(0, (p.sealT || 0) - dt); p.possT = Math.max(0, (p.possT || 0) - dt); p.dslowT = Math.max(0, (p.dslowT || 0) - dt);   // 1.8
     p.bindT = Math.max(0, (p.bindT || 0) - dt); p.comboT = Math.max(0, (p.comboT || 0) - dt);   // 1.9.1：符印束缚 / 灵刃连斩
     if (p.wardN && (p.wardT = (p.wardT || 0) - dt) <= 0) p.wardN = 0;
@@ -585,7 +589,9 @@ class Game {
     if (!p.burst && p.rollT <= 0 && !(p.charge > 0)) {
       const rt = p.foot ? S.sidearm(p.pilot).reload : W.reload;
       let rk = (p.rushT > 0 ? 2 : 1) * (wheel && own ? 1.6 : 1) * (p.tal.has('a2') ? 1.12 : 1);
-      if (this.nearPilot(p, 'echo', 180)) rk *= 1.15;   // 叶声被动：节拍同步
+      if (this.nearPilot(p, 'echo', 200)) rk *= 1.2; else if (p.pilot === 'echo') rk *= 1.1;   // 叶声被动：节拍同步（2.1：队友 +20%，范围 200；自己 +10%）
+      if (p.jamT > 0) rk *= 0.7;
+      if (p.supT > 0) rk *= 1.3;                          // 2.1 霍克的补给箱                          // 2.1 叶声的声波干扰：装填 -30%
       p.ammo = Math.min(S.AMMO, p.ammo + (dt / rt) * rk);
     }
     if (OV && OV.infAmmo && !p.foot) p.ammo = S.AMMO;
@@ -744,7 +750,7 @@ class Game {
       const ya = b.aim ? b.aim.a : p.input.a, pa = b.aim ? b.aim.pt : p.input.pt;
       // 2.0 攻击特性：喷罐最后一发是爆裂弹，旋转机兵越打越狠
       const i = W.shots - b.n, fin = W.finale && b.n === 1 && !p.foot;
-      const mul = (fin ? W.finale : 1) * (W.spinup ? W.spinup[0] + (W.spinup[1] - W.spinup[0]) * i / Math.max(1, W.shots - 1) : 1);
+      const mul = (fin ? W.finale : 1) * (W.lead && i === 0 && !p.foot ? W.lead : 1) * (W.spinup ? W.spinup[0] + (W.spinup[1] - W.spinup[0]) * i / Math.max(1, W.shots - 1) : 1);
       const pr = this.spawnProj(p, ya + (Math.random() - 0.5) * W.spread, pa + (Math.random() - 0.5) * W.spread * 0.4, W.speed, W.range, W.dmg * mul, W.splat * (fin ? 1.5 : 1), W.trail, W.size + (fin ? 3 : 0), null, b.fl);
       if (fin && pr) this.ev(['fin', p.id, pr.id]);
       b.n--; b.t += W.interval;
@@ -881,32 +887,43 @@ class Game {
         break;
       }
       case 'emp':
-        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 190) { e.slowT = 2.5; e.silenceT = 1.3; e.charge = 0; e.burst = null; }
+        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 200) { e.slowT = 3; e.silenceT = 1.4; e.charge = 0; e.burst = null; }
         break;
       case 'bento': this.helpers.push({ id: this.nextId++, kind: 'bento', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 15, armed: 0.6 }); break;
       case 'overdrive': p.ammo = S.AMMO; p.odN = 3; break;
       case 'drone': this.helpers.push({ id: this.nextId++, kind: 'drone', x: p.x, y: p.y, z: p.z + 40, team: p.team, owner: p.id, t: 6, cd: 0.3, ang: 0 }); break;
       case 'rally':
-        for (const a of this.players.values()) if (a.alive && a.team === p.team && dist(a, p) < 180) a.rallyT = Math.max(a.rallyT, 5);
+        for (const a of this.players.values()) if (a.alive && a.team === p.team && dist(a, p) < 180) a.rallyT = Math.max(a.rallyT, 6);
         break;
-      case 'blast': this.helpers.push({ id: this.nextId++, kind: 'charge', x: p.x, y: p.y, z: this.top(p.x, p.y), team: p.team, owner: p.id, t: 0.9, cd: 99 }); break;
-      case 'flash':
+      case 'blast': {   // 2.1 石磊：炸药包扔到瞄准的位置（最远 220），0.9 秒后爆炸，伤害 80 + 击飞
+        const d = clamp(p.input.ad || 140, 0, 220), bx = clamp(p.x + Math.cos(p.input.a) * d, 20, S.W - 20), by2 = clamp(p.y + Math.sin(p.input.a) * d, 20, S.H - 20);
+        this.helpers.push({ id: this.nextId++, kind: 'charge', x: bx, y: by2, z: this.top(bx, by2), team: p.team, owner: p.id, t: 0.9, cd: 99 });
+        break;
+      }
+      case 'flash':   // 2.1 韩冰：闪光弹——范围更大，被闪到的敌人「致盲」3 秒，受到韩冰全队的伤害 +12%
         for (const e of this.players.values()) {
-          if (!e.alive || e.team === p.team || dist(e, p) > 230) continue;
+          if (!e.alive || e.team === p.team || dist(e, p) > 260) continue;
           let da = Math.atan2(e.y - p.y, e.x - p.x) - p.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
-          if (Math.abs(da) > 1.25) continue;
+          if (Math.abs(da) > 1.3) continue;
           e.slowT = Math.max(e.slowT, 1.2); e.silenceT = Math.max(e.silenceT, 0.8); e.revealT = 4; e.charge = 0; e.burst = null;
-          this.hurt(e, 10, p);
+          e.blindT = 3; e.blindTeam = p.team;
+          this.hurt(e, 12, p);
         }
         break;
-      case 'decoy':
-        this.helpers.push({ id: this.nextId++, kind: 'decoy', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 2, cd: 99 });
-        p.cloakT = Math.max(p.cloakT || 0, 2); p.cloakFast = false;
+      case 'decoy':   // 2.1 卡卡：替身会吸引 AI 的火力，2.5 秒后炸开（50 伤害 + 减速）；卡卡隐身加速 2.5 秒
+        this.helpers.push({ id: this.nextId++, kind: 'decoy', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 2.5, cd: 99 });
+        p.cloakT = Math.max(p.cloakT || 0, 2.5); p.cloakFast = true;
         break;
-      case 'jam':
+      case 'airdrop': {   // 2.1 霍克：战术空投——1 秒后补给箱落地
+        const d = clamp(p.input.ad || 160, 40, 260), ax = clamp(p.x + Math.cos(p.input.a) * d, 24, S.W - 24), ay = clamp(p.y + Math.sin(p.input.a) * d, 24, S.H - 24);
+        this.helpers.push({ id: this.nextId++, kind: 'supply', x: ax, y: ay, z: this.top(ax, ay), team: p.team, owner: p.id, t: 7, fall: 1, r: 100, cd: 99 });
+        this.ev(['adp', r1(ax), r1(ay), r1(this.top(ax, ay)), p.team]);
+        break;
+      }
+      case 'jam':   // 2.1 叶声：声波干扰——吸走 30% 大招充能、装填 -30%（3 秒）、打断技能 0.6 秒、暴露 4 秒
         for (const e of this.players.values()) {
-          if (!e.alive || e.team === p.team || dist(e, p) > 220) continue;
-          e.sp = Math.max(0, e.sp - S.WEAPONS[e.weapon].spNeed * 0.3); e.revealT = 4;
+          if (!e.alive || e.team === p.team || dist(e, p) > 230) continue;
+          e.sp = Math.max(0, e.sp - S.WEAPONS[e.weapon].spNeed * 0.3); e.revealT = 4; e.jamT = 3; e.silenceT = Math.max(e.silenceT, 0.6);
         }
         break;
       case 'seal': {   // 1.8 符零：封印符阵
@@ -966,16 +983,27 @@ class Game {
         if (h.armed > 0) return true;
         for (const a of this.players.values()) {
           if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < 26 && Math.abs(a.z - h.z) < 30) {
-            const hv = h.heal || 90; a.hp = Math.min(this.maxHpOf(a), a.hp + hv); this.ev(['heal', a.id, hv]); return false;
+            const hv = h.heal || 90; a.hp = Math.min(this.maxHpOf(a), a.hp + hv); this.ev(['heal', a.id, hv]);
+            if (h.gift && !a.foot) a.sp = Math.min(S.WEAPONS[a.weapon].spNeed, a.sp + S.WEAPONS[a.weapon].spNeed * 0.25);   // 2.1 卡卡的惊喜礼盒：还送 25% 大招充能
+            return false;
           }
         }
         return true;
       }
       if (h.kind === 'charge') {   // 石磊的炸药：时间到就爆
-        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 8, 110, 72, 30, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 110, 0]); return false; }
+        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 8, 115, 86, 32, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 115, 0]); return false; }
         return true;
       }
-      if (h.kind === 'wall') return true;   // 盾墙：挡子弹的判定在 updateProjs
+      if (h.kind === 'wall') return true;
+      if (h.kind === 'supply') {   // 2.1 霍克的补给箱：先砸下来，再给附近队友回血 + 加快装填
+        if (h.fall > 0) { h.fall -= dt; if (h.fall <= 0) { this.explode(h.x, h.y, h.z + 8, 70, 40, 24, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 70, 0]); this.paint(h.x, h.y, h.z, 50, h.team, o); } return true; }
+        for (const a of this.players.values()) if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < h.r && Math.abs(a.z - h.z) < 60) { a.hp = Math.min(this.maxHpOf(a), a.hp + 8 * dt); a.supT = 0.3; }
+        return true;
+      }
+      if (h.kind === 'recon') {    // 2.1 战术机兵的侦察无人机：暴露 + 标记
+        for (const e of this.players.values()) if (e.alive && e.team !== h.team && Math.hypot(e.x - h.x, e.y - h.y) < 320) { e.revealT = Math.max(e.revealT || 0, 0.4); e.blindT = Math.max(e.blindT || 0, 0.4); e.blindTeam = h.team; }
+        return true;
+      }   // 盾墙：挡子弹的判定在 updateProjs
       if (h.kind === 'sealz') {    // 1.8 符零的封印符阵：减速 + 封印技能 / 大招 + 暴露
         for (const e of this.players.values()) {
           if (!e.alive || e.team === h.team || Math.hypot(e.x - h.x, e.y - h.y) > h.r || Math.abs(e.z - h.z) > 60) continue;
@@ -1008,7 +1036,11 @@ class Game {
         return true;
       }
       if (h.kind === 'decoy') {    // 卡卡的替身：时间到就炸开
-        if (h.t <= 0.04) { this.explode(h.x, h.y, h.z + 10, 90, 40, 20, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 10), h.team, 90, 0]); return false; }
+        if (h.t <= 0.04) {
+          const dd = h.dmg || 55; this.explode(h.x, h.y, h.z + 10, 95, dd, 20, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 10), h.team, 95, 0]);
+          for (const e of this.players.values()) if (e.alive && e.team !== h.team && Math.hypot(e.x - h.x, e.y - h.y) < 95) e.slowT = Math.max(e.slowT, 1);
+          return false;
+        }
         return true;
       }
       if (h.kind === 'fog') {      // 毒雾：雾里的敌人中毒、减速、暴露
@@ -1107,7 +1139,7 @@ class Game {
   credit(owner, n) {
     if (!this.players.has(owner.id)) return;
     owner.stats.paint += n;
-    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 1.7 : 1) * (owner.tal.has('p3') ? 1.25 : 1));
+    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 1.6 : 1) * (owner.tal.has('p3') ? 1.25 : 1));
   }
 
   // 冲量：AI 直接作用在服务器状态上；真人玩家的位置由客户端预测，所以发事件让客户端施加
@@ -1139,9 +1171,11 @@ class Game {
       if (by.tal.has('a5') && by.team !== t.team) { by.hitN = (by.hitN || 0) + 1; if (by.hitN % 5 === 0) dmg *= 1.6; }
       if (by.tal.has('a6') && (t.slowT > 0 || t.silenceT > 0 || t.revealT > 0)) dmg *= 1.2;
       if (by.tal.has('p5') && by.z <= this.top(by.x, by.y) + 1 && S.cellAt(this.grid, by.x, by.y) === by.team) dmg *= 1.08;
-      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.9) dmg *= 1.14;   // 韩冰被动：倒戈
-      if (by.pilot === 'fu' && t.slowT > 0) dmg *= 1.15;                       // 符零被动：符咒共鸣
-      if (by.pilot === 'aka' && by.hp < this.maxHpOf(by) * 0.4) dmg *= 1.2;   // 赤镰被动：恶灵低语
+      if (by.pilot === 'han' && t.hp > this.maxHpOf(t) * 0.7) dmg *= 1.1;    // 韩冰被动：倒戈（2.1：生命高于 70% 的敌人 +10%）
+      if (t.blindT > 0 && t.blindTeam === by.team) dmg *= 1.12;
+      if (by.team !== t.team && (by.pilot === 'hawk' || this.nearPilot(by, 'hawk', 260))) dmg *= 1.06;   // 2.1 霍克被动：老练指挥              // 2.1 韩冰的闪光弹：致盲
+      if (by.pilot === 'fu' && t.slowT > 0) dmg *= 1.1;                        // 符零被动：符咒共鸣
+      if (by.pilot === 'aka' && by.hp < this.maxHpOf(by) * 0.5) dmg *= 1.22;   // 赤镰被动：恶灵低语
       const BW = !by.foot && S.WEAPONS[by.weapon];
       if (BW && BW.backstab && by.team !== t.team) {   // 刺客机体：从背后命中（在目标朝向 ±110° 以外）伤害提高
         let da = Math.atan2(by.y - t.y, by.x - t.x) - t.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
@@ -1164,7 +1198,7 @@ class Game {
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -10%（1.9.1：-8% → -10%，范围 200 → 260）
       let n = 0;
       for (const a of this.players.values()) if (a !== t && a.alive && a.team === t.team && Math.hypot(a.x - t.x, a.y - t.y) < 260) n++;
-      dmg *= 1 - 0.1 * Math.min(3, n);
+      dmg *= 1 - 0.12 * Math.min(3, n);   // 2.1：每个队友 -12%（最多 -36%）
     }
     if (kdx != null && !(tOV && tOV.noKb) && !t.boss) this.knock(t, kdx, kdy, Math.min(300, dmg * 1.8 * (kmul || 1)) * (t.wheel ? 1.35 : t.foot ? 1.5 : 1), kup || 0);
     if (t.shield > 0) {
@@ -1201,7 +1235,7 @@ class Game {
     by.stats.kills++;
     if (t && t.hitBy) { for (const id in t.hitBy) { const q = this.players.get(+id); if (q && q !== by && q.team !== t.team && this.time - t.hitBy[id] < 8) q.stats.assists++; } t.hitBy = null; }
     if (this.chat && t) this.chat.onKill(by, t);
-    if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 60, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
+    if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 80, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
     if (by.pilot === 'blaze' && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + this.maxHpOf(by) * 0.4);
     if (by.tal && by.tal.has('s4') && by.alive) by.hp = Math.min(this.maxHpOf(by), by.hp + 15);
   }
@@ -1213,11 +1247,11 @@ class Game {
     this.dropItems(t);
     t.foot = true; t.hp = S.PILOT_HP; t.rebuildT = this.oneLife && !this.loot ? 1e9 : S.REBUILD - (t.pilot === 'aurora' ? 2 : 0) - (t.tal && t.tal.has('d3') ? 1 : 0);   // 一条命的模式：机体不会重建
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.quakeT = 0;
-    const sh = (t.pilot === 'hammer' ? 45 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
+    const sh = (t.pilot === 'hammer' ? 60 : 0) + (t.tal && t.tal.has('d2') ? 25 : 0);   // 石磊被动 / 天赋：弹出护盾
     if (sh) { t.shield = sh; t.shieldT = 6; }
     t.invulnT = 0.7; t.ammo = S.AMMO; t.wheel = false;
     this.ev(['wreck', by ? by.id : 0, t.id, r1(x), r1(y), r1(z)]);
-    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 65, 26, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
+    if (t.pilot === 'vet') { this.explode(x, y, z, 100, 58, 24, t.team, t); this.ev(['bx', r1(x), r1(y), r1(z), t.team, 100, 0]); }
     this.knock(t, Math.random() - 0.5, Math.random() - 0.5, 150, 300);
   }
   redeploy(p) {
@@ -1371,13 +1405,15 @@ class Game {
       }
       case 'swarm':
         p.spT = 0.3;
-        for (let i = 0; i < 3; i++) this.helpers.push({ id: this.nextId++, kind: 'drone', x: p.x, y: p.y, z: p.z + 40, team: p.team, owner: p.id, t: 8, cd: 0.25 + i * 0.15, ang: (i * Math.PI * 2) / 3 });
+        for (let i = 0; i < 4; i++) this.helpers.push({ id: this.nextId++, kind: 'drone', x: p.x, y: p.y, z: p.z + 40, team: p.team, owner: p.id, t: 8, cd: 0.25 + i * 0.12, ang: (i * Math.PI * 2) / 4 });
+        p.repT = 8;   // 2.1：蜂群里有一架维修无人机，8 秒内每秒回复 3% 生命
         break;
       case 'whirl': p.spT = 2.2; break;
       case 'aegis': {
         p.spT = 0.3;
         const wx = p.x + Math.cos(a) * 46, wy = p.y + Math.sin(a) * 46;
-        this.helpers.push({ id: this.nextId++, kind: 'wall', x: wx, y: wy, z: this.top(wx, wy), team: p.team, owner: p.id, t: 6, cd: 99, ang: a + Math.PI / 2, half: 70 });
+        this.helpers.push({ id: this.nextId++, kind: 'wall', x: wx, y: wy, z: this.top(wx, wy), team: p.team, owner: p.id, t: 7, cd: 99, ang: a + Math.PI / 2, half: 80 });
+        p.shield = Math.max(p.shield || 0, 40); p.shieldT = Math.max(p.shieldT || 0, 7);   // 2.1：立盾墙时自己获得 40 点护盾
         break;
       }
       case 'sonic':
@@ -1413,7 +1449,16 @@ class Game {
         if (sh) sh.fog = 1;
         break;
       }
-      case 'cloak': p.spT = 0.3; p.cloakT = 4; p.cloakFast = true; break;
+      case 'recon': {   // 2.1 战术机兵：侦察无人机
+        p.spT = 0.3;
+        const d = clamp(p.input.ad || 260, 60, 420), rx = clamp(p.x + Math.cos(a) * d, 20, S.W - 20), ry = clamp(p.y + Math.sin(a) * d, 20, S.H - 20);
+        this.helpers.push({ id: this.nextId++, kind: 'recon', x: rx, y: ry, z: this.top(rx, ry) + 80, team: p.team, owner: p.id, t: 8, cd: 99 });
+        break;
+      }
+      case 'cloak':   // 2.1 幻影：隐身 4.5 秒，原地留下一个会炸开的残影（吸引 AI 火力）
+        p.spT = 0.3; p.cloakT = 4.5; p.cloakFast = true;
+        this.helpers.push({ id: this.nextId++, kind: 'decoy', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 1.8, cd: 99, dmg: 35 });
+        break;
       case 'barrier':   // 1.8 结界展开
         p.spT = 0.4;
         this.helpers.push({ id: this.nextId++, kind: 'dome', x: p.x, y: p.y, z: this.top(p.x, p.y), r: 150, team: p.team, owner: p.id, t: 6, cd: 0 });
@@ -1660,7 +1705,7 @@ class Game {
     const shown = Math.min(c.rev, c.items.length);
     m.conn.send({ t: 'cv', id: c.id, type: c.type, items: c.items.slice(0, shown), hidden: c.items.length - shown, need: shown < c.items.length ? this.searchNeed(c, p) : 0, prog: p.srch });
   }
-  searchNeed(c, p) { const k = c.items[Math.min(c.rev, c.items.length - 1)]; return S.LOOT.search((S.LOOT.items[k] || {}).r) * (c.type === 'body' ? 0.7 : 1) * (p.pilot === 'raven' ? 0.85 : 1); }
+  searchNeed(c, p) { const k = c.items[Math.min(c.rev, c.items.length - 1)]; return S.LOOT.search((S.LOOT.items[k] || {}).r) * (c.type === 'body' ? 0.7 : 1) * (p.pilot === 'raven' ? 0.85 : p.pilot === 'hawk' ? 0.8 : 1); }
   viewers(c) { const out = []; for (const q of this.players.values()) if (q.openC === c.id) out.push(q); return out; }
   canReach(p, c) { return Math.hypot(p.x - c.x, p.y - c.y) < S.LOOT.openR && Math.abs(p.z - c.z) < 60; }
   // 玩家的背包操作（客户端发 {t:'lo', a: ...}）
@@ -2412,7 +2457,7 @@ function botThink(g, p, dt) {
 
   // 防挂机：1 秒内几乎没挪动（顶着墙原地踏步，或者站在目标点发呆）→ 侧移 + 跳一下，换一个新目标
   // 1.6：站在开放的撤离点里读条时别乱动（防挂机逻辑也不要把它挪走）
-  ai.holdEx = g.loot && !p.guard && g.obj.ex.some((e) => g.time >= e.open && Math.hypot(p.x - e.x, p.y - e.y) < S.LOOT.extR * 0.75);
+  ai.holdEx = g.loot && !p.guard && g.obj.ex.some((e) => g.exOpen(e) && Math.hypot(p.x - e.x, p.y - e.y) < S.LOOT.extR * 0.75);
   ai.stuckT += dt;
   if (ai.holdEx) { ai.stuckT = 0; ai.lastX = p.x; ai.lastY = p.y; }
   if (ai.stuckT > 1.0) {
@@ -2563,7 +2608,7 @@ function botThink(g, p, dt) {
   // 大招
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
-    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480 }[sp];
+    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480, recon: 420 }[sp];
     if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < (P.waste ? 0.015 : P.smart ? 0 : 0.002)) {   // 猪队友乱放大招
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
@@ -2579,10 +2624,11 @@ function botThink(g, p, dt) {
       rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
       turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
       rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
-      seal: enemy && ed < 240, possess: fight && (hpK < 0.7 || ed < 120),
+      seal: enemy && ed < 240, possess: fight && (hpK < 0.7 || ed < 120), airdrop: fight || hpK < 0.6,
     }[sk] || (P.waste && Math.random() < 0.3);
     if (use) {
       if (sk === 'dash' && enemy && !p.foot) { inp.mx = Math.cos(aim.a); inp.my = Math.sin(aim.a); }
+      if ((sk === 'blast' || sk === 'airdrop') && enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z); inp.a = a2.a; inp.ad = sk === 'airdrop' && hpK < 0.6 ? 0 : ed; }
       if (sk === 'seal' && enemy) { const a2 = aimAt(p, enemy.x + enemy.vx * 0.3, enemy.y + enemy.vy * 0.3, enemy.z); inp.a = a2.a; inp.ad = ed; }
       inp.gq++;
     }

@@ -352,7 +352,7 @@
     if (name === 'stash') renderStash();
     if (name === 'chests') { renderChests(); const r = $('offerRow'); if (r) r.dataset.slot = ''; renderOffers(); }
     if (name === 'talents') renderTalents();
-    if (name === 'pass') { renderPass(); if (!store.get('seenS' + E.SEASON.id, false)) { store.set('seenS' + E.SEASON.id, true); playSeasonIntro(); } }
+    if (name === 'pass') { renderPass(); if (!store.get('seenS' + E.SEASON.id, false)) { store.set('seenS' + E.SEASON.id, true); playSeasonTrailer(); } }
     if (name === 'shop') renderShop();
     if (name === 'events') renderEvents();
     if (name === 'mail') renderMail();
@@ -2301,6 +2301,7 @@
       case 'lt+': if (G.loot) G.items.set(e[1], { k: e[2], x: e[3], y: e[4], z: e[5] }); break;
       case 'ct+': if (G.loot && G.conts && !G.conts.has(e[1])) { const c = { id: e[1], type: S.CONT_IDS[e[2]], x: e[3], y: e[4], z: e[5], st: e[6] }; G.contArr.push(c); G.conts.set(c.id, c); G.contDirty = 2; } break;
       case 'ct': if (G.loot && G.conts) { const c = G.conts.get(e[1]); if (c) { c.st = e[2]; G.contDirty = G.contDirty || 1; } } break;
+      case 'adp': ringFx(e[1], e[2], e[3], 70, '#e0a030', 1000); ringFx(e[1], e[2], e[3], 100, '#e0a030', 1000, 300); break;   // 2.1 霍克：空投落点
       case 'lev': if (!silent) { announce(`电闸已拉下！拉闸撤离点开放 ${e[2]} 秒`, '#ff9a3d'); sfx.siren(); } break;
       case 'lt-': {
         if (!G.loot) break;
@@ -2415,7 +2416,7 @@
     flamer: { kick: 0.2, mz: 'fire', tr: 'fire', imp: 'fire' }, carrier: { kick: 0.7, mz: 'launch', tr: 'smoke', imp: 'pop' }, wrecker: { kick: 3.4, sw: 'hammer' },
     megaphone: { kick: 1, mz: 'sonic', tr: 'ring', imp: 'ring' }, riot: { kick: 1.7, mz: 'zap', tr: 'zap', imp: 'zap' }, blade: { kick: 0.9, sw: 'slash' },
     stinger: { kick: 0.35, mz: 'needle', tr: 'needle', imp: 'toxic' }, phantom: { kick: 0.6, mz: 'silent', tr: 'shadow', imp: 'shadow' },
-    warden: { kick: 0.5, mz: 'charm', tr: 'charm', imp: 'charm' }, reaper: { kick: 1, sw: 'spirit' },
+    warden: { kick: 0.5, mz: 'charm', tr: 'charm', imp: 'charm' }, reaper: { kick: 1, sw: 'spirit' }, tactic: { kick: 0.9, mz: 'tracer', tr: 'tracer', imp: 'spark' },
   };
   const wOf = (p) => (p && !p.foot && !(p.flags & 512) ? p.weapon : null);   // 机体形态才有机体手感（弹出来的驾驶员用随身武器）
   function mechVol(x, y) { const me = G.me; if (!me) return 0; const d = Math.hypot(me.px - x, me.py - y); return d > 560 ? 0 : 0.12 + 0.38 * (1 - d / 560); }
@@ -2511,7 +2512,7 @@
     return ks.length ? { rare: ks[0].rare, col: ks[0].over ? ks[0].over.accent : ks[0].paint.light, bg: ks[0].bg || null, snd: (ks.find((K) => K.snd) || {}).snd || null } : { rare: 0, col: '#fff', bg: null, snd: null };
   }
   // 1.9：限定传说的主题颜色（冰雪 / 夜都符纸 / 恶灵火 / 战旗金）
-  const THEME_COL = { ice: ['#dff8ff', '#7af0ff'], yato: ['#f4e6c8', '#8a6bff'], wraith: ['#ff2d4b', '#3a0a18'], martyr: ['#ffd35e', '#c8102e'] };
+  const THEME_COL = { ice: ['#dff8ff', '#7af0ff'], yato: ['#f4e6c8', '#8a6bff'], wraith: ['#ff2d4b', '#3a0a18'], martyr: ['#ffd35e', '#c8102e'], merc: ['#ffb42e', '#ff4d3d'] };
   function fxOf(ownerId) { const o = G && G.players.get(ownerId), K = o && o.looks && o.looks.fx && S.skin(o.looks.fx); return K ? { fx: K.fx, rare: K.rare } : null; }
   // 传说皮肤：击倒时炸出星光
   function legendKill(by, x, y, z) {
@@ -2575,6 +2576,7 @@
       case 'shadowstep': ringFx(x, y, z, 60, '#2a1f3a', 300); R3.emit(x, y, z + 14, '#2a1f3a', 26, 180, 1, { sys: 'pk', size: 20, life: 0.6, grav: -30, drag: 2.5 }); break;
       case 'cloak': ringFx(x, y, z, 80, '#b06bff', 420); R3.emit(x, y, z + 18, '#c8b8ff', 24, 140, 1, { sys: 'pg', size: 10, life: 0.7, grav: -60, drag: 2 }); break;
       case 'venom': ringFx(x, y, z, 70, '#7cff4a', 300); break;
+      case 'recon': ringFx(x, y, z, 60, '#7ad0ff', 300); R3.emit(x, y, z + 40, '#7ad0ff', 14, 160, 1, { sys: 'pg', size: 8, life: 0.5, grav: 0, drag: 3 }); break;
       case 'cluster': ringFx(x, y, z, 90, col, 360); break;
       case 'charge': ringFx(x, y, z, 120, '#ffb02e', 500); R3.emit(x, y, z + 10, '#ffb02e', 30, 200, 1, { sys: 'pg', size: 16, life: 0.6, grav: -100, drag: 2 }); break;
       case 'missiles': for (let i = 0; i < 12; i++) R3.emit(x, y, z + 30, '#ffffff', 1, 700, 0, { sys: 'pg', size: 10, life: 0.6, grav: 0, dir: { x: 0, y: 0, z: 1 }, spread: 0.3 }); break;
@@ -2604,6 +2606,7 @@
       case 'rally': ringFx(x, y, z, 180, '#ff5a36', 600); R3.emit(x, y, z + 50, '#ff5a36', 26, 160, 1, { sys: 'pg', size: 12, life: 0.7, grav: 60, drag: 2 }); break;
       case 'blast': ringFx(x, y, z, 110, '#ff3b52', 1200); break;
       case 'jam': for (let i = 0; i < 3; i++) ringFx(x, y, z, 220 * (0.4 + i * 0.3), '#2ef0c8', 500, i * 110); break;
+      case 'airdrop': ringFx(x, y, z, 50, '#e0a030', 300); R3.emit(x, y, z + 30, '#ff4d3d', 8, 60, 1, { sys: 'pg', size: 8, life: 0.8, grav: -40, drag: 2 }); break;
       case 'rush': ringFx(x, y, z, 70, '#fff36b', 380); R3.emit(x, y, z + 16, '#fff36b', 20, 220, 0.6, { sys: 'pg', size: 10, life: 0.4, grav: 0, drag: 3 }); break;
       case 'scan': ringFx(x, y, z, 700, '#7af0ff', 1000); ringFx(x, y, z, 360, '#7af0ff', 700, 150); if (G.me && p.team === G.me.team) G.scanUntil = performance.now() + 5000; break;
       case 'cheer':
@@ -2865,7 +2868,7 @@
       else if (sp === 'quake') { const dd = clamp(d, 80, 280); Object.assign(base, { kind: 'line', len: dd, w: 10, tx: me.px + Math.cos(a) * dd, ty: me.py + Math.sin(a) * dd, tz: me.pz, tr: 95 }); }
       else if (sp === 'charge') Object.assign(base, { kind: 'line', len: 300, w: 44 });
       else if (sp === 'shadowstep') Object.assign(base, { kind: 'line', len: clamp(d, 100, 260), w: 34 });
-      else if (sp === 'cluster' || sp === 'venom') { const dd = clamp(d, sp === 'venom' ? 80 : 120, sp === 'venom' ? 420 : 360); Object.assign(base, { kind: 'line', len: dd, w: 6, tx: me.px + Math.cos(a) * dd, ty: me.py + Math.sin(a) * dd, tz: me.pz, tr: sp === 'venom' ? 105 : 90 }); }
+      else if (sp === 'cluster' || sp === 'venom' || sp === 'recon') { const dd = clamp(d, sp === 'cluster' ? 120 : 60, sp === 'cluster' ? 360 : 420); Object.assign(base, { kind: 'line', len: dd, w: 6, tx: me.px + Math.cos(a) * dd, ty: me.py + Math.sin(a) * dd, tz: me.pz, tr: sp === 'venom' ? 105 : sp === 'recon' ? 320 : 90 }); }
       else Object.assign(base, { kind: 'circle', len: sp === 'storm' ? 260 : sp === 'bubble' ? 170 : 60 });
       base.color = '#ffdf2e'; G.aimShow = base; return;
     }
@@ -3080,7 +3083,7 @@
   }
   function superRange(me) {
     const sp = S.WEAPONS[me.weapon].special;
-    return { beam: 900, barrage: 440, quake: 280, charge: 300, bulldoze: 430, napalm: 430, cluster: 360, shadowstep: 260, venom: 420 }[sp] || 300;
+    return { beam: 900, barrage: 440, quake: 280, charge: 300, bulldoze: 430, napalm: 430, cluster: 360, shadowstep: 260, venom: 420, recon: 420 }[sp] || 300;
   }
   function updateCamera(dt) {
     if (TOP()) return updateCameraTop(dt);
@@ -3202,7 +3205,32 @@
     clearInterval(TRL.timer);
     TRL.timer = setInterval(() => { const k = Math.min(1, (performance.now() - TRL.t0) / 20500); $('trProg').style.width = (k * 100).toFixed(1) + '%'; }, 120);
   }
+  // 2.1：S2「雇佣兵撤离」45 秒赛季动画（同一个播放器）
+  function playSeasonTrailer() {
+    if (!R3.seasonTrailerStart) { playSeasonIntro(); return; }
+    const el = $('trailer'), host = $('trStage');
+    for (const k of ['trCap', 'trName', 'trLine', 'trCut', 'trTitle']) { $(k).className = $(k).className.split(' ')[0]; $(k).innerHTML = ''; }
+    $('trFlash').className = 'tr-flash'; el.classList.remove('fade'); el.classList.remove('hidden'); el.classList.add('s2');
+    TRL.id = 's2'; TRL.t0 = performance.now();
+    AU.resume(); AU.music('loot');
+    const show = (k, html, cls) => { const e = $(k); e.innerHTML = html; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); if (cls) e.classList.add(cls); };
+    const hooks = { on(ev, d) {
+      if (ev === 'cap') { show('trCap', esc(L(d))); clearTimeout(TRL.capT); TRL.capT = setTimeout(() => $('trCap').classList.remove('on'), 2600); }
+      else if (ev === 'name') { const P = d.pilot; show('trName', `<small>${L(`S${E.SEASON.id} 新驾驶员 · 高级通行证 30 级`)}</small><b>${esc(L(P.name))}</b><span>「${esc(L(P.code))}」${esc(L(P.title))}</span>`); setTimeout(() => $('trName').classList.remove('on'), 2800); }
+      else if (ev === 'line') { show('trLine', `“${esc(L(d))}”`); setTimeout(() => $('trLine').classList.remove('on'), 2200); }
+      else if (ev === 'cut') { show('trCut', `<div class="tc-art">${GP.portrait(d.pilot)}</div><div class="tc-txt"><small>SUPER!</small><b>${esc(L(d.sup))}</b><span>${esc(L(d.mech))}</span></div>`); setTimeout(() => $('trCut').classList.remove('on'), 1300); }
+      else if (ev === 'flash') { const f = $('trFlash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+      else if (ev === 'title2') show('trTitle', `<small style="color:#ffb42e">${L(`第 ${E.SEASON.id} 赛季 · 通行证正式推出`)}</small><b>${esc(L(E.SEASON.name))}</b><span>${L('50 级通行证 · 新驾驶员「霍克」 · 新机体「战术机兵」 · 赛季传说「沙暴统帅」')}</span>`);
+      else if (ev === 'fade') el.classList.add('fade');
+      else if (ev === 'sfx') { const f = sfx[d]; if (f) f(); }
+      else if (ev === 'end') closeTrailer();
+    } };
+    if (!R3.seasonTrailerStart(host, hooks)) { el.classList.add('hidden'); el.classList.remove('s2'); playSeasonIntro(); return; }
+    clearInterval(TRL.timer);
+    TRL.timer = setInterval(() => { const k = Math.min(1, (performance.now() - TRL.t0) / 45000); $('trProg').style.width = (k * 100).toFixed(1) + '%'; }, 150);
+  }
   function closeTrailer() {
+    $('trailer').classList.remove('s2');
     clearInterval(TRL.timer);
     if (R3.trailerStop) R3.trailerStop(true);
     $('trailer').classList.add('hidden');
@@ -4525,18 +4553,28 @@
     $('passLv2').textContent = lv;
     $('passXp').textContent = lv >= E.PASS.tiers ? '已满级' : `${inTier} / ${E.PASS.xpPer}`;
     const days = Math.max(0, Math.ceil((E.SEASON.end - Date.now()) / 86400e3));
+    $('passTitle').textContent = `S${E.SEASON.id} · ${E.SEASON.name}`;
     $('passEnds').textContent = `赛季剩余 ${days} 天 · 对战和任务都给通行证经验`;
-    $('passBuy').textContent = ps.prem ? '✓ 高级通行证已解锁' : `解锁高级通行证 · ${E.PASS.price} 宝石`;
-    $('passBuy').disabled = ps.prem;
-    $('passBuy').onclick = async () => { const r = await eco('buyPass'); if (!r.ok) return toast(r.err); sfx.win(); toast('高级通行证已解锁！高级线的奖励都可以领了'); };
+    $('passBuy').textContent = ps.dlx ? '✓ 豪华版通行证' : ps.prem ? `升级豪华版 · ${E.PASS.deluxe - E.PASS.price} 宝石` : '解锁通行证';
+    $('passBuy').disabled = !!ps.dlx;
+    $('passBuy').onclick = () => openPassShop();
+    // 2.1：左侧赛季大图 + 里程碑；满级后的无尽金币宝箱
+    const MS = [[25, false], [30, true], [50, true]];
+    const hero = S.pilot('hawk@hawk_storm');
+    $('passHero').innerHTML = `<div class="ps-art">${GP.portrait(hero)}</div><div class="ps-tag">Lv.50 赛季传说</div><h3>${hero.name}「${S.skin('hawk_storm').name}」</h3>
+      <ul class="ps-ms">${MS.map(([t, prem]) => { const it = (prem ? E.PASS.prem : E.PASS.free)[t - 1]; return `<li class="${lv >= t ? 'ok' : ''} ${prem ? 'prem' : 'free'}"><b>Lv.${t}</b><span>${rewardLabel(it)}</span><small>${prem ? '高级线' : '免费线'}</small></li>`; }).join('')}</ul>
+      <p class="ps-state">${ps.dlx ? '豪华版：高级线全部奖励 + 专属「沙鹰豪华框」' : ps.prem ? '高级版：高级线奖励已解锁' : '免费版：解锁通行证领取高级线奖励'}</p>`;
+    const B = E.passBonus(profile), maxed = lv >= E.PASS.tiers;
+    $('passBonus').innerHTML = `<div class="pb-chest ${B.can ? 'can' : ''}">${GI.chestArt('supply')}</div><div><b>满级金币宝箱</b><small>${maxed ? `再获得 ${E.PASS.bonusXp - B.into} 经验开下一个 · 已开 ${B.got} 个` : `通行证满 ${E.PASS.tiers} 级后，每 ${E.PASS.bonusXp} 经验送一个金币宝箱（${E.PASS.bonusCoins} 金币），没有上限`}</small><i style="--k:${maxed ? B.into / E.PASS.bonusXp : 0}"></i></div><button class="btn small" id="passBonusGo" ${B.can ? '' : 'disabled'}>${B.can ? `开启 ×${B.can}` : '未就绪'}</button>`;
+    $('passBonusGo').onclick = async () => { const r = await eco('claimBonus'); if (!r.ok) return toast(r.err); sfx.coin(); showGain(r.items, `金币宝箱 ×${r.n}`); };
     $('passAll').disabled = !claimable.length;
     $('passAll').onclick = async () => { const r = await eco('claimAll'); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '通行证奖励'); };
-    $('passIntro').onclick = playSeasonIntro;
+    $('passIntro').onclick = playSeasonTrailer;
     const tr = $('passTrack');
     tr.innerHTML = '';
     for (let t = 1; t <= E.PASS.tiers; t++) {
       const col = document.createElement('div');
-      col.className = 'pt-col' + (t <= lv ? ' reached' : '') + (t === lv + 1 ? ' next' : '');
+      col.className = 'pt-col' + (t <= lv ? ' reached' : '') + (t === lv + 1 ? ' next' : '') + ([25, 30, 50].includes(t) ? ' ms' : '');
       const cell = (it, prem) => {
         const got = (prem ? ps.cp : ps.cf).includes(t), can = t <= lv && !got && (!prem || ps.prem);
         const rare = it.k === 'skin' ? S.skin(it.id).rare : it.k === 'chest' ? E.CHESTS[it.id].tier : 0;
@@ -4568,6 +4606,23 @@
     const qrow = (q, v) => `<div class="qrow ${v >= q[1] ? 'done' : ''}"><div><b>${E.questName(q)}</b><i style="--k:${Math.min(1, v / q[1])}"></i></div><small>${Math.min(v, q[1])} / ${q[1]}</small><em>+${q[2]}</em></div>`;
     $('questBox').innerHTML = `<h4>每日任务 <small>北京时间 0 点刷新</small></h4>${E.dailyQuests(d).map((q, i) => qrow(q, dp[i])).join('')}
       <h4>每周任务</h4>${E.WEEKLY.map((q, i) => qrow(q, wp[i])).join('')}<p class="qnote">完成任务自动获得通行证经验</p>`;
+  }
+  // 2.1：通行证购买弹窗——高级版 / 豪华版
+  function openPassShop() {
+    const ps = profile.pass, el = $('passShop');
+    const up = ps.prem && !ps.dlx, dlxCost = up ? E.PASS.deluxe - E.PASS.price : E.PASS.deluxe;
+    el.innerHTML = `<div class="ps-cards"><button class="ps-x" id="psX">✕</button>
+      <div class="ps-card prem ${ps.prem ? 'owned' : ''}"><h3>高级版</h3><div class="ps-price">${ic('gems')}<b>${E.PASS.price}</b></div>
+        <ul><li>解锁高级线 50 级全部奖励</li><li>Lv.30 新驾驶员「霍克 · 佣兵」</li><li>Lv.50 赛季传说「沙暴统帅」</li><li>史诗服装、雇佣兵涂装、曳光弹特效</li></ul>
+        <button class="btn" id="psPrem" ${ps.prem ? 'disabled' : ''}>${ps.prem ? '已拥有' : '购买'}</button></div>
+      <div class="ps-card dlx ${ps.dlx ? 'owned' : ''}"><div class="ps-ribbon">超值</div><h3>豪华版</h3><div class="ps-price">${ic('gems')}<b>${dlxCost}</b>${up ? '<small>（补差价升级）</small>' : ''}</div>
+        <ul><li>包含高级版全部内容</li><li>通行证直升 <b>${E.PASS.boost}</b> 级</li><li>豪华版专属「沙鹰豪华框」（动态名片框）</li></ul>
+        <button class="btn" id="psDlx" ${ps.dlx ? 'disabled' : ''}>${ps.dlx ? '已拥有' : up ? '升级' : '购买'}</button></div></div>`;
+    el.classList.remove('hidden');
+    const close = () => el.classList.add('hidden');
+    $('psX').onclick = close; el.onclick = (e) => { if (e.target === el) close(); };
+    const buy = async (what) => { const r = await eco('buyPass', { what }); if (!r.ok) return toast(r.err); sfx.win(); close(); toast(what === 'deluxe' ? `豪华版通行证已解锁！直升 ${E.PASS.boost} 级` : '高级通行证已解锁！高级线的奖励都可以领了'); };
+    $('psPrem').onclick = () => buy('prem'); $('psDlx').onclick = () => buy('deluxe');
   }
   // 领到奖励（宝箱会进「我的宝箱」）
   function showGain(items, title) {
@@ -4607,6 +4662,7 @@
   function avatarSvg(a) {
     const st = 'stroke="#141018" stroke-width="3" stroke-linejoin="round"';
     if (a === 'flag') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#5b5e68" ${st}/><path d="M15,38 L15,10" ${st} stroke-width="4"/><path d="M15,11 C24,6 28,16 37,11 L37,26 C28,31 24,21 15,26 Z" fill="#ff5a36" ${st}/><path d="M24,16 l2,4 l4,0 l-3,3 l1,4 l-4,-2 l-4,2 l1,-4 l-3,-3 l4,0 Z" fill="#ffe14d"/></svg>`;
+    if (a === 'merc') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#3a3d48" ${st}/><path d="M24,8 L38,14 L36,30 Q32,38 24,42 Q16,38 12,30 L10,14 Z" fill="#e0a030" ${st}/><path d="M14,22 Q24,14 34,22 L30,26 Q24,22 18,26 Z" fill="#3a3d48"/><circle cx="24" cy="28" r="3" fill="#ff4d3d" ${st} stroke-width="2"/></svg>`;
     if (a === 'talisman') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#1d2140" ${st}/><path d="M16,8 L32,9 L31,40 L15,39 Z" fill="#f4e6c8" ${st} stroke-width="2"/><path d="M23.5,12 L23.5,35" stroke="#8a6bff" stroke-width="4"/><path d="M18,18 L29,18 M18,26 L29,26" stroke="#c8102e" stroke-width="2.4"/></svg>`;
     if (a === 'balloon') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#8fd0ff" ${st}/><path d="M22,30 L20,42 M28,28 L29,42" fill="none" ${st} stroke-width="2"/><ellipse cx="18" cy="18" rx="7" ry="9" fill="#ff3ea5" ${st}/><ellipse cx="30" cy="16" rx="7" ry="9" fill="#ffd23f" ${st}/><ellipse cx="25" cy="24" rx="6" ry="7" fill="#9cff2e" ${st}/></svg>`;
     if (a === 'can') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#ffe600" ${st}/><rect x="17" y="16" width="14" height="24" rx="3" fill="#ff3ea5" ${st}/><rect x="20" y="9" width="8" height="7" fill="#c9d3dc" ${st}/><circle cx="34" cy="10" r="2" fill="#1fd6ee"/><circle cx="38" cy="14" r="1.6" fill="#1fd6ee"/></svg>`;
@@ -5330,7 +5386,7 @@
 
   // ================= 启动 =================
   $('trSkip').onclick = () => { closeTrailer(); sfx.click(); };
-  $('trReplay').onclick = () => { if (TRL.id) playTrailer(TRL.id); };
+  $('trReplay').onclick = () => { if (TRL.id === 's2') playSeasonTrailer(); else if (TRL.id) playTrailer(TRL.id); };
   window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, openHero, playTrailer, showResults, draftSt: () => draft, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();

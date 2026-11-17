@@ -23,16 +23,24 @@
   // 常驻角色：新手宝箱从这 5 位里给 1 位
   E.STARTER_PILOTS = ['blaze', 'frost', 'candy', 'titan', 'raven'];
   E.STARTER_MECHS = ['blaster', 'roller', 'charger'];
-  E.SEASON = { id: 1, name: '灰城重涂', en: 'REPAINT', start: Date.UTC(2026, 10, 13), end: Date.UTC(2026, 11, 11) };
-  // ---------------- 赛季通行证：30 级，免费线 + 高级线（宝石解锁） ----------------
-  E.PASS = { tiers: 30, xpPer: 600, price: 480 };
+  // 2.1：第二赛季「雇佣兵撤离」（通行证赛季；排位赛季另算，见 E.RANK）
+  E.SEASON = { id: 2, name: '雇佣兵撤离', en: 'MERCENARY', start: Date.UTC(2026, 10, 17), end: Date.UTC(2027, 0, 12) };
+  // ---------------- 赛季通行证：50 级，免费线 + 高级线（680 宝石）/ 豪华版（1280 宝石：直升 15 级 + 专属名片框）；满级后每 1500 经验开一个金币宝箱 ----------------
+  E.PASS = { tiers: 50, xpPer: 600, price: 680, deluxe: 1280, boost: 15, bonusXp: 1500, bonusCoins: 500, bonusMax: 200 };
   const C = (k, n) => ({ k, n }), CH = (id) => ({ k: 'chest', id, n: 1 }), SK = (id) => ({ k: 'skin', id }), TP = () => ({ k: 'tp', n: 1 });
-  E.PASS.free = [C('coins', 100), CH('supply'), C('parts', 60), C('gems', 20), CH('military'), C('coins', 150), TP(), C('parts', 80), CH('supply'), SK('fr_tape'),
-    C('coins', 200), C('gems', 30), CH('supply'), C('parts', 100), CH('military'), C('coins', 250), TP(), C('crystals', 1), CH('supply'), SK('av_flag'),
-    C('coins', 300), C('gems', 40), CH('military'), C('parts', 150), C('crystals', 1), C('coins', 400), TP(), CH('supply'), C('gems', 50), CH('airdrop')];
-  E.PASS.prem = [SK('blaze_grey'), C('gems', 30), CH('military'), C('coins', 300), SK('m_camo'), C('parts', 150), CH('airdrop'), C('gems', 50), C('crystals', 1), SK('fx_stars'),
-    CH('military'), C('coins', 500), TP(), SK('echo_midnight'), CH('airdrop'), C('parts', 250), C('gems', 80), CH('military'), C('crystals', 2), SK('m_neon'),
-    CH('airdrop'), C('coins', 800), SK('fr_rebel'), TP(), CH('airdrop'), C('gems', 100), C('crystals', 2), SK('fx_confetti'), CH('airdrop'), SK('flag_red')];
+  E.PASS.free = [C('coins', 150), CH('supply'), C('parts', 60), C('gems', 20), CH('military'), C('coins', 200), TP(), C('parts', 80), CH('supply'), C('gems', 25),
+    C('coins', 250), CH('supply'), C('parts', 100), C('gems', 30), SK('m_desert'), C('coins', 300), CH('military'), TP(), C('parts', 120), C('crystals', 1),
+    CH('supply'), C('coins', 350), C('gems', 40), C('parts', 140), { k: 'mech', id: 'tactic' }, CH('military'), C('coins', 400), TP(), C('parts', 160), C('gems', 50),
+    CH('supply'), C('coins', 450), C('crystals', 1), C('parts', 180), SK('av_merc'), CH('military'), C('coins', 500), C('gems', 60), TP(), C('parts', 200),
+    CH('supply'), C('coins', 600), C('crystals', 1), CH('military'), C('gems', 70), C('parts', 250), C('coins', 800), TP(), C('gems', 80), CH('airdrop')];
+  E.PASS.prem = [C('gems', 40), CH('military'), C('coins', 300), C('parts', 150), CH('airdrop'), C('gems', 50), C('crystals', 1), C('coins', 400), CH('military'), SK('blaze_merc'),
+    C('parts', 200), C('gems', 60), TP(), CH('airdrop'), C('coins', 500), C('crystals', 1), CH('military'), C('parts', 250), C('gems', 70), SK('m_merc'),
+    CH('airdrop'), C('coins', 600), C('crystals', 2), TP(), CH('military'), C('gems', 80), C('parts', 300), CH('airdrop'), C('coins', 700), { k: 'pilot', id: 'hawk' },
+    C('crystals', 2), CH('military'), C('gems', 90), C('parts', 350), CH('airdrop'), C('coins', 800), TP(), C('crystals', 2), CH('airdrop'), SK('fx_tracer'),
+    C('gems', 100), CH('military'), C('parts', 400), C('coins', 1000), CH('airdrop'), C('crystals', 3), TP(), C('gems', 120), CH('airdrop'), SK('hawk_storm')];
+  E.PASS_ONLY = { pilots: ['hawk'], mechs: ['tactic'] };   // 只能从通行证拿到
+  E.passXpMax = () => E.PASS.tiers * E.PASS.xpPer + E.PASS.bonusMax * E.PASS.bonusXp;
+  E.passBonus = (o) => { const ps = o.pass || {}, over = Math.max(0, (ps.xp || 0) - E.PASS.tiers * E.PASS.xpPer); return { got: ps.bc || 0, can: Math.max(0, Math.min(E.PASS.bonusMax, Math.floor(over / E.PASS.bonusXp)) - (ps.bc || 0)), into: over % E.PASS.bonusXp }; };
   E.passLevel = (o) => Math.min(E.PASS.tiers, Math.floor(((o.pass && o.pass.xp) || 0) / E.PASS.xpPer));
   E.matchPassXp = (rw) => 30 + (rw.won ? 30 : rw.draw ? 15 : 0) + Math.min(20, rw.kills * 2) + (rw.mvp ? 10 : 0);
   // ---------------- 每日 / 每周任务（按日期挑选，客户端和服务器一样） ----------------
@@ -51,7 +59,7 @@
   E.STRIKE_MECHS = ['blade', 'stinger', 'phantom'];   // 袭击！特攻队：只会从「特攻队补给箱」开出
   // 1.8：夜都决战联动角色——不会从宝箱、限时购买里出现（符零 / 结界机兵：活动任务；赤镰 / 灵刃机兵：宝石购买）
   E.COLLAB = { pilots: ['fu', 'aka'], mechs: ['warden', 'reaper'], quest: ['fu', 'warden'], shop: [{ k: 'pilot', id: 'aka', gems: 480 }, { k: 'mech', id: 'reaper', gems: 360 }], bundle: 720 };
-  E.noDrop = (id) => E.QUEST_ONLY.includes(id) || E.COLLAB.pilots.includes(id) || E.COLLAB.mechs.includes(id);
+  E.noDrop = (id) => E.QUEST_ONLY.includes(id) || E.COLLAB.pilots.includes(id) || E.COLLAB.mechs.includes(id) || E.PASS_ONLY.pilots.includes(id) || E.PASS_ONLY.mechs.includes(id);
   E.NEW_OFFER = { pilot: 'kaka', mech: 'slinger', until: Date.UTC(2026, 10, 28, 16) };   // 新常驻角色上架期间，限时购买必出
   // ---------------- 限时活动 ----------------
   const RW = (k, n) => ({ k, n }), RC = (id) => ({ k: 'chest', id, n: 1 }), RS = (id) => ({ k: 'skin', id });
@@ -149,7 +157,7 @@
   E.rankedModeEnds = (now) => (Math.floor((now || Date.now()) / (E.RANK_HOURS * 3600e3)) + 1) * E.RANK_HOURS * 3600e3;
   // 克制关系：key 机体会被 value 里的机体克制
   E.COUNTERS = {
-    charger: ['blade', 'phantom'], mortar: ['blade', 'stinger'], slinger: ['blade', 'phantom'], carrier: ['riot', 'blade'], gatling: ['mortar', 'charger'],
+    tactic: ['blade', 'fist'], charger: ['blade', 'phantom'], mortar: ['blade', 'stinger'], slinger: ['blade', 'phantom'], carrier: ['riot', 'blade'], gatling: ['mortar', 'charger'],
     blaster: ['bucket', 'phantom'], bucket: ['charger', 'stinger'], roller: ['charger', 'stinger'], fist: ['stinger', 'charger'], wrecker: ['stinger', 'charger'],
     riot: ['megaphone', 'mortar'], dozer: ['stinger', 'mortar'], flamer: ['charger', 'carrier'], megaphone: ['blade', 'fist'],
     blade: ['riot', 'fist', 'wrecker'], stinger: ['blade', 'phantom'], phantom: ['megaphone', 'carrier', 'flamer'],
@@ -284,7 +292,7 @@
       pilot: '', weapon: E.STARTER_MECHS[0], head: 'antenna', mode: 'turf', map: -1, size: 3, dur: 180, fair: false,
       trophies: 0, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0, day: 0, dayWin: 0,
       talents: [], tal: [], tpBonus: 0,
-      pass: { s: 1, xp: 0, prem: false, cf: [], cp: [] }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
+      pass: { s: 2, xp: 0, prem: false, dlx: false, cf: [], cp: [], bc: 0 }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
       skins: [], wear: {}, mailGot: [], mailDel: [], stash: {}, gear: {}, gearOn: [], safeLv: 1, lootRec: { runs: 0, ex: 0, best: 0, total: 0, gold: 0, wk: 0, wbest: 0 }, ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
       tl: {}, rank: { rp: 0, best: 0, got: [], n: 0, road: [], s: E.RANK.season.id }, streak: 0, bestStreak: 0,
     }, E.START);
@@ -314,7 +322,7 @@
     const ps = p.pass && typeof p.pass === 'object' && p.pass.s === E.SEASON.id ? p.pass : null;
     if (ps) {
       const tierList = (a) => (Array.isArray(a) ? [...new Set(a.filter((t) => Number.isInteger(t) && t >= 1 && t <= E.PASS.tiers))] : []);
-      o.pass = { s: E.SEASON.id, xp: int(ps.xp, 0, E.PASS.tiers * E.PASS.xpPer), prem: !!ps.prem, cf: tierList(ps.cf), cp: tierList(ps.cp) };
+      o.pass = { s: E.SEASON.id, xp: int(ps.xp, 0, E.passXpMax()), prem: !!ps.prem || !!ps.dlx, dlx: !!ps.dlx, cf: tierList(ps.cf), cp: tierList(ps.cp), bc: int(ps.bc, 0, E.PASS.bonusMax) };
     }
     if (p.q && typeof p.q === 'object') {
       const arr = (a, n, hi) => Array.from({ length: n }, (_, i) => int(Array.isArray(a) ? a[i] : 0, 0, hi));
@@ -438,7 +446,7 @@
       else if (it.k === 'chest') o.chests[it.id] = (o.chests[it.id] || 0) + it.n;
       else if (it.k === 'skin') { if (!o.skins.includes(it.id)) o.skins.push(it.id); }
       else if (it.k === 'tp') o.tpBonus = (o.tpBonus || 0) + it.n;
-      else if (it.k === 'passxp') o.pass.xp = Math.min(E.PASS.tiers * E.PASS.xpPer, o.pass.xp + it.n);
+      else if (it.k === 'passxp') o.pass.xp = Math.min(E.passXpMax(), o.pass.xp + it.n);
       else if (E.CUR[it.k]) o[it.k] = (o[it.k] || 0) + it.n;
     }
   }
@@ -525,11 +533,23 @@
         if (o.tal.length < S.TALENT_SLOTS) o.tal.push(T.id);   // 有空位就直接装上
         return { ok: true, items: [] };
       }
-      case 'buyPass': {
-        if (o.pass.prem) return no('已经解锁高级通行证了');
-        if (o.gems < E.PASS.price) return no(`宝石不够（需要 ${E.PASS.price}）`);
-        o.gems -= E.PASS.price; o.pass.prem = true;
-        return { ok: true, items: [], spent: { gems: E.PASS.price } };
+      case 'buyPass': {   // 2.1：what = 'deluxe' 买豪华版（已经有高级版的补差价升级）
+        const dlx = a.what === 'deluxe';
+        if (dlx ? o.pass.dlx : o.pass.prem) return no(dlx ? '已经是豪华版通行证了' : '已经解锁高级通行证了');
+        const cost = dlx ? (o.pass.prem ? E.PASS.deluxe - E.PASS.price : E.PASS.deluxe) : E.PASS.price;
+        if (o.gems < cost) return no(`宝石不够（需要 ${cost}）`);
+        o.gems -= cost; o.pass.prem = true;
+        const items = [];
+        if (dlx) { o.pass.dlx = true; o.pass.xp = Math.min(E.passXpMax(), o.pass.xp + E.PASS.boost * E.PASS.xpPer); items.push({ k: 'skin', id: 'fr_merc' }); grant(o, items); }
+        return { ok: true, items, spent: { gems: cost } };
+      }
+      case 'claimBonus': {   // 2.1：满级后的无尽金币宝箱
+        const b = E.passBonus(o);
+        if (!b.can) return no('还没有可以开的金币宝箱');
+        o.pass.bc = (o.pass.bc || 0) + b.can;
+        const it = { k: 'coins', n: E.PASS.bonusCoins * b.can };
+        grant(o, [it]);
+        return { ok: true, items: [it], n: b.can };
       }
       case 'claimPass': {
         const t = a.tier | 0, prem = !!a.prem;

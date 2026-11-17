@@ -78,7 +78,7 @@
       <button class="trophy-chip" data-ov="road" title="奖杯之路">
         <span class="tro-ico" data-icon="trophy"></span><div><b id="trophyText">0</b><div class="bar gold"><i id="trophyBar"></i></div><small id="trophyNext"></small></div>
       </button>
-      <button class="pass-chip" data-ov="pass" title="第一赛季通行证"><b class="pc-s">S1</b><div><small>灰城重涂 · 通行证</small><b id="passLv">Lv.0</b><div class="bar pass"><i id="passBar"></i></div></div></button>
+      <button class="pass-chip" data-ov="pass" title="第二赛季通行证"><b class="pc-s">S2</b><div><small>雇佣兵撤离 · 通行证</small><b id="passLv">Lv.0</b><div class="bar pass"><i id="passBar"></i></div></div></button>
       <button class="wallet" id="wallet" data-ov="chests" title="宝箱 · 商店 · 兑换"></button>
       <div class="top-gap"></div>
       <div class="upd-banner hidden" id="updBanner"><b id="updText">发现新版本</b><a class="btn small" id="updGo" target="_blank" rel="noopener">去官网下载</a><button class="link-btn" id="updLater">以后再说</button></div>
@@ -95,7 +95,7 @@
       <div class="home-logo"><b><span>涂鸦</span>机兵</b><i>GRAFFI·BOTS</i><em class="s1-badge">S1 · 灰城重涂</em></div>
       <button class="side-btn" data-ov="pilots"><div id="sidePilot" class="side-face"></div><div><b>驾驶员</b><small id="sidePilotName"></small></div></button>
       <button class="side-btn" data-ov="mechs"><span class="side-ico" data-icon="mech"></span><div><b>机体</b><small id="sideMechName"></small></div></button>
-      <button class="side-btn s1" data-ov="pass"><span class="side-ico s1-ico">S1</span><div><b>通行证</b><small id="sidePassTxt">灰城重涂</small></div><em class="badge hidden" id="passBadge">!</em></button>
+      <button class="side-btn s1" data-ov="pass"><span class="side-ico s1-ico">S2</span><div><b>通行证</b><small id="sidePassTxt">雇佣兵撤离</small></div><em class="badge hidden" id="passBadge">!</em></button>
       <button class="side-btn" data-ov="shop"><span class="side-ico" data-icon="gems"></span><div><b>皮肤商店</b><small id="sideShopTxt">今日特惠</small></div></button>
       <button class="side-btn" data-ov="chests"><span class="side-ico" data-icon="chest"></span><div><b>宝箱</b><small id="sideChestTxt">商店 · 兑换</small></div><em class="badge hidden" id="chestBadge">0</em></button>
       <button class="side-btn" data-ov="talents"><span class="side-ico" data-icon="star"></span><div><b>天赋</b><small id="sideTalTxt">天赋树</small></div><em class="badge hidden" id="talBadge">0</em></button>
@@ -197,12 +197,16 @@
       </div>
     </section>
     <section id="ov-pass" class="ov hidden">
-      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>S1 · 灰城重涂</h2><small id="passEnds">赛季剩余 28 天</small>
+      <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2 id="passTitle">S2 · 雇佣兵撤离</h2><small id="passEnds">赛季剩余 56 天</small>
         <div class="pass-head"><div class="pass-lv"><small>通行证等级</small><b id="passLv2">0</b><small id="passXp">0 / 600</small></div><button class="btn" id="passBuy">解锁高级通行证</button><button class="btn ghost small" id="passAll">一键领取</button><button class="link-btn" id="passIntro">▶ 赛季动画</button></div></header>
-      <div class="ov-body pass-body">
-        <div class="quests" id="questBox"></div>
-        <div class="pass-track-wrap"><div class="pass-rows"><span class="pr-free">免费</span><span class="pr-prem">高级</span></div><div class="pass-track" id="passTrack"></div></div>
+      <div class="ov-body pass-body s2">
+        <aside class="ps-hero" id="passHero"></aside>
+        <div class="ps-main">
+          <div class="pass-track-wrap"><div class="pass-rows"><span class="pr-free">免费</span><span class="pr-prem">高级</span></div><div class="pass-track" id="passTrack"></div></div>
+          <div class="ps-bottom"><div class="ps-bonus" id="passBonus"></div><div class="quests" id="questBox"></div></div>
+        </div>
       </div>
+      <div id="passShop" class="ps-shop hidden"></div>
     </section>
     <section id="ov-shop" class="ov hidden">
       <header class="ov-head"><button class="back" data-close data-icon="back">返回</button><h2>皮肤商店</h2><small>皮肤只改变外观；等级越高，对战里的特效越炫</small><div class="wallet in-ov" id="wallet3"></div></header>

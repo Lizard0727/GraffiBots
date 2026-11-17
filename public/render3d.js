@@ -1279,6 +1279,15 @@
     const add = (o) => { g.add(o); return o; };
     const cylX = (m, r, len, x, y, z) => { const o = part(s.cyl, m, r, len, r, x, y, z); o.rotation.z = -Math.PI / 2; return add(o); };
     switch (weapon) {
+      case 'tactic': {    // 2.1 战术机兵：长枪管战术步枪 + 瞄准镜 + 弹匣 + 枪口制退器
+        add(outlined(rbox(16, 5, 5, 1.6), toon(0x5a5240), 1, 1, 1, 6, 0, 0));
+        cylX(dk, 1.1, 18, 22, 0.8, 0); cylX(mt, 1.7, 3, 31.5, 0.8, 0);
+        add(outlined(rbox(9, 2.6, 2.6, 1), dk, 1, 1, 1, 8, 4.4, 0)); add(part(s.sph, basic(0x7ad0ff), 1, 1, 1, 12.8, 4.4, 0));
+        add(outlined(rbox(3, 7, 3, 1), toon(color), 1, 1, 1, 9, -5, 0));
+        add(part(s.box, toon(0xe0a030), 10, 0.8, 5.2, 6, 2.6, 0));
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        break;
+      }
       case 'warden': {    // 1.8 结界机兵：符咒法杖 + 发光宝珠 + 金色符环 + 垂下的符纸
         add(outlined(rbox(8, 5, 5, 1.6), dk, 1, 1, 1, 2, 0, 0));
         cylX(toon(0x3a2a1c), 1.1, 24, 16, 0, 0);
@@ -1824,6 +1833,7 @@
     academyH: { top: '#16141c', inner: '#ff2d4b', pants: '#16141c', shoes: '#2a2430', sleeve: 'long', gakuran: '#c8c8d0', hood: '#16141c' },
     academyW: { top: '#eef0fa', inner: '#8a6bff', pants: '#1d2140', shoes: '#1d2140', sleeve: 'long', coat: true, gakuran: '#d8b25a', haori: '#8a6bff' },
     // 1.9：排位赛季传说「烈士·不灭战旗」——深色长大衣 + 金扣 + 红色围巾
+    merc:     { top: '#8a7a52', inner: '#3a3d48', pants: '#5a5240', shoes: '#2a221c', sleeve: 'long', armor: true, scarf: '#c89a3a' },   // 2.1 霍克：沙漠战术背心
     martyr:   { top: '#2a2420', inner: '#c8102e', pants: '#1d1a18', shoes: '#2a2420', sleeve: 'long', coat: true, gakuran: '#ffd35e', scarf: '#c8102e' },
   };
 
@@ -2032,6 +2042,13 @@
       const st = part(SH.box, toon(0xc8102e), 0.25, 2.2, 0.4, -3.66, 5.4, 1.4); st.rotation.x = 0.45; deco.add(st);
       for (const z of [-0.8, 0.8]) { const pin = part(SH.cylH, toon(0xd8b25a), 0.15, 4.2, 0.15, -3.2, 6.4, z); pin.rotation.z = 1.1; deco.add(pin); }
     }
+    // 2.1 霍克：沙色战术帽 + 帽徽 + 耳麦
+    if (pid === 'hawk') {
+      deco.add(part(SH.sphH, toon(0xb89a62), 4.9, 3.2, 4.9, -0.6, 3.1, 0));
+      { const bill = part(SH.box, toon(0x8a7448), 4.2, 0.4, 5.6, 3.2, 3.3, 0); bill.rotation.z = -0.12; deco.add(bill); }
+      deco.add(part(SH.box, toon(P.accent), 0.3, 1.3, 1.6, 4.1, 4.4, 0));
+      deco.add(part(SH.sph, toon(0x2a2d3a), 0.9, 1.3, 0.6, 0, 0.2, 4.4)); deco.add(part(SH.cylH, toon(0x2a2d3a), 0.12, 2.6, 0.12, 1.2, -0.6, 4.3)).rotation.z = 1.2;
+    }
     // 1.8 赤镰：眼下的红色咒纹
     if (pid === 'aka') for (const [y, z] of [[-0.9, -1.9], [-1.5, -1.6]]) headG.add(part(SH.box, basic(0xff2d4b), 0.25, 0.22, 1.1, CH.headR * 0.93, y, z));
     if (X.has('moonpin')) { const mn = new T.Mesh(new T.TorusGeometry(1.5, 0.4, 6, 14, Math.PI * 1.3), basic(0xffd35e)); mn.position.set(-1.2, 6.6, 3.4); mn.rotation.y = 0.4; deco.add(mn); }
@@ -2216,6 +2233,13 @@
         else if (t < 1.2) { const u = (t - 0.5) / 0.7; c.lift = hump(u, 0, 1) * 14; R.rotation.z = 3 - u; L.rotation.z = 3 - u; L.rotation.x = 0.3; }
         else { const u = Math.min(1, (t - 1.2) / 0.5); c.lift = -1.2 * (1 - u); R.rotation.z = 0.4; L.rotation.z = 0.4; R.rotation.x = -0.9; L.rotation.x = 0.9; }
         if (once('s1', 1.2)) { fx('ring', '#ffd35e', 26); fx('ring', '#ffffff', 18); fx('burst', '#ffd35e', 26); }
+        break;
+      }
+      case 'drop': {   // 2.1 S2 雇佣兵：从高空空降 → 落地半蹲 → 起身举枪
+        if (t < 0.9) { const u = t / 0.9; c.lift = (1 - ease(u)) * 34; R.rotation.z = 2.6; L.rotation.z = 2.6; }
+        else if (t < 1.3) { const u = (t - 0.9) / 0.4; c.lift = -2 * Math.sin(u * Math.PI); R.rotation.z = 0.6; L.rotation.z = 0.3; }
+        else { R.rotation.z = 1.4; R.rotation.x = -0.3; L.rotation.z = 1.2; L.rotation.x = 0.4; }
+        if (once('s1', 0.9)) { fx('ring', '#e0a030', 24); fx('burst', '#ffb42e', 18); }
         break;
       }
       case 'flag': case 'warbanner': {   // 红旗特装 / 烈士·不灭战旗：走进来 → 插下战旗 → 敬礼
@@ -3313,6 +3337,240 @@
     void t0;
   }
   const hx0 = (u) => Math.min(40, u * 40);
+  // =====================================================================
+  // 2.1：S2「雇佣兵撤离」赛季动画（45 秒，8 个镜头）
+  //   灰城禁区黄昏 → 空投 + 霍克登场 → 小队集合 → 战术机兵空降、点射守卫 → 大招侦察无人机
+  //   → 灰石指挥官现身、战术空投砸中 → 撤离点信号烟、成功撤离 → 赛季标题
+  // =====================================================================
+  const S2_LEN = 45;
+  const S2_CAM = [
+    [0, -420, -260, 260, 260, 0, 60, 52], [4.9, -160, -140, 120, 200, 0, 70, 50],
+    [5.0, -110, -70, 40, 0, 0, 30, 42], [7.2, -70, -50, 26, 0, 0, 22, 40],
+    [7.3, 62, -46, 26, 0, 0, 22, 34], [10.4, 54, -40, 22, 0, 0, 22, 32],
+    [10.5, -150, 110, 70, -20, 0, 18, 46], [14.9, -90, 90, 50, 0, 0, 18, 44],
+    [15.0, -60, -140, 60, 120, -10, 30, 50], [20.9, 20, -150, 70, 170, -10, 30, 52],
+    [21.0, 50, -10, 30, 40, -30, 34, 34], [22.4, 30, -60, 50, 160, -10, 40, 48], [26.9, 70, -170, 120, 200, 0, 20, 52],
+    [27.0, 60, -40, 30, 320, 0, 70, 46], [30.5, 120, -120, 60, 300, 0, 60, 50], [33.9, 150, -150, 90, 260, 0, 40, 54],
+    [34.0, -200, 220, 120, -40, 120, 20, 46], [39.9, -120, 260, 70, -40, 120, 20, 40],
+    [40.0, -40, 30, 40, 40, 0, 50, 44], [45, -10, 20, 30, 40, 0, 50, 38],
+  ];
+  function s2Cam(t) {
+    let i = 0; while (i < S2_CAM.length - 2 && t >= S2_CAM[i + 1][0]) i++;
+    const a = S2_CAM[i], b = S2_CAM[i + 1], k = ease(Math.max(0, Math.min(1, (t - a[0]) / Math.max(0.01, b[0] - a[0]))));
+    const L = (j) => a[j] + (b[j] - a[j]) * k, sh = TR.shake || 0;
+    TR.cam.position.copy(g3(L(1) + (Math.random() - 0.5) * sh, L(2) + (Math.random() - 0.5) * sh, L(3) + (Math.random() - 0.5) * sh));
+    TR.cam.lookAt(g3(L(4), L(5), L(6))); TR.cam.fov = L(7); TR.cam.updateProjectionMatrix();
+  }
+  function s2Stage() {
+    const sc = new T.Scene(); sc.fog = new T.Fog(0xb8743a, 300, 1100);
+    sc.add(new T.HemisphereLight(0xffd8a0, 0x3a2a1c, 0.8));
+    const sun = new T.DirectionalLight(0xffc27a, 0.95); sun.position.set(-300, 180, -400); sc.add(sun);
+    const rim = new T.DirectionalLight(0xff6a3a, 0.4); rim.position.set(260, 90, 240); sc.add(rim); TR.rim = rim;
+    const sky = new T.Mesh(new T.SphereGeometry(1300, 24, 12), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, fog: false, uniforms: {},
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 c = mix(vec3(1.0,0.62,0.3), vec3(0.22,0.14,0.32), smoothstep(-0.02,0.6,h)); gl_FragColor = vec4(c,1.0); }' }));
+    sc.add(sky);
+    const sd = new T.Mesh(new T.SphereGeometry(70, 24, 16), new T.MeshBasicMaterial({ color: 0xfff0c8, fog: false })); sd.position.set(-560, 150, -900); sc.add(sd);
+    const halo = new T.Mesh(new T.SphereGeometry(130, 24, 16), new T.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.25, fog: false, depthWrite: false })); halo.position.copy(sd.position); sc.add(halo);
+    // 地面：裂开的柏油路 + 沙土
+    const gc = document.createElement('canvas'); gc.width = gc.height = 512;
+    { const x = gc.getContext('2d'); x.fillStyle = '#6a5a48'; x.fillRect(0, 0, 512, 512); for (let i = 0; i < 1400; i++) { x.fillStyle = `rgba(${Math.random() < 0.5 ? '255,230,190' : '40,30,20'},${Math.random() * 0.12})`; x.fillRect(Math.random() * 512, Math.random() * 512, 3, 3); }
+      x.fillStyle = '#3e3a40'; x.fillRect(0, 180, 512, 150); x.strokeStyle = '#e0a030'; x.lineWidth = 6; x.setLineDash([40, 30]); x.beginPath(); x.moveTo(0, 255); x.lineTo(512, 255); x.stroke();
+      x.setLineDash([]); x.strokeStyle = '#1e1c22'; x.lineWidth = 2; for (let i = 0; i < 14; i++) { x.beginPath(); let px = Math.random() * 512, py = 190 + Math.random() * 130; x.moveTo(px, py); for (let k = 0; k < 5; k++) { px += (Math.random() - 0.5) * 40; py += (Math.random() - 0.5) * 20; x.lineTo(px, py); } x.stroke(); } }
+    const gt = new T.CanvasTexture(gc); gt.wrapS = gt.wrapT = T.RepeatWrapping; gt.repeat.set(4, 4);
+    const ground = new T.Mesh(new T.PlaneGeometry(1800, 1800), new T.MeshLambertMaterial({ map: gt })); ground.rotation.x = -Math.PI / 2; sc.add(ground);
+    // 两排灰色废楼（少数窗户亮着）+ 喷漆
+    const wc = document.createElement('canvas'); wc.width = 64; wc.height = 128;
+    { const x = wc.getContext('2d'); x.fillStyle = '#5a5660'; x.fillRect(0, 0, 64, 128); for (let j = 4; j < 128; j += 9) for (let i = 4; i < 64; i += 9) { x.fillStyle = Math.random() < 0.12 ? '#ffd38a' : '#2a2830'; x.fillRect(i, j, 5, 6); } }
+    const wt = new T.CanvasTexture(wc); wt.wrapS = wt.wrapT = T.RepeatWrapping;
+    const tags = ['#ff3ea5', '#1fd6ee', '#9cff2e', '#ffd23f', '#ff8a1f'];
+    for (let i = 0; i < 12; i++) for (const side of [-1, 1]) {
+      const h = 90 + ((i * 53) % 5) * 40, w = 70 + ((i * 31) % 3) * 20, x = -300 + i * 90, y = side * (190 + ((i * 17) % 3) * 24);
+      const m = new T.MeshLambertMaterial({ map: wt.clone() }); m.map.repeat.set(w / 64, h / 128); m.map.needsUpdate = true;
+      const b = new T.Mesh(new T.BoxGeometry(w, h, 60), m); b.position.copy(g3(x, y, h / 2)); sc.add(b);
+      if (i % 3 === 1) { const s = new T.Mesh(new T.PlaneGeometry(w * 0.8, 26), new T.MeshBasicMaterial({ color: tags[i % tags.length], transparent: true, opacity: 0.8 })); s.position.copy(g3(x, y - side * 31, 22)); s.rotation.y = side > 0 ? 0 : Math.PI; sc.add(s); }
+    }
+    // 远处的灰石大厦：顶上红色信号灯
+    const tower = new T.Mesh(new T.BoxGeometry(90, 380, 90), new T.MeshLambertMaterial({ color: 0x3a3d48 })); tower.position.copy(g3(470, 0, 190)); sc.add(tower);
+    const crown = new T.Mesh(new T.BoxGeometry(110, 16, 110), new T.MeshLambertMaterial({ color: 0x2a2d36 })); crown.position.copy(g3(470, 0, 386)); sc.add(crown);
+    TR.beacon = new T.Mesh(new T.SphereGeometry(7, 12, 8), new T.MeshBasicMaterial({ color: 0xff2d2d, fog: false })); TR.beacon.position.copy(g3(470, 0, 410)); sc.add(TR.beacon);
+    // 路障 / 集装箱
+    const crateM = [0xb05a2a, 0x3a6a8a, 0x5a6a3a];
+    for (let i = 0; i < 8; i++) { const c = new T.Mesh(new T.BoxGeometry(60, 26, 24), new T.MeshLambertMaterial({ color: crateM[i % 3] })); c.position.copy(g3(-220 + i * 70, (i % 2 ? 1 : -1) * (120 + (i % 3) * 8), 13)); c.rotation.y = (i % 3) * 0.3; sc.add(c); }
+    // 撤离点：绿色光圈
+    TR.exRing = new T.Mesh(new T.RingGeometry(52, 60, 48), new T.MeshBasicMaterial({ color: 0x5ee36a, transparent: true, opacity: 0, side: T.DoubleSide, depthWrite: false })); TR.exRing.rotation.x = -Math.PI / 2; TR.exRing.position.copy(g3(-40, 120, 1)); sc.add(TR.exRing);
+    // 粒子
+    const N = 900, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N);
+    for (let i = 0; i < N; i++) pos[i * 3 + 1] = -9999;
+    const pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(pos, 3)); pg.setAttribute('color', new T.BufferAttribute(col, 3)); pg.setAttribute('size', new T.BufferAttribute(size, 1)); pg.setAttribute('alpha', new T.BufferAttribute(alpha, 1));
+    const pm = new T.ShaderMaterial({ vertexShader: PVS, fragmentShader: PFS, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, uniforms: { soft: { value: 1 } } });
+    const pts = new T.Points(pg, pm); pts.frustumCulled = false; sc.add(pts);
+    TR.ps = { pts, pos, col, size, alpha, d: new Array(N).fill(null), i: 0, n: N };
+    TR.wisps = [];
+    for (let i = 0; i < 50; i++) TR.wisps.push({ x: -300 + Math.random() * 700, y: (Math.random() - 0.5) * 340, z: Math.random() * 120, s: 0.5 + Math.random() });
+    return sc;
+  }
+  // 空投箱：箱子 + 降落伞
+  function s2Crate() {
+    const g = new T.Group();
+    g.add(outlined(rbox(20, 16, 20, 2.5), toon(0xe0a030), 1, 1, 1, 0, 8, 0));
+    g.add(part(SH.box, toon(0x2a2d3a), 20.6, 2.4, 20.6, 0, 10, 0));
+    const chute = new T.Group(); chute.position.y = 60; g.add(chute);
+    chute.add(new T.Mesh(new T.SphereGeometry(30, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), toon(0xff4d3d)));
+    for (const [x, z] of [[-20, -20], [20, -20], [-20, 20], [20, 20]]) { const l = part(SH.cyl, toon(0xffffff), 0.4, 50, 0.4, x * 0.5, -24, z * 0.5); l.rotation.z = x > 0 ? 0.35 : -0.35; chute.add(l); }
+    g.userData.chute = chute;
+    return g;
+  }
+  function seasonTrailerStart(host, hooks) {
+    if (!trInit()) return false;
+    shared(); trailerStop(true);
+    TR.scene = s2Stage(); TR.hooks = hooks || { on() {} }; TR.t = 0; TR.shake = 0; TR.fired = {}; TR.on = true; TR.mode = 's2';
+    const sk = (id, k) => (S.skin(k) ? id + '@' + k : id);
+    TR.hero = buildChar('hawk', '#e0a030', null); TR.scene.add(TR.hero.root); TR.hero.root.visible = false;
+    TR.mates = [['blaze', 'blaze_merc', -40, 30], ['flag', null, -50, -36]].map(([pid, skin, x, y]) => { const c = buildChar(skin ? sk(pid, skin) : pid, S.pilot(pid).accent, null); TR.scene.add(c.root); c.root.visible = false; return { c, x, y, sx: -260, sy: y * 2 }; });
+    TR.mech = makeBot('#e0a030', 'antenna', 'tactic', 'hawk', 'm_merc'); TR.scene.add(TR.mech.root); TR.mech.root.visible = false;
+    TR.guards = [[200, -40], [230, 20], [260, -10]].map(([x, y]) => { const b = makeBot('#9aa0a8', 'antenna', 'riot', 'han'); TR.scene.add(b.root); b.root.visible = false; return { b, x, y, hit: 0, dead: 0, hp: 0 }; });
+    TR.boss = makeBot('#5b5e68', 'antenna', 'wrecker', 'han'); TR.boss.root.scale.setScalar(1.9); TR.scene.add(TR.boss.root); TR.boss.root.visible = false; TR.bossHit = 0;
+    TR.crate = s2Crate(); TR.scene.add(TR.crate); TR.crate.visible = false;
+    TR.crate2 = s2Crate(); TR.scene.add(TR.crate2); TR.crate2.visible = false;
+    { const g = new T.Group(); g.add(part(SH.sphL, toon(0x3a3d48), 6, 4, 6, 0, 0, 0)); const ro = new T.Group(); for (const a of [0, Math.PI / 2]) { const bl = part(SH.box, toon(0x2a2d3a), 22, 0.6, 2, 0, 3.5, 0); bl.rotation.y = a; ro.add(bl); } g.add(ro); g.add(part(SH.sph, basic(0xff4d3d), 1.6, 1.6, 1.6, 4, -1, 0)); g.userData.ro = ro; TR.drone = g; TR.scene.add(g); g.visible = false; }
+    TR.cam = new T.PerspectiveCamera(50, 1, 1, 3200);
+    if (TR.canvas.parentNode !== host) host.appendChild(TR.canvas);
+    TR.host = host; trSize();
+    TR.last = performance.now();
+    const loop = (now) => { if (!TR.on) return; TR.raf = requestAnimationFrame(loop); s2Frame(now); };
+    TR.raf = requestAnimationFrame(loop);
+    return true;
+  }
+  function s2Frame(now) {
+    if (TR.host.clientWidth !== TR.w || TR.host.clientHeight !== TR.h) trSize();
+    const rdt = Math.min(0.05, (now - TR.last) / 1000); TR.last = now;
+    TR.slow = TR.t > 32.6 && TR.t < 33.4 ? 0.35 : 1;
+    const dt = rdt * TR.slow; TR.t += dt;
+    const t = TR.t, on = TR.hooks.on, H = TR.hero, M = TR.mech, B = TR.boss, col = '#e0a030';
+    if (t >= S2_LEN) { trailerStop(); return; }
+    TR.shake = Math.max(0, TR.shake - rdt * 18);
+    // ---- 镜头 1：灰城禁区黄昏 ----
+    if (trOnce('c1', t, 0.5)) on('cap', '灰城禁区 · 封锁第 47 天');
+    if (trOnce('c2', t, 2.7)) on('cap', '灰石集团封锁了整座城区——只有雇佣兵敢进去');
+    TR.beacon.material.color.set(Math.floor(t * 2) % 2 ? 0xff2d2d : 0x3a0a0a);
+    // ---- 镜头 2：空投 + 霍克登场 ----
+    if (t >= 5 && t < 21) {
+      const C1 = TR.crate; C1.visible = true;
+      const fall = Math.max(0, 1 - (t - 5) / 1.2);
+      C1.position.copy(g3(20, 20, fall * 220)); C1.userData.chute.visible = fall > 0.02; C1.rotation.y = fall * 2;
+      if (trOnce('crate', t, 6.2)) { trRing(20, 20, 0, 60, col, 0.6); trEmit(20, 20, 4, '#c8a878', 30, 140, { size: 22, life: 0.9, grav: -20, up: 0.4 }); TR.shake = 5; on('sfx', 'boom'); }
+      if (t >= 6.4) {
+        H.root.visible = t < 16 || t >= 34;
+        const drop = Math.max(0, 1 - (t - 6.4) / 0.5);
+        if (trOnce('land', t, 6.9)) { trRing(0, 0, 0, 70, col, 0.6); trRing(0, 0, 0, 110, '#ffffff', 0.5); trEmit(0, 0, 4, '#c8a878', 30, 160, { size: 22, life: 0.8, grav: -20, up: 0.4 }); TR.shake = 7; on('sfx', 'boom'); H.act = { name: 'hello', t: 0 }; }
+        if (trOnce('name', t, 7.4)) on('name', { pilot: S.pilot('hawk') });
+        if (trOnce('line', t, 8.6)) on('line', S.pilot('hawk').line);
+        let face = -0.4;
+        if (t >= 10.5) face = Math.PI * 0.85;
+        H.root.position.copy(g3(0, 0, drop * 80));
+        animateChar(H, { a: face, vx: 0, vy: 0 }, rdt, 0, {});
+        H.root.rotation.y = -face + H.yawOff;
+      }
+    }
+    // ---- 镜头 3：小队集合 ----
+    if (t >= 10.5 && t < 16) {
+      if (trOnce('c3', t, 10.8)) on('cap', '组队进入禁区：搜刮、交火、活着撤离');
+      if (trOnce('c3b', t, 13.0)) on('cap', '网格背包 · 可搜索容器 · 安全箱 · 交易行');
+      for (const m of TR.mates) {
+        m.c.root.visible = true;
+        const k = Math.min(1, (t - 10.5) / 2.2), x = m.sx + (m.x - m.sx) * ease(k), y = m.sy + (m.y - m.sy) * ease(k), sp = k < 1 ? 220 : 0;
+        m.c.root.position.copy(g3(x, y, 0));
+        const face = k < 1 ? Math.atan2(m.y - m.sy, m.x - m.sx) : Math.atan2(-y, -x);
+        animateChar(m.c, { a: face, vx: Math.cos(face) * sp, vy: Math.sin(face) * sp }, rdt, sp, {});
+        m.c.root.rotation.y = -face + m.c.yawOff;
+        if (trOnce('mv' + m.x, t, 12.8)) m.c.act = { name: 'victory', t: 0 };
+      }
+    } else if (t >= 16 && t < 34) for (const m of TR.mates) m.c.root.visible = false;
+    // ---- 镜头 4：战术机兵空降、点射守卫 ----
+    if (t >= 15 && t < 34) {
+      const md = Math.max(0, 1 - (t - 15.3) / 0.45);
+      if (t >= 15.3) M.root.visible = true;
+      if (trOnce('mech', t, 15.75)) { trRing(40, -30, 0, 90, col, 0.6); trRing(40, -30, 0, 140, '#ffffff', 0.6); trEmit(40, -30, 4, '#c8a878', 40, 200, { size: 26, life: 0.9, grav: -20, up: 0.4 }); TR.shake = 9; on('sfx', 'boom'); }
+      if (trOnce('board', t, 16.0)) { trEmit(10, 0, 20, col, 20, 120, { size: 10, life: 0.5, grav: -100 }); on('cap', '新机体「战术机兵」：三连点射，穿甲首发'); }
+      const alive = TR.guards.filter((g) => !g.dead);
+      if (t >= 16.2) for (const g of TR.guards) g.b.root.visible = !g.dead || g.dead < 0.4;
+      let firing = false;
+      const shootAt = (g, k) => { trShot(52, -30, 28, g.x, g.y, 26, k === 0 ? '#ffffff' : col, 0.18, k === 0 ? 3.4 : 2.6, () => { g.hit = 0.25; trEmit(g.x, g.y, 26, col, 10, 200, { size: 10, life: 0.4 }); if (++g.hp >= (t > 24 ? 3 : 6) && !g.dead) { g.dead = 0.001; trRing(g.x, g.y, 0, 70, '#ffffff', 0.5); trEmit(g.x, g.y, 20, '#9aa0a8', 40, 260, { size: 16, life: 0.8, grav: -40 }); on('sfx', 'kill'); TR.shake = 4; } else on('sfx', 'hit'); }); };
+      const burstWin = (t > 17 && t < 20.8) || (t > 24 && t < 26.8) || (t > 30 && t < 33);
+      if (burstWin) {
+        const ph = (t * 1.1) % 1, ph0 = ((t - dt) * 1.1) % 1;
+        for (const [k, at] of [[0, 0], [1, 0.1], [2, 0.2]]) if (ph >= at && (ph0 < at || ph0 > ph)) { firing = true; on('sfx', 'shoot'); const tg = t > 30 ? null : alive[0]; if (tg) shootAt(tg, k); else if (t > 30) trShot(52, -30, 28, 300, 0, 60, k === 0 ? '#ffffff' : col, 0.25, 3, () => { TR.bossHit = 0.2; trEmit(300, 0, 60, col, 10, 200, { size: 12, life: 0.4 }); }); }
+      }
+      for (const g of TR.guards) {
+        if (g.dead) { g.dead += dt; g.b.root.scale.setScalar(Math.max(0.01, 1 - g.dead * 2.5)); }
+        const kx = g.hit > 0 ? (g.hit -= dt, g.hit * 30) : 0;
+        g.b.root.position.copy(g3(g.x + kx, g.y, 0));
+        animateBot(g.b, { x: g.x + kx, y: g.y, z: 0, vx: 0, vy: 0, vz: 0, a: Math.PI, pt: 0, flags: 1 | (t > 16.5 && !g.dead && Math.random() < 0.06 ? 16 : 0), charge: 0, tank: 100, flash: g.hit > 0.1 ? 1 : 0, weapon: 'riot' }, now, rdt);
+        if (t > 23 && t < 27 && !g.dead && Math.floor(t * 3) !== Math.floor((t - dt) * 3)) trRing(g.x, g.y, 0, 40, '#ff4d3d', 0.5);   // 被侦察无人机标记
+      }
+      // ---- 镜头 5：大招 侦察无人机 ----
+      if (trOnce('cut', t, 21.2)) { on('cut', { pilot: S.pilot('hawk'), sup: S.SPECIALS.recon.name, mech: S.WEAPONS.tactic.name }); on('flash'); on('sfx', 'special'); TR.shake = 6; }
+      if (t >= 21.6 && t < 27) {
+        const D = TR.drone; D.visible = true; const k = Math.min(1, (t - 21.6) / 1.4);
+        const x = 40 + (220 - 40) * ease(k), y = -30 + 20 * ease(k), z = 40 + 70 * Math.sin(k * Math.PI * 0.5);
+        D.position.copy(g3(x, y, z + Math.sin(t * 3) * 4)); D.userData.ro.rotation.y = t * 40;
+        if (trOnce('scan', t, 23.0)) { trRing(220, -10, 0, 160, '#7ad0ff', 1.2); trRing(220, -10, 0, 120, '#ff4d3d', 1.2); on('cap', '侦察无人机：暴露并标记区域内所有敌人'); on('sfx', 'special'); }
+        if (Math.random() < 0.4) trEmit(x, y, z - 6, '#7ad0ff', 1, 30, { size: 8, life: 0.4, grav: 0 });
+      } else TR.drone.visible = false;
+      // ---- 镜头 6：灰石指挥官 + 战术空投 ----
+      if (t >= 27 && t < 34) {
+        B.root.visible = true;
+        const k = Math.min(1, (t - 27) / 3), bx = 420 - 120 * ease(k), hurtK = TR.bossHit > 0 ? (TR.bossHit -= dt, 1) : 0;
+        if (trOnce('boss', t, 27.4)) { on('cap', 'Boss「灰石指挥官 · 铁卫」'); on('sfx', 'siren'); TR.shake = 5; }
+        const dying = t >= 33;
+        B.root.position.copy(g3(bx + hurtK * 6, 0, 0));
+        animateBot(B, { x: bx, y: 0, z: 0, vx: k < 1 ? -40 : 0, vy: 0, vz: 0, a: Math.PI, pt: 0, flags: 1 | (k >= 1 && Math.random() < 0.05 ? 16 : 0), charge: 0, tank: 100, flash: hurtK, weapon: 'wrecker' }, now, rdt);
+        if (trOnce('drop2', t, 30.6)) { on('cap', '霍克技能「战术空投」'); on('sfx', 'special'); }
+        const C2 = TR.crate2;
+        if (t >= 30.6) { C2.visible = t < 33; const f = Math.max(0, 1 - (t - 30.6) / 0.9); C2.position.copy(g3(300, 0, f * 260)); C2.userData.chute.visible = f > 0.05; }
+        if (trOnce('hit2', t, 31.5)) { trRing(300, 0, 0, 120, '#ffffff', 0.6); trRing(300, 0, 0, 160, col, 0.8); trEmit(300, 0, 20, '#ff8a1f', 50, 300, { size: 18, life: 0.9, grav: -40 }); TR.bossHit = 0.6; TR.shake = 10; on('flash'); on('sfx', 'boom'); }
+        if (dying) { const u = (t - 33) / 0.9; B.root.scale.setScalar(1.9 * Math.max(0.01, 1 - u)); if (Math.random() < 0.9) trEmit(300, 0, 40 + Math.random() * 60, Math.random() < 0.5 ? '#ffb42e' : '#ff4d3d', 8, 260, { size: 18, life: 1, grav: -40 }); }
+        if (trOnce('bossdie', t, 33)) { trRing(300, 0, 0, 220, '#ffffff', 0.8); TR.shake = 12; on('flash'); on('sfx', 'boom'); }
+      } else if (t >= 34) B.root.visible = false;
+      M.root.position.copy(g3(40, -30, md * 160));
+      animateBot(M, { x: 40, y: -30, z: md * 160, vx: 0, vy: 0, vz: md ? -400 : 0, a: t > 27 ? 0.1 : Math.atan2(10, 180), pt: 0.05, flags: 1 | (firing ? 16 : 0) | (t > 21.2 && t < 22.6 ? 128 : 0), charge: 0, tank: 100, flash: 0, weapon: 'tactic' }, now, rdt);
+    }
+    // ---- 镜头 7：撤离点 ----
+    if (t >= 34 && t < 40) {
+      if (trOnce('ex', t, 34.3)) { on('cap', '撤离点已开放！'); on('sfx', 'siren'); }
+      TR.exRing.material.opacity = 0.6 + 0.3 * Math.sin(t * 6);
+      if (Math.random() < 0.9) trEmit(-40 + (Math.random() - 0.5) * 10, 120 + (Math.random() - 0.5) * 10, 6, Math.random() < 0.7 ? '#5ee36a' : '#d8ffd0', 2, 40, { size: 26, life: 2, grav: -70, up: 2 });
+      const k = Math.min(1, (t - 34) / 3);
+      const pos = [[H, -10, 0], ...TR.mates.map((m) => [m.c, m.x, m.y])];
+      pos.forEach(([c, x0, y0], i) => {
+        c.root.visible = true;
+        const tx = -40 + (i - 1) * 22, ty = 120 + (i % 2) * 14, x = x0 + (tx - x0) * ease(k), y = y0 + (ty - y0) * ease(k), sp = k < 1 ? 200 : 0, face = k < 1 ? Math.atan2(ty - y0, tx - x0) : -0.6;
+        c.root.position.copy(g3(x, y, 0)); animateChar(c, { a: face, vx: Math.cos(face) * sp, vy: Math.sin(face) * sp }, rdt, sp, {}); c.root.rotation.y = -face + c.yawOff;
+      });
+      M.root.visible = false;
+      if (trOnce('exd', t, 38.2)) { on('flash'); on('cap', '成功撤离 · 带出物资价值 128,400'); on('sfx', 'win'); for (let i = 0; i < 3; i++) trRing(-40, 120, 0, 90 + i * 40, '#5ee36a', 0.9); }
+    }
+    // ---- 镜头 8：赛季标题 ----
+    if (t >= 40) {
+      TR.exRing.material.opacity = 0;
+      H.root.visible = true; H.root.position.copy(g3(0, 0, 0));
+      if (trOnce('vic', t, 40.1)) H.act = { name: 'victory', t: 0 };
+      animateChar(H, { a: -0.5, vx: 0, vy: 0 }, rdt, 0, {}); H.root.rotation.y = 0.5 + H.yawOff;
+      for (const m of TR.mates) m.c.root.visible = false;
+      M.root.visible = true; M.root.position.copy(g3(60, -40, 0));
+      animateBot(M, { x: 60, y: -40, z: 0, vx: 0, vy: 0, vz: 0, a: -0.6, pt: 0, flags: 1, charge: 0, tank: 100, flash: 0, weapon: 'tactic' }, now, rdt);
+      if (trOnce('title', t, 40.4)) on('title2', {});
+      if (trOnce('fade', t, 44)) on('fade');
+    }
+    // 沙尘 + 粒子
+    for (const w of TR.wisps) { w.x += dt * 30 * w.s; w.z += Math.sin(t + w.y) * dt * 4; if (w.x > 420) w.x = -300; if (Math.random() < 0.05) trEmit(w.x, w.y, w.z, '#e8c890', 1, 6, { size: 14 * w.s, life: 1, grav: -4 }); }
+    for (let i = trMeshes.length - 1; i >= 0; i--) { const f = trMeshes[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.update(f.m, k, dt); if (f.t >= f.life) { TR.scene.remove(f.m); trMeshes.splice(i, 1); } }
+    trStepPS(dt);
+    TR.rim.color.set(t > 27 && t < 34 ? '#ff2d2d' : '#ff6a3a');
+    s2Cam(t);
+    TR.r.render(TR.scene, TR.cam);
+  }
 
   // ---------------- 1.5：结算台——我方全队 3D 模型，赢了轮流庆祝 + 彩纸，输了垂头丧气 ----------------
   const TS = { list: [] };
@@ -3518,6 +3776,8 @@
         continue;
       }
       if (kind === 'sealz') { const g = P.sealz.next(); g.position.set(x, z + 1, y); g.rotation.y = now / 900; continue; }
+      if (kind === 'supply') { const g = P.crate.next(); g.position.set(x, z, y); g.rotation.y = 0.4; continue; }   // 2.1 霍克的补给箱
+      if (kind === 'recon') { const g = P['drone' + team].next(); g.position.set(x, z + Math.sin(now / 300) * 4, y); g.userData.rotor.rotation.y = now / 25; continue; }   // 2.1 侦察无人机
       if (kind === 'decoy') { const g = P.decoy.next(); g.position.set(x, z + Math.sin(now / 160) * 1.5, y); g.rotation.y = now / 260; continue; }
       if (kind === 'bento' && h[6] === 7) { const g = P.gift.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }
       if (kind === 'bento') { const g = P.bento.next(); g.position.set(x, z + Math.abs(Math.sin(now / 250)) * 3, y); g.rotation.y = now / 600; continue; }
@@ -3845,7 +4105,7 @@
     get scene() { return scene; },
     setPost(on, o) { POST.off = !on; if (o && POST.comp) for (const k in o) { if (POST.comp.uniforms[k]) POST.comp.uniforms[k].value = o[k]; if (k === 'th') POST.bright.uniforms.th.value = o[k]; } },
     teamShow, teamFrame, teamSlots,
-    build, paintCell, burst, emit, trailerStart, trailerStop, TRAILERS, __trT: () => (TR.on ? TR.t : -1), setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
+    build, paintCell, burst, emit, trailerStart, trailerStop, seasonTrailerStart, TRAILERS, __trT: () => (TR.on ? TR.t : -1), setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
     setDyn, dyn: () => DYN,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };

@@ -311,6 +311,14 @@
         s += `<path d="M252,86 l5,10 l11,1 l-8,7 l3,11 l-11,-6 l-10,6 l3,-11 l-8,-7 l11,-1 Z" fill="#ffe14d" ${ol(2)}/>`;
         s += `<path d="M142,226 q22,-6 44,2" stroke="${a}" stroke-width="7" stroke-linecap="round" opacity="0.85" fill="none"/>`;
         break;
+      case 'hawk': // 2.1 霍克：沙色战术帽 + 帽徽 + 眉骨疤 + 胡茬 + 耳麦
+        s += path(shape([[112, 140], [116, 98], [152, 66], [200, 56], [250, 66], [286, 98], [290, 140], [200, 126]]), '#b89a62', ol(3));
+        s += path(shape([[200, 126], [290, 140], [330, 152], [326, 162], [286, 152], [200, 140]]), '#8a7448', ol(3));
+        s += `<rect x="186" y="80" width="30" height="22" rx="4" fill="${a}" ${ol(2.4)}/><path d="M192,91 l9,-6 l9,6 l-9,6 Z" fill="#2a2d3a"/>`;
+        s += `<path d="M226,160 L246,196" stroke="${mix(P.skin, '#7a2a1a', 0.5)}" stroke-width="3.4" stroke-linecap="round"/>`;
+        s += `<path d="M150,250 Q200,306 250,250 Q246,284 200,294 Q154,284 150,250 Z" fill="${P.hair2}" opacity="0.32"/>`;
+        s += `<rect x="108" y="190" width="14" height="30" rx="6" fill="#2a2d3a" ${ol(2.4)}/><path d="M115,220 Q122,252 156,262" fill="none" stroke="#2a2d3a" stroke-width="4"/><circle cx="158" cy="262" r="4" fill="${a}" ${ol(1.5)}/>`;
+        break;
       case 'hammer': // 黄色安全帽 + 胡茬 + 创可贴
         s += path(shape([[112, 142], [116, 96], [150, 64], [200, 52], [250, 64], [284, 96], [288, 142]]), '#ffc531', ol(3));
         s += path(shape([[96, 146], [200, 132], [304, 146], [304, 160], [200, 148], [96, 160]]), '#ffb000', ol(3));
@@ -494,6 +502,16 @@
         s += `<path d="M228,442 L298,404" stroke="#ff5a36" stroke-width="7" stroke-linecap="round"/>`;
         for (const y of [452, 476]) s += `<rect x="110" y="${y}" width="44" height="16" rx="3" fill="#3a4458" ${ol(2)}/>`;
         s += `<path d="M168,338 L200,396 L232,338" fill="none" stroke="${P.accent}" stroke-width="5"/>`;
+        break;
+      }
+      case 'merc': {   // 2.1 霍克：沙漠迷彩外套 + 深色战术背心 + 弹匣袋 + 斜挎背带 + 狗牌
+        s += path(shape(SH), '#8a7a52', ol(3));
+        for (const [x, y, r] of [[96, 420, 16], [300, 440, 18], [130, 486, 14], [272, 500, 15], [80, 470, 12]]) s += `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r * 0.6}" fill="#6a5c3a" opacity="0.8"/>`;
+        s += path(shape([[124, 372], [170, 346], [200, 380], [230, 346], [276, 372], [282, 520, 1], [118, 520, 1]]), '#3a3d48', ol(3));
+        for (const x of [146, 178, 222, 254]) s += `<rect x="${x - 12}" y="440" width="24" height="30" rx="4" fill="#4a4e5a" ${ol(2)}/>`;
+        s += `<path d="M128,360 L276,500" stroke="#2a221c" stroke-width="12" stroke-linecap="round"/><path d="M128,360 L276,500" stroke="${a}" stroke-width="3" stroke-dasharray="8 10"/>`;
+        s += `<path d="M186,352 L200,400 L214,352" fill="none" stroke="#c9d3dc" stroke-width="2.4"/><rect x="190" y="398" width="20" height="13" rx="3" fill="#c9d3dc" ${ol(1.8)}/>`;
+        s += `<path d="M60,430 L112,410 L120,440 L68,462 Z" fill="${a}" ${ol(2.4)}/><path d="M78,438 l24,-9" stroke="#2a2d3a" stroke-width="4" stroke-linecap="round"/>`;
         break;
       }
       case 'rebel': {   // 灰色军装外套 + 红色喷漆臂章

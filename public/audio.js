@@ -360,7 +360,7 @@
     zap() { tone(2400, 0.05, 'square', 0.02, 0.5); noise(0.04, 0.03, 4000, 'highpass'); },
   };
   const HIT_OF = { blaster: 'tick', roller: 'splat', charger: 'ding', bucket: 'splat', gatling: 'tick', mortar: 'thud', fist: 'thud', slinger: 'thud', dozer: 'thud', flamer: 'tick',
-    carrier: 'ding', wrecker: 'thud', megaphone: 'sonic', riot: 'zap', blade: 'slash', stinger: 'ding', phantom: 'slash', warden: 'charm', reaper: 'slash' };
+    carrier: 'ding', wrecker: 'thud', megaphone: 'sonic', riot: 'zap', blade: 'slash', stinger: 'ding', phantom: 'slash', warden: 'charm', reaper: 'slash', tactic: 'tick' };
   const SUPER = {
     storm() { for (let i = 0; i < 6; i++) noise(0.05, 0.05, 2400 + i * 300, 'bandpass', i * 0.05); tone(300, 0.4, 'sawtooth', 0.04, 2); },
     charge() { tone(90, 0.6, 'sawtooth', 0.06, 2.4); noise(0.5, 0.05, 300, 'lowpass', 0, 1200); },
@@ -378,6 +378,7 @@
     cluster() { for (let i = 0; i < 5; i++) tone(260 + i * 60, 0.1, 'triangle', 0.04, 2, i * 0.07); },
     shadowstep() { noise(0.35, 0.06, 4000, 'bandpass', 0, 400); tone(180, 0.3, 'sine', 0.05, 0.4); },
     venom() { noise(0.6, 0.06, 6000, 'highpass', 0, 2000); tone(300, 0.4, 'sine', 0.03, 0.5); },
+    recon() { for (let i = 0; i < 4; i++) tone(1600 + i * 200, 0.06, 'sine', 0.03, 1.2, i * 0.08); noise(0.5, 0.03, 3000, 'bandpass', 0.1, 6000); },
     cloak() { for (let i = 0; i < 4; i++) tone(1600 - i * 250, 0.12, 'sine', 0.025, 1, i * 0.06); },
     barrier() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.5, 'triangle', 0.03, 1, i * 0.06)); },
     rend() { noise(0.35, 0.06, 1200, 'bandpass', 0, 6000); tone(200, 0.35, 'sawtooth', 0.04, 3); },
@@ -460,6 +461,7 @@
       else if (k === 'ice') { tone(2637, 0.05, 'sine', 0.035); noise(0.06, 0.03, 6000, 'highpass', 0, 9000); }
       else if (k === 'yato') { tone(1318, 0.06, 'triangle', 0.035); tone(1975, 0.05, 'sine', 0.02, 0, 0.03); }
       else if (k === 'wraith') { tone(330, 0.08, 'sawtooth', 0.035, 0.5); noise(0.05, 0.04, 2500, 'bandpass'); }
+      else if (k === 'merc') { tone(180, 0.05, 'square', 0.04, 0.5); noise(0.04, 0.06, 3200, 'bandpass'); tone(2200, 0.03, 'triangle', 0.02, 0, 0.02); }
       else { tone(1500, 0.035, 'square', 0.03, 0.7); noise(0.03, 0.03, 4000, 'highpass'); }
     },
     hitConfirm() { if (rl('hc', 45)) { tone(1500, 0.035, 'square', 0.03, 0.7); noise(0.03, 0.03, 4000, 'highpass'); } },
