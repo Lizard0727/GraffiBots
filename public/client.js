@@ -6,7 +6,7 @@
   const cv = $('game'), ctx = cv.getContext('2d');
   let DPR = 1, VW = 0, VH = 0;
   function resize() {
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    DPR = Math.min(1.5, window.devicePixelRatio || 1);   // 2.1.2：HUD 画布最多 1.5 倍（2 倍时每帧要画的像素多 78%）
     VW = innerWidth; VH = innerHeight;
     cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
     cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
@@ -225,6 +225,7 @@
       <label class="set-row toggle"><span>显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）</span><input type="checkbox" data-set="chat" ${store.get('chat', true) ? 'checked' : ''}></label>
       <label class="set-row"><span>语言 / Language</span><select data-set="lang"><option value="zh" ${window.GBI18N && GBI18N.lang === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${window.GBI18N && GBI18N.lang === 'en' ? 'selected' : ''}>English</option></select></label>
       <label class="set-row toggle"><span>精致界面（2.1 新风格；关闭后换回涂鸦风界面）</span><input type="checkbox" data-set="ui21" ${store.get('ui21', true) ? 'checked' : ''}></label>
+      <div class="set-note">显卡：${esc((R3.gpuName && R3.gpuName()) || '未知')}${R3.softGpu && R3.softGpu() ? ' ⚠ 软件渲染：请在浏览器设置里打开「使用图形加速」' : ''}</div>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
       <div><div class="set-note" style="margin-bottom:6px">原创曲目试听：</div><div class="jukebox">${Object.entries(AU.TRACK_NAMES).map(([k, n]) => `<button data-track="${k}" class="${cur === k ? 'sel' : ''}">♪ ${n}</button>`).join('')}</div></div>
       <div class="set-note">所有音乐和音效都由浏览器实时合成，均为原创。主界面播放「霓虹喷漆街」，对战中播放「涂装突击」，最后 30 秒切换为「倒数冲刺」。</div>`;
@@ -2007,6 +2008,10 @@
     G.paintable = 0; for (let i = 0; i < M.solid.length; i++) if (!M.solid[i]) G.paintable++;
     R3.setQuality(hqOn);
     if (!R3.build(G)) toast('你的浏览器不支持 WebGL，无法显示 3D 画面。请换用新版 Chrome / Edge / Firefox。', 8000);
+    else if (R3.softGpu && R3.softGpu() && !navigator.webdriver) {   // 2.1.2：软件渲染（显卡加速没开）→ 自动降画质并提醒一次
+      if (hqOn) { hqOn = false; store.set('hq', false); R3.setQuality(false); }
+      if (!store.get('swWarned', false)) { store.set('swWarned', true); toast('浏览器没有使用显卡加速（正在用软件渲染），帧率会很低。已自动切到低画质。Edge / Chrome：设置 → 系统 → 打开「使用图形加速」，然后重启浏览器。', 12000); }
+    }
     keys.clear(); mouse.down = false;
     $('results').classList.add('hidden');
     chatReset();
@@ -3205,17 +3210,21 @@
   // 1.7.1：帧率上限（设置里可改，默认 60）。高刷新率显示器上不再每秒渲染 144 / 240 帧，显卡和 CPU 都轻松很多
   //   大厅：最多 60 帧；被全屏弹窗挡住时不画大厅；背景涂鸦 30 帧、半分辨率
   // 2.0：自适应画质——对局中帧率持续低于目标就逐步降低分辨率 / 粒子，回升后再慢慢调回（设置里可以关）
-  const AQ = { acc: 0, n: 0, t0: 0, low: 0, high: 0, scale: 1, pk: 1, on: store.get('autoQ', true) };
+  const AQ = { acc: 0, n: 0, t0: 0, low: 0, high: 0, scale: 1, pk: 1, lvl: 1, on: store.get('autoQ', true) };
+  // 2.1.2：降档顺序：分辨率 0.85 → 关阴影 → 关泛光 → 分辨率一路降到 0.55；回升时倒着来
+  const AQ_STEPS = [[1, 1, 1], [0.85, 0.8, 1], [0.85, 0.7, 2], [0.8, 0.6, 3], [0.7, 0.5, 3], [0.6, 0.4, 3], [0.55, 0.35, 3]];
+  function aqApply() { const s = AQ_STEPS[AQ.step]; AQ.scale = s[0]; AQ.pk = s[1]; AQ.lvl = s[2]; R3.setDyn(s[0], s[1], s[2]); }
+  AQ.step = 0;
   function autoQuality(now, ft) {
     if (!R3.setDyn || document.hidden || ft > 250) return;
     AQ.acc += ft; AQ.n++;
     if (now - AQ.t0 < 1000) return;
     AQ.on = store.get('autoQ', true);
-    if (!AQ.on) { AQ.t0 = now; AQ.acc = 0; AQ.n = 0; if (AQ.scale < 1 || AQ.pk < 1) { AQ.scale = AQ.pk = 1; R3.setDyn(1, 1); } return; }
+    if (!AQ.on) { AQ.t0 = now; AQ.acc = 0; AQ.n = 0; if (AQ.step) { AQ.step = 0; aqApply(); } return; }
     const fps = AQ.n * 1000 / Math.max(1, AQ.acc), target = Math.min(fpsCap || 60, 60);
     AQ.t0 = now; AQ.acc = 0; AQ.n = 0;
-    if (fps < target * 0.8) { AQ.high = 0; if (++AQ.low >= 2) { AQ.low = 0; AQ.scale = Math.max(0.55, AQ.scale - 0.1); AQ.pk = Math.max(0.35, AQ.pk - 0.15); R3.setDyn(AQ.scale, AQ.pk); } }
-    else if (fps > target * 0.95) { AQ.low = 0; if (++AQ.high >= 5 && (AQ.scale < 1 || AQ.pk < 1)) { AQ.high = 0; AQ.scale = Math.min(1, AQ.scale + 0.05); AQ.pk = Math.min(1, AQ.pk + 0.1); R3.setDyn(AQ.scale, AQ.pk); } }
+    if (fps < target * 0.8) { AQ.high = 0; if (++AQ.low >= 2 && AQ.step < AQ_STEPS.length - 1) { AQ.low = 0; AQ.step++; aqApply(); } }
+    else if (fps > target * 0.95) { AQ.low = 0; if (++AQ.high >= 6 && AQ.step > 0) { AQ.high = 0; AQ.step--; aqApply(); } }
     else { AQ.low = 0; AQ.high = 0; }
   }
   function loop(now) {

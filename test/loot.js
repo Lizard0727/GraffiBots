@@ -258,5 +258,19 @@ const mk = (st) => { const room = new Room('L', null, { manual: true }); room.se
   ok(g.squad === 2 && t1.some((p) => p.id === A.id) && t1.some((p) => p.id === B.id), '组队房间 2 人：排 2 人小队场次，两人在同一队');
 }
 
+// ---- 2.1.2：电梯 + AI 打法 ----
+{
+  const M = S.buildMap(S.GIANT_MAP()), grid = new Uint8Array(S.GW * S.GH);
+  let up = 0;
+  for (const [lx, ly] of M.lifts) {
+    const p = { x: (lx + 1) * S.CELL, y: (ly + 1) * S.CELL, team: 1, sm: 1, vx: 0, vy: 0 };
+    for (let i = 0; i < 6 * 60 && !(p.onGround && p.z > 200 && !p.lift); i++) S.stepMove(p, { mx: 0, my: 0 }, 1 / 60, grid, M, 1);
+    if (p.onGround && p.z >= S.LEVEL_H[5] - 1) up++;
+  }
+  ok(up === M.lifts.length, `电梯：${up}/${M.lifts.length} 部都能把人送上楼顶（以前撞到楼墙会被弹回去）`);
+  const g = mk({ squad: 2 });
+  const styles = Object.values(g.lootStyle || {});
+  ok(styles.length === 6 && styles.every((s) => ['rat', 'hunter', 'balanced', 'greedy'].includes(s)), 'AI 小队各有打法：' + styles.join(' / '));
+}
 console.log(failed ? `\n${failed} 项失败` : '\n搜刮撤离测试全部通过');
 process.exit(failed ? 1 : 0);

@@ -349,6 +349,8 @@ class Game {
       }
     }
     if (this.loot) for (const p of this.players.values()) if (p.bot && !p.guard && !p.gear) { const bd = S.bagDims(this.risk === 'high' && Math.random() < 0.6 ? ['pack'] : []); p.inv = { w: bd[0], h: bd[1], items: [] }; }
+    // 2.1.2：每支纯 AI 小队一种打法（早撤 / 阴人 / 均衡 / 贪心）；有真人的小队里 AI 队友按均衡打
+    if (this.loot) { this.lootStyle = {}; for (let t = 1; t <= this.teams; t++) { const hum = [...this.players.values()].some((p) => p.team === t && !p.bot); this.lootStyle[t] = hum ? 'balanced' : pickStyle(); } }
     this.chat = usePersonaChat(this, st) ? new BotChat(this) : null;
     this.initMode();
     if (this.mode === 'zone') {
@@ -497,13 +499,15 @@ class Game {
     if (p.alive && this.countdown <= 0 && !this.over && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z) && m.sync === p.sync) {
       const dtAllow = Math.min(0.6, this.time - p.lastPosT) + 0.05;
       if (S.padAt(this.M, p.x, p.y) || S.padAt(this.M, m.x, m.y)) p.kbT = this.time;   // 踩到弹跳板也会被弹飞
+      if (this.M.lift && (S.liftAt(this.M, p.x, p.y) || S.liftAt(this.M, m.x, m.y))) p.liftT = this.time;   // 2.1.2：坐电梯（3 秒内允许升到楼顶高度）
+      const riding = this.time - (p.liftT || -9) < 3;
       const kb = this.time - (p.kbT || -9) < 1.2 ? 540 : 0;     // 刚被击退：放宽速度上限
       const maxStep = (380 * p.sm + 40 + kb) * dtAllow + 12;
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       const gh = this.top(m.x, m.y);
       const test = { x: m.x, y: m.y, z: m.z };
       S.collide(test, (p.foot ? S.PILOT_R : S.R) - 2, this.M);
-      const bad = Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? (S.PAD.v * S.PAD.v) / (2 * S.GRAV) : 0);
+      const bad = riding ? (m.z < gh - 2 || m.z > S.LEVEL_H[5] + 30) : (Math.hypot(test.x - m.x, test.y - m.y) > 3 || m.z < gh - 2 || m.z > gh + 130 || m.z > p.z + (S.JUMP_W * S.JUMP_W) / (2 * S.GRAV) + 30 + (kb ? (S.PAD.v * S.PAD.v) / (2 * S.GRAV) : 0));
       if (d <= maxStep && !bad) {
         p.x = m.x; p.y = m.y; p.z = Math.max(gh, m.z); p.lastPosT = this.time;
         const vmax = 460 * p.sm + kb;
@@ -1139,7 +1143,7 @@ class Game {
   credit(owner, n) {
     if (!this.players.has(owner.id)) return;
     owner.stats.paint += n;
-    if (!(owner.spT > 0)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 1.6 : 1) * (owner.tal.has('p3') ? 1.25 : 1));
+    if (!(owner.spT > 0) && !(owner.noSpUntil > this.time)) owner.sp = Math.min(S.WEAPONS[owner.weapon].spNeed, owner.sp + n * 0.6 * (owner.pilot === 'yuzu' ? 1.6 : 1) * (owner.tal.has('p3') ? 1.25 : 1));
   }
 
   // 冲量：AI 直接作用在服务器状态上；真人玩家的位置由客户端预测，所以发事件让客户端施加
@@ -1221,7 +1225,7 @@ class Game {
       if (heal > 0) by.hp = Math.min(this.maxHpOf(by), by.hp + heal);
     }
     // 打中敌人给大招充能
-    if (by && by.team !== t.team && this.players.has(by.id) && !by.foot && !(by.spT > 0)) {
+    if (by && by.team !== t.team && this.players.has(by.id) && !by.foot && !(by.spT > 0) && !(by.noSpUntil > this.time)) {
       const bo = by.ovT > 0 ? S.OVERLOADS[by.pilot] : null;
       by.sp = Math.min(S.WEAPONS[by.weapon].spNeed, by.sp + dmg * (by.pilot === 'candy' ? 1.3 : 1) * (by.tal.has('a3') ? 1.15 : 1) * (bo && bo.spGain ? bo.spGain : 1));
     }
@@ -1346,7 +1350,7 @@ class Game {
       m.t -= dt;
       if (m.t > 0) return true;
       if (this.domainBlocks(m.team, m.x, m.y, m.z)) { this.ev(['blk', 0, r1(m.x), r1(m.y), r1(m.z + 10)]); return false; }
-      this.explode(m.x, m.y, m.z, 80, 140, 50, m.team, this.players.get(m.owner));
+      this.explode(m.x, m.y, m.z, 80, S.MISSILE.dmg, S.MISSILE.min, m.team, this.players.get(m.owner));
       this.ev(['bx', r1(m.x), r1(m.y), r1(m.z), m.team, 80, 0]);
       return false;
     });
@@ -1382,6 +1386,7 @@ class Game {
   activateSpecial(p) {
     const W = S.WEAPONS[p.weapon];
     p.sp = 0; p.spKind = W.special;
+    p.noSpUntil = this.time + 3;   // 2.1.2：放大招后 3 秒内造成的伤害不再给大招充能（延迟落下的导弹 / 炮弹也算），防止「大招刷新大招」
     if (p.tal.has('s5')) for (const a of this.players.values()) if (a !== p && a.alive && a.team === p.team && dist(a, p) < 200) { a.shield = Math.max(a.shield, 30); a.shieldT = 4; }
     this.ev(['sp', p.id, p.spKind]);
     const a = p.input.a;
@@ -1472,11 +1477,13 @@ class Game {
       case 'rend': p.spT = 0.5; p.rendArm = true; p.rendA = a; break;   // 1.8 裂空斩：蓄力 0.35 秒后出刀
       case 'missiles': {
         p.spT = 0.3;
-        const targets = [];
-        for (const e of this.players.values()) if (e.alive && e.team !== p.team) targets.push({ x: e.x, y: e.y });
+        // 2.1.2：只锁定 1100 范围内、看得见的敌人（草丛 / 隐身里的不算），最多 4 个，由近到远
+        const vis = (e) => !e.hidden || this.reveal[p.team] > this.time || e.revealT > 0;
+        const targets = [...this.players.values()].filter((e) => e.alive && e.team !== p.team && !e.guard && vis(e) && Math.hypot(e.x - p.x, e.y - p.y) < S.MISSILE.range)
+          .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y)).slice(0, S.MISSILE.max).map((e) => ({ x: e.x, y: e.y }));
         let guard = 0;
         while (targets.length < 4 && guard++ < 50) {
-          const x = p.team === 1 ? rand(S.W / 2, S.W - 120) : rand(120, S.W / 2), y = rand(80, S.H - 80);
+          const a0 = Math.random() * Math.PI * 2, d0 = rand(200, S.MISSILE.range * 0.8), x = clamp(p.x + Math.cos(a0) * d0, 120, S.W - 120), y = clamp(p.y + Math.sin(a0) * d0, 80, S.H - 80);
           if (!this.M.solid[Math.floor(y / S.CELL) * S.GW + Math.floor(x / S.CELL)]) targets.push({ x, y });
         }
         for (const t of targets) {
@@ -1926,6 +1933,7 @@ class Game {
       p.late = true;
       added.push(p);
     }
+    if (this.lootStyle) this.lootStyle[t] = added.some((p) => !p.bot) ? 'balanced' : pickStyle();
     let squads = 0; const seen = new Set();
     for (const p of this.players.values()) if (!p.guard && !p.out && !seen.has(p.team)) { seen.add(p.team); squads++; }
     this.ev(['pjn', added.map((p) => [p.id, p.name, p.team, p.weapon, p.head, p.pilot, p.bot ? 1 : 0, p.lv, p.bt, p.looks || null])]);
@@ -2535,10 +2543,11 @@ function botThink(g, p, dt) {
     if (!e.alive || e.team === p.team) continue;
     if (p.guard && (Math.hypot(e.x - p.guard.x, e.y - p.guard.y) > 320 || Math.hypot(p.x - p.guard.x, p.y - p.guard.y) > 450)) continue;   // 守卫只管自己岗位附近，追远了就回去
     const d = Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z);
-    if (g.loot && !p.guard && !e.guard && d > 200 && !(p.hitBy && p.hitBy[e.id] > g.time - 6)) continue;   // 2.1 撤离：AI 以搜物资为主，别的小队离得远又没打我就不理
+    if (g.loot && !p.guard && !e.guard && d > styleOf(g, p).engage && !(p.hitBy && p.hitBy[e.id] > g.time - 6)) continue;   // 2.1 撤离：AI 以搜物资为主；2.1.2：主动交战距离按打法（早撤型不主动打，阴人型 520 内都打）
     if (!botSees(g, p, e, d)) continue;
     const lobber = p.foot ? SA.kind === 'lob' || SA.ghost : p.weapon === 'mortar' || p.weapon === 'slinger';
-    const sc = P.focus ? d * (0.55 + 0.45 * e.hp / g.maxHpOf(e)) : d;   // 高手 / 大神优先打残血
+    let sc = P.focus ? d * (0.55 + 0.45 * e.hp / g.maxHpOf(e)) : d;   // 高手 / 大神优先打残血
+    if (g.loot && !p.guard && styleOf(g, p).ambush && !e.guard) sc /= 1 + S.invValue(e.inv) / 5000;   // 2.1.2 阴人型：专挑身上值钱的
     if (d < range + 160 && sc < best && (lobber || S.los3(g.M, p.x, p.y, p.z + S.MUZZLE, e.x, e.y, e.z + 18))) { enemy = e; ed = d; best = sc; }
   }
   ai.seenT = enemy ? ai.seenT + dt : 0;
@@ -2691,13 +2700,30 @@ function botThink(g, p, dt) {
   }
 
   inp.w = wheel;
+  // 2.1.2 撤离 AI：残血就撤（边退边打）、吃药回血；阴人型到了蹲点就不动
+  if (g.loot && !p.guard && p.alive) {
+    const ST = styleOf(g, p);
+    if (enemy && hpK < ST.retreat) {
+      const ea = Math.atan2(enemy.y - p.y, enemy.x - p.x);
+      let rx = -Math.cos(ea), ry = -Math.sin(ea);
+      if (ai.goal && (ai.goal.ex || ai.goal.near)) { const ga = Math.atan2(ai.goal.y - p.y, ai.goal.x - p.x); rx = rx * 0.5 + Math.cos(ga) * 0.5; ry = ry * 0.5 + Math.sin(ga) * 0.5; }
+      mx = rx; my = ry; ai.retreatT = g.time;
+      if (ed > range * 0.9) wantAtk = false;
+    }
+    if ((ai.useT || 0) < g.time && p.inv && p.inv.items.length) {
+      const pick = (k) => p.inv.items.find((x) => x.k === k);
+      const it = hpK < 0.5 ? pick('repair') || pick('stim') : enemy && !p.shield && hpK < 0.85 ? pick('shieldc') : enemy && ed < range && hpK > 0.6 ? pick('adren') : null;
+      if (it) { g.lootOp(p, { a: 'use', from: 'inv', id: it.id }); ai.useT = g.time + 1.5; }
+    }
+    if (ai.goal && ai.goal.camp && !enemy && dist(p, ai.goal) < 60) { mx *= 0.08; my *= 0.08; }
+  }
   inp.mx = mx; inp.my = my; inp.a = aim.a; inp.pt = clamp(aim.pt, -1.2, 1.2);
 
   // 大招
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
-    const reach = { beam: 700, missiles: 1e9, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480, recon: 420 }[sp];
-    if ((enemy && ed < reach) || sp === 'missiles' || Math.random() < (P.waste ? 0.015 : P.smart ? 0 : 0.002)) {   // 猪队友乱放大招
+    const reach = { beam: 700, missiles: 1000, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480, recon: 420 }[sp];
+    if ((enemy && ed < reach) || Math.random() < (P.waste ? 0.015 : P.smart ? 0 : 0.002)) {   // 猪队友乱放大招
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
     }
@@ -2847,6 +2873,24 @@ function randomGoal(g, p) {
   return { x: S.W / 2, y: S.H / 2 };
 }
 
+// ---- 2.1.2：撤离 AI 的打法 ----
+//   rat 早撤：拿一点就走、能不打就不打；hunter 阴人：拿够本钱后蹲撤离点、专挑身上值钱的人；
+//   balanced 均衡：能多拿就多拿，残血就撤；greedy 贪心：拿到最后一刻，残血也不太跑
+const LOOT_STYLE = {
+  rat: { want: 2200, late: 1.6, retreat: 0.6, engage: 0, ambush: false, w: 25, name: '早撤型' },
+  hunter: { want: 3000, late: 0.6, retreat: 0.35, engage: 520, ambush: true, w: 25, name: '阴人型' },
+  balanced: { want: 6000, late: 1, retreat: 0.42, engage: 200, ambush: false, w: 38, name: '均衡型' },
+  greedy: { want: 11000, late: 0.55, retreat: 0.16, engage: 260, ambush: false, w: 12, name: '贪心型' },
+};
+function pickStyle() { let r = Math.random() * 100; for (const [k, s] of Object.entries(LOOT_STYLE)) { if ((r -= s.w) < 0) return k; } return 'balanced'; }
+const styleOf = (g, p) => LOOT_STYLE[(g.lootStyle && g.lootStyle[p.team]) || 'balanced'];
+// 容器值不值得开：按类型 / 品质估算价值（遗骸就是看得到的真实价值）
+const CONT_EV = { vault: 6000, safe: 2400, weapon: 1800, server: 2200, pc: 1200, crate: 900, tools: 800, med: 650, locker: 500, duffel: 420, fridge: 320, pile: 600 };
+function contEV(c) {
+  if (c.type === 'body' || c.type === 'pile') return S.lootValue(c.items);
+  const T = S.LOOT.conts[c.type] || {}, n = c.items.length;
+  return (CONT_EV[c.type] || 500) * Math.min(1.6, n / Math.max(1, ((T.n || [1, 2])[0] + (T.n || [1, 2])[1]) / 2)) * (c.state ? 0.75 : 1);
+}
 function chooseGoal(g, p) {
   const o = g.obj;
   switch (g.mode) {
@@ -2858,10 +2902,22 @@ function chooseGoal(g, p) {
         if (G.follow) { const b = g.players.get(G.follow); if (b && b.alive) return { x: b.x + rand(-70, 70), y: b.y + rand(-70, 70), calm: true }; }
         const a = Math.random() * Math.PI * 2, r = rand(0, 120); return { x: G.x + Math.cos(a) * r, y: G.y + Math.sin(a) * r, calm: true };
       }
-      const P = BOTS.persona(p.persona), v = S.invValue(p.inv), used = S.invCells(p.inv), cap = p.inv.w * p.inv.h;
+      const P = BOTS.persona(p.persona), v = S.invValue(p.inv), used = S.invCells(p.inv), cap = p.inv.w * p.inv.h, ST = styleOf(g, p);
       const left = Math.max(0, g.timeLeft) / Math.max(1, g.duration);   // 开局很贪，越到后面越容易满足
-      const want = (P.pow >= 1.6 ? 9000 : P.pow >= 1 ? 6000 : 3500) * (1 + 2.5 * left);
-      if (v >= want || (used >= cap - 1 && v >= want * 0.6) || g.timeLeft < 150 + (p.slot % 3) * 30) {
+      const want = ST.want * (P.pow >= 1.6 ? 1.4 : P.pow >= 1 ? 1 : 0.65) * (1 + 2.5 * left * (ST === LOOT_STYLE.rat ? 0.2 : 1));
+      const hurtBad = p.hp < g.maxHpOf(p) * ST.retreat && v > 1500;   // 残血又带着值钱东西：先保命去撤离
+      // 阴人型：本钱够了就去撤离点附近蹲人，快结束了（或者已经抢得很肥）再自己撤
+      if (ST.ambush && v >= want && g.timeLeft > 130 && v < 16000 && !hurtBad) {
+        const open = o.ex.filter((e) => g.exOpen(e) && e.type !== 'lever');
+        const tgt = open.length ? open : o.ex.filter((e) => e.type === 'normal');
+        if (tgt.length) {
+          let e = p.ai && p.ai.campEx && o.ex[p.ai.campEx - 1];
+          if (!e || !tgt.includes(e)) { e = tgt[(p.team * 3 + p.slot) % tgt.length]; if (p.ai) p.ai.campEx = o.ex.indexOf(e) + 1; }
+          const a = (p.team * 1.7 + p.slot * 1.1) % (Math.PI * 2), r = 170 + (p.slot % 3) * 40;
+          return { x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, calm: true, camp: true };
+        }
+      }
+      if (v >= want || hurtBad || (used >= cap - 1 && v >= want * 0.6) || g.timeLeft < (150 + (p.slot % 3) * 30) * ST.late) {
         const late = g.timeLeft < 220;
         const usable = o.ex.filter((e) => e.type !== 'lever' && !(e.type === 'weight' && used > S.LOOT.ext.weight.max) && (late || e.type !== 'paid'));
         const openEx = usable.filter((e) => g.exOpen(e));
@@ -2882,14 +2938,23 @@ function chooseGoal(g, p) {
       if (leader !== p && dist(p, leader) > 340) return { x: leader.x + rand(-60, 60), y: leader.y + rand(-60, 60) };
       const done = (p.ai && p.ai.done) || new Set();
       const hv = g.M.loot && g.M.loot.hv, C2 = S.CELL;
-      let best = null, bs = Infinity;
+      // 2.1.2：挑「值得开」的容器——估算价值 ÷（距离 + 危险）；背包快满时只看值钱的；早撤型只开顺路的
+      const free = cap - used, foes = [...g.players.values()].filter((q) => q.alive && !q.out && q.team !== p.team && !q.guard);
+      const reach = ST === LOOT_STYLE.rat ? 700 : ST === LOOT_STYLE.greedy ? 2200 : 1600;
+      let best = null, bs = 0;
       for (const c of o.conts) {
         if (!c.items.length || done.has(c.id) || c.z > 120) continue;   // AI 不坐电梯上楼顶
         const d = Math.hypot(c.x - p.x, c.y - p.y);
-        if (d > 1600) continue;
-        if (hv && !P.chase && P.pow < 1.6 && c.x > hv[0] * C2 && c.x < (hv[0] + hv[2]) * C2 && c.y > hv[1] * C2 && c.y < (hv[1] + hv[3]) * C2) continue;   // 弱的 AI 不去灰石大厦
-        const sc = d / (1 + (c.type === 'vault' || c.type === 'safe' || c.type === 'weapon' ? 0.6 : 0) + (c.state ? 0 : 0.3));
-        if (sc < bs) { bs = sc; best = c; }
+        if (d > reach) continue;
+        const inHv = hv && c.x > hv[0] * C2 && c.x < (hv[0] + hv[2]) * C2 && c.y > hv[1] * C2 && c.y < (hv[1] + hv[3]) * C2;
+        if (inHv && !P.chase && P.pow < 1.6 && ST !== LOOT_STYLE.greedy) continue;   // 弱的 AI 不去灰石大厦（贪心型除外）
+        const ev = contEV(c);
+        if (free <= 2 && ev < 1500) continue;   // 背包快满：小东西不值得开
+        let danger = 0;
+        for (const q of foes) { const dq = Math.hypot(q.x - c.x, q.y - c.y); if (dq < 520) danger += (520 - dq) * (ST === LOOT_STYLE.rat ? 6 : ST === LOOT_STYLE.greedy ? 1 : 3); }
+        if (inHv) danger += ST === LOOT_STYLE.greedy ? 200 : 900;
+        const sc = (ev * (c.type === 'body' && ST !== LOOT_STYLE.rat ? 1.5 : 1)) / (d + 300 + danger);   // 别人留下的遗骸很香（早撤型不碰）
+        if (sc > bs) { bs = sc; best = c; }
       }
       if (best) return { x: best.x, y: best.y, cont: best.id };
       return randomGoal(g, p);

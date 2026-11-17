@@ -605,5 +605,16 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   ok(replied > 0, '被说是人机：AI 会回一句（' + (g.chatLog || []).filter((m) => g.players.get(m.id) && g.players.get(m.id).bot).slice(-2).map((m) => m.text).join(' / ') + '）');
 }
 
+// ---- 2.1.2：狙击机兵「锁定导弹」不能无限刷新大招 ----
+{
+  const { g, A, B, run } = duel({ weapon: 'charger', pilot: 'blaze' }, { weapon: 'blaster' }, { dist: 300 });
+  B.hp = B.maxHp = 2000;
+  let dealt = 0; const h0 = g.hurt.bind(g); g.hurt = (t, d, by, ...r) => { const hp = t.hp; const out = h0(t, d, by, ...r); if (t === B && new Error().stack.includes('explode')) dealt += hp - t.hp; return out; };
+  A.sp = S.WEAPONS.charger.spNeed; A.input.qq++; run(2.2);
+  ok(dealt > 30 && dealt <= S.MISSILE.dmg * 2 + 1, `锁定导弹命中 ${Math.round(dealt)} 伤害（每发最多 ${S.MISSILE.dmg}）`);
+  ok(A.sp < S.WEAPONS.charger.spNeed * 0.05, `导弹伤害不给大招充能（充能 ${Math.round(A.sp)} / ${S.WEAPONS.charger.spNeed}）`);
+  B.x = A.x + 1600; B.hp = 2000; g.time += 5; A.sp = S.WEAPONS.charger.spNeed; A.input.qq++; run(2.2);
+  ok(B.hp === 2000, '1100 范围外的敌人不会被锁定');
+}
 console.log(failed ? `\n${failed} 项失败` : '\n第一赛季内容测试全部通过');
 process.exit(failed ? 1 : 0);

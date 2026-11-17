@@ -44,7 +44,7 @@
     charger: {
       name: '狙击机兵', short: '狙击', role: '远程狙击', desc: '按住蓄力、松开射出贯穿直线，满蓄力伤害极高。蓄力时移动变慢，生命值低。',
       hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.95, range: 720, dmg: 82, minDmg: 32,
-      special: 'missiles', spNeed: 240, pierce: 0.7,
+      special: 'missiles', spNeed: 270, pierce: 0.7,
     },
     bucket: {
       name: '泼桶机兵', short: '泼桶', role: '近距爆发', desc: '近距离泼出一大片涂料弹，覆盖面积大，贴脸伤害很高。',
@@ -176,7 +176,7 @@
   S.SPECIALS = {
     storm: { name: '涂装风暴', desc: '向四周连续爆发三圈涂料弹。' },
     charge: { name: '碾压冲锋', desc: '4 秒无敌高速冲刺，碾过的敌人受到重创。' },
-    missiles: { name: '锁定导弹', desc: '锁定所有敌人当前位置，1.5 秒后导弹落下。' },
+    missiles: { name: '锁定导弹', desc: '锁定 1100 范围内看得见的最近 4 个敌人，1.5 秒后导弹落下（每发最多 100 伤害）。' },
     bubble: { name: '气泡护盾', desc: '为自己和附近队友套上吸收伤害的护盾。' },
     beam: { name: '极光喷射', desc: '2.6 秒持续高压光束，贯穿并涂满整条直线。' },
     barrage: { name: '地毯轰炸', desc: '沿瞄准方向连续落下 6 发炮弹。' },
@@ -195,6 +195,7 @@
     recon: { name: '侦察无人机', desc: '放出一架侦察无人机飞到瞄准位置上空（最远 420）：8 秒内暴露 320 范围里的所有敌人，并标记他们——受到你全队的伤害 +12%。' },
     rend: { name: '裂空斩', desc: '蓄力 0.35 秒，朝瞄准方向斩出一道巨大的灵能刀气：贯穿 520 距离内的所有敌人，造成 85 点伤害并击退，沿路涂满。' },
   };
+  S.MISSILE = { range: 1100, max: 4, dmg: 100, min: 36 };   // 2.1.2：锁定导弹削弱（以前全图锁定、每发 140）
   S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis', 'cluster', 'shadowstep', 'venom', 'cloak', 'barrier', 'rend', 'recon'];
   S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm' || sp === 'cluster' || sp === 'shadowstep' || sp === 'venom' || sp === 'rend' || sp === 'recon';
 
@@ -1202,7 +1203,7 @@
     return { top, solid, lv, rects, stairs, pad, pads, bush, bushes, lift, lifts, gw: GW, gh: GH, giant: !!m.giant, loot: m.loot || null };
   };
   S.padAngle = (code) => ((code - 1) / 250) * Math.PI * 2;
-  S.LIFT = { v: 760, push: 150 };
+  S.LIFT = { v: 760, push: 150, up: 300, across: 260 };   // 2.1.2：电梯上升 / 平移速度
   S.liftAt = (M, x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return M.lift && S.inBounds(cx, cy) ? M.lift[cy * GW + cx] : 0; };
   S.GIANT_MAP = () => S.MAPS.findIndex((m) => m.giant);
   S.padAt = (M, x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return S.inBounds(cx, cy) ? M.pad[cy * GW + cx] : 0; };
@@ -1391,13 +1392,29 @@
       }
     }
     // 2.1 电梯：站上去就被平稳地送上 210 高的楼顶，再往楼的方向轻推一下
-    if (p.onGround && p.padT <= 0 && M.lift) {
+    // 2.1.2：改成真正的电梯——先沿着电梯井匀速升到楼顶高度，再平移到楼顶上（以前是弹射，撞到楼墙会被弹回去掉下来）
+    if (p.onGround && p.padT <= 0 && M.lift && !p.lift) {
       const lc = S.liftAt(M, p.x, p.y);
       if (lc) {
-        const a = S.padAngle(lc);
-        p.vz = S.LIFT.v; p.onGround = false; p.coy = 0; p.jumped = false; p.padT = 0.8; p.padded = true; p.lifted = 1;
-        p.kx += Math.cos(a) * S.LIFT.push; p.ky += Math.sin(a) * S.LIFT.push;
+        const a = S.padAngle(lc), roof = S.LEVEL_H[5], ux = Math.cos(a), uy = Math.sin(a);
+        const cx = (Math.floor(p.x / CELL) + 0.5) * CELL, cy = (Math.floor(p.y / CELL) + 0.5) * CELL;
+        let d = CELL;   // 往楼的方向找第一格楼顶，再往里走一格多，站稳
+        while (d < CELL * 12 && S.topAt(M, cx + ux * d, cy + uy * d) < roof - 1) d += CELL / 2;
+        if (d < CELL * 12) p.lift = { x0: p.x, y0: p.y, tx: cx + ux * (d + CELL * 1.4), ty: cy + uy * (d + CELL * 1.4), top: roof + 8, ph: 0 };
       }
+    }
+    if (p.lift) {
+      const L = p.lift;
+      p.vx = p.vy = 0; p.kx = p.ky = 0; p.vz = 0; p.onGround = false; p.coy = 0; p.jumped = false; p.padT = 0.6; p.lifted = 1;
+      if (L.ph === 0) {   // 上升
+        p.z = Math.min(L.top, p.z + S.LIFT.up * dt);
+        if (p.z >= L.top) L.ph = 1;
+      } else {           // 平移到楼顶
+        const dx = L.tx - p.x, dy = L.ty - p.y, dl = Math.hypot(dx, dy), st = S.LIFT.across * dt;
+        if (dl <= st) { p.x = L.tx; p.y = L.ty; p.lift = null; }
+        else { p.x += (dx / dl) * st; p.y += (dy / dl) * st; }
+      }
+      if (p.lift) return -1;
     }
     // 垂直
     const gh = S.topAt(M, p.x, p.y);
@@ -1572,9 +1589,46 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '2.1.1';
+  S.VERSION = '2.1.2';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '2.1.2', date: '2026-11-17', title: '2.1.2 更新 · 流畅度 & 撤离 AI', en_title: 'Update 2.1.2 · Smoothness & Extraction AI', sections: [
+      ['修复「无限大招」', [
+        '狙击机兵「锁定导弹」以前会锁定全图所有敌人，导弹伤害又给大招充能，打中后马上又能放，形成无限大招',
+        '现在：放大招后 3 秒内造成的伤害和涂地都不再给大招充能（所有机体都一样）',
+        '锁定导弹只锁定 1100 范围内、看得见的最近 4 个敌人（草丛里 / 隐身的锁不到），每发最多 100 伤害（原 140），大招充能 240 → 270']],
+      ['帧率优化（彻查）', [
+        '查出来主要卡在「绘制次数」：一局普通对战每帧要画 937 次，其中阴影那一遍几乎把整个场景又画了一遍。现在降到约 360 次（−62%），撤离地图从 588 降到约 325',
+        '场地围栏、远景城市的几百个零件合并成几块网格；机兵和驾驶员只有大的部件投影子；阴影改成隔帧更新',
+        '高画质渲染分辨率上限 1.5 → 1.25 倍，界面画布最多 1.5 倍，后期抗锯齿 4x → 2x',
+        '自动调节画质会一档档降：分辨率 → 关阴影 → 关泛光 → 再降分辨率，帧率回来后再慢慢调回',
+        '浏览器没有开显卡加速（软件渲染，帧率只有 20–30）时会提醒并自动切到低画质；设置里能看到显卡名称']],
+      ['电梯修复', ['电梯以前是把人弹上去，撞到楼墙会被弹回来掉下去；现在是真正的电梯：沿电梯井升到楼顶高度，再平移到楼顶上，14 部电梯全部能用']],
+      ['撤离 AI 大改', [
+        '每支 AI 小队有自己的打法：早撤型（拿一点就走、能不打就不打）、阴人型（拿够本钱后蹲在撤离点附近阴人，专挑身上值钱的）、均衡型（能多拿就多拿，残血就撤）、贪心型（拿到最后一刻，残血也不太跑）',
+        'AI 会判断容器值不值得开：按容器类型估算价值，再算上距离、附近的敌人和背包剩余空间；别人留下的高价值遗骸会去抢',
+        '战斗中残血会边打边撤，会用急救针 / 维修包 / 护盾电池 / 肾上腺素',
+        '模拟测试：每局成功撤离的 AI 从 3–5 / 18 提高到约 15 / 30']],
+      ['更新奖励', ['信箱里有一份 2.1.2 小礼包：80 宝石 + 2 个补给箱']],
+    ], en: [
+      ['“Infinite Super” fixed', [
+        'The Sniper Bot’s “Lock-on Missiles” used to lock every enemy on the whole map, and the missile damage charged the Super again — so it could be fired again right away, forever',
+        'Now damage and painting within 3 s after using a Super no longer charge your Super (for every mech)',
+        'Lock-on Missiles only target the 4 nearest visible enemies within 1100 range (enemies in bushes / invisible can’t be locked), up to 100 damage each (was 140), and the Super costs 270 charge (was 240)']],
+      ['Frame rate (full investigation)', [
+        'The main cost was draw calls: a normal match drew 937 times per frame, with the shadow pass drawing almost the whole scene a second time. It’s now about 360 (−62%), and the extraction map went from 588 to about 325',
+        'The arena fence and the distant city (hundreds of parts) are merged into a few meshes; mechs and pilots only cast shadows from big parts; shadows update every other frame',
+        'High-quality render resolution capped at 1.25× (was 1.5×), the HUD canvas at 1.5×, post-processing anti-aliasing 2× (was 4×)',
+        'Auto quality now steps down gradually — resolution → shadows off → bloom off → lower resolution — and steps back up when the frame rate recovers',
+        'If the browser isn’t using hardware acceleration (software rendering, only 20–30 FPS), you’re warned and switched to low quality automatically; Settings shows your graphics card']],
+      ['Lift fix', ['Lifts used to launch you, so you hit the tower wall, bounced off and fell; they’re now real lifts that rise up the shaft to roof height and then move you onto the roof — all 14 work']],
+      ['Extraction AI overhaul', [
+        'Each AI squad has its own play style: Quick Extractor (grabs a little and leaves, avoids fights), Ambusher (loots enough, then camps near extractions and goes after players carrying valuable loot), Balanced (takes as much as it can but retreats when hurt) and Greedy (loots to the last second and rarely retreats)',
+        'AI judges whether a container is worth opening — estimated value by container type, weighed against distance, nearby enemies and free backpack space — and goes after valuable remains left by others',
+        'When hurt in a fight the AI retreats while shooting and uses Stim Shots / Repair Kits / Shield Cells / Adrenaline',
+        'In simulations, AI extractions per raid went from 3–5 of 18 to about 15 of 30']],
+      ['Update reward', ['A small 2.1.2 gift is in your mailbox: 80 gems + 2 Supply Crates']],
+    ] },
     { v: '2.1.1', date: '2026-11-17', title: '2.1.1 更新 · 中途加入 & 账号互通', en_title: 'Update 2.1.1 · Mid-Raid Joins & Account Transfer', sections: [
       ['撤离：中途加入', [
         '和三角洲一样：有小队全灭后，空出来的位置会有新的小队中途杀进来——联机时优先匹配正在排队的真人玩家，没人排队时由 AI 增援小队空降补位',

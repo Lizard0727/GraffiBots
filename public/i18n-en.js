@@ -1,6 +1,14 @@
 // 涂鸦机兵 — 英文词典（中文原文 → English）。新增界面文字时在这里补一条即可
 // 带数字的句式写在 i18n.js 的 PATTERNS 里
 window.GB_EN = {
+  // ---- 2.1.2 ----
+  "2.1.2 更新礼包 · 更流畅": "Update 2.1.2 gift · Smoother",
+  "2.1.2 来啦：修好了狙击机兵的无限大招和电梯，画面每帧的绘制次数少了一大半、更流畅了，撤离模式的 AI 也变聪明了。小礼包请收下！": "Update 2.1.2 is here: the Sniper Bot’s infinite Super and the lifts are fixed, each frame now needs less than half the draw calls so the game runs smoother, and the Extraction AI got smarter. Please accept this small gift!",
+  "锁定 1100 范围内看得见的最近 4 个敌人，1.5 秒后导弹落下（每发最多 100 伤害）。": "Locks the 4 nearest visible enemies within 1100 range; missiles strike 1.5 s later (up to 100 damage each).",
+  "浏览器没有使用显卡加速（正在用软件渲染），帧率会很低。已自动切到低画质。Edge / Chrome：设置 → 系统 → 打开「使用图形加速」，然后重启浏览器。": "Your browser isn’t using hardware acceleration (software rendering), so the frame rate will be very low. Switched to low quality automatically. Edge / Chrome: Settings → System → turn on “Use graphics acceleration”, then restart the browser.",
+  "显卡：": "Graphics: ",
+  " ⚠ 软件渲染：请在浏览器设置里打开「使用图形加速」": " ⚠ Software rendering: turn on “Use graphics acceleration” in your browser settings",
+  "未知": "Unknown",
   // ---- 2.1.1 ----
   "2.1.1 更新礼包 · 中途加入": "Update 2.1.1 gift · Mid-Raid Joins",
   "2.1.1 来啦：撤离行动可以中途加入了，物资多了 31 种、还有能用的消耗品；按 N 打开大地图；账号可以用转移码搬到别的浏览器和设备。小礼包请收下！": "Update 2.1.1 is here: you can now join Extraction raids mid-match, there are 31 new items plus usable consumables, N opens the full map, and you can move your account to other browsers and devices with a transfer code. Please accept this small gift!",

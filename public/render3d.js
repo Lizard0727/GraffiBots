@@ -18,7 +18,7 @@
     try {
       renderer = new T.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, powerPreference: 'high-performance' });
     } catch (e) { failed = true; console.error(e); return false; }
-    renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1) * (typeof DYN === 'object' ? DYN.scale : 1));
+    renderer.setPixelRatio(Math.min(HQ ? 1.25 : 1, window.devicePixelRatio || 1) * (typeof DYN === 'object' ? DYN.scale : 1));
     renderer.shadowMap.enabled = HQ;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     camera = new T.PerspectiveCamera(72, 1, 2, 7000);
@@ -67,6 +67,18 @@
     SH.eyeW = basic(0xffffff); SH.pupil = basic(0x14101c); SH.blush = basic(0xff8aa8, { transparent: true, opacity: 0.55, depthWrite: false });
     SH.mouth = basic(0x5a1a2a); SH.tongue = basic(0xff6a8a);
     return SH;
+  }
+  // 2.1.2：只让大的部件投影子（小零件、发光件、描边不投影），阴影那一遍的绘制次数少一大半
+  function trimShadows(root, minR) {
+    root.updateMatrixWorld(true);
+    const s = new T.Vector3();
+    root.traverse((o) => {
+      if (!o.isMesh || !o.castShadow) return;
+      if (o.material && (o.material.isMeshBasicMaterial || o.material.transparent)) { o.castShadow = false; return; }
+      const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+      o.getWorldScale(s);
+      if (g.boundingSphere.radius * Math.max(s.x, s.y, s.z) < minR) o.castShadow = false;
+    });
   }
   function part(g, m, sx, sy, sz, x, y, z) {
     const o = new T.Mesh(g, m);
@@ -622,7 +634,13 @@
 
   // ---------------- 场地围栏：矮墙 + 玻璃护栏 + 立柱 ----------------
   function buildBounds() {
-    const th = 40, SK = W.SK;
+    const th = 40, SK = W.SK, g0 = new T.Group(), scene0 = scene;
+    scene = { add: (...o) => g0.add(...o) };   // 2.1.2：围栏的几百个零件合并成几块网格（以前每个零件一次绘制）
+    try { buildBounds0(th, SK); } finally { scene = scene0; }
+    for (const o of g0.children) if (o.isMesh && (o.material.transparent || o.material.isMeshBasicMaterial || o.geometry === SH.sph || o.geometry === SH.cyl)) o.castShadow = false;
+    scene.add(g0); bake(g0, true);
+  }
+  function buildBounds0(th, SK) {
     const wall = lambert(new T.Color(SK.sides[2][0]).multiplyScalar(0.8));
     const capM = lambert(SK.trim[2]);
     const glass = new T.MeshPhongMaterial({ color: SK.night ? 0x7af0ff : 0xbfefff, transparent: true, opacity: 0.22, shininess: 90, depthWrite: false, side: T.DoubleSide });
@@ -649,6 +667,15 @@
 
   // ---------------- 远景城市 ----------------
   function buildCity(mapIdx) {
+    const g0 = new T.Group(), scene0 = scene;
+    scene = { add: (...o) => g0.add(...o) };   // 2.1.2：远景城市合并成几块网格，不投影子
+    try { buildCity0(mapIdx); } finally { scene = scene0; }
+    g0.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+    const keep = g0.children.filter((o) => o === W.ring || (o.isMesh && o.material.map && !o.material.emissiveMap));   // 天际线圆环 / 广告牌保持独立（天际线跟着镜头动）
+    for (const o of keep) { g0.remove(o); scene.add(o); }
+    scene.add(g0); bake(g0, false);
+  }
+  function buildCity0(mapIdx) {
     const SK = W.SK, R = rng(mapIdx * 131 + 5);
     const wc = document.createElement('canvas'); wc.width = 64; wc.height = 128;
     const x = wc.getContext('2d');
@@ -1226,12 +1253,24 @@
   const _c = new T.Color();
   // opt: { size, life, grav, drag, grow, sys: 'ps'|'pg'|'pk', spread, dir: {x,y,z} }
   // 2.0：自适应画质——帧率不够时降低渲染分辨率和粒子数量，恢复后再调回来
-  const DYN = { scale: 1, pk: 1 };
-  function setDyn(scale, pk) {
+  // 2.1.2：自适应画质分档——lvl 0 全开；1 阴影隔帧更新（默认）；2 关阴影；3 再关泛光后期
+  const DYN = { scale: 1, pk: 1, lvl: 1, frame: 0 };
+  function setDyn(scale, pk, lvl) {
     scale = Math.max(0.5, Math.min(1, scale)); DYN.pk = Math.max(0.3, Math.min(1, pk));
+    if (lvl != null && lvl !== DYN.lvl) {
+      const sh0 = DYN.lvl >= 2, sh1 = lvl >= 2; DYN.lvl = lvl;
+      POST.auto = lvl >= 3;
+      if (sh0 !== sh1 && scene) scene.traverse((o) => { if (o.isDirectionalLight && (o.castShadow || o.userData.cs)) { o.userData.cs = true; o.castShadow = !sh1; } });
+    }
     if (Math.abs(scale - DYN.scale) < 0.01) return; DYN.scale = scale;
-    if (renderer) { renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1) * DYN.scale); resize(); }
+    if (renderer) { renderer.setPixelRatio(Math.min(HQ ? PR_HQ : 1, window.devicePixelRatio || 1) * DYN.scale); resize(); }
   }
+  const PR_HQ = 1.25;   // 2.1.2：高画质的渲染分辨率上限 1.5 → 1.25（高分屏上省很多像素）
+  // 2.1.2：检测浏览器是不是在用软件渲染（显卡加速没开 / 显卡被浏览器屏蔽）——这种情况帧率只有 20–30
+  function gpuName() {
+    try { const gl = renderer && renderer.getContext(), ext = gl && gl.getExtension('WEBGL_debug_renderer_info'); return ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '') : ''; } catch (e) { return ''; }
+  }
+  const softGpu = () => /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i.test(gpuName());
   function emit(x, y, z, color, n, spd = 220, up = 1, opt = {}) {
     if (!W) return;
     if (DYN.pk < 1) { n *= DYN.pk; n = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0); if (!n) return; }
@@ -1592,7 +1631,7 @@
     HQ = !!hq;
     OUTLINE.visible = HQ;
     if (renderer) {
-      renderer.setPixelRatio(Math.min(HQ ? 1.5 : 1, window.devicePixelRatio || 1) * (typeof DYN === 'object' ? DYN.scale : 1));
+      renderer.setPixelRatio(Math.min(HQ ? PR_HQ : 1, window.devicePixelRatio || 1) * (typeof DYN === 'object' ? DYN.scale : 1));
       resize();
       if (renderer.shadowMap.enabled !== HQ) {
         renderer.shadowMap.enabled = HQ;
@@ -1642,7 +1681,7 @@
     for (const [mat, bk] of buckets) {
       let n = 0;
       const parts = bk.items.map(([geo, m]) => { const gg = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m); n += gg.attributes.position.count; return gg; });
-      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = mat.map ? new Float32Array(n * 2) : null;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = mat.map || mat.emissiveMap ? new Float32Array(n * 2) : null;
       let o = 0;
       for (const gg of parts) {
         pos.set(gg.attributes.position.array, o * 3); nor.set(gg.attributes.normal.array, o * 3);
@@ -2803,6 +2842,7 @@
         b.skinCol = top ? (top.over ? top.over.accent : top.paint.light) : null;
         b.theme = top && top.bg || null;
         if (b.rare >= 4) { b.halo = new T.Mesh(new T.RingGeometry(20, 24, 40), basic(b.skinCol, { transparent: true, opacity: 0.55, side: T.DoubleSide, depthWrite: false })); b.halo.rotation.x = -Math.PI / 2; b.root.add(b.halo); }
+        trimShadows(b.root, 5);
         W.bots.set(id, b); scene.add(b.root);
       }
       if (!(p.flags & 1)) { b.zs = null; b.face = null; continue; }
@@ -4029,7 +4069,7 @@
     if (POST.rt) return true;
     try {
       const gl2 = renderer.capabilities.isWebGL2;
-      POST.rt = new T.WebGLRenderTarget(4, 4, { samples: gl2 ? 4 : 0 });
+      POST.rt = new T.WebGLRenderTarget(4, 4, { samples: gl2 ? 2 : 0 });   // 2.1.2：4x → 2x 抗锯齿（显存带宽减半）
       POST.a = new T.WebGLRenderTarget(4, 4); POST.b = new T.WebGLRenderTarget(4, 4);
       POST.c = new T.WebGLRenderTarget(4, 4); POST.d = new T.WebGLRenderTarget(4, 4);
       POST.cam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -4076,7 +4116,7 @@
   }
   function pass(mat, target) { POST.quad.material = mat; renderer.setRenderTarget(target); renderer.render(POST.scene, POST.cam); }
   function renderPost() {
-    if (!HQ || POST.off || POST.fail || !postInit()) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+    if (!HQ || POST.off || POST.auto || POST.fail || !postInit()) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
     postSize();
     renderer.setRenderTarget(POST.rt); renderer.render(scene, camera);
     POST.bright.uniforms.t.value = POST.rt.texture; pass(POST.bright, POST.a);
@@ -4097,7 +4137,10 @@
     stepAmbient(dt, now);
     if (W.pads) for (const p of W.pads) { const k = (now / 600) % 1; p.ring.scale.setScalar(9 + k * 6); p.ringM.opacity = 0.9 * (1 - k); }
     stepParticles(dt);
+    // 2.1.2：阴影隔帧更新（太阳不动、东西移动得慢，看不出来；阴影那一遍几乎要把整个场景再画一次）
+    renderer.shadowMap.autoUpdate = DYN.lvl === 0 || (DYN.frame++ & 1) === 0;
     renderPost();
+    renderer.shadowMap.autoUpdate = true;
   }
   function clear() { dispose(); show(false); }
 
@@ -4107,7 +4150,7 @@
     setPost(on, o) { POST.off = !on; if (o && POST.comp) for (const k in o) { if (POST.comp.uniforms[k]) POST.comp.uniforms[k].value = o[k]; if (k === 'th') POST.bright.uniforms.th.value = o[k]; } },
     teamShow, teamFrame, teamSlots,
     build, paintCell, burst, emit, trailerStart, trailerStop, seasonTrailerStart, TRAILERS, __trT: () => (TR.on ? TR.t : -1), setCamera, project, screenRay, render, clear, show, preview, previewFrame, previewMode, mechThumb, charPreview, charFrame, charShot, charAction, setQuality,
-    setDyn, dyn: () => DYN,
+    setDyn, dyn: () => DYN, gpuName, softGpu, __r: () => renderer,
     info: () => (renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries } : null),
   };
 })();
