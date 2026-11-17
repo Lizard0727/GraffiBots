@@ -15,10 +15,18 @@ for (let mi = 0; mi < S.MAPS.length; mi++) {
     const L = M.loot, C = CELL;
     for (const [x, y] of L.spawns) good &= ok(clearAround(x * C, y * C, 40), `${name}：出生点 (${x},${y}) 被挡住`);
     for (const [x, y] of L.extract) good &= ok(clearAround(x * C, y * C, 50), `${name}：撤离点 (${x},${y}) 被挡住`);
-    good &= ok(L.spots.length >= 80 && L.spots.every(([x, y]) => !M.solid[y * GW + x]), `${name}：物资点 ${L.spots.length} 个，不能在墙里`);
-    good &= ok(L.spots.filter((p) => p[2] >= 3).length >= 10, `${name}：高级物资点太少`);
     good &= ok(L.guards.every(([x, y]) => !M.solid[y * GW + x]), `${name}：守卫站在墙里`);
-    good &= ok(S.GW === 240 && S.GH === 160, `${name}：超大地图尺寸 ${S.GW}×${S.GH}`);
+    if (M.giant) {   // 2.1：十倍面积的灰城禁区——容器代替地上的物资点
+      good &= ok(S.GW === 760 && S.GH === 500, `${name}：超大地图尺寸 ${S.GW}×${S.GH}`);
+      good &= ok(L.conts.length >= 500 && L.conts.every(([x, y, , , roof]) => roof || !M.solid[y * GW + x]), `${name}：容器 ${L.conts.length} 个，不能在墙里`);
+      good &= ok(L.conts.filter((c) => c[3] >= 4).length >= 30, `${name}：高级容器太少`);
+      good &= ok(L.extract.length === 8 && new Set(L.extract.map((e) => e[2])).size === 5, `${name}：8 个撤离点、5 种类型`);
+      good &= ok(M.lifts.length >= 10, `${name}：电梯 ${M.lifts.length} 部`);
+    } else {
+      good &= ok(L.spots.length >= 80 && L.spots.every(([x, y]) => !M.solid[y * GW + x]), `${name}：物资点 ${L.spots.length} 个，不能在墙里`);
+      good &= ok(L.spots.filter((p) => p[2] >= 3).length >= 10, `${name}：高级物资点太少`);
+      good &= ok(S.GW === 240 && S.GH === 160, `${name}：超大地图尺寸 ${S.GW}×${S.GH}`);
+    }
   } else {
   for (const t of [1, 2]) for (let s = 0; s < 4; s++) { const p = S.spawnPoint(t, s); good &= ok(clearAround(p.x, p.y, 20) && !S.collideTest(M, p.x, p.y, 0), `${name}：出生点 ${t}-${s} 被挡住`); }
   for (const t of [1, 2]) { const g = S.goalFor(t, mi); good &= ok(clearAround(g.x, g.y, 14), `${name}：护送终点被挡住`); }
@@ -40,6 +48,10 @@ for (let mi = 0; mi < S.MAPS.length; mi++) {
       const x = cx + dx, y = cy + dy, n = y * GW + x;
       if (!S.inBounds(x, y) || seen[n] || M.solid[n] || M.top[n] > M.top[c] + 80) continue;
       seen[n] = 1; q.push(n);
+    }
+    if (M.lift && M.lift[c]) for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {   // 2.1：电梯把人弹上天台
+      const x = cx + dx, y = cy + dy, n = y * GW + x;
+      if (S.inBounds(x, y) && !seen[n] && !M.solid[n]) { seen[n] = 1; q.push(n); }
     }
   }
   let open = 0, reach = 0;

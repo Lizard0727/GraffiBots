@@ -238,7 +238,7 @@ class Game {
     // 逃亡圈默认用「废墟逃亡区」
     const ruins = S.MAPS.findIndex((m) => m.name === '废墟逃亡区');
     const parkMap = S.MAPS.findIndex((m) => m.park);   // 乐园模式默认用「欢乐乐园」
-    this.mapIdx = st.map < 0 ? (S.isEscape(this.mode) && ruins >= 0 ? ruins : this.mode === 'park' && parkMap >= 0 ? parkMap : this.mode === 'loot' ? S.MAP_N + randInt(S.MAPS.length - S.MAP_N) : randInt(S.MAP_N)) : st.map;
+    this.mapIdx = this.mode === 'loot' ? S.GIANT_MAP() : st.map < 0 ? (S.isEscape(this.mode) && ruins >= 0 ? ruins : this.mode === 'park' && parkMap >= 0 ? parkMap : this.mode === 'loot' ? S.GIANT_MAP() : randInt(S.MAP_N)) : st.map;
     this.ranked = !!st.ranked; this.bans = st.bans || { pilots: [], mechs: [] };
     this.teams = S.teamsOf(this.mode);
     this.oneLife = !!(S.MODES[this.mode] && S.MODES[this.mode].oneLife);
@@ -263,7 +263,7 @@ class Game {
     if (this.teams > 2) { let i = 0; for (const c of room.members.values()) c.gTeam = 1 + (Math.floor(i++ / teamCap) % this.teams); }
     if (S.isEscape(this.mode)) this.spawns = this.escapeSpawns();
     if (this.loot) {   // 四支小队从地图四个角出发
-      const sp = this.M.loot.spawns.map(([x, y]) => ({ x: x * S.CELL, y: y * S.CELL })).sort(() => Math.random() - 0.5);
+      const sp = this.M.loot.spawns.slice(0, this.teams).map(([x, y]) => ({ x: x * S.CELL, y: y * S.CELL })).sort(() => Math.random() - 0.5);
       this.spawns = [null, ...sp];
     }
     // 角色等级：公平模式下所有人按同一等级；AI 的等级跟着真人玩家的平均等级
@@ -280,6 +280,7 @@ class Game {
       pl.looks = c.looks || null;
       if (c.conn && c.conn.held) pl.away = true;   // 1.7.1：断线中的队员开局就由 AI 接管
       if (this.loot && this.risk === 'high' && c.power && Array.isArray(c.power.gear)) this.applyGear(pl, c.power.gear);
+      if (this.loot) { const sd = S.LOOT.safe[clamp((c.power && c.power.safe) | 0 || 1, 1, 3)]; pl.safe = { w: sd[0], h: sd[1], items: [] }; }   // 2.1 安全箱
     }
     const avgLv = humans.length ? Math.round(humans.reduce((a, b) => a + b.lv, 0) / humans.length) : 1;
     const botPw = this.fair ? FAIR : st.botPower || { lv: avgLv, bt: avgLv >= 9 ? 2 : avgLv >= 5 ? 1 : 0 };   // 排位赛：AI 强度跟着段位
@@ -323,13 +324,31 @@ class Game {
     // 1.6：搜刮撤离的中立守卫（守着中间的高级物资，谁靠近打谁）
     if (this.loot && st.bots !== false) {
       const GW_ = ['bucket', 'riot', 'blaster', 'fist', 'roller', 'flamer'];   // 守卫用短中程武器，不在远处狙人
-      this.M.loot.guards.forEach(([gx, gy], k) => {
-        const g = this.addPlayer(-500 - k, '守卫机兵', S.LOOT.guardTeam, GW_[k % GW_.length], 'antenna', true, k, S.PILOTS[randInt(S.PILOTS.length)].id,
-          { lv: clamp((botPw.lv | 0) + 1, 1, E.MAX_LV), bt: Math.min(2, (botPw.bt | 0) + 1) });
-        g.guard = { x: gx * S.CELL, y: gy * S.CELL }; g.npc = true; g.persona = 'expert';
+      this.M.loot.guards.forEach(([gx, gy, grp], k) => {
+        const hv = grp === 'hv';
+        const g = this.addPlayer(-500 - k, hv ? '灰石重装卫兵' : '守卫机兵', S.LOOT.guardTeam, GW_[k % GW_.length], 'antenna', true, k, S.PILOTS[randInt(S.PILOTS.length)].id,
+          { lv: clamp((botPw.lv | 0) + (hv ? 2 : 1), 1, E.MAX_LV), bt: Math.min(2, (botPw.bt | 0) + 1) });
+        g.guard = { x: gx * S.CELL, y: gy * S.CELL, hv }; g.npc = true; g.persona = 'expert';
+        if (hv) { g.maxHp = Math.round(g.maxHp * 1.4); g.hp = g.maxHp; }
         this.respawn(g);
       });
+      // 2.1：Boss 小队——灰石指挥官带 3 个护卫，在各城区之间巡逻
+      const route = (this.M.loot.bossRoute || []).map(([x, y]) => ({ x: x * S.CELL, y: y * S.CELL }));
+      if (route.length) {
+        const bp = { lv: clamp((botPw.lv | 0) + 3, 1, E.MAX_LV), bt: 2 };
+        const boss = this.addPlayer(-900, '灰石指挥官 · 铁卫', S.LOOT.guardTeam, 'wrecker', 'antenna', true, 90, 'han', bp);
+        boss.guard = { x: route[0].x, y: route[0].y, route, ri: 0 }; boss.npc = true; boss.persona = 'expert'; boss.lootBoss = true;
+        boss.maxHp = Math.round(boss.maxHp * 3.2); boss.hp = boss.maxHp;
+        this.respawn(boss); boss.x = route[0].x; boss.y = route[0].y;
+        ['riot', 'charger', 'gatling'].forEach((w, k) => {
+          const e = this.addPlayer(-901 - k, '铁卫护卫', S.LOOT.guardTeam, w, 'antenna', true, 91 + k, S.PILOTS[randInt(S.PILOTS.length)].id, { lv: bp.lv - 1, bt: 2 });
+          e.guard = { x: route[0].x, y: route[0].y, follow: boss.id }; e.npc = true; e.persona = 'expert';
+          e.maxHp = Math.round(e.maxHp * 1.5); e.hp = e.maxHp;
+          this.respawn(e); e.x = route[0].x + (k - 1) * 40; e.y = route[0].y + 40;
+        });
+      }
     }
+    if (this.loot) for (const p of this.players.values()) if (p.bot && !p.guard && !p.gear) { const bd = S.bagDims(this.risk === 'high' && Math.random() < 0.6 ? ['pack'] : []); p.inv = { w: bd[0], h: bd[1], items: [] }; }
     this.chat = usePersonaChat(this, st) ? new BotChat(this) : null;
     this.initMode();
     if (this.mode === 'zone') {
@@ -337,6 +356,7 @@ class Game {
       for (let y = S.ZONE.y0; y < S.ZONE.y1; y++)
         for (let x = S.ZONE.x0; x < S.ZONE.x1; x++) if (!this.M.solid[y * S.GW + x]) this.zoneCells.push(y * S.GW + x);
     }
+    this.started = true;
     room.broadcast(this.startMsg());
     // 1.6：按真实时间补帧——浏览器里画面卡的时候模拟也不会变慢（最多一次补 4 帧）
     if (!opts.manual) {
@@ -371,7 +391,7 @@ class Game {
       input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, qq: 0, gq: 0, aq: 0, oq: 0, ad: 200 },
       lastQq: 0, lastGq: 0, lastAq: 0, sync: 0, lastPosT: 0, hitCd: {},
       stats: { kills: 0, deaths: 0, paint: 0, obj: 0, assists: 0, balloons: 0, float: 0, seals: 0, spirits: 0 },
-      bag: [], bagCap: S.LOOT.bag, exT: 0, extracted: false, pickT: 0,
+      bag: [], bagCap: S.LOOT.bag, inv: { w: 5, h: 3, items: [] }, safe: { w: 2, h: 2, items: [] }, openC: 0, srch: 0, exT: 0, extracted: false, pickT: 0,
     };
     this.players.set(id, p);
     this.respawn(p);
@@ -418,7 +438,8 @@ class Game {
       t: 'start', map: this.mapIdx, mode: this.mode, colorSet: this.colorSet, duration: this.duration,
       players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team, weapon: p.weapon, head: p.head, pilot: p.pilot, bot: p.bot, lv: p.lv, bt: p.bt, looks: p.looks || null, npc: p.npc ? 1 : 0, boss: p.boss ? 1 : 0, spirit: p.spirit ? 1 : 0 })),
       fair: this.fair, teams: this.teams, cd: Math.round(this.countdown * 10) / 10, ranked: this.ranked ? 1 : 0, bans: this.ranked ? this.bans : undefined, tutorial: this.tutorial ? 1 : 0, risk: this.loot ? this.risk : undefined, squad: this.squad,
-      loot: this.loot ? this.lootList() : undefined,
+      loot: this.loot ? this.lootList() : undefined, conts: this.loot ? this.contList() : undefined,
+      lever: this.loot && this.obj.lever ? [r1(this.obj.lever.x), r1(this.obj.lever.y)] : undefined,
     };
   }
   // 1.7.1：断线重连——把整张涂料图（游程编码）发给重新连上的玩家
@@ -1212,10 +1233,16 @@ class Game {
   kill(t, by) {
     t.alive = false; t.hp = 0; t.respawnT = this.oneLife ? 1e9 : S.KO_RESPAWN; t.stats.deaths++;
     if (this.oneLife) t.out = true;   // 出局：生死之战等下一局，逃亡圈直接淘汰
-    if (this.loot) {   // 搜刮撤离：阵亡掉落整个背包；守卫掉落高级物资
-      const drop = t.bag.splice(0);
-      if (t.guard) { drop.push(S.rollLoot(3, this.risk === 'high'), S.rollLoot(3, this.risk === 'high')); if (Math.random() < 0.35) drop.push(S.rollLoot(5)); }
-      this.scatter(drop, t.x, t.y);
+    if (this.loot) {   // 2.1 搜刮撤离：阵亡留下一具遗骸（背包里的东西都在里面，要搜）；安全箱里的东西不掉
+      const drop = t.inv.items.map((it) => it.k); t.inv.items = []; this.syncBag(t);
+      if (t.guard) {
+        const hi = this.risk === 'high';
+        drop.push(S.rollLoot(t.guard.hv ? 5 : 4, hi), S.rollLoot(3, hi));
+        if (Math.random() < (t.guard.hv ? 0.5 : 0.25)) drop.push(S.rollLoot(5, hi));
+        if (t.lootBoss) drop.push(S.rollLoot(6, true), S.rollLoot(6, true), S.rollLoot(5, true));
+      }
+      if (drop.length) this.makeCont('body', t.x, t.y, 0, false, false, drop);
+      if (t.openC) t.openC = 0;
       this.sendBag(t);
     }
     t.charge = 0; t.burst = null; t.rollT = 0; t.spT = 0; t.spKind = null; t.shield = 0; t.shieldT = 0; t.foot = false;
@@ -1584,6 +1611,7 @@ class Game {
     const G = new Set(gear.filter((g) => S.LOOT.gear[g]));
     if (G.has('armor')) { p.maxHp = Math.round(p.maxHp * 1.25); p.hp = p.maxHp; }
     if (G.has('pack')) p.bagCap += 6;
+    const bd = S.bagDims([...G]); p.inv = { w: bd[0], h: bd[1], items: [] };   // 2.1 网格背包
     if (G.has('kit')) p.kit = 1;
     p.gear = [...G];
   }
@@ -1600,55 +1628,166 @@ class Game {
   scatter(items, x, y) {
     items.forEach((k, i) => { const a = (i / Math.max(1, items.length)) * Math.PI * 2 + Math.random(), d = 16 + Math.random() * 26; this.dropLoot(k, x + Math.cos(a) * d, y + Math.sin(a) * d) || this.dropLoot(k, x, y); });
   }
+  // ================= 2.1 撤离：容器 / 网格背包 / 撤离点 =================
+  makeCont(type, x, y, tier, hi, roof, keys) {
+    const T = S.LOOT.conts[type] || S.LOOT.conts.duffel;
+    let items = keys;
+    if (!items) {
+      const [a, b] = T.n || [1, 2], n = randInt(b - a + 1) + a + (hi ? (Math.random() < 0.5 ? 1 : 0) : 0);
+      items = []; for (let k = 0; k < n; k++) items.push(S.rollLoot(Math.min(6, tier + (T.bump || 0)), hi, null, T.kinds));
+    }
+    const z = roof ? S.LEVEL_H[5] : this.top(x, y);
+    const c = { id: this.nextId++, type, x, y, z, items: items.filter((k) => S.LOOT.items[k]), rev: 0, state: 0 };
+    if (type === 'pile') c.rev = c.items.length;
+    this.obj.conts.push(c); this.obj.contMap.set(c.id, c);
+    if (this.started) this.ev(['ct+', c.id, S.CONT_IDS.indexOf(type), r1(x), r1(y), r1(z), this.contState(c)]);
+    return c;
+  }
+  contState(c) { return !c.items.length ? 2 : c.state ? 1 : 0; }
+  setContState(c, st) { const before = this.contState(c); c.state = st; if (this.contState(c) !== before) this.ev(['ct', c.id, this.contState(c)]); }
+  syncBag(p) { p.bag = p.inv.items.map((it) => it.k); }
   sendBag(p) {
+    this.syncBag(p);
     if (p.bot || this.room.manual) return;
     const c = this.room.members.get(p.id);
-    if (c) c.conn.send({ t: 'bag', items: p.bag, cap: p.bagCap, gear: p.gear || [] });
+    if (c) c.conn.send({ t: 'bag', inv: p.inv, safe: p.safe, gear: p.gear || [], items: p.bag, cap: p.inv.w * p.inv.h });
   }
-  // 捡东西：背包放不下时，如果新东西更值钱，自动把最不值钱的扔掉换上
-  tryPick(p, it) {
-    const I = S.LOOT.items[it.k];
-    let used = S.lootSlots(p.bag);
-    const drop = [];
-    if (used + I.size > p.bagCap) {
-      const cand = p.bag.map((k, i) => ({ k, i, d: S.LOOT.items[k].v / S.LOOT.items[k].size })).sort((a, b) => a.d - b.d);
-      for (const c of cand) {
-        if (used + I.size <= p.bagCap) break;
-        if (c.d >= I.v / I.size) return false;
-        drop.push(c); used -= S.LOOT.items[c.k].size;
+  sendCont(p) {   // 正在看的容器：已经搜出来的物资 + 还没搜的数量 + 当前这件的进度
+    if (p.bot || this.room.manual) return;
+    const m = this.room.members.get(p.id); if (!m) return;
+    const c = p.openC && this.obj.contMap.get(p.openC);
+    if (!c) { m.conn.send({ t: 'cv', id: 0 }); return; }
+    const shown = Math.min(c.rev, c.items.length);
+    m.conn.send({ t: 'cv', id: c.id, type: c.type, items: c.items.slice(0, shown), hidden: c.items.length - shown, need: shown < c.items.length ? this.searchNeed(c, p) : 0, prog: p.srch });
+  }
+  searchNeed(c, p) { const k = c.items[Math.min(c.rev, c.items.length - 1)]; return S.LOOT.search((S.LOOT.items[k] || {}).r) * (c.type === 'body' ? 0.7 : 1) * (p.pilot === 'raven' ? 0.85 : 1); }
+  viewers(c) { const out = []; for (const q of this.players.values()) if (q.openC === c.id) out.push(q); return out; }
+  canReach(p, c) { return Math.hypot(p.x - c.x, p.y - c.y) < S.LOOT.openR && Math.abs(p.z - c.z) < 60; }
+  // 玩家的背包操作（客户端发 {t:'lo', a: ...}）
+  lootOp(p, m) {
+    if (!p || !this.loot || !p.alive || p.out || p.guard) return;
+    const o = this.obj, invOf = (w) => (w === 'safe' ? p.safe : p.inv);
+    switch (m.a) {
+      case 'open': {
+        const c = o.contMap.get(m.c | 0);
+        if (!c || !this.canReach(p, c)) return;
+        p.openC = c.id; p.srch = 0;
+        if (!c.state) this.setContState(c, 1);
+        this.sendCont(p); return;
       }
-      if (used + I.size > p.bagCap) return false;
+      case 'close': p.openC = 0; this.sendCont(p); return;
+      case 'take': {   // 从容器拿一件：x/y/r 指定位置，不指定就自动找空位；to = 'safe' 放进安全箱
+        const c = o.contMap.get(m.c | 0), i = m.i | 0;
+        if (!c || p.openC !== c.id || !this.canReach(p, c) || i < 0 || i >= Math.min(c.rev, c.items.length)) return;
+        const k = c.items[i], inv = invOf(m.to);
+        const pos = Number.isInteger(m.x) && Number.isInteger(m.y) && S.invFits(inv, k, m.x, m.y, m.r ? 1 : 0) ? { x: m.x, y: m.y, rot: m.r ? 1 : 0 } : S.invPlace(inv, k);
+        if (!pos) { this.toast(p, inv === p.safe ? '安全箱放不下了' : '背包放不下了'); return; }
+        c.items.splice(i, 1); c.rev = Math.max(0, c.rev - 1);
+        inv.items.push({ id: this.nextId++, k, x: pos.x, y: pos.y, rot: pos.rot });
+        if (!c.items.length) this.setContState(c, 2);
+        this.ev(['lt-', c.id, p.id, k]);
+        this.sendBag(p); for (const q of this.viewers(c)) this.sendCont(q);
+        return;
+      }
+      case 'move': {   // 背包 / 安全箱之间挪动、旋转
+        const from = invOf(m.from), to = invOf(m.to), it = from.items.find((x) => x.id === (m.id | 0));
+        if (!it) return;
+        const rot = m.r ? 1 : 0;
+        if (!Number.isInteger(m.x) || !Number.isInteger(m.y) || !S.invFits(to, it.k, m.x, m.y, rot, from === to ? it.id : -1)) { this.sendBag(p); return; }
+        if (from !== to) { from.items.splice(from.items.indexOf(it), 1); to.items.push(it); }
+        it.x = m.x; it.y = m.y; it.rot = rot;
+        this.sendBag(p); return;
+      }
+      case 'drop': {   // 扔掉：扔进正在看的容器，或者在脚下堆一堆
+        const from = invOf(m.from), it = from.items.find((x) => x.id === (m.id | 0));
+        if (!it) return;
+        from.items.splice(from.items.indexOf(it), 1);
+        let c = p.openC && o.contMap.get(p.openC);
+        if (c && this.canReach(p, c)) { const all = c.rev >= c.items.length; c.items.push(it.k); if (all) c.rev = c.items.length; else { c.items.splice(c.items.length - 1, 1); c.items.splice(c.rev, 0, it.k); c.rev++; } this.setContState(c, 1); }
+        else {
+          c = o.conts.find((q) => q.type === 'pile' && Math.hypot(q.x - p.x, q.y - p.y) < 36 && Math.abs(q.z - p.z) < 30);
+          if (c) { c.items.push(it.k); c.rev = c.items.length; this.setContState(c, 1); } else c = this.makeCont('pile', p.x + rand(-10, 10), p.y + rand(-10, 10), 0, false, false, [it.k]);
+        }
+        this.sendBag(p); for (const q of this.viewers(c)) this.sendCont(q);
+        return;
+      }
+      case 'lever': {
+        const L = o.lever;
+        if (!L || Math.hypot(p.x - L.x, p.y - L.y) > 70 || L.until > this.time) return;
+        L.until = this.time + S.LOOT.ext.lever.open;
+        for (const e of o.ex) if (e.type === 'lever') { e.open = this.time; e.close = L.until; e.told = 0; }
+        this.ev(['lev', p.id, Math.round(S.LOOT.ext.lever.open)]);
+        return;
+      }
     }
-    for (const c of drop.sort((a, b) => b.i - a.i)) { p.bag.splice(c.i, 1); this.dropLoot(c.k, p.x - 20 + Math.random() * 40, p.y - 20 + Math.random() * 40); }
-    p.bag.push(it.k);
-    this.obj.items.splice(this.obj.items.indexOf(it), 1);
-    this.ev(['lt-', it.id, p.id, it.k]);
-    this.sendBag(p);
+  }
+  toast(p, text) { if (p.bot || this.room.manual) return; const m = this.room.members.get(p.id); if (m) m.conn.send({ t: 'toast', text }); }
+  exOpen(e) { return this.time >= e.open && this.time < e.close; }
+  // AI 拿东西：从容器里挑最值钱、放得下的
+  botTake(p, c) {
+    const shown = Math.min(c.rev, c.items.length);
+    let best = -1, bv = 0;
+    for (let i = 0; i < shown; i++) { const I = S.LOOT.items[c.items[i]]; if (I.v / I.size > bv && S.invPlace(p.inv, c.items[i])) { bv = I.v / I.size; best = i; } }
+    if (best < 0) {   // 背包满了：扔掉最不值钱的，换更值钱的
+      let cand = -1, cv = 0;
+      for (let i = 0; i < shown; i++) { const I = S.LOOT.items[c.items[i]]; if (I.v / I.size > cv) { cv = I.v / I.size; cand = i; } }
+      if (cand < 0) return false;
+      const junk = p.inv.items.slice().sort((a, b) => S.LOOT.items[a.k].v / S.LOOT.items[a.k].size - S.LOOT.items[b.k].v / S.LOOT.items[b.k].size);
+      const removed = [];
+      for (const it of junk) {
+        const J = S.LOOT.items[it.k];
+        if (J.v / J.size * 1.5 >= cv) break;
+        p.inv.items.splice(p.inv.items.indexOf(it), 1); removed.push(it.k);
+        if (S.invPlace(p.inv, c.items[cand])) break;
+      }
+      if (!S.invPlace(p.inv, c.items[cand])) { for (const k of removed) { const pos = S.invPlace(p.inv, k); if (pos) p.inv.items.push({ id: this.nextId++, k, x: pos.x, y: pos.y, rot: pos.rot }); } return false; }
+      for (const k of removed) c.items.push(k);   // 扔掉的东西留在这个容器里
+      c.rev = Math.min(c.rev + removed.length, c.items.length);
+      best = cand;
+    }
+    const k = c.items[best], pos = S.invPlace(p.inv, k);
+    c.items.splice(best, 1); c.rev = Math.max(0, c.rev - 1);
+    p.inv.items.push({ id: this.nextId++, k, x: pos.x, y: pos.y, rot: pos.rot });
+    if (!c.items.length) this.setContState(c, 2);
+    this.ev(['lt-', c.id, p.id, k]); this.syncBag(p);
+    for (const q of this.viewers(c)) this.sendCont(q);
     return true;
   }
   updateLoot(dt) {
-    const o = this.obj, R = S.LOOT.pickR, LT = S.LOOT;
+    const o = this.obj, LT = S.LOOT;
     for (const p of this.players.values()) {
       if (!p.alive || p.out || p.guard) continue;
       // 急救包
       if (p.kit && p.hp < this.maxHpOf(p) * 0.3 && !p.foot) { p.kit = 0; p.hp = Math.min(this.maxHpOf(p), p.hp + 60); this.ev(['kit', p.id]); this.sendBag(p); }
-      if ((p.pickT -= dt) <= 0) {
-        for (const it of o.items) {
-          if (Math.abs(it.x - p.x) > R || Math.abs(it.y - p.y) > R || Math.abs(it.z - p.z) > 34) continue;
-          if (this.tryPick(p, it)) { p.pickT = 0.15; break; }
+      // AI：走到目标容器旁边就打开
+      if (p.bot && !p.openC && p.ai && p.ai.goal && p.ai.goal.cont) { const c = o.contMap.get(p.ai.goal.cont); if (c && this.canReach(p, c)) { if (c.items.length) { p.openC = c.id; p.srch = 0; if (!c.state) this.setContState(c, 1); } else { (p.ai.done || (p.ai.done = new Set())).add(c.id); p.ai.goal = null; p.ai.replan = 0; } } }
+      // 搜索：站在容器旁边，一件一件搜出来
+      if (p.openC) {
+        const c = o.contMap.get(p.openC);
+        if (!c || !this.canReach(p, c)) { p.openC = 0; this.sendCont(p); }
+        else if (c.rev < c.items.length) {
+          p.srch += dt;
+          if (p.srch >= this.searchNeed(c, p)) { c.rev++; p.srch = 0; for (const q of this.viewers(c)) this.sendCont(q); }
+          else if (!p.bot && (this.tick % 6) === 0) this.sendCont(p);
+        } else if (p.bot) {
+          if ((p.pickT -= dt) <= 0) { p.pickT = 0.35; if (!this.botTake(p, c)) { p.openC = 0; if (p.ai) { (p.ai.done || (p.ai.done = new Set())).add(c.id); p.ai.goal = null; p.ai.replan = 0; } } }
         }
       }
       // 撤离：站在开放的撤离点里读条，挨打会倒退
-      let inEx = null;
-      for (const e of o.ex) if (this.time >= e.open && Math.hypot(p.x - e.x, p.y - e.y) < LT.extR) { inEx = e; break; }
+      let inEx = null, why = '';
+      for (const e of o.ex) {
+        if (!this.exOpen(e) || Math.hypot(p.x - e.x, p.y - e.y) >= LT.extR) continue;
+        if (e.type === 'weight' && S.invCells(p.inv) > LT.ext.weight.max) { why = '背包里的东西太多了（轻装撤离不能超过 12 格）'; continue; }
+        inEx = e; break;
+      }
       if (inEx) {
         const hurt = this.time - p.lastHurt < 1;
         p.exT = hurt ? Math.max(0, p.exT - dt * 1.5) : p.exT + dt;
-        if (p.exT >= LT.extTime) this.extract(p);
-      } else p.exT = Math.max(0, p.exT - dt * 2);
+        if (p.exT >= LT.extTime) this.extract(p, inEx);
+      } else { p.exT = Math.max(0, p.exT - dt * 2); if (why && (p.whyT = (p.whyT || 0) - dt) <= 0) { p.whyT = 3; this.toast(p, why); } }
     }
     // 撤离点开放提示
-    for (const e of o.ex) if (!e.told && this.time >= e.open) { e.told = 1; this.ev(['exo', r1(e.x), r1(e.y)]); }
+    for (const e of o.ex) if (!e.told && this.exOpen(e)) { e.told = 1; this.ev(['exo', r1(e.x), r1(e.y)]); }
     // 所有真人都撤离或阵亡（或者场上只剩守卫）→ 结束
     let humansLeft = 0, anyHuman = false, squadsLeft = 0;
     for (const p of this.players.values()) {
@@ -1658,15 +1797,18 @@ class Game {
     }
     if ((anyHuman && humansLeft === 0) || squadsLeft === 0) this.finish(null);
   }
-  extract(p) {
-    p.extracted = true; p.out = true; p.alive = false; p.exT = 0; p.respawnT = 1e9;
-    const v = S.lootValue(p.bag);
-    this.obj.banked[p.id] = p.bag.slice();
+  extract(p, e) {
+    p.extracted = true; p.out = true; p.alive = false; p.exT = 0; p.respawnT = 1e9; p.openC = 0;
+    const keys = p.inv.items.map((it) => it.k).concat(p.safe.items.map((it) => it.k));
+    const v = S.lootValue(keys);
+    this.obj.banked[p.id] = keys;
+    if (e && e.type === 'paid') this.obj.paid[p.id] = S.LOOT.ext.paid.cost;
     this.obj.score[p.team] = (this.obj.score[p.team] || 0) + v;
     this.ev(['exd', p.id, v]);
     p.stats.obj += 1;
     if (this.chat && p.bot && Math.random() < 0.4) this.chat.say(p, 'endWin', { end: true, delay: 0.5 });
   }
+  contList() { return this.obj.conts.map((c) => [c.id, S.CONT_IDS.indexOf(c.type), r1(c.x), r1(c.y), r1(c.z), this.contState(c)]); }
   // 逃亡圈：各队分散在地图四周的空地上
   escapeSpawns() {
     const out = [null], n = this.teams, cx = S.W / 2, cy = S.H / 2;
@@ -1768,14 +1910,23 @@ class Game {
     if (this.loot) {
       // 1.6：搜刮撤离——物资点按品质刷物资（高危：更多更好），撤离点按时间陆续开放
       const L = this.M.loot, hi = this.risk === 'high', C = S.CELL;
-      o.items = []; o.score = [0, 0, 0, 0, 0];
-      for (const [x, y, tier, n0] of L.spots) {
-        const n = hi ? Math.round(n0 * 1.6 + (Math.random() < 0.5 ? 1 : 0)) : n0;
-        for (let i = 0; i < n; i++) this.dropLoot(S.rollLoot(tier, hi), (x + 0.5) * C + rand(-14, 14), (y + 0.5) * C + rand(-14, 14), true);
-      }
-      const opens = S.LOOT.opens.slice().sort(() => Math.random() - 0.5);
-      o.ex = L.extract.map(([x, y], i) => ({ x: x * C, y: y * C, open: opens[i] }));
-      o.banked = {};
+      o.items = []; o.score = new Array(this.teams + 6).fill(0); o.conts = []; o.contMap = new Map();
+      // 2.1：容器（军需箱 / 储物柜 / 保险柜 / 电脑 / 医疗箱 / 武器箱 / 行李包 / 金库）
+      for (const [x, y, type, tier, roof] of L.conts || []) this.makeCont(type, (x + 0.5) * C, (y + 0.5) * C, tier, hi, !!roof);
+      // 旧地图（没有容器）：照旧在物资点刷物资，装进行李包
+      for (const [x, y, tier, n0] of L.spots || []) { const n = hi ? Math.round(n0 * 1.6) : n0; const ks = []; for (let i = 0; i < n; i++) ks.push(S.rollLoot(tier, hi)); this.makeCont('duffel', (x + 0.5) * C, (y + 0.5) * C, tier, hi, false, ks); }
+      const opens = S.LOOT.opens.slice().sort(() => Math.random() - 0.5); let ni = 0;
+      const E2 = S.LOOT.ext;
+      o.ex = L.extract.map(([x, y, type]) => {
+        type = E2[type] ? type : 'normal';
+        const e = { x: x * C, y: y * C, type, open: 0, close: 1e9 };
+        if (type === 'normal') e.open = opens[ni++ % opens.length];
+        if (type === 'timed') { e.open = E2.timed.from; e.close = E2.timed.to; }
+        if (type === 'lever') { e.open = 1e9; e.close = 0; }
+        return e;
+      });
+      o.lever = L.lever ? { x: (L.lever[0] + 0.5) * C, y: (L.lever[1] + 0.5) * C, until: 0 } : null;
+      o.banked = {}; o.paid = {};
       return;
     }
     switch (this.mode) {
@@ -2075,10 +2226,11 @@ class Game {
   objState() {
     const o = this.obj;
     if (this.loot) {
+      // 2.1：撤离点 [x, y, 类型, 开放中?, 距离开放 / 关闭的秒数]；背包 [id, 已用格, 总格数, 价值, 读条, 已撤离]；电闸剩余秒数
       const ex = [], bags = [];
-      for (const e of o.ex) ex.push(r1(e.x), r1(e.y), Math.max(0, Math.ceil(e.open - this.time)));
-      for (const p of this.players.values()) if (!p.guard) bags.push(p.id, S.lootSlots(p.bag), p.bagCap, S.lootValue(p.bag), Math.round(p.exT * 10), p.extracted ? 1 : 0);
-      return [ex, bags];
+      for (const e of o.ex) { const op = this.exOpen(e); ex.push(r1(e.x), r1(e.y), S.EXT_IDS.indexOf(e.type), op ? 1 : 0, Math.max(0, Math.ceil(op ? Math.min(9999, e.close - this.time) : Math.min(9999, e.open - this.time)))); }
+      for (const p of this.players.values()) if (!p.guard) bags.push(p.id, S.invCells(p.inv), p.inv.w * p.inv.h, S.invValue(p.inv), Math.round(p.exT * 10), p.extracted ? 1 : 0);
+      return [ex, bags, o.lever ? Math.max(0, Math.ceil(o.lever.until - this.time)) : -1];
     }
     switch (this.mode) {
       case 'zone': return [o.owner, Math.ceil(o.count[1]), Math.ceil(o.count[2]), Math.round(o.share[1] * 100), Math.round(o.share[2] * 100)];
@@ -2137,7 +2289,7 @@ class Game {
       rv: [0, this.reveal[1] > this.time ? 1 : 0, this.reveal[2] > this.time ? 1 : 0],
       h: this.helpers.map((h) => [h.id, h.kind, r1(h.x), r1(h.y), r1(h.z), h.team, h.ang != null ? r2(h.ang) : 0]).concat(this.obj.crates ? this.obj.crates.map((k) => [k.id, 'crate', r1(k.x), r1(k.y), r1(k.z), 0]) : []) };
     if (this.tick % 15 === 0) msg.sb = [...this.players.values()].map((p) => [p.id, p.stats.kills, p.stats.deaths, p.stats.paint, p.stats.obj, p.stats.assists || 0]);
-    if (this.loot && this.tick % 60 === 0) msg.lt = this.lootList();   // 物资全量（每 2 秒一次，防止丢包后对不上）
+    if (this.loot && this.tick % 60 === 0) msg.cs = this.obj.conts.map((c) => this.contState(c)).join('');   // 2.1：容器状态全量（每 2 秒一次，防止丢包后对不上）
     this.room.broadcast(msg, true);
     this.diff = []; this.events = [];
   }
@@ -2180,7 +2332,7 @@ class Game {
     };
     if (this.loot) {
       const lp = {};
-      for (const p of this.players.values()) if (!p.guard) lp[p.id] = { ex: !!p.extracted, items: p.extracted ? (o.banked[p.id] || []) : [], gear: p.gear || [] };
+      for (const p of this.players.values()) if (!p.guard) lp[p.id] = { ex: !!p.extracted, items: p.extracted ? (o.banked[p.id] || []) : [], safe: p.safe.items.map((it) => it.k), gear: p.gear || [], paid: o.paid[p.id] || 0 };
       result.loot = { risk: this.risk, players: lp };
       result.players = result.players.filter((q) => !this.players.get(q.id) || !this.players.get(q.id).guard);
     }
@@ -2250,6 +2402,7 @@ function botThink(g, p, dt) {
     if (!e.alive || e.team === p.team) continue;
     if (p.guard && (Math.hypot(e.x - p.guard.x, e.y - p.guard.y) > 320 || Math.hypot(p.x - p.guard.x, p.y - p.guard.y) > 450)) continue;   // 守卫只管自己岗位附近，追远了就回去
     const d = Math.hypot(e.x - p.x, e.y - p.y, e.z - p.z);
+    if (g.loot && !p.guard && !e.guard && d > 200 && !(p.hitBy && p.hitBy[e.id] > g.time - 6)) continue;   // 2.1 撤离：AI 以搜物资为主，别的小队离得远又没打我就不理
     if (!botSees(g, p, e, d)) continue;
     const lobber = p.foot ? SA.kind === 'lob' || SA.ghost : p.weapon === 'mortar' || p.weapon === 'slinger';
     const sc = P.focus ? d * (0.55 + 0.45 * e.hp / g.maxHpOf(e)) : d;   // 高手 / 大神优先打残血
@@ -2564,36 +2717,47 @@ function chooseGoal(g, p) {
   const o = g.obj;
   switch (g.mode) {
     case 'loot': {
-      // 1.6：守卫守在岗位附近；其他 AI：跟着队长搜物资，背包够值钱或时间不多了就去开放的撤离点
-      if (p.guard) { const a = Math.random() * Math.PI * 2, r = rand(0, 120); return { x: p.guard.x + Math.cos(a) * r, y: p.guard.y + Math.sin(a) * r, calm: true }; }
-      const P = BOTS.persona(p.persona), v = S.lootValue(p.bag), used = S.lootSlots(p.bag);
-      const want = P.pow >= 1.6 ? 4500 : P.pow >= 1 ? 2600 : 1300;
-      const openEx = o.ex.filter((e) => g.time >= e.open);
-      if (v >= want || used >= p.bagCap - 1 || g.timeLeft < 110) {
-        const list = openEx.length ? openEx : o.ex;   // 还没开放：去最近的撤离点附近等着
+      // 2.1：守卫守岗位；Boss 沿城区巡逻，护卫跟着 Boss；其他 AI：搜最近的容器，背包够值钱或时间不多了就去能用的撤离点
+      if (p.guard) {
+        const G = p.guard;
+        if (G.route) { const tgt = G.route[G.ri % G.route.length]; if (dist(p, tgt) < 120) G.ri++; const t2 = G.route[G.ri % G.route.length]; return { x: t2.x + rand(-40, 40), y: t2.y + rand(-40, 40), calm: true }; }
+        if (G.follow) { const b = g.players.get(G.follow); if (b && b.alive) return { x: b.x + rand(-70, 70), y: b.y + rand(-70, 70), calm: true }; }
+        const a = Math.random() * Math.PI * 2, r = rand(0, 120); return { x: G.x + Math.cos(a) * r, y: G.y + Math.sin(a) * r, calm: true };
+      }
+      const P = BOTS.persona(p.persona), v = S.invValue(p.inv), used = S.invCells(p.inv), cap = p.inv.w * p.inv.h;
+      const left = Math.max(0, g.timeLeft) / Math.max(1, g.duration);   // 开局很贪，越到后面越容易满足
+      const want = (P.pow >= 1.6 ? 9000 : P.pow >= 1 ? 6000 : 3500) * (1 + 2.5 * left);
+      if (v >= want || (used >= cap - 1 && v >= want * 0.6) || g.timeLeft < 150 + (p.slot % 3) * 30) {
+        const late = g.timeLeft < 220;
+        const usable = o.ex.filter((e) => e.type !== 'lever' && !(e.type === 'weight' && used > S.LOOT.ext.weight.max) && (late || e.type !== 'paid'));
+        const openEx = usable.filter((e) => g.exOpen(e));
+        const list = openEx.length ? openEx : usable.filter((e) => e.type === 'normal' || e.type === 'timed');
+        // 分散撤离：别的小队已经在往那边走的撤离点要加很多「距离」
+        const heading = (x) => { let n = 0; for (const q of g.players.values()) if (q.bot && q.team !== p.team && !q.guard && q.alive && !q.out && q.ai && q.ai.goal && (q.ai.goal.ex || q.ai.goal.near) && Math.hypot(q.ai.goal.x - x.x, q.ai.goal.y - x.y) < 300) n++; return n; };
+        const cost = (x) => dist(p, x) + heading(x) * 3000;
         let e = list[0];
-        for (const x of list) if (dist(p, x) < dist(p, e)) e = x;
-        if (g.time < e.open) {   // 还没开：在旁边找个地方躲着等，别站在点上当靶子
+        for (const x of list) if (cost(x) < cost(e)) e = x;
+        if (e && !g.exOpen(e)) {   // 还没开：在旁边找个地方躲着等
           const d = Math.max(1, dist(p, e)), k = Math.min(1, 190 / d);
           return { x: e.x + (p.x - e.x) * k + rand(-40, 40), y: e.y + (p.y - e.y) * k + rand(-40, 40), calm: true, near: true };
         }
-        return { x: e.x + rand(-30, 30), y: e.y + rand(-30, 30), calm: true, ex: true };
+        if (e) return { x: e.x + rand(-30, 30), y: e.y + rand(-30, 30), calm: true, ex: true };
       }
       const mates = [...g.players.values()].filter((q) => q.team === p.team && q.alive && !q.out);
       const leader = mates.sort((a, b) => a.slot - b.slot)[0] || p;
-      if (leader !== p && dist(p, leader) > 280) return { x: leader.x + rand(-60, 60), y: leader.y + rand(-60, 60) };
+      if (leader !== p && dist(p, leader) > 340) return { x: leader.x + rand(-60, 60), y: leader.y + rand(-60, 60) };
+      const done = (p.ai && p.ai.done) || new Set();
+      const hv = g.M.loot && g.M.loot.hv, C2 = S.CELL;
       let best = null, bs = Infinity;
-      const cx = S.W / 2, cy = S.H / 2;
-      for (const it of o.items) {
-        const I = S.LOOT.items[it.k];
-        if (used + I.size > p.bagCap && I.r < 4) continue;
-        const d = Math.hypot(it.x - p.x, it.y - p.y);
-        if (d > 1100) continue;
-        let sc = d / (1 + I.r * 0.35);
-        if (!P.chase && P.pow < 1.6 && Math.hypot(it.x - cx, it.y - cy) < 480) continue;   // 弱的 AI 不去守卫区
-        if (sc < bs) { bs = sc; best = it; }
+      for (const c of o.conts) {
+        if (!c.items.length || done.has(c.id) || c.z > 120) continue;   // AI 不坐电梯上楼顶
+        const d = Math.hypot(c.x - p.x, c.y - p.y);
+        if (d > 1600) continue;
+        if (hv && !P.chase && P.pow < 1.6 && c.x > hv[0] * C2 && c.x < (hv[0] + hv[2]) * C2 && c.y > hv[1] * C2 && c.y < (hv[1] + hv[3]) * C2) continue;   // 弱的 AI 不去灰石大厦
+        const sc = d / (1 + (c.type === 'vault' || c.type === 'safe' || c.type === 'weapon' ? 0.6 : 0) + (c.state ? 0 : 0.3));
+        if (sc < bs) { bs = sc; best = c; }
       }
-      if (best) return { x: best.x, y: best.y, loot: true };
+      if (best) return { x: best.x, y: best.y, cont: best.id };
       return randomGoal(g, p);
     }
     case 'park': {
@@ -2807,7 +2971,7 @@ function setProfile(c, m) {
     c.looks = L;
   }
   if (m.rk && typeof m.rk === 'object') c.rk = { tier: clamp(m.rk.tier | 0, 0, 6), ok: !!m.rk.ok };   // 1.7：组队排位要知道每个人的段位
-  if (m.power && typeof m.power === 'object') c.power = { lv: clamp(m.power.lv | 0 || 1, 1, E.MAX_LV), bt: clamp(m.power.bt | 0, 0, 2), tal: cleanTal(m.power.tal), gear: Array.isArray(m.power.gear) ? [...new Set(m.power.gear.filter((g) => S.LOOT.gear[g]))] : [] };
+  if (m.power && typeof m.power === 'object') c.power = { lv: clamp(m.power.lv | 0 || 1, 1, E.MAX_LV), bt: clamp(m.power.bt | 0, 0, 2), tal: cleanTal(m.power.tal), gear: Array.isArray(m.power.gear) ? [...new Set(m.power.gear.filter((g) => S.LOOT.gear[g]))] : [], safe: clamp(m.power.safe | 0 || 1, 1, 3) };
 }
 
 function handle(hub, c, m) {
@@ -2876,6 +3040,7 @@ function handle(hub, c, m) {
       break;
     }
     case 'ping': c.conn.send({ t: 'pong', ts: m.ts }); break;
+    case 'lo': if (r && r.game && r.game.loot) r.game.lootOp(r.game.players.get(c.id), m); break;   // 2.1：背包 / 容器操作
     case 'dbgSp': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) me.sp = S.WEAPONS[me.weapon].spNeed; } break;   // 调试：大招充满
     case 'dbgOv': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) { me.bt = Math.max(me.bt, 1); me.ovUsed = false; me.ov = S.OV_NEED; r.game.activateOverload(me); } } break;   // 调试：立刻放超载
     case 'dbgFinish': if (hub.debug && r && r.game && r.hostId === c.id) { const g = r.game, me = g.players.get(c.id); if (g.loot) { me.extracted = true; me.out = true; me.alive = false; g.obj.banked[c.id] = ['scrap']; } g.finish(me ? me.team : 1); } break;   // 只在测试服务器（GB_DEBUG=1）里可用

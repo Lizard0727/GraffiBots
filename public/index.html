@@ -382,6 +382,26 @@
     </div>
     <div class="chat-quick" id="chatQuick"></div>
   </form>
+  <!-- ============ 2.1：撤离模式背包 / 容器搜索 ============ -->
+  <div id="invPanel" class="inv-panel hidden">
+    <div class="inv-wrap">
+      <section class="inv-col inv-cont" id="invCont"></section>
+      <section class="inv-col inv-mine">
+        <header><b>背包</b><small id="invVal"></small></header>
+        <div id="invBag"></div>
+        <header class="inv-safe-h"><b>安全箱</b><small>阵亡也不会丢 · <span id="invSafeVal"></span></small></header>
+        <div id="invSafe"></div>
+        <div class="inv-gear" id="invGear"></div>
+        <div class="inv-drop" id="invDrop">🗑 拖到这里丢弃</div>
+      </section>
+    </div>
+    <button class="inv-x" id="invX" aria-label="关闭">✕</button>
+  </div>
+  <div id="lootBtns" class="loot-btns hidden">
+    <button id="tLoot" class="lb lb-use hidden">✋<small>搜索</small></button>
+    <button id="tBag" class="lb">🎒<small>背包</small></button>
+    <button id="tMap" class="lb">🗺<small>地图</small></button>
+  </div>
   <!-- ============ 触屏操作层 ============ -->
   <div id="touchUI" class="hidden">
     <div id="tStick" class="t-stick"><i></i></div>

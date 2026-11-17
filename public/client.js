@@ -619,7 +619,9 @@
     const board = E.lootBoard(profile), myRank = board.findIndex((r) => r.me) + 1;
     const gearOn = new Set(profile.gearOn || []);
     box.innerHTML = `<div class="lb-main">
-      <div class="lb-maps">${[[{ name: '随机地图', desc: '两张超大地图随机选一张' }, -1], ...maps].map(([m, i]) => `<button class="lb-map ${LOOTCFG.map === i ? 'sel' : ''}" data-map="${i}"><b>${m.name}</b><small>${m.desc}</small>${i >= 0 ? `<i class="lb-mapart m${i - S.MAP_N}"></i>` : '<i class="lb-mapart rnd">?</i>'}</button>`).join('')}</div>
+      <div class="lb-maps lb-giant"><div class="lb-map sel"><b>${S.MAPS[S.GIANT_MAP()].name}</b><small>${S.MAPS[S.GIANT_MAP()].desc}</small>
+        <div class="lb-feat"><span>📦 ${S.CONT_IDS.length} 种可搜索容器</span><span>🏙 6 个区域 · 高楼电梯</span><span>💀 高价值区 Boss 小队</span><span>🔒 安全箱 ${S.LOOT.safe[profile.safeLv || 1].join('×')}</span></div>
+        <div class="lb-exts">${S.EXT_IDS.map((t) => `<span style="--ec:${EXT_COL[t]}"><b>${S.LOOT.ext[t].name}</b><small>${S.LOOT.ext[t].desc}</small></span>`).join('')}</div></div></div>
       <div class="lb-opts">
         <div class="lb-opt"><span>难度</span>${['normal', 'high'].map((r) => `<button class="${LOOTCFG.risk === r ? 'sel' : ''} ${r}" data-risk="${r}"><b>${S.LOOT.risks[r].name}</b><small>${S.LOOT.risks[r].desc}</small></button>`).join('')}</div>
         <div class="lb-opt"><span>小队人数</span>${[1, 2, 3, 4].map((n) => `<button class="sq ${LOOTCFG.squad === n ? 'sel' : ''}" data-squad="${n}" ${n < party ? 'disabled' : ''}>${n} 人</button>`).join('')}<label class="lb-fill"><input type="checkbox" id="lootFill" ${LOOTCFG.fill ? 'checked' : ''}> AI 队友补位</label></div>
@@ -672,7 +674,7 @@
     const keys = S.LOOT_KEYS.filter((k) => st[k]).sort((a, b) => S.LOOT.items[b].r - S.LOOT.items[a].r || S.LOOT.items[b].v - S.LOOT.items[a].v);
     if (STASH.sel && !st[STASH.sel]) STASH.sel = null;
     const sel = STASH.sel || keys[0], I = sel && S.LOOT.items[sel];
-    let html = `<nav class="st-tabs">${[['stash', '仓库'], ['shop', '军需处']].map(([k, n]) => `<button data-st="${k}" class="${STASH.tab === k ? 'sel' : ''}">${n}</button>`).join('')}<span class="st-val">仓库总价值 <b>${fmtV(E.stashValue(profile))}</b></span></nav>`;
+    let html = `<nav class="st-tabs">${[['stash', '仓库'], ['market', '交易行'], ['shop', '军需处'], ['safe', '安全箱']].map(([k, n]) => `<button data-st="${k}" class="${STASH.tab === k ? 'sel' : ''}">${n}</button>`).join('')}<span class="st-val">仓库总价值 <b>${fmtV(E.stashValue(profile))}</b></span></nav>`;
     if (STASH.tab === 'stash') {
       html += `<div class="st-wrap"><div class="st-grid">${keys.length ? keys.map((k) => `<button class="st-cell ${k === sel ? 'sel' : ''}" data-k="${k}">${lootIcon(k)}<b>${S.LOOT.items[k].name}</b><em>×${st[k]}</em></button>`).join('') : '<p class="st-empty">仓库还是空的。去「搜刮撤离」带点东西回来吧！</p>'}</div>
         ${I ? `<aside class="st-detail" style="--rc:${S.LOOT.rare[I.r].c}">${lootIcon(sel, 'big')}<h3>${I.name}</h3><small class="rr">${S.LOOT.rare[I.r].name} · 占 ${I.size} 格</small>
@@ -680,6 +682,21 @@
           <div class="st-acts"><button class="btn" data-sell="1">卖出 1 件</button><button class="btn ghost" data-sell="${st[sel]}">全部卖出（${fmtV(E.sellPrice(sel) * st[sel])} 金币）</button>
           ${I.ex ? `<button class="btn ex" data-ex="1">兑换：${Object.entries(I.ex).map(([k, n]) => `${E.CUR[k].name} ×${n}`).join(' + ')}</button>` : ''}</div></aside>` : ''}</div>
         ${keys.length ? `<div class="st-bulk"><button class="btn ghost" id="sellAll">一键卖出普通 / 优良 / 稀有物资</button><small>史诗和传说物资不会被一键卖出</small></div>` : ''}`;
+    } else if (STASH.tab === 'market') {
+      // 2.1：交易行——每小时整点换一次价格，低买高卖
+      const now = Date.now(), rows = S.LOOT_KEYS.slice().sort((a, b) => S.LOOT.items[b].r - S.LOOT.items[a].r || S.LOOT.items[b].v - S.LOOT.items[a].v);
+      const left = Math.max(0, Math.ceil((E.marketPrice(rows[0], now).next - now) / 60000));
+      html += `<p class="mk-note">价格每小时整点刷新（还有 ${left} 分钟）· 所有玩家同一个价格 · 低买高卖赚差价。至宝和传说物资只收不卖。</p><div class="mk-list">${rows.map((k) => {
+        const I = S.LOOT.items[k], q = E.marketPrice(k, now), have = st[k] || 0, up = q.trend > 0.005, dn = q.trend < -0.005;
+        return `<div class="mk-row" style="--rc:${S.LOOT.rare[I.r].c}">${lootIcon(k)}<div class="mk-name"><b>${I.name}</b><small>${S.LOOT.rare[I.r].name} · 持有 ${have}</small></div>
+          <div class="mk-p"><small>收购价</small><b>${fmtV(q.sell)}</b><i class="${up ? 'up' : dn ? 'dn' : ''}">${up ? '▲' : dn ? '▼' : '—'} ${Math.round(q.mult * 100)}%</i></div>
+          <div class="mk-btns"><button class="btn small" data-mks="${k}" ${have ? '' : 'disabled'}>卖出</button>${q.buy ? `<button class="btn small ghost" data-mkb="${k}" ${profile.coins >= q.buy ? '' : 'disabled'}>买入 ${fmtV(q.buy)}</button>` : ''}</div></div>`;
+      }).join('')}</div>`;
+    } else if (STASH.tab === 'safe') {
+      const lv = profile.safeLv || 1, cur = S.LOOT.safe[lv], nx = S.LOOT.safe[lv + 1], cost = S.LOOT.safeCost[lv + 1];
+      const cells = (d) => `<div class="sf-grid" style="--w:${d[0]};--h:${d[1]}">${'<i></i>'.repeat(d[0] * d[1])}</div>`;
+      html += `<div class="sf-wrap"><div class="sf-card"><h3>安全箱 · ${lv} 级</h3>${cells(cur)}<p>${cur[0]}×${cur[1]} 格。放进安全箱的物资阵亡也不会丢，撤离失败也能带回仓库。</p></div>
+        ${nx ? `<div class="sf-arrow">➜</div><div class="sf-card nx"><h3>升到 ${lv + 1} 级</h3>${cells(nx)}<p>${nx[0]}×${nx[1]} 格</p><button class="btn" id="safeUp" ${profile.coins >= cost ? '' : 'disabled'}>${ic('coins')}${fmtV(cost)}</button></div>` : '<div class="sf-card nx"><h3>已满级</h3><p>你的安全箱已经是最大的 3×3 了。</p></div>'}</div>`;
     } else {
       html += `<div class="st-shop">${Object.entries(S.LOOT.gear).map(([g, G]) => `<div class="gear-card"><div class="g-ico g-${g}"></div><h3>${G.name}</h3><p>${G.desc}</p><small>持有 ${(profile.gear || {})[g] || 0}</small><button class="btn" data-buy="${g}" ${profile.coins < G.price ? 'disabled' : ''}>${ic('coins')}${G.price}</button></div>`).join('')}</div>
         <p class="st-note">装备只能带进「高危行动」：成功撤离会保留，阵亡就会丢失。在搜刮撤离界面选择要带的装备。</p>`;
@@ -690,6 +707,9 @@
     for (const b of box.querySelectorAll('[data-sell]')) b.onclick = async () => { const r = await eco('sellLoot', { k: sel, n: +b.dataset.sell }); if (!r.ok) return toast(r.err); sfx.coin(); toast(`卖出获得 ${r.items[0].n} 金币`); renderStash(); };
     const ex = box.querySelector('[data-ex]'); if (ex) ex.onclick = async () => { const r = await eco('exLoot', { k: sel }); if (!r.ok) return toast(r.err); sfx.win(); showGain(r.items, '兑换成功'); renderStash(); };
     const sa = $('sellAll'); if (sa) sa.onclick = async () => { const r = await eco('sellAll', { maxR: 3 }); if (!r.ok) return toast(r.err); sfx.pick(); toast(`卖出获得 ${r.items[0].n} 金币`); renderStash(); };
+    for (const b of box.querySelectorAll('[data-mks]')) b.onclick = async () => { const r = await eco('mktSell', { k: b.dataset.mks, n: 1 }); if (!r.ok) return toast(r.err); sfx.coin(); toast(`卖出获得 ${r.items[0].n} 金币`); renderStash(); };
+    for (const b of box.querySelectorAll('[data-mkb]')) b.onclick = async () => { const r = await eco('mktBuy', { k: b.dataset.mkb, n: 1 }); if (!r.ok) return toast(r.err); sfx.pick(); toast(`买到「${S.LOOT.items[b.dataset.mkb].name}」`); renderStash(); };
+    const su = $('safeUp'); if (su) su.onclick = async () => { const r = await eco('safeUp'); if (!r.ok) return toast(r.err); sfx.win(); toast(`安全箱升到 ${profile.safeLv} 级！`); renderStash(); };
     for (const b of box.querySelectorAll('[data-buy]')) b.onclick = async () => { const r = await eco('buyGear', { g: b.dataset.buy }); if (!r.ok) return toast(r.err); sfx.pick(); toast(`买到「${S.LOOT.gear[b.dataset.buy].name}」`); renderStash(); };
   }
 
@@ -1546,7 +1566,9 @@
         break;
       case 'err': toast(m.msg); break;
       case 'start': startGame(m); setTimeout(socHello, 100); renderReqPop(); break;
-      case 'bag': if (G && G.loot) { const before = G.bag.items.length; G.bag = { items: m.items || [], cap: m.cap || S.LOOT.bag, gear: m.gear || [] }; if (G.bag.items.length < before) G.bagFlash = performance.now(); } break;
+      case 'bag': if (G && G.loot) { const before = G.bag.items.length; G.bag = { items: m.items || [], cap: m.cap || S.LOOT.bag, gear: m.gear || [], inv: m.inv || G.bag.inv, safe: m.safe || G.bag.safe }; if (G.bag.items.length < before) G.bagFlash = performance.now(); invRender(); } break;
+      case 'cv': if (G && G.loot) { INV.cv = m.id ? Object.assign(m, { at: performance.now() }) : null; if (m.id && !INV.open && INV.want === m.id) invToggle(true); INV.want = 0; invRender(); } break;
+      case 'toast': toast(m.text); break;
       case 's': onSnap(m); break;
       case 'over':
         if (G) {
@@ -1918,7 +1940,13 @@
     G.loot = m.mode === 'loot';
     if (G.loot) {
       G.items = new Map((m.loot || []).map((a) => [a[0], { k: a[1], x: a[2], y: a[3], z: a[4] }]));
-      G.bag = { items: [], cap: S.LOOT.bag, gear: [] }; G.risk = m.risk || 'normal'; G.pops = []; G.exDone = null;
+      G.bag = { items: [], cap: S.LOOT.bag, gear: [], inv: { w: 5, h: 3, items: [] }, safe: { w: 2, h: 2, items: [] } }; G.risk = m.risk || 'normal'; G.pops = []; G.exDone = null;
+      // 2.1：可以搜索的容器 [id, 类型, x, y, z, 状态 0 没开过 / 1 开过 / 2 空了]，电闸位置
+      G.contArr = (m.conts || []).map((a) => ({ id: a[0], type: S.CONT_IDS[a[1]], x: a[2], y: a[3], z: a[4], st: a[5] }));
+      G.conts = new Map(G.contArr.map((c) => [c.id, c])); G.contDirty = 2; G.lever = m.lever || null;
+      INV.cv = null; INV.want = 0; INV.drag = null; invToggle(false);
+    }
+    { const lb = $('lootBtns'); if (lb) lb.classList.toggle('hidden', !(G.loot && TOUCH));
     }
     G.ps = null; G.camDip = 0; G.camDipV = 0;
     view.yaw = G.me && G.me.team === 2 && teams === 2 ? Math.PI : 0; view.pitch = -0.12;
@@ -2060,6 +2088,7 @@
     }
     if (m.sb) for (const r of m.sb) G.sb.set(r[0], r);
     if (m.lt && G.loot) G.items = new Map(m.lt.map((a) => [a[0], { k: a[1], x: a[2], y: a[3], z: a[4] }]));
+    if (m.cs && G.loot && G.contArr) { for (let i = 0; i < m.cs.length && i < G.contArr.length; i++) { const v = m.cs.charCodeAt(i) - 48; if (G.contArr[i].st !== v) { G.contArr[i].st = v; G.contDirty = G.contDirty || 1; } } }
     if (m.rv) G.rv = m.rv;
     G.snaps.push({ t: st, pm, o: m.o, d: m.d, e: m.e, h: m.h || [], done: false });
     while (G.snaps.length > 120) { const s = G.snaps.shift(); if (!s.done) consume(s, true); }
@@ -2270,9 +2299,12 @@
       case 'fz': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0 }); break;
       case 'fg': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0, fog: 1 }); if (!silent && nearMe(e[1], e[2], 500)) sfx.boom(); break;
       case 'lt+': if (G.loot) G.items.set(e[1], { k: e[2], x: e[3], y: e[4], z: e[5] }); break;
+      case 'ct+': if (G.loot && G.conts && !G.conts.has(e[1])) { const c = { id: e[1], type: S.CONT_IDS[e[2]], x: e[3], y: e[4], z: e[5], st: e[6] }; G.contArr.push(c); G.conts.set(c.id, c); G.contDirty = 2; } break;
+      case 'ct': if (G.loot && G.conts) { const c = G.conts.get(e[1]); if (c) { c.st = e[2]; G.contDirty = G.contDirty || 1; } } break;
+      case 'lev': if (!silent) { announce(`电闸已拉下！拉闸撤离点开放 ${e[2]} 秒`, '#ff9a3d'); sfx.siren(); } break;
       case 'lt-': {
         if (!G.loot) break;
-        const it = G.items.get(e[1]); G.items.delete(e[1]);
+        const it = (G.conts && G.conts.get(e[1])) || G.items.get(e[1]); G.items.delete(e[1]);
         if (e[2] === myId && !silent) {
           const I = S.LOOT.items[e[3]];
           G.pops.push({ k: e[3], t: performance.now() });
@@ -2660,6 +2692,13 @@
     if (k === 'Tab' || k === 'Space' || k.startsWith('Arrow')) e.preventDefault();
     if (e.repeat) return;
     if ((k === 'Enter' || k === 'NumpadEnter') && !TUT) { e.preventDefault(); chatOpen(); return; }   // 打字聊天
+    // 2.1：撤离模式——Tab 背包、F 搜索 / 拉闸、M 大地图；背包打开时只能走路
+    if (G.loot) {
+      if (k === 'Tab' || (k === 'Escape' && INV.open)) { invToggle(); return; }
+      if (k === 'KeyM') { G.bigMap = !G.bigMap; return; }
+      if (k === 'KeyF') { if (!lootUse() && INV.open) invToggle(false); return; }
+      if (INV.open) { if (k === 'KeyR' && INV.drag) { INV.drag.s.rot ^= 1; drawGhost(); } else if (/^(Key[WASD]|Arrow|Space|Shift)/.test(k)) keys.add(k); return; }
+    }
     keys.add(k);
     if (k === 'KeyE') { G.qq++; G.edge = true; }   // 大招
     if (k === 'KeyR') { G.oq = (G.oq || 0) + 1; G.edge = true; }   // 超载技能
@@ -2679,6 +2718,7 @@
   });
   cv.addEventListener('mousedown', (e) => {
     if (!G) return;
+    if (INV.open) return;
     if (!TOP() && !locked()) { lockPointer(); return; }
     if (e.button === 0) { mouse.down = true; G.aq++; G.edge = true; }
     if (e.button === 2) { G.qq++; G.edge = true; }
@@ -2689,6 +2729,7 @@
     if (locked()) { wasLocked = true; return; }
     if (!wasLocked) return;
     wasLocked = false; mouse.down = false; lastUnlock = performance.now();
+    if (INV.unlock || INV.open) { INV.unlock = false; return; }
     if (G && !G.over && !CHAT.open && $('settingsDlg').classList.contains('hidden') && $('results').classList.contains('hidden')) openSettings();
   });
 
@@ -2792,6 +2833,7 @@
     ui.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   function touchShow(on) {
+    if (!on) { invToggle(false); const lb = $('lootBtns'); if (lb) lb.classList.add('hidden'); if (G) G.bigMap = false; }
     if (!TOUCH) return;
     TT.on = on;
     $('touchUI').classList.toggle('hidden', !on);
@@ -3290,7 +3332,7 @@
       if (G.prevTl > 60 && tl <= 60) { announce('剩余 1 分钟！', '#ffdf2e', true); sfx.warn(); }
       if (G.prevTl > 30 && tl <= 30) { announce('最后 30 秒！', '#ff5a6a', true); sfx.warn(); }
       if (tl <= 10 && tl > 0 && Math.ceil(tl) !== Math.ceil(G.prevTl)) sfx.tick();
-      if (G.loot) { const ex = (G.obj && G.obj[0]) || []; let open = false; for (let i = 2; i < ex.length; i += 3) if (ex[i] <= 0) open = true; if (open || tl <= 60) AU.music('extract'); }
+      if (G.loot) { const open = exList(G.obj).some((e) => e.open && e.type === 'normal'); if (open || tl <= 60) AU.music('extract'); }
       else if (tl <= 30) AU.music('final');
       G.prevTl = tl;
     }
@@ -3486,34 +3528,212 @@
     else if (G.mode === 'battery' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '充电站', G.colors[myTeam], '⚡'); }
     else if (G.mode === 'seal' && me && me.carry) { const b = S.basePos(myTeam); marker(b.x, b.y, 50, '祭坛', G.colors[myTeam], '◆'); }
     else if (G.loot && o[0]) {
-      const ex = o[0];
-      for (let i = 0; i < ex.length; i += 3) marker(ex[i], ex[i + 1], 60, ex[i + 2] <= 0 ? '撤离点' : `${ex[i + 2]} 秒后开放`, ex[i + 2] <= 0 ? '#5ee36a' : '#9aa0a8', '⬆');
+      // 2.1：只标出开放中的撤离点和 1 分钟内要开放的（超大地图上太多标记会乱）
+      for (const e of exList(o)) {
+        const nm = S.LOOT.ext[e.type].name;
+        if (e.open) marker(e.x, e.y, 60, e.type === 'normal' || e.secs >= 9999 ? nm : `${nm} · ${e.secs}秒`, EXT_COL[e.type], '⬆');
+        else if (e.type !== 'lever' && e.secs <= 60) marker(e.x, e.y, 60, `${nm} · ${e.secs} 秒后开放`, '#9aa0a8', '⬆');
+      }
+      if (G.lever && !(o[2] > 0)) marker(G.lever[0], G.lever[1], 50, '电闸', '#ff9a3d', '⚡');
     }
     else if (G.mode === 'park') marker(o[2], o[3], 80, o[4] ? (o[4] === myTeam ? '花车 · 我方' : '花车 · 敌方') : '花车', o[4] ? G.colors[o[4]] : '#fff', '★');
   }
 
+  // ================= 2.1：网格背包 / 容器搜索（像搜打撤那样：打开容器一件件搜，自己挑要拿的放进背包） =================
+  const INV = { open: false, cv: null, want: 0, drag: null };
+  const exList = (o) => { const ex = (o && o[0]) || [], out = []; for (let i = 0; i + 4 < ex.length; i += 5) out.push({ x: ex[i], y: ex[i + 1], type: S.EXT_IDS[ex[i + 2]] || 'normal', open: !!ex[i + 3], secs: ex[i + 4] }); return out; };
+  const EXT_COL = { normal: '#5ee36a', paid: '#ffd23f', weight: '#4fd8ff', lever: '#ff9a3d', timed: '#c78cff' };
+  // 离自己最近、够得着的容器（或电闸）
+  function lootNear() {
+    const me = G && G.me; if (!me || !G.contArr) return null;
+    if (G.lever && Math.hypot(me.px - G.lever[0], me.py - G.lever[1]) < 64) { const ls = (G.obj && G.obj[2]) || 0; return { lever: true, busy: ls > 0 ? ls : 0 }; }
+    let best = null, bd = S.LOOT.openR - 4;
+    for (const c of G.contArr) {
+      const d = Math.hypot(me.px - c.x, me.py - c.y);
+      if (d < bd && Math.abs((me.pz || 0) - c.z) < 60) { if (best && best.st !== 2 && c.st === 2) continue; best = c; bd = d; }
+    }
+    return best ? { c: best } : null;
+  }
+  function lootUse() {
+    const n = lootNear(); if (!n) return false;
+    if (n.lever) { if (!n.busy) send({ t: 'lo', a: 'lever' }); return true; }
+    INV.want = n.c.id; send({ t: 'lo', a: 'open', c: n.c.id });
+    return true;
+  }
+  function invToggle(on) {
+    on = on == null ? !INV.open : !!on;
+    const el = $('invPanel');
+    if (!G || !G.loot) on = false;
+    if (on === INV.open) { if (!on && el) el.classList.add('hidden'); return; }
+    INV.open = on;
+    el.classList.toggle('hidden', !on);
+    INV.drag = null; const gh = $('invGhost'); if (gh) gh.remove();
+    if (on) { keys.clear(); mouse.down = false; if (locked()) { INV.unlock = true; document.exitPointerLock(); } invRender(); }
+    else { if (INV.cv) send({ t: 'lo', a: 'close' }); INV.cv = null; if (G && !G.over) lockPointer(); }
+  }
+  const itemTile = (k, cp, extra = '') => {
+    const I = S.LOOT.items[k], R = S.LOOT.rare[I.r];
+    return `<div class="inv-it r${I.r}" style="--rc:${R.c};${extra}" title="${I.name} · ${R.name} · ${fmtV(I.v)}"><b>${I.name}</b><small>${fmtV(I.v)}</small></div>`;
+  };
+  function gridHtml(g, which, cp) {
+    let h = `<div class="inv-grid" data-grid="${which}" style="width:${g.w * cp}px;height:${g.h * cp}px;--cp:${cp}px">`;
+    for (const it of g.items) {
+      const [w, hh] = S.itemDims(it.k, it.rot);
+      h += itemTile(it.k, cp, `left:${it.x * cp}px;top:${it.y * cp}px;width:${w * cp - 3}px;height:${hh * cp - 3}px" data-from="${which}" data-id="${it.id}`);
+    }
+    return h + '</div>';
+  }
+  function invRender() {
+    if (!INV.open || !G || !G.loot) return;
+    const cp = Math.max(30, Math.min(TOUCH ? 40 : 52, Math.floor((innerHeight - 260) / 11)));
+    const inv = G.bag.inv || { w: 5, h: 3, items: [] }, safe = G.bag.safe || { w: 2, h: 2, items: [] };
+    $('invBag').innerHTML = gridHtml(inv, 'inv', cp);
+    $('invSafe').innerHTML = gridHtml(safe, 'safe', cp);
+    $('invVal').textContent = `${S.invCells(inv)}/${inv.w * inv.h} 格 · 价值 ${fmtV(S.invValue(inv))}`;
+    $('invSafeVal').textContent = `价值 ${fmtV(S.invValue(safe))}`;
+    $('invGear').innerHTML = (G.bag.gear || []).map((g) => `<span>${S.LOOT.gear[g].name}</span>`).join('') || '<em>没有带装备</em>';
+    const c = INV.cv, box = $('invCont');
+    if (!c) { box.innerHTML = `<div class="inv-empty"><b>没有打开容器</b><p>${TOUCH ? '走到箱子、柜子、遗骸旁边点 ✋' : '走到箱子、柜子、遗骸旁边按 F'} 搜索。搜出来的物资由你自己挑选拿走。</p></div>`; return; }
+    const CT = S.LOOT.conts[c.type] || { name: '容器' };
+    let h = `<header><b>${CT.name}</b><small>${c.hidden ? `还有 ${c.hidden} 件没搜` : c.items.length ? '已搜完' : '空了'}</small></header><div class="inv-list">`;
+    c.items.forEach((k, i) => { const [w, hh] = S.itemDims(k, 0); h += itemTile(k, cp, `position:relative;width:${w * cp - 3}px;height:${hh * cp - 3}px" data-from="cont" data-i="${i}`); });
+    for (let i = 0; i < c.hidden; i++) h += `<div class="inv-it inv-q" style="position:relative;width:${cp - 3}px;height:${cp - 3}px">${i === 0 ? '<i class="inv-prog"></i>' : ''}<b>?</b></div>`;
+    h += '</div>';
+    h += `<p class="inv-hint">${TOUCH ? '点一下拿进背包 · 长按放进安全箱 · 拖动摆放' : '点击拿进背包 · 右键放进安全箱 · 拖动摆放（拖动时按 R 旋转）'}</p>`;
+    box.innerHTML = h;
+  }
+  // 搜索进度条（本地平滑）
+  function invTick() {
+    if (!INV.open || !INV.cv || !INV.cv.hidden) return;
+    const el = document.querySelector('#invCont .inv-prog'); if (!el) return;
+    const k = Math.min(1, (INV.cv.prog + (performance.now() - INV.cv.at) / 1000) / Math.max(0.1, INV.cv.need));
+    el.style.height = (k * 100).toFixed(1) + '%';
+  }
+  // 拖动 / 点击
+  function setupInv() {
+    const panel = $('invPanel');
+    if (!panel) return;
+    $('invX').onclick = () => invToggle(false);
+    const tb = $('tBag'); if (tb) tb.onclick = (e) => { e.stopPropagation(); invToggle(); };
+    const tl = $('tLoot'); if (tl) tl.onclick = (e) => { e.stopPropagation(); lootUse(); };
+    const tm = $('tMap'); if (tm) tm.onclick = (e) => { e.stopPropagation(); if (G) G.bigMap = !G.bigMap; };
+    let press = null;
+    const itemOf = (el) => el && el.closest && el.closest('.inv-it[data-from]');
+    const quick = (src, toSafe) => {
+      if (src.from === 'cont') send({ t: 'lo', a: 'take', c: INV.cv.id, i: src.i, to: toSafe ? 'safe' : undefined });
+      else {
+        const to = src.from === 'safe' ? 'inv' : 'safe', g = to === 'safe' ? G.bag.safe : G.bag.inv, it = (src.from === 'safe' ? G.bag.safe : G.bag.inv).items.find((x) => x.id === src.id);
+        const pos = it && S.invPlace(g, it.k);
+        if (pos) send({ t: 'lo', a: 'move', from: src.from, id: src.id, to, x: pos.x, y: pos.y, r: pos.rot });
+        else toast(to === 'safe' ? '安全箱放不下了' : '背包放不下了');
+      }
+    };
+    const srcOf = (el) => { const f = el.dataset.from; if (f === 'cont') { const i = +el.dataset.i, k = INV.cv && INV.cv.items[i]; return k ? { from: f, i, k, rot: 0 } : null; } const g = f === 'safe' ? G.bag.safe : G.bag.inv, it = g.items.find((x) => x.id === +el.dataset.id); return it ? { from: f, id: it.id, k: it.k, rot: it.rot } : null; };
+    panel.addEventListener('contextmenu', (e) => { e.preventDefault(); const el = itemOf(e.target); if (!el) return; const s = srcOf(el); if (s) quick(s, true); });
+    panel.addEventListener('pointerdown', (e) => {
+      const el = itemOf(e.target); if (!el || e.button === 2) return;
+      const s = srcOf(el); if (!s) return;
+      const r = el.getBoundingClientRect();
+      press = { s, el, x: e.clientX, y: e.clientY, ox: e.clientX - r.left, oy: e.clientY - r.top, t: performance.now(), drag: false, long: TOUCH ? setTimeout(() => { if (press && !press.drag) { quick(press.s, press.s.from !== 'safe'); press = null; } }, 520) : 0 };
+      e.preventDefault();
+    });
+    addEventListener('pointermove', (e) => {
+      if (!press) return;
+      if (!press.drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) {
+        press.drag = true; clearTimeout(press.long);
+        const g = document.createElement('div'); g.id = 'invGhost'; g.className = 'inv-ghost';
+        document.body.appendChild(g); INV.drag = press; press.ghost = g; drawGhost();
+      }
+      if (press.drag) { press.cx = e.clientX; press.cy = e.clientY; placeGhost(); }
+    });
+    addEventListener('pointerup', (e) => {
+      if (!press) return;
+      const p = press; press = null; clearTimeout(p.long);
+      if (!p.drag) { if (p.s.from === 'cont') quick(p.s, false); return; }
+      if (p.ghost) p.ghost.remove(); INV.drag = null;
+      const tgt = invTarget(e.clientX, e.clientY, p);
+      if (!tgt) return;
+      if (tgt.drop) { if (p.s.from !== 'cont') send({ t: 'lo', a: 'drop', from: p.s.from, id: p.s.id }); return; }
+      if (p.s.from === 'cont') send({ t: 'lo', a: 'take', c: INV.cv.id, i: p.s.i, x: tgt.x, y: tgt.y, r: p.s.rot, to: tgt.grid === 'safe' ? 'safe' : undefined });
+      else send({ t: 'lo', a: 'move', from: p.s.from, id: p.s.id, to: tgt.grid, x: tgt.x, y: tgt.y, r: p.s.rot });
+    });
+  }
+  function drawGhost() {
+    const p = INV.drag; if (!p || !p.ghost) return;
+    const cp = parseFloat(getComputedStyle(document.querySelector('.inv-grid') || document.body).getPropertyValue('--cp')) || 44;
+    const [w, h] = S.itemDims(p.s.k, p.s.rot), I = S.LOOT.items[p.s.k];
+    p.cp = cp; p.ghost.style.width = w * cp - 3 + 'px'; p.ghost.style.height = h * cp - 3 + 'px';
+    p.ghost.style.setProperty('--rc', S.LOOT.rare[I.r].c); p.ghost.innerHTML = `<b>${L(I.name)}</b>`;
+    p.ox = Math.min(p.ox, w * cp - 6); p.oy = Math.min(p.oy, h * cp - 6);
+    placeGhost();
+  }
+  function placeGhost() { const p = INV.drag; if (!p || !p.ghost) return; p.ghost.style.left = (p.cx || p.x) - p.ox + 'px'; p.ghost.style.top = (p.cy || p.y) - p.oy + 'px'; }
+  function invTarget(px, py, p) {
+    const el = document.elementFromPoint(px, py);
+    if (el && el.closest && (el.closest('#invDrop') || (el.closest('#invCont') && p.s.from !== 'cont'))) return { drop: true };
+    for (const gEl of document.querySelectorAll('#invPanel .inv-grid')) {
+      const r = gEl.getBoundingClientRect(), cp = p.cp || 44;
+      const x = Math.round((px - p.ox - r.left) / cp), y = Math.round((py - p.oy - r.top) / cp);
+      if (px >= r.left - cp && px <= r.right + cp && py >= r.top - cp && py <= r.bottom + cp) return { grid: gEl.dataset.grid, x, y };
+    }
+    return null;
+  }
+  // 大地图（M）：整张地图 + 撤离点 + 区域名
+  function drawBigMap(o, me) {
+    const pad = 40, aw = VW - pad * 2, ah = VH - pad * 2, k = Math.min(aw / S.GW, ah / S.GH), mw = S.GW * k, mh = S.GH * k, mx = (VW - mw) / 2, my = (VH - mh) / 2, ms = mw / S.W;
+    ctx.fillStyle = '#000d'; ctx.fillRect(0, 0, VW, VH);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
+    ctx.strokeStyle = '#fff6'; ctx.lineWidth = 2; ctx.strokeRect(mx, my, mw, mh);
+    const LO = G.M.loot || {};
+    for (const d of LO.districts || []) txt(d.name, mx + d.x * S.CELL * ms, my + d.y * S.CELL * ms, 16, '#ffffffaa', 'center', 4);
+    if (LO.hv) { const [hx, hy, hw, hh] = LO.hv; ctx.strokeStyle = '#ff3b52'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(mx + hx * S.CELL * ms, my + hy * S.CELL * ms, hw * S.CELL * ms, hh * S.CELL * ms); ctx.setLineDash([]); txt('高价值区 · 守卫', mx + (hx + hw / 2) * S.CELL * ms, my + hy * S.CELL * ms - 10, 13, '#ff6b7d', 'center', 3); }
+    if (G.lever) { ctx.fillStyle = '#ff9a3d'; ctx.fillRect(mx + G.lever[0] * ms - 5, my + G.lever[1] * ms - 5, 10, 10); txt('电闸', mx + G.lever[0] * ms, my + G.lever[1] * ms - 14, 12, '#ff9a3d', 'center', 3); }
+    for (const e of exList(o)) {
+      const x = mx + e.x * ms, y = my + e.y * ms, c = EXT_COL[e.type];
+      ctx.fillStyle = e.open ? c : '#777'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fill(); ctx.stroke();
+      txt(S.LOOT.ext[e.type].name, x, y - 18, 13, e.open ? c : '#aaa', 'center', 3);
+      txt(e.open ? (e.secs < 9999 && e.type !== 'normal' ? `开放中 · ${e.secs}秒` : '开放中') : e.type === 'lever' ? '需要拉闸' : `${e.secs} 秒后开放`, x, y + 18, 11, '#fff', 'center', 3);
+    }
+    for (const id of G.cur) { const p = G.players.get(id); if (!p || !(p.flags & 1) || (me && p.team !== me.team)) continue; ctx.fillStyle = G.colors[p.team]; ctx.strokeStyle = id === myId ? '#fff' : '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + p.x * ms, my + p.y * ms, id === myId ? 7 : 5, 0, 7); ctx.fill(); ctx.stroke(); }
+    txt(TOUCH ? '点地图关闭' : 'M 关闭地图', VW / 2, VH - 18, 13, '#9a9db5', 'center', 3);
+  }
   // 1.6：搜刮撤离 HUD——背包、撤离读条、捡到东西的提示、撤离成功 / 阵亡
   function drawLootHud(o, me, cx) {
     const now = performance.now(), bags = o[1] || [];
     let mine = null;
     for (let i = 0; i < bags.length; i += 6) if (bags[i] === myId) mine = bags.slice(i, i + 6);
-    // 背包条：每格一个方块，颜色 = 物资品质
-    const cap = G.bag.cap || S.LOOT.bag, items = G.bag.items || [];
-    const sz = TOUCH ? 15 : 19, gap = 3, w = cap * (sz + gap) - gap, x0 = 16, y0 = VH - (TOUCH ? 190 : 150);
-    ctx.fillStyle = '#000b'; rr(ctx, x0 - 8, y0 - 26, Math.max(w, 200) + 16, sz + 36, 10); ctx.fill();
-    const val = S.lootValue(items), used = S.lootSlots(items);
-    txt(`背包 ${used}/${cap}`, x0, y0 - 13, 13, used >= cap ? '#ff8a5a' : '#fff', 'left', 3);
-    txt(`价值 ${fmtV(val)}`, x0 + Math.max(w, 200), y0 - 13, 14, '#ffd23f', 'right', 3);
-    let slot = 0;
-    for (const k of items) {
-      const I = S.LOOT.items[k]; if (!I) continue;
-      ctx.fillStyle = S.LOOT.rare[I.r].c;
-      rr(ctx, x0 + slot * (sz + gap), y0, I.size * (sz + gap) - gap, sz, 4); ctx.fill();
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
-      slot += I.size;
+    // 2.1：网格背包缩略图（每格一个小方块，物资按实际大小画出来）+ 价值；Tab 打开完整背包
+    const inv = G.bag.inv || { w: 5, h: 3, items: [] }, safe = G.bag.safe || { w: 2, h: 2, items: [] };
+    const sz = TOUCH ? 9 : 12, x0 = 16, gh = inv.h * sz, y0 = VH - (TOUCH ? 200 : 150) - gh;
+    const val = S.invValue(inv), sv = S.invValue(safe), used = S.invCells(inv), cap = inv.w * inv.h;
+    const pw = Math.max(inv.w * sz + safe.w * sz + 26, 210);
+    ctx.fillStyle = '#000b'; rr(ctx, x0 - 8, y0 - 30, pw + 16, gh + 54, 10); ctx.fill();
+    txt(`背包 ${used}/${cap}`, x0, y0 - 16, 13, used >= cap ? '#ff8a5a' : '#fff', 'left', 3);
+    txt(`价值 ${fmtV(val)}`, x0 + pw, y0 - 16, 14, '#ffd23f', 'right', 3);
+    const grid = (g, gx, gy, border) => {
+      ctx.fillStyle = '#ffffff10'; ctx.fillRect(gx, gy, g.w * sz, g.h * sz);
+      ctx.strokeStyle = '#ffffff22'; ctx.lineWidth = 1;
+      for (let i = 0; i <= g.w; i++) { ctx.beginPath(); ctx.moveTo(gx + i * sz, gy); ctx.lineTo(gx + i * sz, gy + g.h * sz); ctx.stroke(); }
+      for (let j = 0; j <= g.h; j++) { ctx.beginPath(); ctx.moveTo(gx, gy + j * sz); ctx.lineTo(gx + g.w * sz, gy + j * sz); ctx.stroke(); }
+      for (const it of g.items) { const I = S.LOOT.items[it.k]; if (!I) continue; const [w, h] = S.itemDims(it.k, it.rot); ctx.fillStyle = S.LOOT.rare[I.r].c; ctx.fillRect(gx + it.x * sz + 1, gy + it.y * sz + 1, w * sz - 2, h * sz - 2); }
+      ctx.strokeStyle = border; ctx.lineWidth = 1.5; ctx.strokeRect(gx, gy, g.w * sz, g.h * sz);
+    };
+    grid(inv, x0, y0, '#ffffff66');
+    grid(safe, x0 + inv.w * sz + 14, y0, '#ffd23f');
+    txt(TOUCH ? '🎒 打开背包' : 'Tab 打开背包', x0, y0 + gh + 12, 11, '#9a9db5', 'left', 3);
+    if (sv) txt(`安全箱 ${fmtV(sv)}`, x0 + pw, y0 + gh + 12, 11, '#ffd23f', 'right', 3);
+    if (G.bag.gear && G.bag.gear.length) txt('装备：' + G.bag.gear.map((g) => S.LOOT.gear[g].name).join(' · '), x0, y0 - 40, 11, '#b78cff', 'left', 3);
+    // 附近能搜的容器 / 电闸：屏幕下方提示
+    const near = lootNear();
+    if (near && !INV.open && me && (me.flags & 1)) {
+      const label = near.lever ? (near.busy ? `电闸冷却中 ${near.busy} 秒` : '拉下电闸（开放拉闸撤离点）') : `搜索 ${S.LOOT.conts[near.c.type].name}${near.c.st === 2 ? '（空）' : ''}`;
+      const yy = VH * 0.7;
+      ctx.fillStyle = '#000c'; rr(ctx, cx - 150, yy - 18, 300, 36, 18); ctx.fill();
+      ctx.fillStyle = near.lever ? '#ff9a3d' : '#ffd23f'; ctx.beginPath(); ctx.arc(cx - 128, yy, 13, 0, 7); ctx.fill();
+      txt(TOUCH ? '✋' : 'F', cx - 128, yy + 1, 15, '#141018', 'center', 0);
+      txt(label, cx + 10, yy, 15, '#fff', 'center', 3);
     }
-    for (; slot < cap; slot++) { ctx.strokeStyle = '#ffffff33'; ctx.lineWidth = 1.5; rr(ctx, x0 + slot * (sz + gap), y0, sz, sz, 4); ctx.stroke(); }
-    if (G.bag.gear && G.bag.gear.length) txt('装备：' + G.bag.gear.map((g) => S.LOOT.gear[g].name).join(' · '), x0, y0 + sz + 14, 11, '#b78cff', 'left', 3);
+    const tb = document.getElementById('tLoot'); if (tb) tb.classList.toggle('hidden', !near || INV.open);
     // 捡到东西：右侧飘出物资名
     G.pops = G.pops.filter((p) => now - p.t < 2200);
     G.pops.forEach((p, i) => {
@@ -3664,9 +3884,7 @@
       });
     };
     if (G.loot) {
-      const ex = (G.obj && G.obj[0]) || [], opens = [];
-      for (let i = 0; i < ex.length; i += 3) opens.push(ex[i + 2]);
-      const nOpen = opens.filter((t) => t <= 0).length, next = opens.filter((t) => t > 0).sort((a, b) => a - b)[0];
+      const exs = exList(G.obj), nOpen = exs.filter((e) => e.open).length, next = exs.filter((e) => !e.open && e.type !== 'lever').map((e) => e.secs).sort((a, b) => a - b)[0];
       splat(cx - 160, 33, 86, 20, '#141018', 3); splat(cx + 160, 33, 86, 20, '#141018', 5);
       let squads = 0; const seen = new Set();
       for (const p of G.players.values()) if (!p.npc && (p.flags & 1) && !seen.has(p.team)) { seen.add(p.team); squads++; }
@@ -3763,7 +3981,7 @@
       }
     }
     G.miniFrame++;
-    if (G.mode !== 'turf' && G.miniFrame % 6 === 0) updateMini();
+    if (G.mode !== 'turf' && G.miniFrame % (G.M.giant ? 45 : 6) === 0) updateMini();
 
     // ---- 击杀信息 ----
     let fy = VW < 1000 ? 112 : 20;
@@ -3833,22 +4051,32 @@
     }
 
     // ---- 小地图 ----
-    const mw = TOUCH ? 132 : small ? 150 : 190, mh = (mw * S.GH) / S.GW, mx = VW - mw - 14, my = 14;
+    const GIANT = G.M.giant;
+    let mw = TOUCH ? 132 : small ? 150 : 190, mh = (mw * S.GH) / S.GW, mx = VW - mw - 14, my = 14;
+    if (GIANT) mh = mw;
     ctx.fillStyle = '#000c'; rr(ctx, mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.fill();
-    ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
-    const ms = mw / S.W;
+    let ms = mw / S.W;
+    ctx.save(); ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
+    if (GIANT) {
+      // 2.1：超大地图的小地图只显示自己周围 2400 范围（M 打开整张地图）
+      const span = 2400, fx = me ? me.px : S.W / 2, fy = me ? me.py : S.H / 2;
+      ms = mw / span;
+      const ox = fx - span / 2, oy = fy - span / 2;
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, ox / S.CELL, oy / S.CELL, span / S.CELL, span / S.CELL, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
+      mx -= ox * ms; my -= oy * ms;
+    } else { ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true; }
     if (o && G.mode === 'escort' && !o[5]) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && G.mode === 'park') { ctx.fillStyle = o[4] ? G.colors[o[4]] : '#fff'; ctx.beginPath(); ctx.arc(mx + o[2] * ms, my + o[3] * ms, Math.max(4, S.PARK.r * ms), 0, 7); ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1; const f = o[5] || []; ctx.fillStyle = '#ffd23f'; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
     if (o && G.mode === 'soccer') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + o[0] * ms, my + o[1] * ms, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke(); }
     if (o && (G.mode === 'battery' || G.mode === 'seal')) { ctx.fillStyle = G.mode === 'seal' ? '#b48cff' : '#b8ff3a'; const f = o[2]; for (let i = 0; i < f.length; i += 4) ctx.fillRect(mx + f[i + 1] * ms - 1.5, my + f[i + 2] * ms - 1.5, 3, 3); }
-    if (o && G.loot) {   // 小地图：撤离点（绿 = 开放）+ 史诗 / 传说物资
-      const ex = o[0] || [];
-      for (let i = 0; i < ex.length; i += 3) {
-        const open = ex[i + 2] <= 0;
-        ctx.fillStyle = open ? '#5ee36a' : '#777'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(mx + ex[i] * ms, my + ex[i + 1] * ms, open ? 6 : 4, 0, 7); ctx.fill(); ctx.stroke();
-        if (open) { ctx.strokeStyle = '#5ee36a'; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(now / 200); ctx.beginPath(); ctx.arc(mx + ex[i] * ms, my + ex[i + 1] * ms, 10, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+    if (o && G.loot) {   // 小地图：撤离点（颜色 = 类型，灰 = 没开放）+ 史诗 / 传说物资
+      for (const e of exList(o)) {
+        const c = EXT_COL[e.type];
+        ctx.fillStyle = e.open ? c : '#777'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(mx + e.x * ms, my + e.y * ms, e.open ? 6 : 4, 0, 7); ctx.fill(); ctx.stroke();
+        if (e.open) { ctx.strokeStyle = c; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(now / 200); ctx.beginPath(); ctx.arc(mx + e.x * ms, my + e.y * ms, 10, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
       }
+      if (G.lever) { ctx.fillStyle = '#ff9a3d'; ctx.fillRect(mx + G.lever[0] * ms - 3, my + G.lever[1] * ms - 3, 6, 6); }
       for (const it of G.items.values()) { const I = S.LOOT.items[it.k]; if (!I || I.r < 4) continue; ctx.fillStyle = S.LOOT.rare[I.r].c; ctx.fillRect(mx + it.x * ms - 1.5, my + it.y * ms - 1.5, 3, 3); }
     }
     if (o && G.teams > 2 && !G.loot) {
@@ -3870,6 +4098,7 @@
       ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.beginPath(); ctx.moveTo(px, py);
       ctx.arc(px, py, 26, view.yaw - 0.55, view.yaw + 0.55); ctx.closePath(); ctx.fill();
     }
+    ctx.restore();
 
     // ---- 公告 / 大字 ----
     if (G.announce) {
@@ -3925,7 +4154,9 @@
     }
 
     // ---- 记分板 ----
-    if (keys.has('Tab') || TT.board) drawScoreboard();
+    if ((keys.has('Tab') && !G.loot) || TT.board) drawScoreboard();
+    if (G.loot && G.bigMap) drawBigMap(G.obj, me);
+    invTick();
 
     // ---- 准星：俯视模式跟着鼠标，触屏不显示 ----
     if (TOP() && TOUCH) return;
@@ -4077,7 +4308,7 @@
     // 搜刮撤离：带出来的物资 / 丢掉的装备
     if (LR && meRow) {
       const lost = LR.ex ? [] : (r.loot.risk === 'high' ? LR.gear || [] : []);
-      $('resTable').insertAdjacentHTML('afterbegin', `<div class="r-loot ${LR.ex ? 'ok' : 'fail'}"><h4>${LR.ex ? `带出的物资 · ${LR.items.length} 件（已存入仓库）` : '物资全部丢失'}</h4><div class="r-items">${LR.ex ? LR.items.map((k) => lootIcon(k)).join('') : '<span class="r-none">下次记得早点去撤离点</span>'}</div>${lost.length ? `<p class="r-lost">高危行动阵亡，丢失装备：${lost.map((g) => S.LOOT.gear[g].name).join('、')}</p>` : ''}</div>`);
+      $('resTable').insertAdjacentHTML('afterbegin', `<div class="r-loot ${LR.ex ? 'ok' : 'fail'}"><h4>${LR.ex ? `带出的物资 · ${LR.items.length} 件（已存入仓库）${LR.paid ? ` · 付费撤离 −${LR.paid} 金币` : ''}` : (LR.safe || []).length ? `背包物资丢失 · 安全箱保住 ${LR.safe.length} 件（已存入仓库）` : '物资全部丢失'}</h4><div class="r-items">${LR.ex ? LR.items.map((k) => lootIcon(k)).join('') : (LR.safe || []).length ? LR.safe.map((k) => lootIcon(k)).join('') : '<span class="r-none">下次记得早点去撤离点</span>'}</div>${lost.length ? `<p class="r-lost">高危行动阵亡，丢失装备：${lost.map((g) => S.LOOT.gear[g].name).join('、')}</p>` : ''}</div>`);
     }
     $('resStage').classList.toggle('lose', !!meRow && !won && (LR || rank !== 1));
     $('resStage').classList.toggle('no3d', !stageOk);
@@ -5103,6 +5334,7 @@
   window.__gbDebug = () => ({ tut: () => TUT, tutSet: (i) => tutSet(i), G, keys: [...keys], mouse, myId, view, R3, hub: localHub, send, room, sess, resumeSess, openHero, playTrailer, showResults, draftSt: () => draft, net: () => net, netDrop: () => { if (ws) ws.close(); }, netFreeze: () => { if (ws) ws.onmessage = null; }, frame: () => { const n = performance.now(); if (G) { const dt = Math.min(0.05, (n - G.lastFrame) / 1000); G.lastFrame = n; updateGame(n, dt); renderGame(n, dt); } } });
   bindUI();
   setupTouch();
+  setupInv();
   boot().then(startAccount);
   // 通过网址打开时注册离线缓存（双击本地文件打开时浏览器不支持，自动跳过）
   const IN_APP = new URLSearchParams(location.search).has('app');   // 安卓 App 里运行

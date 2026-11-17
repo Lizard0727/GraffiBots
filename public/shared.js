@@ -486,7 +486,7 @@
     elim: { name: '生死之战', short: '生死', desc: '只有一条命：机体被打爆不会重建，驾驶员也倒下就出局。先把对面全队消灭赢一局，三局两胜。', original: true, oneLife: true, isNew: true },
     escape4: { name: '逃亡圈 · 四队', short: '逃亡', desc: '4 队 × 2 人分散空降。灰色毒圈不断缩小，捡空投箱变强，只有一条命，最后活下来的队伍获胜。', original: true, oneLife: true, teams: 4, size: 2, isNew: true },
     park: { name: '乐园模式', short: '乐园', desc: '嘉年华花车沿着环形路线巡游：花车光圈里人多的队伍每秒得 1 分，打爆飘着的气球再得 3 分。先到 100 分获胜。', original: true, isNew: true },
-    loot: { name: '搜刮撤离', short: '撤离', desc: '超大地图上搜刮物资、和其他小队争夺，在撤离点读条 10 秒成功撤离，带出来的物资存进仓库。只有一条命，阵亡或没来得及撤离，这局搜到的东西全部丢失。', original: true, oneLife: true, teams: 4, size: 3, isNew: true },
+    loot: { name: '搜刮撤离', short: '撤离', desc: '超大地图上搜刮物资、和其他小队争夺，在撤离点读条 10 秒成功撤离，带出来的物资存进仓库。只有一条命，阵亡或没来得及撤离，这局搜到的东西全部丢失。', original: true, oneLife: true, teams: 6, size: 3, isNew: true },
     escape8: { name: '逃亡圈 · 单人', short: '单人逃亡', desc: '8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。', original: true, oneLife: true, teams: 8, size: 1, isNew: true },
     // ---- 1.8：夜都决战限时玩法 ----
     raid: { name: '咒灵讨伐', short: '讨伐', desc: '最多 4 人合作讨伐巨型咒灵「百目」：它会砸地、放弹幕、召唤小咒灵、冲撞，血量过半后进入狂暴。4 分钟内打倒它就赢了！', original: true, coop: true, size: 4, isNew: true, limited: 'yato' },
@@ -497,38 +497,88 @@
   S.isEscape = (mode) => mode === 'escape4' || mode === 'escape8';
   // ---------------- 1.6：搜刮撤离 ----------------
   //   物资 5 种品质；size = 占几格背包；v = 价值（卖给仓库得 v/10 金币）；ex = 可以兑换的特殊奖励
+  // 2.1：三角洲式撤离——网格背包、可搜索容器、六档品质（白 / 绿 / 蓝 / 紫 / 金 / 红）
+  //   物资 w×h = 占几格（可以旋转），v = 价值，ex = 传说 / 至宝可兑换的东西
   S.LOOT = {
-    duration: 420, bag: 10, pickR: 28, extTime: 10, extR: 70, opens: [180, 230, 280, 330], guardTeam: 5,
-    rare: [null, { name: '普通', c: '#c9ccd4' }, { name: '优良', c: '#5ee36a' }, { name: '稀有', c: '#4fb8ff' }, { name: '史诗', c: '#b78cff' }, { name: '传说', c: '#ffc531' }],
+    duration: 720, bag: 10, pickR: 28, extTime: 8, extR: 64, opens: [120, 210, 300], guardTeam: 8, openR: 62,
+    rare: [null, { name: '普通', c: '#c9ccd4' }, { name: '优良', c: '#5ee36a' }, { name: '稀有', c: '#4fb8ff' }, { name: '史诗', c: '#b78cff' }, { name: '传说', c: '#ffc531' }, { name: '至宝', c: '#ff3b52' }],
     items: {
-      scrap: { name: '废旧零件', r: 1, size: 1, v: 60 }, can: { name: '空涂料罐', r: 1, size: 1, v: 80 }, battery: { name: '旧电池', r: 1, size: 1, v: 100 }, cable: { name: '电缆卷', r: 1, size: 2, v: 160 },
-      neon: { name: '霓虹灯管', r: 2, size: 1, v: 240 }, circuit: { name: '电路板', r: 2, size: 1, v: 280 }, toolbox: { name: '工具箱', r: 2, size: 2, v: 420 }, spray: { name: '专业喷枪', r: 2, size: 1, v: 320 },
-      engine: { name: '机甲引擎', r: 3, size: 2, v: 800 }, drive: { name: '加密硬盘', r: 3, size: 1, v: 700 }, rarepaint: { name: '限定喷漆', r: 3, size: 1, v: 650 }, optic: { name: '狙击镜', r: 3, size: 1, v: 720 },
-      qchip: { name: '量子芯片', r: 4, size: 1, v: 1600 }, proto: { name: '原型装甲', r: 4, size: 3, v: 2600 }, radio: { name: '古董收音机', r: 4, size: 2, v: 1900 }, cell: { name: '能量电池组', r: 4, size: 2, v: 2000 },
-      goldcan: { name: '黄金涂鸦罐', r: 5, size: 1, v: 4500, ex: { gems: 40 } }, reactor: { name: '核心反应堆', r: 5, size: 4, v: 9000, ex: { crystals: 1, gems: 60 } }, files: { name: '灰城机密档案', r: 5, size: 1, v: 6000, ex: { crystals: 1 } },
+      scrap: { name: '废旧零件', r: 1, w: 1, h: 1, v: 60 }, can: { name: '空涂料罐', r: 1, w: 1, h: 1, v: 80 }, battery: { name: '旧电池', r: 1, w: 1, h: 1, v: 100 }, cable: { name: '电缆卷', r: 1, w: 1, h: 2, v: 160 },
+      tape: { name: '强力胶带', r: 1, w: 1, h: 1, v: 70 }, bolts: { name: '一袋螺栓', r: 1, w: 1, h: 1, v: 90 }, canned: { name: '罐头食品', r: 1, w: 1, h: 1, v: 110 },
+      neon: { name: '霓虹灯管', r: 2, w: 1, h: 2, v: 240 }, circuit: { name: '电路板', r: 2, w: 1, h: 1, v: 280 }, toolbox: { name: '工具箱', r: 2, w: 2, h: 1, v: 420 }, spray: { name: '专业喷枪', r: 2, w: 1, h: 2, v: 320 },
+      medkit: { name: '战地医疗包', r: 2, w: 2, h: 1, v: 380 }, walkie: { name: '对讲机', r: 2, w: 1, h: 1, v: 300 },
+      engine: { name: '机甲引擎', r: 3, w: 2, h: 2, v: 900 }, drive: { name: '加密硬盘', r: 3, w: 1, h: 1, v: 700 }, rarepaint: { name: '限定喷漆', r: 3, w: 1, h: 2, v: 650 }, optic: { name: '狙击镜', r: 3, w: 2, h: 1, v: 720 },
+      gpu: { name: '显卡', r: 3, w: 2, h: 1, v: 950 }, drone: { name: '侦察无人机', r: 3, w: 2, h: 2, v: 1100 },
+      qchip: { name: '量子芯片', r: 4, w: 1, h: 1, v: 1600 }, proto: { name: '原型装甲', r: 4, w: 2, h: 2, v: 2600 }, radio: { name: '古董收音机', r: 4, w: 2, h: 1, v: 1900 }, cell: { name: '能量电池组', r: 4, w: 1, h: 2, v: 2000 },
+      servo: { name: '军用伺服电机', r: 4, w: 2, h: 2, v: 2400 }, watch: { name: '名表', r: 4, w: 1, h: 1, v: 2200 },
+      goldcan: { name: '黄金涂鸦罐', r: 5, w: 1, h: 2, v: 4500, ex: { gems: 40 } }, reactor: { name: '核心反应堆', r: 5, w: 3, h: 2, v: 9000, ex: { crystals: 1, gems: 60 } }, files: { name: '灰城机密档案', r: 5, w: 1, h: 1, v: 6000, ex: { crystals: 1 } },
+      goldbar: { name: '金条', r: 5, w: 1, h: 1, v: 5200, ex: { gems: 30 } }, aicore: { name: '战术 AI 核心', r: 5, w: 2, h: 2, v: 7800, ex: { crystals: 1, gems: 40 } },
+      fusion: { name: '便携聚变核心', r: 6, w: 2, h: 2, v: 22000, ex: { crystals: 3, gems: 120 } }, crown: { name: '灰石董事会王冠', r: 6, w: 1, h: 1, v: 18000, ex: { crystals: 2, gems: 100 } },
+      blueprint: { name: '机兵原型蓝图', r: 6, w: 2, h: 1, v: 16000, ex: { crystals: 2, gems: 80 } }, goldmech: { name: '黄金机兵模型', r: 6, w: 3, h: 3, v: 30000, ex: { crystals: 4, gems: 160 } },
     },
-    // 物资点品质 → 各品质的权重
-    tiers: { 1: [0, 70, 25, 5, 0, 0], 2: [0, 40, 40, 17, 3, 0], 3: [0, 0, 35, 40, 22, 3], 5: [0, 0, 0, 0, 50, 50] },
+    // 物资点品质 → 各品质的权重（1 野外 / 2 普通房间 / 3 好房间 / 4 守卫区 / 5 高价值区 / 6 金库）
+    tiers: { 1: [0, 66, 26, 7, 1, 0, 0], 2: [0, 40, 38, 17, 4, 1, 0], 3: [0, 12, 34, 34, 16, 4, 0], 4: [0, 0, 18, 38, 30, 12, 2], 5: [0, 0, 0, 24, 40, 30, 6], 6: [0, 0, 0, 0, 30, 52, 18] },
+    // 容器：搜索时间 = 打开 0.4 秒 + 每件 search(r)；n = 物资数量范围；bump = 品质加成（0 / +1 档）
+    conts: {
+      crate: { name: '军需箱', n: [2, 4] }, locker: { name: '储物柜', n: [1, 3] }, safe: { name: '保险柜', n: [1, 2], bump: 1 }, pc: { name: '电脑', n: [1, 2], kinds: ['drive', 'circuit', 'qchip', 'gpu', 'files', 'blueprint', 'walkie'] },
+      med: { name: '医疗箱', n: [1, 3], kinds: ['medkit', 'canned', 'tape', 'cell', 'battery'] }, weapon: { name: '武器箱', n: [2, 3], bump: 1 }, duffel: { name: '行李包', n: [1, 3] },
+      vault: { name: '金库', n: [3, 5], bump: 1 }, body: { name: '遗骸' }, pile: { name: '丢弃的物资' },
+    },
+    search: (r) => 0.35 + 0.28 * (r || 1),
+    // 背包（不带背包 / 扩容背包 / 大型登山包），安全箱等级（死亡也不会丢），撤离点类型
+    bags: { base: [5, 3], pack: [6, 5], bigpack: [7, 6] },
+    safe: [null, [2, 2], [2, 3], [3, 3]], safeCost: [0, 0, 4000, 12000],
+    ext: {
+      normal: { name: '撤离点', desc: '到时间开放，站进去读条撤离' },
+      paid: { name: '付费撤离', desc: '一直开放，撤离成功后扣 800 金币', cost: 800 },
+      weight: { name: '轻装撤离', desc: '一直开放，但背包里的东西不能超过 12 格', max: 12 },
+      lever: { name: '拉闸撤离', desc: '先去地图上的电闸拉闸，之后开放 150 秒', open: 150 },
+      timed: { name: '限时撤离', desc: '只在第 4–7 分钟开放', from: 240, to: 420 },
+    },
     // 军需处：用金币买的装备，只能带进「高危」行动，阵亡会丢
     gear: {
       armor: { name: '战术护甲', price: 600, desc: '机体生命 +25%' },
-      pack: { name: '扩容背包', price: 400, desc: '背包 +6 格' },
+      pack: { name: '扩容背包', price: 400, desc: '背包 5×3 → 6×5' },
+      bigpack: { name: '大型登山包', price: 1200, desc: '背包 5×3 → 7×6' },
       kit: { name: '急救包', price: 200, desc: '生命低于 30% 时自动回复 60 生命（一次）' },
     },
-    risks: { normal: { name: '普通行动', desc: '阵亡只丢这局搜到的物资' }, high: { name: '高危行动', desc: '物资更多、品质更高，可以带装备进场，但阵亡时装备也会丢' } },
+    risks: { normal: { name: '普通行动', desc: '阵亡丢掉背包里的物资（安全箱里的保留）' }, high: { name: '高危行动', desc: '物资更多、品质更高，可以带装备进场，但阵亡时装备也会丢' } },
   };
+  for (const I of Object.values(S.LOOT.items)) I.size = I.w * I.h;
+  // ---- 网格背包：inv = { w, h, items: [{ id, k, x, y, rot }] } ----
+  S.itemDims = (k, rot) => { const I = S.LOOT.items[k]; return I ? (rot ? [I.h, I.w] : [I.w, I.h]) : [1, 1]; };
+  S.invFits = (inv, k, x, y, rot, ignoreId) => {
+    const [w, h] = S.itemDims(k, rot);
+    if (x < 0 || y < 0 || x + w > inv.w || y + h > inv.h) return false;
+    for (const it of inv.items) {
+      if (it.id === ignoreId) continue;
+      const [iw, ih] = S.itemDims(it.k, it.rot);
+      if (x < it.x + iw && x + w > it.x && y < it.y + ih && y + h > it.y) return false;
+    }
+    return true;
+  };
+  S.invPlace = (inv, k) => {   // 找第一个放得下的位置（先横后竖）
+    for (const rot of [0, 1]) for (let y = 0; y < inv.h; y++) for (let x = 0; x < inv.w; x++) if (S.invFits(inv, k, x, y, rot)) return { x, y, rot };
+    return null;
+  };
+  S.invValue = (inv) => (inv && inv.items ? inv.items.reduce((a, it) => a + ((S.LOOT.items[it.k] || {}).v || 0), 0) : 0);
+  S.invCells = (inv) => (inv && inv.items ? inv.items.reduce((a, it) => a + ((S.LOOT.items[it.k] || {}).size || 1), 0) : 0);
+  S.bagDims = (gear) => S.LOOT.bags[(gear || []).includes('bigpack') ? 'bigpack' : (gear || []).includes('pack') ? 'pack' : 'base'];
+  S.CONT_IDS = Object.keys(S.LOOT.conts);
+  S.EXT_IDS = Object.keys(S.LOOT.ext);
   S.lootItem = (k) => S.LOOT.items[k];
   S.LOOT_KEYS = Object.keys(S.LOOT.items);
   S.lootValue = (items) => (items || []).reduce((a, k) => a + ((S.LOOT.items[k] || {}).v || 0), 0);
   S.lootSlots = (items) => (items || []).reduce((a, k) => a + ((S.LOOT.items[k] || {}).size || 1), 0);
   // 按物资点品质抽一件物资（高危：30% 概率升一档）
-  S.rollLoot = (tier, high, rnd) => {
+  S.rollLoot = (tier, high, rnd, kinds) => {
     rnd = rnd || Math.random;
     const w = S.LOOT.tiers[tier] || S.LOOT.tiers[1], tot = w.reduce((a, b) => a + b, 0);
     let x = rnd() * tot, r = 1;
     for (let i = 1; i < w.length; i++) { x -= w[i]; if (x < 0) { r = i; break; } }
-    if (high && r < 5 && rnd() < 0.3) r++;
-    const pool = S.LOOT_KEYS.filter((k) => S.LOOT.items[k].r === r);
+    if (high && r < 6 && rnd() < 0.3) r++;
+    let pool = S.LOOT_KEYS.filter((k) => S.LOOT.items[k].r === r);
+    if (kinds) { const kp = kinds.filter((k) => S.LOOT.items[k]); const near = kp.filter((k) => Math.abs(S.LOOT.items[k].r - r) <= 1); if (near.length) pool = near; }
     return pool[Math.floor(rnd() * pool.length)];
   };
   // 多队模式的涂料颜色（第 1–8 队）
@@ -547,7 +597,7 @@
   S.PARK = { path: [[38, 22], [82, 22], [82, 58], [38, 58]], loop: 64, r: 92, tick: 1, balloon: 3, target: 100, maxBalloons: 6, balloonT: 3.5 };
 
   // ---------------- 3D 参数 ----------------
-  S.LEVEL_H = [0, 40, 80, 150];   // 地块高度：地面 / 矮台 / 高台 / 高墙（不可攀登、不可涂）
+  S.LEVEL_H = [0, 40, 80, 150, 0, 210];   // 地块高度：地面 / 矮台 / 高台 / 高墙（不可攀登、不可涂）/（4 是楼梯）/ 2.1 楼顶（坐电梯上去）
   S.PH = 36;                       // 机兵身高
   S.MUZZLE = 24;                   // 枪口离脚底高度
   S.STEP = 10;                     // 可直接走上的台阶高度
@@ -811,11 +861,234 @@
     const okSpot = (s2) => !wall[s2[1] * gw + s2[0]];
     return { rects, stairs, bush, pads, gw, gh, nomirror: true, loot: { spawns, extract, spots: spots.filter(okSpot), guards } };
   }
+  // ===== 2.1：灰城禁区——面积是旧撤离地图的 10 倍（760×500 格）=====
+  //   六个城区（港口 / 商业 / 工业 / 棚户 / 研究园 / 公园），道路网格，带隔间的建筑、可以坐电梯上去的高楼楼顶，
+  //   中央是重兵把守的灰石大厦（高价值区 + 金库），Boss 小队在城区之间巡逻
+  function genCityMap(seed) {
+    let st = seed >>> 0;
+    const R = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    const RI = (a, b) => a + Math.floor(R() * (b - a + 1));
+    const pick = (a) => a[Math.floor(R() * a.length)];
+    const gw = 760, gh = 500, cx = gw / 2, cy = gh / 2;
+    const rects = [], stairs = [], bush = [], pads = [], lifts = [], conts = [], guards = [];
+    const occ = new Uint8Array(gw * gh);
+    const inb = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh;
+    const isFree = (x, y, w, h, m = 0) => {
+      if (x < 2 || y < 2 || x + w > gw - 2 || y + h > gh - 2) return false;
+      for (let j = y - m; j < y + h + m; j++) for (let i = x - m; i < x + w + m; i++) if (inb(i, j) && occ[j * gw + i]) return false;
+      return true;
+    };
+    const mark = (x, y, w, h, v = 1) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (inb(i, j)) occ[j * gw + i] = v; };
+    const add = (x, y, w, h, l) => { if (w > 0 && h > 0) { rects.push([x, y, w, h, l]); mark(x, y, w, h); } };
+    const cont = (x, y, type, tier, roof) => conts.push([x, y, type, tier, roof ? 1 : 0]);
+    // ---- 道路：主干道把地图分成 3×2 个城区，城区里再有支路 ----
+    const COLS = [0, 250, 510, 760], ROWS = [0, 250, 500], MAIN = 10, SIDE = 5;
+    const road = new Uint8Array(gw * gh);
+    const roadRect = (x, y, w, h) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (inb(i, j)) road[j * gw + i] = 1; mark(x, y, w, h, 2); };
+    for (const x of COLS.slice(1, -1)) roadRect(x - MAIN / 2, 0, MAIN, gh);
+    for (const y of ROWS.slice(1, -1)) roadRect(0, y - MAIN / 2, gw, MAIN);
+    roadRect(0, 0, gw, 6); roadRect(0, gh - 6, gw, 6); roadRect(0, 0, 6, gh); roadRect(gw - 6, 0, 6, gh);
+    // 出生点（8 支小队：四角 + 四边中间）和撤离点（8 个，5 种）
+    // 前 6 个给 6 支小队（四角 + 上下两边中间，彼此相隔 5000 以上），后两个备用
+    const spawns = [[14, 14], [gw - 14, 14], [14, gh - 14], [gw - 14, gh - 14], [cx + 40, 12], [cx - 40, gh - 12], [12, cy], [gw - 12, cy]];
+    const extract = [[190, 9, 'normal'], [570, 9, 'paid'], [gw - 9, 170, 'normal'], [gw - 9, 330, 'lever'], [570, gh - 9, 'normal'], [190, gh - 9, 'timed'], [9, 330, 'weight'], [9, 170, 'paid']];
+    for (const [x, y] of spawns) mark(x - 9, y - 9, 18, 18, 2);
+    for (const [x, y] of extract) mark(x - 8, y - 8, 16, 16, 2);
+    // ---- 中央高价值区：灰石大厦（围墙 + 4 个门 + 大楼楼顶 + 金库）----
+    const hv = [cx - 34, cy - 28, 68, 56];
+    {
+      const [hx, hy, hw, hh] = hv;
+      mark(hx - 4, hy - 4, hw + 8, hh + 8, 0);
+      const gate = 6;
+      add(hx, hy, hw / 2 - gate / 2, 1, 3); add(hx + hw / 2 + gate / 2, hy, hw / 2 - gate / 2, 1, 3);
+      add(hx, hy + hh - 1, hw / 2 - gate / 2, 1, 3); add(hx + hw / 2 + gate / 2, hy + hh - 1, hw / 2 - gate / 2, 1, 3);
+      add(hx, hy + 1, 1, hh / 2 - gate / 2 - 1, 3); add(hx, hy + hh / 2 + gate / 2, 1, hh / 2 - gate / 2 - 1, 3);
+      add(hx + hw - 1, hy + 1, 1, hh / 2 - gate / 2 - 1, 3); add(hx + hw - 1, hy + hh / 2 + gate / 2, 1, hh / 2 - gate / 2 - 1, 3);
+      // 大楼（楼顶 210 高，坐电梯上去）+ 两部电梯
+      const tx = cx - 9, ty = cy - 9;
+      add(tx, ty, 18, 18, 5);
+      lifts.push([tx - 3, cy - 1, 0], [tx + 18 + 1, cy - 1, 180]);
+      cont(cx - 5, cy - 5, 'vault', 6, 1); cont(cx + 4, cy + 4, 'vault', 6, 1); cont(cx + 4, cy - 5, 'safe', 6, 1); cont(cx - 5, cy + 4, 'weapon', 5, 1);
+      // 院子里：两间库房（带门）、掩体、物资
+      for (const [bx, by] of [[hx + 5, hy + 5], [hx + hw - 19, hy + hh - 17]]) {
+        add(bx, by, 14, 1, 3); add(bx, by + 11, 6, 1, 3); add(bx + 9, by + 11, 5, 1, 3); add(bx, by + 1, 1, 10, 3); add(bx + 13, by + 1, 1, 10, 3);
+        add(bx + 3, by + 3, 8, 2, 1);
+        cont(bx + 3, by + 7, 'weapon', 5); cont(bx + 9, by + 7, 'safe', 5);
+      }
+      for (const [bx, by] of [[hx + 22, hy + 6], [hx + 40, hy + 8], [hx + 8, hy + 36], [hx + 26, hy + 42], [hx + 48, hy + 20]]) add(bx, by, RI(3, 5), 2, R() < 0.5 ? 1 : 2);
+      cont(hx + 30, hy + 4, 'crate', 5); cont(hx + 6, hy + hh - 6, 'crate', 5); cont(hx + hw - 8, hy + 6, 'pc', 5); cont(hx + hw - 10, hy + hh - 8, 'crate', 5);
+      for (const [gx, gy] of [[hx + hw / 2, hy - 3], [hx + hw / 2, hy + hh + 2], [hx - 3, hy + hh / 2], [hx + hw + 2, hy + hh / 2], [cx - 14, cy - 14], [cx + 14, cy + 14], [cx + 14, cy - 14], [cx - 14, cy + 14], [hx + 12, hy + 20], [hx + hw - 12, hy + hh - 20]])
+        guards.push([gx, gy, 'hv']);
+      mark(hx, hy, hw, hh, 1);
+    }
+    // ---- 建筑生成 ----
+    const tierAt = (x, y, base) => { const d = Math.hypot(x - cx, y - cy) / Math.hypot(cx, cy); return Math.min(4, base + (d < 0.28 ? 1 : 0)); };
+    // 带隔间的建筑：外墙 + 门，内部隔墙分成 2–4 间，每间有家具和容器
+    const building = (x, y, w, h, base, kinds) => {
+      const L = 3, door = 3;
+      const sides = { N: R() < 0.8, S: R() < 0.8, W: R() < 0.6, E: R() < 0.6 };
+      if (!sides.N && !sides.S) sides.S = true;
+      const dN = RI(2, w - door - 2), dS = RI(2, w - door - 2), dW = RI(2, h - door - 2), dE = RI(2, h - door - 2);
+      const hw = (yy, d, has) => { if (has) { add(x, yy, d, 1, L); add(x + d + door, yy, w - d - door, 1, L); } else add(x, yy, w, 1, L); };
+      const vw = (xx, d, has) => { if (has) { add(xx, y + 1, 1, d - 1, L); add(xx, y + d + door, 1, h - d - door - 1, L); } else add(xx, y + 1, 1, h - 2, L); };
+      hw(y, dN, sides.N); hw(y + h - 1, dS, sides.S); vw(x, dW, sides.W); vw(x + w - 1, dE, sides.E);
+      // 隔墙：沿长边切 1–2 刀，每道隔墙留一个门
+      const rooms = [[x + 1, y + 1, w - 2, h - 2]];
+      const cuts = w * h > 260 ? 2 : 1;
+      for (let c = 0; c < cuts; c++) {
+        rooms.sort((a, b) => b[2] * b[3] - a[2] * a[3]);
+        const [rx, ry, rw, rh] = rooms.shift();
+        if (rw >= rh && rw >= 10) {
+          const k = RI(4, rw - 5), dd = RI(1, rh - door - 1);
+          add(rx + k, ry, 1, dd, L); add(rx + k, ry + dd + door, 1, rh - dd - door, L);
+          rooms.push([rx, ry, k, rh], [rx + k + 1, ry, rw - k - 1, rh]);
+        } else if (rh >= 9) {
+          const k = RI(3, rh - 4), dd = RI(1, rw - door - 1);
+          add(rx, ry + k, dd, 1, L); add(rx + dd + door, ry + k, rw - dd - door, 1, L);
+          rooms.push([rx, ry, rw, k], [rx, ry + k + 1, rw, rh - k - 1]);
+        } else rooms.push([rx, ry, rw, rh]);
+      }
+      for (const [rx, ry, rw, rh] of rooms) {
+        if (rw >= 5 && rh >= 5 && R() < 0.7) { const fw = RI(1, 2), fh = RI(2, Math.max(2, rh - 3)); add(rx + 1, ry + 1, fw, Math.min(fh, rh - 2), 1); }
+        const t = tierAt(rx, ry, base), n = rw * rh > 50 ? 2 : 1;
+        for (let k = 0; k < n; k++) cont(rx + RI(Math.min(2, rw - 1), Math.max(1, rw - 2)), ry + RI(Math.min(2, rh - 1), Math.max(1, rh - 2)), pick(kinds), t);
+      }
+    };
+    // 高楼：楼顶 210 高，旁边一部电梯；楼顶有好东西
+    const tower = (x, y, w, h, base) => {
+      add(x, y, w, h, 5);
+      const side = RI(0, 3);
+      const lx = side === 0 ? x - 3 : side === 1 ? x + w + 1 : x + RI(1, w - 3), ly = side === 2 ? y - 3 : side === 3 ? y + h + 1 : y + RI(1, h - 3);
+      const ang = side === 0 ? 0 : side === 1 ? 180 : side === 2 ? 90 : 270;
+      if (isFree(lx, ly, 2, 2)) { lifts.push([lx, ly, ang]); mark(lx, ly, 2, 2); }
+      const t = Math.min(5, tierAt(x, y, base) + 1);
+      cont(x + 2, y + 2, pick(['safe', 'weapon', 'crate']), t, 1); cont(x + w - 3, y + h - 3, pick(['pc', 'crate', 'locker']), t, 1);
+    };
+    const houses = (x, y, w, h, base) => {   // 棚户：小屋子 + 围栏
+      for (let j = y + 1; j + 9 < y + h; j += RI(11, 14)) for (let i = x + 1; i + 9 < x + w; i += RI(11, 15)) {
+        const bw = RI(7, 10), bh = RI(7, 9);
+        if (!isFree(i, j, bw, bh, 1)) continue;
+        const d = RI(2, bw - 5);
+        add(i, j, bw, 1, 3); add(i, j + bh - 1, d, 1, 3); add(i + d + 3, j + bh - 1, bw - d - 3, 1, 3); add(i, j + 1, 1, bh - 2, 3); add(i + bw - 1, j + 1, 1, bh - 2, 3);
+        cont(i + RI(2, bw - 3), j + RI(2, bh - 3), pick(['duffel', 'locker', 'med']), tierAt(i, j, base));
+        if (R() < 0.4 && isFree(i + bw + 1, j, 1, bh)) add(i + bw + 1, j, 1, bh, 1);
+      }
+    };
+    const containers = (x, y, w, h, base) => {   // 港口：集装箱堆 + 吊臂
+      for (let j = y + 2; j + 4 < y + h; j += RI(6, 8)) for (let i = x + 2; i + 8 < x + w; i += RI(10, 13)) {
+        const horiz = R() < 0.7, bw = horiz ? RI(6, 8) : 3, bh = horiz ? 3 : RI(6, 8);
+        if (!isFree(i, j, bw, bh, 1)) continue;
+        add(i, j, bw, bh, R() < 0.5 ? 1 : 2);
+        if (R() < 0.3) cont(horiz ? i + RI(0, bw - 1) : i + bw + 1, horiz ? j + bh + 1 : j + RI(0, bh - 1), pick(['crate', 'duffel', 'weapon']), tierAt(i, j, base));
+      }
+    };
+    const factory = (x, y, w, h, base) => {   // 工业：大厂房（一排排货架）
+      building(x, y, w, h, base, ['crate', 'locker', 'weapon']);
+      for (let j = y + 4; j < y + h - 4; j += 5) { const len = RI(Math.floor(w / 3), Math.floor(w / 2)); const ii = x + RI(3, Math.max(3, w - len - 3)); if (isFree(ii, j, len, 1)) add(ii, j, len, 1, R() < 0.6 ? 1 : 2); }
+    };
+    const park = (x, y, w, h, base) => {
+      for (let k = 0; k < Math.floor(w * h / 120); k++) { const bw = RI(3, 8), bh = RI(3, 7), bx = RI(x, x + w - bw), by = RI(y, y + h - bh); if (isFree(bx, by, bw, bh)) { bush.push([bx, by, bw, bh]); mark(bx, by, bw, bh); } }
+      for (let k = 0; k < Math.floor(w * h / 900); k++) { const bx = RI(x + 2, x + w - 7), by = RI(y + 2, y + h - 6); if (isFree(bx, by, 5, 4, 1)) { add(bx, by, 5, 4, R() < 0.5 ? 1 : 3); cont(bx + 2, by + 5, pick(['duffel', 'crate']), tierAt(bx, by, base)); } }
+    };
+    // 城区：每个城区再用支路切成地块，每块按城区类型放建筑
+    const DIST = [
+      { c: 0, r: 0, type: 'harbor', name: '港口区' }, { c: 1, r: 0, type: 'downtown', name: '商业区' }, { c: 2, r: 0, type: 'industry', name: '工业区' },
+      { c: 0, r: 1, type: 'slum', name: '棚户区' }, { c: 1, r: 1, type: 'lab', name: '研究园区' }, { c: 2, r: 1, type: 'park', name: '废弃公园' },
+    ];
+    const districts = [];
+    for (const D of DIST) {
+      const x0 = COLS[D.c] + (D.c ? MAIN / 2 : 6), x1 = COLS[D.c + 1] - (D.c < 2 ? MAIN / 2 : 6), y0 = ROWS[D.r] + (D.r ? MAIN / 2 : 6), y1 = ROWS[D.r + 1] - (D.r < 1 ? MAIN / 2 : 6);
+      districts.push({ name: D.name, type: D.type, x: (x0 + x1) / 2, y: (y0 + y1) / 2 });
+      const lotW = D.type === 'industry' ? 60 : D.type === 'park' ? 80 : 48, lotH = D.type === 'industry' ? 56 : 44;
+      const xs = [x0]; while (xs[xs.length - 1] + lotW < x1 - 10) xs.push(xs[xs.length - 1] + lotW + RI(-6, 6));
+      const ys = [y0]; while (ys[ys.length - 1] + lotH < y1 - 10) ys.push(ys[ys.length - 1] + lotH + RI(-5, 5));
+      for (const xx of xs.slice(1)) roadRect(xx, y0, SIDE, y1 - y0);
+      for (const yy of ys.slice(1)) roadRect(x0, yy, x1 - x0, SIDE);
+      const xe = xs.concat([x1]), ye = ys.concat([y1]);
+      for (let a = 0; a < xs.length; a++) for (let b = 0; b < ys.length; b++) {
+        const lx = xe[a] + (a ? SIDE : 0) + 2, ly = ye[b] + (b ? SIDE : 0) + 2, lw = xe[a + 1] - lx - 2, lh = ye[b + 1] - ly - 2;
+        if (lw < 14 || lh < 12) continue;
+        const busy = !isFree(lx, ly, lw, lh);
+        if (busy) { // 地块里有出生点 / 撤离点 / 高价值区：只放零散掩体
+          for (let k = 0; k < 6; k++) { const bw = RI(2, 5), bh = RI(2, 4), bx = RI(lx, lx + lw - bw), by = RI(ly, ly + lh - bh); if (isFree(bx, by, bw, bh, 1)) add(bx, by, bw, bh, R() < 0.6 ? 1 : 2); }
+          continue;
+        }
+        const r = R();
+        if (D.type === 'harbor') { if (r < 0.65) containers(lx, ly, lw, lh, 1); else building(lx, ly, Math.min(lw, 34), Math.min(lh, 24), 2, ['crate', 'locker', 'weapon']); }
+        else if (D.type === 'downtown') { if (r < 0.4) { const tw = RI(10, 16), th = RI(10, 14); tower(lx + RI(3, Math.max(3, lw - tw - 3)), ly + RI(3, Math.max(3, lh - th - 3)), tw, th, 2); }
+          else building(lx, ly, Math.min(lw, RI(26, 40)), Math.min(lh, RI(20, 30)), 2, ['locker', 'safe', 'pc', 'duffel']); }
+        else if (D.type === 'industry') { if (r < 0.7) factory(lx, ly, Math.min(lw, 52), Math.min(lh, 40), 2); else containers(lx, ly, lw, lh, 1); }
+        else if (D.type === 'slum') houses(lx, ly, lw, lh, 1);
+        else if (D.type === 'lab') { if (r < 0.3) { tower(lx + 6, ly + 6, RI(10, 13), RI(10, 12), 3); } else building(lx, ly, Math.min(lw, RI(28, 40)), Math.min(lh, RI(22, 32)), 3, ['pc', 'safe', 'med', 'locker']); }
+        else park(lx, ly, lw, lh, 1);
+        // 地块边缘：草丛 / 零散掩体
+        for (let k = 0; k < 3; k++) { const bw = RI(3, 6), bh = RI(2, 5), bx = RI(lx, lx + lw - bw), by = RI(ly, ly + lh - bh); if (isFree(bx, by, bw, bh, 1)) { if (R() < 0.5) { bush.push([bx, by, bw, bh]); mark(bx, by, bw, bh); } else add(bx, by, bw, bh, 1); } }
+      }
+      // 每个城区一处守卫据点（守在城区里最好的房子附近）
+      const gx = (x0 + x1) / 2 + RI(-40, 40), gy = (y0 + y1) / 2 + RI(-30, 30);
+      for (let k = 0; k < 4; k++) guards.push([gx + RI(-14, 14), gy + RI(-14, 14), 'd' + D.type]);
+    }
+    // ---- 道路上的车辆 / 路障（掩体）、路口的弹跳板 ----
+    for (let k = 0, tries = 0; k < 260 && tries < 6000; tries++) {
+      const x = RI(4, gw - 8), y = RI(4, gh - 8);
+      if (!road[y * gw + x]) continue;
+      const horiz = R() < 0.5, w = horiz ? RI(3, 4) : 2, h = horiz ? 2 : RI(3, 4);
+      let ok = true; for (let j = y - 1; j < y + h + 1 && ok; j++) for (let i = x - 1; i < x + w + 1; i++) if (!inb(i, j) || !road[j * gw + i] || occ[j * gw + i] === 1) { ok = false; break; }
+      if (!ok) continue;
+      add(x, y, w, h, 1); k++;
+      if (R() < 0.12) cont(horiz ? x + 1 : x + w + 1, horiz ? y + h + 1 : y + 1, 'duffel', 1);
+    }
+    for (let k = 0, tries = 0; k < 18 && tries < 2000; tries++) {
+      const x = RI(10, gw - 12), y = RI(10, gh - 12);
+      if (!road[y * gw + x] || !isFree(x, y, 2, 2, 2) && occ[y * gw + x] !== 2) continue;
+      let ok = true; for (let j = y; j < y + 2; j++) for (let i = x; i < x + 2; i++) if (occ[j * gw + i] === 1) ok = false;
+      if (!ok) continue;
+      pads.push([x, y, Math.round(Math.atan2(cy - y, cx - x) * 180 / Math.PI)]); mark(x, y, 2, 2); k++;
+    }
+    // 野外零散物资
+    for (let k = 0, tries = 0; k < 160 && tries < 8000; tries++) {
+      const x = RI(6, gw - 7), y = RI(6, gh - 7);
+      if (occ[y * gw + x] === 1) continue;
+      cont(x, y, pick(['duffel', 'crate', 'duffel']), tierAt(x, y, 1)); k++;
+    }
+    // 拉闸撤离的电闸：放在离它很远的城区里
+    const lever = [cx + 160, cy + 120];
+    // Boss 巡逻路线：经过各城区中心
+    const bossRoute = districts.map((d) => [Math.round(d.x), Math.round(d.y)]);
+    // ---- 连通性：被高墙围死的空地填成墙 ----
+    const wall = new Uint8Array(gw * gh);
+    for (const [x, y, w, h, l] of rects) if (l === 3 || l === 5) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) wall[j * gw + i] = 1;
+    const seen = new Uint8Array(gw * gh), q = [spawns[0][1] * gw + spawns[0][0]];
+    seen[q[0]] = 1;
+    while (q.length) {
+      const c = q.pop(), x0 = c % gw, y0 = (c / gw) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = x0 + dx, y = y0 + dy, n = y * gw + x;
+        if (x < 0 || y < 0 || x >= gw || y >= gh || seen[n] || wall[n]) continue;
+        seen[n] = 1; q.push(n);
+      }
+    }
+    // 楼顶（5 级）本身算「到得了」（坐电梯），不填墙
+    for (const [x, y, w, h, l] of rects) if (l === 5) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) seen[j * gw + i] = 1;
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+      if (wall[y * gw + x] || seen[y * gw + x]) continue;
+      let w = 1; while (x + w < gw && !wall[y * gw + x + w] && !seen[y * gw + x + w]) w++;
+      rects.push([x, y, w, 1, 3]); for (let i = 0; i < w; i++) wall[y * gw + x + i] = 1;
+      x += w - 1;
+    }
+    const roofCell = new Uint8Array(gw * gh);
+    for (const [x, y, w, h, l] of rects) if (l === 5) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) roofCell[j * gw + i] = 1;
+    const okC = (c) => inb(c[0], c[1]) && (c[4] ? roofCell[c[1] * gw + c[0]] : !wall[c[1] * gw + c[0]]);
+    return { rects, stairs, bush, pads, lifts, gw, gh, nomirror: true, giant: true,
+      loot: { spawns, extract, conts: conts.filter(okC), guards: guards.filter((g) => inb(g[0], g[1]) && !wall[g[1] * gw + g[0]]), bossRoute, lever, hv, districts, spots: [] } };
+  }
   const LOOT_DEFS = [
     { name: '废弃港口', desc: '超大地图：集装箱迷宫和废弃仓库，中央的货轮甲板上有金色物资，但有守卫看守。', sky: 2, seed: 7341, theme: 'harbor', isNew: true },
     { name: '地下研究所', desc: '超大地图：一间间实验室和走廊，中央反应堆大厅藏着最值钱的东西，守卫重重。', sky: 8, seed: 9127, theme: 'lab', isNew: true },
   ];
   for (const d of LOOT_DEFS) S.MAPS.push(Object.assign({ goalX: 24 }, d, genLootMap(d.seed, d.theme)));
+  // 2.1：超大撤离地图（只给撤离玩法用；旧的两张撤离地图保留在列表里，不再进轮换）
+  S.MAPS.push(Object.assign({ goalX: 24, name: '灰城禁区', desc: '超大地图（旧撤离地图的 10 倍）：六个城区、能坐电梯上楼顶的高楼，中央是重兵把守的灰石大厦，Boss 小队在城区之间巡逻。', sky: 2, isNew: true }, genCityMap(20261117)));
   const DIR_FLIP = { E: 'W', W: 'E', N: 'S', S: 'N' };
   const mirror0 = (r) => [GW - r[0] - r[2], GH - r[1] - r[3], r[2], r[3]];
   S.PAD = { v: 560, push: 360 };
@@ -877,9 +1150,19 @@
             if (i >= 0 && i < GW && j >= 0 && j < GH && !top[j * GW + i] && !pad[j * GW + i]) bush[j * GW + i] = 1;
       }
     }
-    return { top, solid, lv, rects, stairs, pad, pads, bush, bushes, gw: GW, gh: GH, loot: m.loot || null };
+    // 2.1：电梯（2×2，站上去被送上旁边的楼顶）
+    const lift = new Uint8Array(GW * GH), lifts = [];
+    for (const [x, y, ang] of m.lifts || []) {
+      lifts.push([x, y, ang]);
+      const code = 1 + Math.round(((((ang % 360) + 360) % 360) / 360) * 250) % 251;
+      for (let j = y; j < y + 2; j++) for (let i = x; i < x + 2; i++) if (S.inBounds(i, j) && top[j * GW + i] === 0) { lift[j * GW + i] = code; bush[j * GW + i] = 0; }
+    }
+    return { top, solid, lv, rects, stairs, pad, pads, bush, bushes, lift, lifts, gw: GW, gh: GH, giant: !!m.giant, loot: m.loot || null };
   };
   S.padAngle = (code) => ((code - 1) / 250) * Math.PI * 2;
+  S.LIFT = { v: 760, push: 150 };
+  S.liftAt = (M, x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return M.lift && S.inBounds(cx, cy) ? M.lift[cy * GW + cx] : 0; };
+  S.GIANT_MAP = () => S.MAPS.findIndex((m) => m.giant);
   S.padAt = (M, x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return S.inBounds(cx, cy) ? M.pad[cy * GW + cx] : 0; };
 
   S.basePos = (team) => ({ x: team === 1 ? 6 * CELL : S.W - 6 * CELL, y: S.H / 2 });
@@ -1065,6 +1348,15 @@
         p.kx += Math.cos(a) * S.PAD.push; p.ky += Math.sin(a) * S.PAD.push;
       }
     }
+    // 2.1 电梯：站上去就被平稳地送上 210 高的楼顶，再往楼的方向轻推一下
+    if (p.onGround && p.padT <= 0 && M.lift) {
+      const lc = S.liftAt(M, p.x, p.y);
+      if (lc) {
+        const a = S.padAngle(lc);
+        p.vz = S.LIFT.v; p.onGround = false; p.coy = 0; p.jumped = false; p.padT = 0.8; p.padded = true; p.lifted = 1;
+        p.kx += Math.cos(a) * S.LIFT.push; p.ky += Math.sin(a) * S.LIFT.push;
+      }
+    }
     // 垂直
     const gh = S.topAt(M, p.x, p.y);
     if (p.onGround) {
@@ -1194,9 +1486,10 @@
     const isMvp = !!(mvp && mvp.id === pid) || !!(lm && lm.id === pid);   // 1.9：败方 MVP 也算（排位输了只扣一半）
     if (result.mode === 'loot') {   // 1.6：搜刮撤离——撤离成功才有物资；奖杯按是否撤离
       const L = (result.loot && result.loot.players[pid]) || { ex: false, items: [] };
-      const v = L.ex ? S.lootValue(L.items) : 0;
+      // 2.1：阵亡也能保住安全箱里的东西；付费撤离扣金币
+      const kept = L.ex ? L.items : (L.safe || []), v = S.lootValue(kept);
       return { xp: 60 + me.kills * 12 + (L.ex ? 80 + Math.min(120, Math.floor(v / 100)) : 0), trophies: L.ex ? 6 : -2, won: L.ex, draw: false, mvp: isMvp, kills: me.kills, paint: me.paint, mode: 'loot',
-        loot: { ex: !!L.ex, items: L.ex ? L.items.slice(0, 40) : [], v, risk: result.loot ? result.loot.risk : 'normal', gear: L.gear || [] } };
+        loot: { ex: !!L.ex, items: kept.slice(0, 60), v, risk: result.loot ? result.loot.risk : 'normal', gear: L.gear || [], paid: L.ex ? L.paid || 0 : 0, safeOnly: !L.ex && kept.length > 0 } };
     }
     // 逃亡圈按名次：四队 +10/+5/0/−3，单人 +10/+7/+4/+2/0/−2/−3/−4
     if (result.place) {

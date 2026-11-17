@@ -285,7 +285,7 @@
       trophies: 0, xp: 0, matches: 0, wins: 0, kills: 0, paint: 0, day: 0, dayWin: 0,
       talents: [], tal: [], tpBonus: 0,
       pass: { s: 1, xp: 0, prem: false, cf: [], cp: [] }, q: { d: 0, dp: [0, 0, 0], w: 0, wp: [0, 0, 0, 0] },
-      skins: [], wear: {}, mailGot: [], mailDel: [], stash: {}, gear: {}, gearOn: [], lootRec: { runs: 0, ex: 0, best: 0, total: 0, gold: 0, wk: 0, wbest: 0 }, ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
+      skins: [], wear: {}, mailGot: [], mailDel: [], stash: {}, gear: {}, gearOn: [], safeLv: 1, lootRec: { runs: 0, ex: 0, best: 0, total: 0, gold: 0, wk: 0, wbest: 0 }, ev: {}, story: { p: [0, 0, 0, 0, 0], c: [] },
       tl: {}, rank: { rp: 0, best: 0, got: [], n: 0, road: [], s: E.RANK.season.id }, streak: 0, bestStreak: 0,
     }, E.START);
   };
@@ -325,6 +325,7 @@
     o.stash = {}; if (p.stash && typeof p.stash === 'object') for (const k of S.LOOT_KEYS) { const n = int(p.stash[k], 0, 9999); if (n) o.stash[k] = n; }
     o.gear = {}; if (p.gear && typeof p.gear === 'object') for (const g of Object.keys(S.LOOT.gear)) { const n = int(p.gear[g], 0, 99); if (n) o.gear[g] = n; }
     o.gearOn = Array.isArray(p.gearOn) ? [...new Set(p.gearOn.filter((g) => o.gear[g] > 0))] : [];
+    o.safeLv = int(p.safeLv, 1, 3);
     if (p.lootRec && typeof p.lootRec === 'object') for (const k of Object.keys(o.lootRec)) o.lootRec[k] = int(p.lootRec[k], 0, 1e9);
     o.mailGot = Array.isArray(p.mailGot) ? [...new Set(p.mailGot.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
     o.mailDel = Array.isArray(p.mailDel) ? [...new Set(p.mailDel.filter((id) => E.MAILS.some((m) => m.id === id)))] : [];
@@ -379,10 +380,20 @@
   E.tpFree = (o) => E.tpTotal(o) - E.tpSpent(o);
   E.hasPilot = (o, id) => !!(o.pilots && o.pilots[id]);
   E.hasMech = (o, id) => !!(o.mechs && o.mechs.includes(id));
-  E.power = (o, id) => { const q = o.pilots && o.pilots[id]; return Object.assign(q ? { lv: q.lv, bt: q.bt } : { lv: 1, bt: 0 }, { tal: (o.tal || []).slice(0, S.TALENT_SLOTS), gear: (o.gearOn || []).filter((g) => (o.gear || {})[g] > 0) }); };
+  E.power = (o, id) => { const q = o.pilots && o.pilots[id]; return Object.assign(q ? { lv: q.lv, bt: q.bt } : { lv: 1, bt: 0 }, { safe: o.safeLv || 1, tal: (o.tal || []).slice(0, S.TALENT_SLOTS), gear: (o.gearOn || []).filter((g) => (o.gear || {})[g] > 0) }); };
   // 1.6：仓库价值 + 每周最佳撤离排行（同一周里固定的一批对手成绩）
   E.stashValue = (o) => Object.entries(o.stash || {}).reduce((a, [k, n]) => a + (S.LOOT.items[k] ? S.LOOT.items[k].v * n : 0), 0);
   E.sellPrice = (k) => Math.floor(((S.LOOT.items[k] || {}).v || 0) / 10);
+  // 2.1：交易行价格——按小时浮动（同一时间所有玩家看到的价格一样）；卖价 0.6~1.45 倍回收价，买价再贵 20%
+  // 能兑换宝石的至宝 / 传说物资只能卖不能买
+  const khash = (k) => { let h = 7; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) % 100003; return h; };
+  E.marketMult = (k, hour) => { const h = khash(k); return Math.max(0.6, Math.min(1.45, 1 + 0.28 * Math.sin(hour * 0.37 + h) + 0.1 * Math.sin(hour * 1.73 + h * 0.5) + 0.05 * Math.sin(hour * 4.1 + h * 1.3))); };
+  E.marketPrice = (k, now) => {
+    const I = S.LOOT.items[k]; if (!I) return null;
+    const hour = Math.floor((now || Date.now()) / 3600000), m = E.marketMult(k, hour), m0 = E.marketMult(k, hour - 1);
+    const sell = Math.max(1, Math.round((I.v / 10) * m));
+    return { sell, buy: I.ex ? 0 : Math.max(2, Math.round(sell * 1.2)), mult: m, trend: m - m0, next: (hour + 1) * 3600000 };
+  };
   E.lootBoard = (o, now) => {
     const wk = E.weekIndex(now);
     let st = (wk * 2654435761) >>> 0;
@@ -634,6 +645,29 @@
         o.coins -= G.price; o.gear[a.g] = (o.gear[a.g] || 0) + 1;
         return { ok: true, items: [], spent: { coins: G.price } };
       }
+      case 'safeUp': {   // 2.1：升级安全箱（2×2 → 2×3 → 3×3）
+        const lv = o.safeLv || 1, cost = S.LOOT.safeCost[lv + 1];
+        if (!cost) return no('安全箱已经满级了');
+        if (o.coins < cost) return no(`金币不够（需要 ${cost}）`);
+        o.coins -= cost; o.safeLv = lv + 1;
+        return { ok: true, items: [], spent: { coins: cost } };
+      }
+      case 'mktSell': case 'mktBuy': {   // 2.1：交易行——价格每小时浮动，所有玩家看到的一样
+        const k = a.k, n = Math.max(1, Math.min(99, a.n | 0 || 1)), I = S.LOOT.items[k];
+        if (!I) return no('没有这种物资');
+        const q = E.marketPrice(k, a.now);
+        if (op === 'mktSell') {
+          if ((o.stash[k] || 0) < n) return no('仓库里没有这么多');
+          o.stash[k] -= n; if (!o.stash[k]) delete o.stash[k];
+          const it = { k: 'coins', n: q.sell * n }; grant(o, [it]);
+          return { ok: true, items: [it] };
+        }
+        if (!q.buy) return no('这件物资不在交易行出售');
+        if (o.coins < q.buy * n) return no(`金币不够（需要 ${q.buy * n}）`);
+        if ((o.stash[k] || 0) + n > 9999) return no('仓库放不下了');
+        o.coins -= q.buy * n; o.stash[k] = (o.stash[k] || 0) + n;
+        return { ok: true, items: [], spent: { coins: q.buy * n } };
+      }
       case 'setGear': {   // 选择带进高危行动的装备
         const on = Array.isArray(a.on) ? [...new Set(a.on.filter((g) => S.LOOT.gear[g] && o.gear[g] > 0))] : [];
         o.gearOn = on;
@@ -744,14 +778,16 @@
       R2.runs++;
       if (R2.wk !== wk) { R2.wk = wk; R2.wbest = 0; }
       const lost = [];
+      // 2.1：撤离成功 = 背包 + 安全箱全部入库；阵亡 = 只有安全箱里的入库
+      for (const k of L.items) if (S.LOOT.items[k]) o.stash[k] = Math.min(9999, (o.stash[k] || 0) + 1);
       if (L.ex) {
-        for (const k of L.items) if (S.LOOT.items[k]) o.stash[k] = Math.min(9999, (o.stash[k] || 0) + 1);
         R2.ex++; R2.total += L.v; R2.best = Math.max(R2.best, L.v); R2.wbest = Math.max(R2.wbest, L.v);
-        R2.gold += L.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r === 5).length;
+        R2.gold += L.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r >= 5).length;
+        if (L.paid > 0) o.coins = Math.max(0, o.coins - Math.min(S.LOOT.ext.paid.cost, L.paid | 0));
       } else if (L.risk === 'high') {
         for (const g of L.gear || []) if (o.gear[g] > 0) { o.gear[g]--; lost.push(g); if (!o.gear[g]) { delete o.gear[g]; o.gearOn = o.gearOn.filter((x) => x !== g); } }
       }
-      lootInfo = { ex: L.ex, v: L.v, items: L.items, lost };
+      lootInfo = { ex: L.ex, v: L.v, items: L.items, lost, paid: L.ex ? L.paid || 0 : 0 };
     }
     // 乐园祭：乐园模式每局给乐园票
     for (const ev of evs) if (park && ev.ticketsPerPark) items.push({ k: 'tickets', n: ev.ticketsPerPark + (rw.won ? ev.ticketsWin || 0 : 0), why: ev.name });
@@ -759,7 +795,7 @@
     for (const ev of evs) if (ev.curPer) { const n = (ev.curPer[rw.mode] || ev.curOther || 0) + (rw.won && ev.curPer[rw.mode] ? ev.curWin || 0 : 0); if (n) items.push({ k: ev.cur, n, why: ev.name }); }
     const gainS = { play: 1, win: rw.won ? 1 : 0, kills: rw.kills, paint: rw.paint, elim: rw.mode === 'elim' ? 1 : 0, escape: esc ? 1 : 0, top3: esc && rw.rank && rw.rank <= 3 ? 1 : 0, crates: rw.cubes || 0,
       park: park ? 1 : 0, parkwin: park && rw.won ? 1 : 0, balloons: rw.balloons || 0, float: rw.float || 0, ranked: rw.ranked ? 1 : 0,
-      loot: rw.mode === 'loot' ? 1 : 0, lootex: lootInfo && lootInfo.ex ? 1 : 0, lootv: lootInfo && lootInfo.ex ? lootInfo.v : 0, lootgold: lootInfo && lootInfo.ex ? lootInfo.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r === 5).length : 0, loothi: lootInfo && lootInfo.ex && rw.loot.risk === 'high' ? 1 : 0,
+      loot: rw.mode === 'loot' ? 1 : 0, lootex: lootInfo && lootInfo.ex ? 1 : 0, lootv: lootInfo && lootInfo.ex ? lootInfo.v : 0, lootgold: lootInfo && lootInfo.ex ? lootInfo.items.filter((k) => S.LOOT.items[k] && S.LOOT.items[k].r >= 5).length : 0, loothi: lootInfo && lootInfo.ex && rw.loot.risk === 'high' ? 1 : 0,
       raid: rw.mode === 'raid' ? 1 : 0, raidwin: rw.mode === 'raid' && rw.won ? 1 : 0, seal: rw.mode === 'seal' ? 1 : 0, seals: rw.seals || 0, spirits: rw.spirits || 0 };
     for (const ev of evs) {
       const st = o.ev[ev.id] || (o.ev[ev.id] = { p: ev.quests.map(() => 0), c: ev.quests.map(() => false) });

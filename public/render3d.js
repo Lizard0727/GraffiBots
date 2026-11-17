@@ -4,7 +4,7 @@
   'use strict';
   const S = window.GS;
   const T = window.THREE;
-  const PK = 0.5;              // 涂料贴图分辨率（像素/游戏单位）
+  let PK = 0.5;                // 涂料贴图分辨率（像素/游戏单位）；2.1：超大地图自动降低，贴图不超过 4096
   const PN = 2500;             // 粒子上限
   let renderer = null, scene = null, camera = null, W = null, failed = false, HQ = true;
 
@@ -165,7 +165,9 @@
     fill.position.set(S.W / 2 - sd.x * 1200, 600, S.H / 2 - sd.z * 1200);
     scene.add(fill);
 
-    W = { G, M: G.M, colors: G.colors, bots: new Map(), pools: {}, dirty: true, pd: new Array(PN).fill(null), pi: 0, SK };
+    PK = Math.min(0.5, Math.min(HQ ? 4096 : 3072, renderer.capabilities.maxTextureSize || 4096) / Math.max(S.W, S.H));
+    W = { G, M: G.M, colors: G.colors, bots: new Map(), pools: {}, dirty: true, pd: new Array(PN).fill(null), pi: 0, SK, sun, sd, giant: !!G.M.giant };
+    if (W.giant) { scene.fog.near = 1300; scene.fog.far = 4200; }
     buildSky(SK, sd);
     buildSurface(G);
     buildFloor();
@@ -313,7 +315,7 @@
     for (let cy = 0; cy < S.GH; cy++)
       for (let cx = 0; cx < S.GW; cx++) {
         const lv = M.lv[cy * S.GW + cx];
-        x.fillStyle = lv ? SK.tops[lv - 1] : SK.floor[((cx >> 3) + (cy >> 3)) % 2];
+        x.fillStyle = lv ? SK.tops[lv === 5 ? 1 : lv - 1] : SK.floor[((cx >> 3) + (cy >> 3)) % 2];
         x.fillRect(cx * C, cy * C, C, C);
       }
     x.save(); x.scale(PK, PK);
@@ -439,13 +441,14 @@
     m.receiveShadow = true;
     scene.add(m);
     // 场外的天台地面
-    const g2 = new T.PlaneGeometry(9000, 9000);
+    const ext = Math.max(9000, Math.max(S.W, S.H) + 6000), g2 = new T.PlaneGeometry(ext, ext);
     g2.rotateX(-Math.PI / 2); g2.translate(S.W / 2, -40, S.H / 2);
     scene.add(new T.Mesh(g2, lambert(new T.Color(W.SK.floor[1]).multiplyScalar(0.45))));
   }
 
   // ---------------- 方块侧面贴图（三种高度三种风格） ----------------
   function sideTexture(lv, SK, seed) {
+    if (lv === 5) lv = 3;   // 2.1：高楼天台的外墙用高墙风格
     const [a, b] = SK.sides[lv - 1];
     const c = document.createElement('canvas'); c.width = 256; c.height = lv === 3 ? 512 : 256;
     const x = c.getContext('2d'), R = rng(seed), H = c.height;
@@ -527,7 +530,15 @@
     const M = W.M, GW = S.GW, GH = S.GH, C = S.CELL, SK = W.SK;
     const used = new Uint8Array(GW * GH);
     const geo = () => ({ p: [], n: [], uv: [] });
-    const top = geo(), sides = [null, geo(), geo(), geo(), geo()], trim = [null, geo(), geo(), geo(), geo()];
+    // 2.1：超大地图按区块分开建网格，镜头外的区块整块剔除
+    const CH = W.giant ? 96 : 1e9, chunks = new Map();
+    let top, sides, trim;
+    const useChunk = (cx, cy) => {
+      const k = Math.floor(cx / CH) + ',' + Math.floor(cy / CH);
+      let c = chunks.get(k);
+      if (!c) chunks.set(k, (c = { top: geo(), sides: [null, geo(), geo(), geo(), geo(), geo()], trim: [null, geo(), geo(), geo(), geo(), geo()] }));
+      top = c.top; sides = c.sides; trim = c.trim;
+    };
     const quad = (o, v, n, uv) => {
       for (const k of [0, 1, 2, 0, 2, 3]) { o.p.push(v[k][0], v[k][1], v[k][2]); o.n.push(n[0], n[1], n[2]); o.uv.push(uv[k][0], uv[k][1]); }
     };
@@ -546,7 +557,7 @@
       quad(top, [[x0, H, z0], [x0, H, z1], [x1, H, z1], [x1, H, z0]], [0, 1, 0], [tuv(x0, z0), tuv(x0, z1), tuv(x1, z1), tuv(x1, z0)]);
       const o = sides[lv];
       // 每个面随机水平偏移，避免相邻墙面图案一模一样
-      const ul = lv === 3 ? 512 : lv === 4 ? 64 : 128;
+      const ul = lv === 3 || lv === 5 ? 512 : lv === 4 ? 64 : 128;
       const suv = (len) => { const u0 = (faceSeed++ * 0.37) % 1; return [[u0, 0], [u0 + len / ul, 0], [u0 + len / ul, 1], [u0, 1]]; };
       quad(o, [[x1, 0, z0], [x0, 0, z0], [x0, H, z0], [x1, H, z0]], [0, 0, -1], suv(w));
       quad(o, [[x0, 0, z1], [x1, 0, z1], [x1, H, z1], [x0, H, z1]], [0, 0, 1], suv(w));
@@ -577,6 +588,7 @@
           h++;
         }
         for (let j = 0; j < h; j++) for (let k = 0; k < w; k++) used[(cy + j) * GW + cx + k] = 1;
+        useChunk(cx, cy);
         box(cx * C, cy * C, w * C, h * C, tp, lv);
       }
     const mk = (o) => {
@@ -586,18 +598,25 @@
       g.setAttribute('uv', new T.Float32BufferAttribute(o.uv, 2));
       return g;
     };
-    if (top.p.length) {
-      const tm = new T.Mesh(mk(top), W.groundMat);
-      tm.receiveShadow = true; tm.castShadow = true; scene.add(tm);
+    const sideM = [], trimM = [];
+    for (let lv = 1; lv <= 5; lv++) {
+      const sl = lv === 5 ? 3 : lv, tc = new T.Color(SK.trim[sl - 1]), glow = (SK.night || SK.glow) && sl !== 3;
+      sideM[lv] = lv === 5 && sideM[3] ? sideM[3] : null; trimM[lv] = [glow ? basic(tc) : lambert(tc), glow];
     }
-    for (let lv = 1; lv <= 4; lv++) {
-      if (!sides[lv].p.length) continue;
-      const sm = new T.Mesh(mk(sides[lv]), lambert(0xffffff, { map: sideTexture(lv, SK, lv * 3 + W.G.map) }));
-      sm.receiveShadow = true; sm.castShadow = true; scene.add(sm);
-      const tc = new T.Color(SK.trim[lv - 1]);
-      const glow = (SK.night || SK.glow) && lv !== 3;
-      const tmm = new T.Mesh(mk(trim[lv]), glow ? basic(tc) : lambert(tc));
-      tmm.castShadow = true; tmm.receiveShadow = !glow; scene.add(tmm);
+    for (const c of chunks.values()) {
+      if (c.top.p.length) {
+        const tm = new T.Mesh(mk(c.top), W.groundMat);
+        tm.receiveShadow = true; tm.castShadow = true; scene.add(tm);
+      }
+      for (let lv = 1; lv <= 5; lv++) {
+        if (!c.sides[lv].p.length) continue;
+        if (!sideM[lv]) sideM[lv] = lambert(0xffffff, { map: sideTexture(lv, SK, lv * 3 + W.G.map) });
+        const sm = new T.Mesh(mk(c.sides[lv]), sideM[lv]);
+        sm.receiveShadow = true; sm.castShadow = true; scene.add(sm);
+        if (!c.trim[lv].p.length) continue;
+        const tmm = new T.Mesh(mk(c.trim[lv]), trimM[lv][0]);
+        tmm.castShadow = true; tmm.receiveShadow = !trimM[lv][1]; scene.add(tmm);
+      }
     }
   }
 
@@ -665,6 +684,8 @@
       new T.MeshBasicMaterial({ map: stex, transparent: true, side: T.BackSide, depthWrite: false, fog: false, color: new T.Color(SK.mid).lerp(new T.Color(SK.zen), 0.55) }));
     ring.position.set(S.W / 2, 380, S.H / 2); ring.renderOrder = -8;
     scene.add(ring);
+    W.ring = ring;
+    if (W.giant) return;   // 2.1：超大地图里天际线跟着镜头走，不放广告牌
     // 霓虹广告牌
     const texts = ['GRAFFI BOTS', '涂鸦机兵', 'SPRAY ON!', 'INK ZONE'];
     for (let i = 0; i < 4; i++) {
@@ -690,8 +711,9 @@
     const metal = lambert(0xb9bfd0), dark = lambert(0x3a3e52), fan = lambert(0x23252f);
     const lamp = basic(SK.night ? 0x7dfcff : 0xfff1c2);
     for (const [rx, ry, rw, rh, lv] of M.rects) {
-      if (lv < 3) continue;
-      const H = S.LEVEL_H[3], cx = (rx + rw / 2) * C, cz = (ry + rh / 2) * C;
+      if (lv < 3 || lv === 4) continue;
+      if (W.giant && (Math.min(rw, rh) < 3 || R() < 0.5)) continue;
+      const H = S.LEVEL_H[lv === 5 ? 5 : 3], cx = (rx + rw / 2) * C, cz = (ry + rh / 2) * C;
       const long = rw >= rh, L = (long ? rw : rh) * C;
       const n = Math.max(1, Math.floor(L / 110));
       for (let k = 0; k < n; k++) {
@@ -781,6 +803,22 @@
       }
       scene.add(g);
       W.pads.push({ g, ring, ringM });
+    }
+    // 2.1：电梯——发光底座 + 一直升到天台的光柱和钢架
+    const liftM = basic(0x5ee36a, { transparent: true, opacity: 0.18, depthWrite: false, side: T.DoubleSide });
+    const frameM = toon(0x3a3e52), lampM = basic(0x5ee36a);
+    const HL = S.LEVEL_H[5] + 14;
+    for (const [lx, ly] of W.M.lifts || []) {
+      const g = new T.Group();
+      g.position.set((lx + 1) * C, 0, (ly + 1) * C);
+      g.add(part(SH.box, frameM, 30, 3, 30, 0, 1.5, 0));
+      const ring = new T.Mesh(SH.ring, basic(0x5ee36a, { transparent: true, opacity: 0.9 })); ring.rotation.x = -Math.PI / 2; ring.position.y = 3.2; ring.scale.setScalar(12); g.add(ring);
+      const beam = new T.Mesh(new T.CylinderGeometry(12, 12, HL, 12, 1, true), liftM); beam.position.y = HL / 2; g.add(beam);
+      for (const [ox, oz] of [[-15, -15], [15, -15], [-15, 15], [15, 15]]) g.add(part(SH.box, frameM, 2.4, HL, 2.4, ox, HL / 2, oz));
+      for (let y = 40; y < HL; y += 56) { g.add(part(SH.box, frameM, 32, 2, 2, 0, y, -15)); g.add(part(SH.box, frameM, 32, 2, 2, 0, y, 15)); }
+      g.add(part(SH.box, lampM, 32, 2, 32, 0, HL, 0));
+      scene.add(g);
+      W.pads.push({ g, ring, ringM: ring.material });
     }
   }
   // ---------------- 环境粒子：樱花花瓣 / 雪 / 炉火余烬 ----------------
@@ -1092,6 +1130,27 @@
       }
       W.lootM = new T.Matrix4(); W.lootQ = new T.Quaternion(); W.lootE = new T.Euler(); W.lootV = new T.Vector3(); W.lootSc = new T.Vector3();
       W.exZones = null;
+      // 2.1：可搜索的容器——每种容器一个实例化网格（箱体 + 一道色带），颜色随状态变暗（开过 / 空了）
+      const CV = { crate: [24, 18, 16, 0x9a6a3a, 0xffc46b], locker: [16, 11, 36, 0x5a7a9a, 0xc8d8ea], safe: [18, 16, 20, 0x3a3e4a, 0xd8b25a], pc: [20, 12, 14, 0x2a2d3a, 0x1fd6ee],
+        med: [20, 14, 12, 0xf2f2f2, 0xff3b52], weapon: [36, 12, 10, 0x5a6a3a, 0xffd23f], duffel: [24, 12, 10, 0x2a2a30, 0xff8a1f], vault: [32, 32, 30, 0xb08a3a, 0xffe58a],
+        body: [22, 14, 8, 0x3a3448, 0xff3b52], pile: [16, 16, 8, 0x6a6a6a, 0xffffff] };
+      W.contInst = {}; W.contCV = CV;
+      const unit = new T.BoxGeometry(1, 1, 1); unit.translate(0, 0.5, 0);
+      for (const type of S.CONT_IDS) {
+        const v = CV[type] || CV.crate, cap = Math.max(64, ((G.contArr || []).filter((c) => c.type === type).length + 64));
+        const body = new T.InstancedMesh(unit, lambert(0xffffff), cap), band = new T.InstancedMesh(unit, basic(0xffffff), cap);
+        body.count = band.count = 0; body.castShadow = true; body.receiveShadow = true; body.frustumCulled = band.frustumCulled = false;
+        scene.add(body, band);
+        W.contInst[type] = { body, band, cap, v };
+      }
+      if (G.lever) {   // 电闸：配电柜 + 拉杆 + 警示灯
+        const [lx, ly] = G.lever, lz = S.topAt(W.M, lx, ly), g = new T.Group(); g.position.set(lx, lz, ly);
+        g.add(part(SH.box, toon(0x3a3e4a), 26, 40, 14, 0, 20, 0));
+        g.add(part(SH.box, toon(0xffd23f), 26.5, 4, 14.5, 0, 34, 0));
+        W.leverArm = part(SH.box, toon(0xff3b52), 3, 18, 3, 0, 9, 0); const pv = new T.Group(); pv.position.set(0, 24, 8); pv.add(W.leverArm); g.add(pv); W.leverPivot = pv;
+        W.leverLamp = part(SH.sph, basic(0xff9a3d), 4, 4, 4, 0, 46, 0); g.add(W.leverLamp);
+        scene.add(g);
+      }
     }
     if (G.mode === 'park') {
       // 气球：每个颜色随 id 变化
@@ -3619,9 +3678,27 @@
         }
         for (let r = 1; r <= 5; r++) { L[r].im.instanceMatrix.needsUpdate = true; if (L[r].bm) L[r].bm.instanceMatrix.needsUpdate = true; }
       }
+      // 2.1：容器（状态变了才重新写实例）
+      if (G.contArr && W.contInst && G.contDirty) {
+        const M4 = W.lootM, Q = W.lootQ, E3 = W.lootE, V = W.lootV, SC = W.lootSc, col = new T.Color();
+        for (const k in W.contInst) { W.contInst[k].body.count = 0; W.contInst[k].band.count = 0; }
+        for (const c of G.contArr) {
+          const ci = W.contInst[c.type]; if (!ci || ci.body.count >= ci.cap) continue;
+          const [w, d, h, bc, lc] = ci.v, n = ci.body.count, k = c.st === 2 ? 0.35 : c.st === 1 ? 0.7 : 1;
+          Q.setFromEuler(E3.set(0, (c.id * 1.7) % 6.283, 0));
+          V.set(c.x, c.z, c.y); SC.set(w, h, d); ci.body.setMatrixAt(n, M4.compose(V, Q, SC));
+          ci.body.setColorAt(n, col.set(bc).multiplyScalar(k));
+          V.set(c.x, c.z + h * 0.62, c.y); SC.set(w + 1.2, Math.max(2, h * 0.14), d + 1.2); ci.band.setMatrixAt(n, M4.compose(V, Q, SC));
+          ci.band.setColorAt(n, col.set(c.st === 2 ? 0x333640 : lc));
+          ci.body.count = ci.band.count = n + 1;
+        }
+        for (const k in W.contInst) { const ci = W.contInst[k]; ci.body.instanceMatrix.needsUpdate = ci.band.instanceMatrix.needsUpdate = true; if (ci.body.instanceColor) ci.body.instanceColor.needsUpdate = true; if (ci.band.instanceColor) ci.band.instanceColor.needsUpdate = true; }
+        G.contDirty = 0;
+      }
+      if (W.leverPivot) { const on = o && o[2] > 0; W.leverPivot.rotation.x = on ? 1.1 : -0.5; W.leverLamp.material.color.set(on ? 0x5ee36a : (Math.floor(now / 400) % 2 ? 0xff9a3d : 0x5a3a1a)); }
       if (o && o[0] && !W.exZones) {
         W.exZones = [];
-        for (let i = 0; i < o[0].length; i += 3) {
+        for (let i = 0; i + 4 < o[0].length; i += 5) {
           const x = o[0][i], y = o[0][i + 1], z = S.topAt(W.M, x, y);
           const ringM = basic(0x9aa0a8, { transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false });
           const ring = new T.Mesh(new T.RingGeometry(S.LOOT.extR - 6, S.LOOT.extR, 48), ringM); ring.rotation.x = -Math.PI / 2; ring.position.set(x, z + 1.5, y);
@@ -3633,8 +3710,9 @@
         }
       }
       if (o && o[0] && W.exZones) W.exZones.forEach((z, j) => {
-        const open = o[0][j * 3 + 2] <= 0, c = open ? 0x5ee36a : 0x9aa0a8;
-        z.ringM.color.set(c); z.lamp.material.color.set(open ? 0x5ee36a : (Math.floor(now / 500) % 2 ? 0xffd23f : 0x9aa0a8));
+        const EC = [0x5ee36a, 0xffd23f, 0x4fd8ff, 0xff9a3d, 0xc78cff];
+        const open = !!o[0][j * 5 + 3], c = open ? EC[o[0][j * 5 + 2]] || 0x5ee36a : 0x9aa0a8;
+        z.ringM.color.set(c); z.lamp.material.color.set(open ? c : (Math.floor(now / 500) % 2 ? 0xffd23f : 0x9aa0a8)); z.discM.color.set(c); z.beacon.material.color.set(c);
         z.discM.opacity = open ? 0.14 + 0.06 * Math.sin(now / 250) : 0;
         z.beacon.material.opacity = open ? 0.22 + 0.08 * Math.sin(now / 300) : 0;
       });
@@ -3657,6 +3735,13 @@
     if (!camera) return;
     camera.position.set(cx, cz, cy);
     camera.lookAt(tx, tz, ty);
+    if (W && W.giant && W.sun) {
+      // 2.1：超大地图的阴影范围跟着镜头（按 64 取整，避免阴影抖动）
+      const sx = Math.round(tx / 64) * 64, sz = Math.round(ty / 64) * 64, sd = W.sd;
+      W.sun.target.position.set(sx, 0, sz);
+      W.sun.position.set(sx + sd.x * 1500, sd.y * 1500 + 300, sz + sd.z * 1500);
+      if (W.ring) W.ring.position.set(cx, 380, cy);
+    }
     if (fov && Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   }
   const _p = new T.Vector3();
