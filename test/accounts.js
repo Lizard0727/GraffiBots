@@ -100,5 +100,18 @@ ok(li.ok && li.profile.trophies === 30 && li.profile.weapon === 'roller', '本�
 L.save('喷漆王', Object.assign(li.profile, { trophies: 38 }));
 ok(L.profile('喷漆王').trophies === 38 && L.list().length === 1, '本机账号：保存进度');
 
+// ---- 2.1.1：账号转移码（换浏览器 / 设备）----
+{
+  const GA = require('../public/account.js');
+  const mk = () => { const m = {}; return { get: (k, d) => (k in m ? JSON.parse(m[k]) : d), set: (k, v) => { m[k] = JSON.stringify(v); } }; };
+  const A1 = GA.LocalAccounts(mk(), S), A2 = GA.LocalAccounts(mk(), S);
+  A1.register('转移测试', 'secret12', { coins: 4321, trophies: 88 });
+  const code = A1.exportCode('转移测试');
+  ok(/^GBACC1\./.test(code) && !code.includes('secret12'), '转移码里没有明文密码');
+  ok(A2.importCode(code).ok && A2.login('转移测试', 'secret12').ok && !A2.login('转移测试', 'nope1234').ok, '另一个浏览器导入后用原密码登录');
+  ok(A2.profile('转移测试').coins === 4321, '进度跟着转移');
+  ok(A2.importCode(code).exists && A2.importCode(code, true).replaced, '同名账号要确认才覆盖');
+  ok(!A2.importCode(code.slice(0, 40) + 'x' + code.slice(41)).ok, '转移码被改动就拒绝');
+}
 console.log(failed ? `\n${failed} 项失败` : '\n账号测试全部通过');
 process.exit(failed ? 1 : 0);

@@ -62,7 +62,14 @@
       <button type="submit" class="btn big" id="lgGo">登 录</button>
       <p class="lg-note" id="lgNote"></p>
       <button type="button" class="lg-guest" id="lgGuest">先不登录，<b>游客试玩 →</b></button>
+      <div class="lg-extra"><button type="button" class="link-btn" id="lgImport">📥 导入账号（从别的浏览器 / 设备搬过来）</button><button type="button" class="link-btn" id="lgServer">🌐 连接游戏服务器</button></div>
+      <p class="lg-warn hidden" id="lgWarn"></p>
     </form>
+    <div id="xferDlg" class="dlg hidden"><div class="dlg-card xfer-card">
+      <h3 id="xferTitle">账号转移</h3><p id="xferNote" class="xfer-note"></p>
+      <textarea id="xferCode" rows="6" spellcheck="false" autocomplete="off"></textarea>
+      <div class="xfer-btns" id="xferBtns"></div>
+    </div></div>
   </section>
   <canvas id="gl"></canvas>
   <canvas id="game"></canvas>
@@ -417,6 +424,7 @@
     <button class="tb t-ov hidden" data-tb="ov" id="tOv"><span>超载</span></button>
     <button class="tb t-mini t-menu" data-tb="menu"><span>⏸</span></button>
     <button class="tb t-mini t-board" data-tb="board"><span>☰</span></button>
+    <button class="tb t-mini t-map" data-tb="map"><span>🗺</span></button>
     <button class="tb t-mini t-chat" data-tb="chat"><span>💬</span></button>
   </div>
   <div id="rotateHint"><div><b>⟳</b><p>请把手机横过来玩</p></div></div>

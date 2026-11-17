@@ -16,6 +16,13 @@
   const TIER = { 高级: 'Premium', 免费: 'Free' };
   // 带数字 / 名字的句式（先于片段替换）
   const PATTERNS = [
+    [/账号「(.+)」导入成功，输入密码登录吧/g, 'Account “$1” imported — enter your password to log in'],
+    [/这台设备上已经有账号「(.+)」了。用转移码里的进度覆盖它吗？/g, 'An account “$1” already exists on this device. Replace it with the progress from the transfer code?'],
+    [/已保存服务器地址：(.+)，正在重新连接…/g, 'Server address saved: $1 — reconnecting…'],
+    [/新小队「(.+)」中途加入战场！当前 (\d+) 支小队/g, 'New squad “$1” joined the raid mid-match! $2 squads now'],
+    [/增援小队「(.+)」空降进场！当前 (\d+) 支小队/g, 'Reinforcement squad “$1” dropped in! $2 squads now'],
+    [/找到一局进行中的撤离行动（还剩 (\d+) 分钟），等空出来的小队位置……/g, 'Found a raid in progress ($1 min left) — waiting for a free squad slot…'],
+    [/使用了 (.+)/g, 'Used $1'],
     // ---- 2.1 撤离 / 通行证 ----
     [/还有 (\d+) 件没搜/g, '$1 left to search'], [/(\d+) 秒后开放/g, 'opens in $1 s'], [/电闸冷却中 (\d+) 秒/g, 'Lever cooling down: $1 s'],
     [/开放中 · (\d+)秒/g, 'Open · $1 s'], [/价格每小时整点刷新（还有 (\d+) 分钟）/g, 'Prices refresh every hour on the hour ($1 min left)'],

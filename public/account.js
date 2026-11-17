@@ -44,6 +44,14 @@
     if (c && c.getRandomValues) c.getRandomValues(b); else for (let i = 0; i < n; i++) b[i] = Math.floor(Math.random() * 256);
     return hex(b);
   }
+  // base64（UTF-8 安全；不依赖 Buffer，浏览器和 node 都能用）
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 3) { const n = (bytes[i] << 16) | ((bytes[i + 1] || 0) << 8) | (bytes[i + 2] || 0); s += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + (i + 1 < bytes.length ? B64[(n >> 6) & 63] : '=') + (i + 2 < bytes.length ? B64[n & 63] : '='); } return s; }
+  function unb64(s) {
+    const out = []; s = s.replace(/=+$/, '');
+    for (let i = 0; i < s.length; i += 4) { const n = (B64.indexOf(s[i]) << 18) | (B64.indexOf(s[i + 1]) << 12) | ((B64.indexOf(s[i + 2]) & 63) << 6) | (B64.indexOf(s[i + 3]) & 63); out.push((n >> 16) & 255); if (i + 2 < s.length) out.push((n >> 8) & 255); if (i + 3 < s.length) out.push(n & 255); }
+    return typeof TextDecoder !== 'undefined' ? new TextDecoder().decode(new Uint8Array(out)) : decodeURIComponent(escape(String.fromCharCode.apply(null, out)));
+  }
   const ROUNDS = 4000;
   function hashPass(pass, salt) {
     let h = sha256(utf8(salt + '\u0000' + pass));
@@ -79,6 +87,23 @@
       },
       profile(name) { const acc = all()[key(name)]; return acc ? Object.assign({}, acc.profile, { name: acc.name }) : null; },
       save(name, profile) { const a = all(), acc = a[key(name)]; if (!acc) return false; acc.profile = Object.assign({}, profile, { name: acc.name }); put(a); return true; },
+      // 2.1.1：账号转移码——把账号（加盐哈希 + 进度）搬到别的浏览器 / 设备，导入后用原来的密码登录
+      exportCode(name) {
+        const acc = all()[key(name)]; if (!acc) return null;
+        const body = b64(utf8(JSON.stringify({ v: 1, n: acc.name, s: acc.salt, h: acc.hash, c: acc.created, t: Date.now(), p: acc.profile })));
+        return 'GBACC1.' + body + '.' + hex(sha256(utf8(body))).slice(0, 10);
+      },
+      importCode(code, overwrite) {
+        const m = String(code || '').replace(/\s+/g, '').match(/^GBACC1\.([A-Za-z0-9+/=]+)\.([0-9a-f]{10})$/);
+        if (!m || hex(sha256(utf8(m[1]))).slice(0, 10) !== m[2]) return { ok: false, err: '转移码不完整或者复制错了' };
+        let d; try { d = JSON.parse(unb64(m[1])); } catch (e) { return { ok: false, err: '转移码不完整或者复制错了' }; }
+        if (!d || d.v !== 1 || !S.ACCOUNT.nameOk(d.n) || !/^[0-9a-f]{32}$/.test(d.s) || !/^[0-9a-f]{64}$/.test(d.h)) return { ok: false, err: '转移码格式不对' };
+        const a = all(), k = key(d.n), had = a[k];
+        if (had && !overwrite) return { ok: false, exists: true, name: d.n, err: '这台设备上已经有同名账号了' };
+        a[k] = { name: d.n, salt: d.s, hash: d.h, created: d.c || Date.now(), profile: Object.assign({}, d.p || {}, { name: d.n }) };
+        put(a);
+        return { ok: true, name: d.n, replaced: !!had };
+      },
       remove(name, pass) {
         const a = all(), acc = a[key(name)];
         if (!acc || !same(hashPass(String(pass || ''), acc.salt), acc.hash)) return { ok: false, err: '密码不对' };

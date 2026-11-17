@@ -539,16 +539,34 @@
       goldbar: { name: '金条', r: 5, w: 1, h: 1, v: 5200, ex: { gems: 30 } }, aicore: { name: '战术 AI 核心', r: 5, w: 2, h: 2, v: 7800, ex: { crystals: 1, gems: 40 } },
       fusion: { name: '便携聚变核心', r: 6, w: 2, h: 2, v: 22000, ex: { crystals: 3, gems: 120 } }, crown: { name: '灰石董事会王冠', r: 6, w: 1, h: 1, v: 18000, ex: { crystals: 2, gems: 100 } },
       blueprint: { name: '机兵原型蓝图', r: 6, w: 2, h: 1, v: 16000, ex: { crystals: 2, gems: 80 } }, goldmech: { name: '黄金机兵模型', r: 6, w: 3, h: 3, v: 30000, ex: { crystals: 4, gems: 160 } },
+      // ---- 2.1.1：更多物资 ----
+      wire: { name: '铜线', r: 1, w: 1, h: 1, v: 70 }, glue: { name: '胶水', r: 1, w: 1, h: 1, v: 65 }, nails: { name: '钉子盒', r: 1, w: 1, h: 1, v: 75 }, water: { name: '瓶装水', r: 1, w: 1, h: 1, v: 80 },
+      snack: { name: '压缩饼干', r: 1, w: 1, h: 1, v: 85 }, fuse: { name: '保险丝', r: 1, w: 1, h: 1, v: 90 },
+      drill: { name: '电钻', r: 2, w: 2, h: 1, v: 360 }, gasmask: { name: '防毒面具', r: 2, w: 1, h: 1, v: 340 }, flashl: { name: '战术手电', r: 2, w: 1, h: 1, v: 260 }, antib: { name: '抗生素', r: 2, w: 1, h: 1, v: 310 },
+      router: { name: '军用路由器', r: 2, w: 1, h: 1, v: 330 }, paintset: { name: '喷漆套装', r: 2, w: 2, h: 1, v: 380 },
+      thermal: { name: '热成像仪', r: 3, w: 2, h: 1, v: 980 }, ssd: { name: '固态硬盘', r: 3, w: 1, h: 1, v: 760 }, milbat: { name: '军用电池', r: 3, w: 1, h: 2, v: 820 }, surgkit: { name: '手术包', r: 3, w: 2, h: 1, v: 880 },
+      camera: { name: '单反相机', r: 3, w: 2, h: 1, v: 900 }, vinyl: { name: '黑胶唱片', r: 3, w: 1, h: 1, v: 680 },
+      laptop: { name: '加固笔记本', r: 4, w: 2, h: 1, v: 2300 }, nvg: { name: '夜视仪', r: 4, w: 1, h: 1, v: 2100 }, statue: { name: '青铜雕像', r: 4, w: 2, h: 2, v: 2700 }, serum: { name: '实验血清', r: 4, w: 1, h: 1, v: 2500 },
+      satphone: { name: '卫星电话', r: 4, w: 1, h: 1, v: 2000 },
+      diamond: { name: '钻石', r: 5, w: 1, h: 1, v: 6500, ex: { gems: 40 } }, painting: { name: '名画', r: 5, w: 2, h: 2, v: 8800, ex: { crystals: 1, gems: 50 } }, srvdrive: { name: '灰石服务器硬盘', r: 5, w: 1, h: 2, v: 7000, ex: { crystals: 1 } },
+      mechheart: { name: '机甲之心', r: 6, w: 2, h: 2, v: 26000, ex: { crystals: 3, gems: 140 } },
+      // 消耗品：在背包里双击（手机长按后点「使用」）就能用
+      stim: { name: '急救针', r: 2, w: 1, h: 1, v: 200, use: { heal: 50 } }, shieldc: { name: '护盾电池', r: 2, w: 1, h: 1, v: 220, use: { shield: 50 } },
+      adren: { name: '肾上腺素', r: 3, w: 1, h: 1, v: 500, use: { rush: 4 } }, repair: { name: '机体维修包', r: 3, w: 2, h: 1, v: 600, use: { heal: 120 } },
     },
     // 物资点品质 → 各品质的权重（1 野外 / 2 普通房间 / 3 好房间 / 4 守卫区 / 5 高价值区 / 6 金库）
     tiers: { 1: [0, 66, 26, 7, 1, 0, 0], 2: [0, 40, 38, 17, 4, 1, 0], 3: [0, 12, 34, 34, 16, 4, 0], 4: [0, 0, 18, 38, 30, 12, 2], 5: [0, 0, 0, 24, 40, 30, 6], 6: [0, 0, 0, 0, 30, 52, 18] },
     // 容器：搜索时间 = 打开 0.4 秒 + 每件 search(r)；n = 物资数量范围；bump = 品质加成（0 / +1 档）
     conts: {
-      crate: { name: '军需箱', n: [2, 4] }, locker: { name: '储物柜', n: [1, 3] }, safe: { name: '保险柜', n: [1, 2], bump: 1 }, pc: { name: '电脑', n: [1, 2], kinds: ['drive', 'circuit', 'qchip', 'gpu', 'files', 'blueprint', 'walkie'] },
-      med: { name: '医疗箱', n: [1, 3], kinds: ['medkit', 'canned', 'tape', 'cell', 'battery'] }, weapon: { name: '武器箱', n: [2, 3], bump: 1 }, duffel: { name: '行李包', n: [1, 3] },
+      crate: { name: '军需箱', n: [2, 4] }, locker: { name: '储物柜', n: [1, 3] }, safe: { name: '保险柜', n: [1, 2], bump: 1 }, pc: { name: '电脑', n: [1, 2], kinds: ['drive', 'circuit', 'qchip', 'gpu', 'files', 'blueprint', 'walkie', 'ssd', 'router', 'laptop', 'satphone'] },
+      med: { name: '医疗箱', n: [1, 3], kinds: ['medkit', 'canned', 'tape', 'cell', 'battery', 'stim', 'antib', 'surgkit', 'serum', 'repair', 'adren'] },
+      fridge: { name: '冰箱', n: [1, 3], kinds: ['canned', 'water', 'snack', 'serum', 'antib', 'stim'] }, server: { name: '服务器机柜', n: [1, 2], bump: 1, kinds: ['ssd', 'router', 'srvdrive', 'laptop', 'drive', 'qchip', 'gpu', 'aicore'] },
+      tools: { name: '工具柜', n: [2, 3], kinds: ['scrap', 'cable', 'wire', 'glue', 'nails', 'fuse', 'drill', 'toolbox', 'milbat', 'servo', 'engine', 'shieldc', 'repair'] }, weapon: { name: '武器箱', n: [2, 3], bump: 1 }, duffel: { name: '行李包', n: [1, 3] },
       vault: { name: '金库', n: [3, 5], bump: 1 }, body: { name: '遗骸' }, pile: { name: '丢弃的物资' },
     },
     search: (r) => 0.35 + 0.28 * (r || 1),
+    // 2.1.1 中途加入：剩余时间至少 joinMin 秒才能加入；每局最多 maxJoins 支新小队；没人排队时 AI 增援小队在全灭 botJoinWait 秒后进场
+    joinMin: 300, maxJoins: 4, botJoinWait: 25,
     // 背包（不带背包 / 扩容背包 / 大型登山包），安全箱等级（死亡也不会丢），撤离点类型
     bags: { base: [5, 3], pack: [6, 5], bigpack: [7, 6] },
     safe: [null, [2, 2], [2, 3], [3, 3]], safeCost: [0, 0, 4000, 12000],
@@ -994,7 +1012,7 @@
         if (!isFree(i, j, bw, bh, 1)) continue;
         const d = RI(2, bw - 5);
         add(i, j, bw, 1, 3); add(i, j + bh - 1, d, 1, 3); add(i + d + 3, j + bh - 1, bw - d - 3, 1, 3); add(i, j + 1, 1, bh - 2, 3); add(i + bw - 1, j + 1, 1, bh - 2, 3);
-        cont(i + RI(2, bw - 3), j + RI(2, bh - 3), pick(['duffel', 'locker', 'med']), tierAt(i, j, base));
+        cont(i + RI(2, bw - 3), j + RI(2, bh - 3), pick(['duffel', 'locker', 'med', 'fridge']), tierAt(i, j, base));
         if (R() < 0.4 && isFree(i + bw + 1, j, 1, bh)) add(i + bw + 1, j, 1, bh, 1);
       }
     };
@@ -1007,7 +1025,7 @@
       }
     };
     const factory = (x, y, w, h, base) => {   // 工业：大厂房（一排排货架）
-      building(x, y, w, h, base, ['crate', 'locker', 'weapon']);
+      building(x, y, w, h, base, ['crate', 'locker', 'weapon', 'tools']);
       for (let j = y + 4; j < y + h - 4; j += 5) { const len = RI(Math.floor(w / 3), Math.floor(w / 2)); const ii = x + RI(3, Math.max(3, w - len - 3)); if (isFree(ii, j, len, 1)) add(ii, j, len, 1, R() < 0.6 ? 1 : 2); }
     };
     const park = (x, y, w, h, base) => {
@@ -1038,12 +1056,12 @@
           continue;
         }
         const r = R();
-        if (D.type === 'harbor') { if (r < 0.65) containers(lx, ly, lw, lh, 1); else building(lx, ly, Math.min(lw, 34), Math.min(lh, 24), 2, ['crate', 'locker', 'weapon']); }
+        if (D.type === 'harbor') { if (r < 0.65) containers(lx, ly, lw, lh, 1); else building(lx, ly, Math.min(lw, 34), Math.min(lh, 24), 2, ['crate', 'locker', 'weapon', 'tools']); }
         else if (D.type === 'downtown') { if (r < 0.4) { const tw = RI(10, 16), th = RI(10, 14); tower(lx + RI(3, Math.max(3, lw - tw - 3)), ly + RI(3, Math.max(3, lh - th - 3)), tw, th, 2); }
-          else building(lx, ly, Math.min(lw, RI(26, 40)), Math.min(lh, RI(20, 30)), 2, ['locker', 'safe', 'pc', 'duffel']); }
+          else building(lx, ly, Math.min(lw, RI(26, 40)), Math.min(lh, RI(20, 30)), 2, ['locker', 'safe', 'pc', 'duffel', 'server']); }
         else if (D.type === 'industry') { if (r < 0.7) factory(lx, ly, Math.min(lw, 52), Math.min(lh, 40), 2); else containers(lx, ly, lw, lh, 1); }
         else if (D.type === 'slum') houses(lx, ly, lw, lh, 1);
-        else if (D.type === 'lab') { if (r < 0.3) { tower(lx + 6, ly + 6, RI(10, 13), RI(10, 12), 3); } else building(lx, ly, Math.min(lw, RI(28, 40)), Math.min(lh, RI(22, 32)), 3, ['pc', 'safe', 'med', 'locker']); }
+        else if (D.type === 'lab') { if (r < 0.3) { tower(lx + 6, ly + 6, RI(10, 13), RI(10, 12), 3); } else building(lx, ly, Math.min(lw, RI(28, 40)), Math.min(lh, RI(22, 32)), 3, ['pc', 'safe', 'med', 'locker', 'server', 'fridge']); }
         else park(lx, ly, lw, lh, 1);
         // 地块边缘：草丛 / 零散掩体
         for (let k = 0; k < 3; k++) { const bw = RI(3, 6), bh = RI(2, 5), bx = RI(lx, lx + lw - bw), by = RI(ly, ly + lh - bh); if (isFree(bx, by, bw, bh, 1)) { if (R() < 0.5) { bush.push([bx, by, bw, bh]); mark(bx, by, bw, bh); } else add(bx, by, bw, bh, 1); } }
@@ -1554,9 +1572,44 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '2.1';
+  S.VERSION = '2.1.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '2.1.1', date: '2026-11-17', title: '2.1.1 更新 · 中途加入 & 账号互通', en_title: 'Update 2.1.1 · Mid-Raid Joins & Account Transfer', sections: [
+      ['撤离：中途加入', [
+        '和三角洲一样：有小队全灭后，空出来的位置会有新的小队中途杀进来——联机时优先匹配正在排队的真人玩家，没人排队时由 AI 增援小队空降补位',
+        '新小队进场时全场播报：「新小队「XX」中途加入战场！当前 N 支小队」',
+        '新小队从离其他小队最远的出生点进场；每局最多 4 支，剩余时间不到 5 分钟后不再加入',
+        '联机开「撤离行动」时会先找同难度、有空位的进行中对局直接加入，找不到才开新的一局']],
+      ['更多可以拾取的物资', [
+        '新增 31 种物资（共 65 种）：铜线、电钻、防毒面具、热成像仪、固态硬盘、加固笔记本、夜视仪、青铜雕像、钻石、名画、灰石服务器硬盘、至宝「机甲之心」……',
+        '新增 4 种消耗品：急救针（+50 生命）、护盾电池（50 护盾）、肾上腺素（加速 + 快速装填 4 秒）、机体维修包（+120 生命），在背包里双击（手机双击）使用',
+        '新增 3 种容器：冰箱、服务器机柜、工具柜，各自掉落对应类型的物资',
+        '所有物资都有了自己的图标']],
+      ['大地图', ['所有模式都可以按 N 打开大地图（撤离模式 N / M 都行），手机右上角新增 🗺 按钮']],
+      ['账号互通', [
+        '新增「账号转移码」：在名片页「导出账号」，到另一个浏览器 / 设备（Edge、Chrome、手机、HTML 文件版……）的登录页「导入账号」，用原来的密码登录，进度一起带走',
+        '新增「连接游戏服务器」：所有版本（官网网页版、HTML 文件版、Windows 版、安卓版）都可以填同一个服务器地址，共用同一套在线账号',
+        '浏览器禁止页面保存数据时（隐私模式、某些 Edge 设置下直接打开的 HTML 文件），登录页会提醒，避免账号丢失']],
+      ['更新奖励', ['信箱里有一份 2.1.1 小礼包：100 宝石 + 补给箱']],
+    ], en: [
+      ['Extraction: mid-raid joins', [
+        'Just like tactical extraction shooters: when a squad is wiped out, a new squad can drop into its slot mid-raid — online, real players waiting in matchmaking get the slot first; otherwise an AI reinforcement squad drops in',
+        'Everyone is told when a new squad arrives: “New squad “XX” joined the raid mid-match! N squads now”',
+        'New squads spawn at the spawn point farthest from other squads; up to 4 per raid, and nobody joins once less than 5 minutes remain',
+        'When you start an Extraction raid online, the game first looks for a raid in progress with the same risk level and a free slot, and only starts a new raid if there isn’t one']],
+      ['More items to loot', [
+        '31 new items (65 in total): Copper Wire, Power Drill, Gas Mask, Thermal Imager, SSD, Rugged Laptop, Night-Vision Goggles, Bronze Statue, Diamond, Masterpiece Painting, Grayco Server Drive, the Treasure “Mech Heart”…',
+        '4 new consumables: Stim Shot (+50 HP), Shield Cell (50 shield), Adrenaline (speed + fast reload for 4 s) and Mech Repair Kit (+120 HP) — double-click (double-tap on mobile) them in your backpack to use',
+        '3 new containers: Fridge, Server Rack and Tool Cabinet, each dropping its own kind of items',
+        'Every item now has its own icon']],
+      ['Full map', ['Press N in any mode to open the full map (N or M in Extraction); mobile gets a new 🗺 button at the top right']],
+      ['Accounts everywhere', [
+        'New account transfer code: “Export account” on your profile, then “Import account” on the login screen of another browser / device (Edge, Chrome, your phone, the HTML file version…) and log in with your original password — your progress comes with you',
+        'New “Connect to a game server”: every version (website, HTML file, Windows, Android) can use the same server address and share the same online accounts',
+        'If the browser blocks the page from saving data (private mode, or local HTML files under some Edge settings), the login screen now warns you so you don’t lose your account']],
+      ['Update reward', ['A small 2.1.1 gift is in your mailbox: 100 gems + a Supply Crate']],
+    ] },
     { v: '2.1', date: '2026-11-17', title: '2.1 更新 · 雇佣兵撤离', en_title: 'Update 2.1 · Mercenary Extraction', sections: [
       ['全新撤离玩法：灰城禁区', [
         '新地图「灰城禁区」：面积是旧撤离地图的 10 倍，六个城区（港口区、商业区、工业区、棚户区、研究园区、废弃公园），有内部隔间的建筑和能坐电梯上天台的高楼',

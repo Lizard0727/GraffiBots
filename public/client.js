@@ -595,6 +595,52 @@
   const LOOTCFG = { map: -1, risk: 'normal', squad: 3, fill: true };
   try { Object.assign(LOOTCFG, store.get('lootCfg', {})); } catch (e) { /* ignore */ }
   const LOOT_SHAPE = {   // 物资图标：几笔简单的涂鸦形状
+    tape: '<circle cx="28" cy="28" r="14" fill="none" stroke-width="7"/>',
+    bolts: '<path d="M14 18h28l-4 24H18z"/><circle cx="22" cy="14" r="3"/><circle cx="34" cy="14" r="3"/>',
+    canned: '<rect x="16" y="14" width="24" height="28" rx="4"/><rect x="16" y="24" width="24" height="8" fill="#fff8" stroke="none"/>',
+    medkit: '<rect x="10" y="16" width="36" height="26" rx="4"/><path d="M28 21v16M20 29h16" stroke="#fff" stroke-width="5"/>',
+    walkie: '<rect x="18" y="16" width="20" height="30" rx="4"/><rect x="31" y="6" width="4" height="10"/><rect x="22" y="22" width="12" height="8" fill="#fff8" stroke="none"/>',
+    gpu: '<rect x="8" y="18" width="40" height="20" rx="3"/><circle cx="20" cy="28" r="6" fill="#0008"/><circle cx="36" cy="28" r="6" fill="#0008"/>',
+    drone: '<rect x="20" y="24" width="16" height="10" rx="3"/><path d="M10 18h12M34 18h12" stroke-width="4"/><path d="M16 18v8M40 18v8" stroke-width="3"/>',
+    servo: '<circle cx="28" cy="28" r="14"/><circle cx="28" cy="28" r="6" fill="#0006"/><rect x="25" y="8" width="6" height="8"/>',
+    watch: '<circle cx="28" cy="28" r="12"/><rect x="23" y="8" width="10" height="8"/><rect x="23" y="40" width="10" height="8"/><path d="M28 22v7l5 3" stroke="#fff" stroke-width="3" fill="none"/>',
+    goldbar: '<path d="M10 38l8-16h20l8 16z"/>',
+    aicore: '<rect x="14" y="14" width="28" height="28" rx="4"/><circle cx="28" cy="28" r="7" fill="#fff9"/><path d="M14 22H8M14 34H8M42 22h6M42 34h6" stroke-width="3"/>',
+    fusion: '<circle cx="28" cy="28" r="15"/><ellipse cx="28" cy="28" rx="22" ry="7" fill="none" stroke-width="3"/><circle cx="28" cy="28" r="5" fill="#fff"/>',
+    crown: '<path d="M10 40l4-22 8 10 6-14 6 14 8-10 4 22z"/>',
+    blueprint: '<rect x="10" y="14" width="36" height="28" rx="2"/><path d="M16 22h14M16 30h20M34 18v18" stroke="#fff8" stroke-width="2"/>',
+    goldmech: '<rect x="18" y="10" width="20" height="16" rx="3"/><rect x="14" y="26" width="28" height="12" rx="3"/><rect x="16" y="38" width="8" height="10"/><rect x="32" y="38" width="8" height="10"/>',
+    wire: '<path d="M12 40c10-30 22 10 32-20" fill="none" stroke-width="5"/>',
+    glue: '<rect x="20" y="18" width="16" height="26" rx="4"/><path d="M24 18l4-10 4 10z"/>',
+    nails: '<rect x="12" y="22" width="32" height="18" rx="3"/><path d="M18 22v-10M26 22v-12M34 22v-10" stroke-width="3"/>',
+    water: '<path d="M22 12h12v6l4 6v22H18V24l4-6z"/>',
+    snack: '<rect x="10" y="20" width="36" height="16" rx="4"/><path d="M18 20v16M28 20v16M38 20v16" stroke="#0006" stroke-width="2"/>',
+    fuse: '<rect x="20" y="14" width="16" height="28" rx="6"/><rect x="25" y="8" width="6" height="6"/><rect x="25" y="42" width="6" height="6"/>',
+    drill: '<rect x="10" y="18" width="24" height="12" rx="4"/><rect x="18" y="30" width="8" height="16" rx="2"/><path d="M34 24h14" stroke-width="4"/>',
+    gasmask: '<path d="M14 22c0-10 28-10 28 0v10c0 8-28 8-28 0z"/><circle cx="21" cy="25" r="4" fill="#fff8"/><circle cx="35" cy="25" r="4" fill="#fff8"/><circle cx="28" cy="40" r="6"/>',
+    flashl: '<rect x="10" y="24" width="24" height="10" rx="3"/><path d="M34 20l10-6v30l-10-6z"/>',
+    antib: '<rect x="14" y="22" width="28" height="12" rx="6"/><rect x="28" y="22" width="14" height="12" rx="6" fill="#fff8" stroke="none"/>',
+    router: '<rect x="10" y="28" width="36" height="12" rx="3"/><path d="M16 28V12M40 28V12" stroke-width="3"/>',
+    paintset: '<rect x="10" y="18" width="10" height="24" rx="3"/><rect x="23" y="14" width="10" height="28" rx="3"/><rect x="36" y="18" width="10" height="24" rx="3"/>',
+    thermal: '<rect x="10" y="18" width="30" height="20" rx="4"/><circle cx="25" cy="28" r="6" fill="#ff5a36"/><rect x="40" y="22" width="8" height="12"/>',
+    ssd: '<rect x="12" y="14" width="32" height="28" rx="3"/><rect x="18" y="20" width="20" height="6" fill="#fff8" stroke="none"/>',
+    milbat: '<rect x="14" y="12" width="28" height="34" rx="4"/><path d="M24 22l6 0-4 8h6l-10 12 3-9h-6z" fill="#fff"/>',
+    surgkit: '<rect x="8" y="16" width="40" height="24" rx="4"/><path d="M14 28h12M20 22v12" stroke="#fff" stroke-width="4"/><path d="M32 22l10 12" stroke="#fff" stroke-width="3"/>',
+    camera: '<rect x="10" y="18" width="36" height="24" rx="4"/><rect x="18" y="12" width="12" height="6"/><circle cx="28" cy="30" r="7" fill="#0008"/>',
+    vinyl: '<circle cx="28" cy="28" r="16"/><circle cx="28" cy="28" r="5" fill="#fff"/>',
+    laptop: '<rect x="14" y="12" width="28" height="20" rx="2"/><path d="M8 36h40l-4 6H12z"/>',
+    nvg: '<rect x="12" y="20" width="32" height="12" rx="4"/><circle cx="20" cy="36" r="6"/><circle cx="36" cy="36" r="6"/>',
+    statue: '<circle cx="28" cy="16" r="7"/><path d="M18 24h20l-4 16H22z"/><rect x="16" y="40" width="24" height="6"/>',
+    serum: '<rect x="22" y="10" width="12" height="34" rx="5"/><rect x="22" y="24" width="12" height="20" rx="5" fill="#7cff4a"/>',
+    satphone: '<rect x="18" y="16" width="20" height="30" rx="4"/><rect x="22" y="6" width="6" height="10"/><circle cx="28" cy="26" r="4" fill="#fff8"/>',
+    diamond: '<path d="M14 22l8-10h12l8 10-14 22z"/>',
+    painting: '<rect x="10" y="12" width="36" height="30" rx="2"/><path d="M14 38l10-12 8 8 6-6 6 10z" fill="#fff8"/>',
+    srvdrive: '<rect x="14" y="10" width="28" height="36" rx="3"/><path d="M18 18h20M18 26h20M18 34h20" stroke="#fff8" stroke-width="3"/>',
+    mechheart: '<path d="M28 44C10 32 10 14 20 14c4 0 6 3 8 6 2-3 4-6 8-6 10 0 10 18-8 30z"/><circle cx="28" cy="26" r="5" fill="#fff"/>',
+    stim: '<rect x="14" y="24" width="26" height="8" rx="3"/><path d="M40 28h8M8 28h6M22 24v-6M30 24v-6" stroke-width="3"/>',
+    shieldc: '<path d="M28 8l16 6v12c0 10-8 16-16 20-8-4-16-10-16-20V14z"/>',
+    adren: '<rect x="20" y="10" width="14" height="30" rx="4"/><path d="M27 40v8" stroke-width="3"/><path d="M24 16l6 0-4 8h5l-8 10 2-7h-5z" fill="#fff"/>',
+    repair: '<rect x="8" y="18" width="40" height="22" rx="4"/><path d="M18 24l8 8M26 24l-8 8M34 24h8M38 20v12" stroke="#fff" stroke-width="3"/>',
     scrap: '<path d="M12 30l8-14 10 6 6-10 8 12-6 10H18z" />', can: '<rect x="18" y="12" width="20" height="30" rx="5"/><rect x="22" y="7" width="12" height="6" rx="2"/>',
     battery: '<rect x="14" y="16" width="28" height="22" rx="4"/><rect x="22" y="11" width="4" height="5"/><rect x="31" y="11" width="4" height="5"/>',
     cable: '<circle cx="28" cy="28" r="14" fill="none" stroke-width="6"/><circle cx="28" cy="28" r="5"/>', neon: '<rect x="10" y="22" width="36" height="10" rx="5"/><rect x="6" y="24" width="4" height="6"/><rect x="46" y="24" width="4" height="6"/>',
@@ -1325,13 +1371,14 @@
   const NO_P2P = window.GB_ARTIFACT ? '网页版只能和 AI 对战；和朋友联机请用 ZIP 版' : 'P2P 组件未加载，只能和 AI 对战';
   const LOCAL_TEXT = () => (window.Peer ? '单机模式 ✓ 创建房间后，朋友可用房间码联机' : `单机模式 ✓（${NO_P2P}）`);
 
-  function connect() { if (FILE_MODE) startLocal(); else connectWS(); }
+  function connect() { if (FILE_MODE && !serverUrl()) startLocal(); else connectWS(); }
 
   function connectWS() {
     setConn('正在连接服务器…', '');
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     rcTimer = 0;
-    const sock = ws = new WebSocket(`${proto}://${location.host}/ws`);
+    let sock;
+    try { sock = ws = new WebSocket(serverUrl() || `${proto}://${location.host}/ws`); } catch (e) { FILE_MODE = true; startLocal(); return; }
     net = { kind: 'ws', send: (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); } };
     const openT = setTimeout(() => { if (sock.readyState === 0) { try { sock.close(); } catch (e) { /* ignore */ } wsLost(sock); } }, 8000);   // 连接卡住
     sock.onopen = () => {
@@ -1572,6 +1619,7 @@
       case 'bag': if (G && G.loot) { const before = G.bag.items.length; G.bag = { items: m.items || [], cap: m.cap || S.LOOT.bag, gear: m.gear || [], inv: m.inv || G.bag.inv, safe: m.safe || G.bag.safe }; if (G.bag.items.length < before) G.bagFlash = performance.now(); invRender(); } break;
       case 'cv': if (G && G.loot) { INV.cv = m.id ? Object.assign(m, { at: performance.now() }) : null; if (m.id && !INV.open && INV.want === m.id) invToggle(true); INV.want = 0; invRender(); } break;
       case 'toast': toast(m.text); break;
+      case 'joining': toast(`找到一局进行中的撤离行动（还剩 ${Math.floor(m.left / 60)} 分钟），等空出来的小队位置……`, 4000); break;
       case 's': onSnap(m); break;
       case 'over':
         if (G) {
@@ -2302,6 +2350,15 @@
       case 'fz': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0 }); break;
       case 'fg': (G.fires || (G.fires = [])).push({ x: e[1], y: e[2], z: e[3], r: e[4], end: now + e[5] * 1000, team: e[6], acc: 0, fog: 1 }); if (!silent && nearMe(e[1], e[2], 500)) sfx.boom(); break;
       case 'lt+': if (G.loot) G.items.set(e[1], { k: e[2], x: e[3], y: e[4], z: e[5] }); break;
+      case 'pjn': for (const a of e[1]) if (!G.players.has(a[0])) G.players.set(a[0], { id: a[0], name: a[1], team: a[2], weapon: a[3], head: a[4], pilot: a[5], bot: !!a[6], lv: a[7], bt: a[8], looks: a[9], x: 0, y: 0, z: 0, a: 0, pt: 0, hp: 100, tank: 100, sp: 0, flags: 1, carry: 0, charge: 0, shield: 0, spk: -1, vx: 0, vy: 0, flash: 0, resp: 0 }); break;
+      case 'sqj': {   // 2.1.1：新小队中途加入
+        if (silent) break;
+        const mine = G.me && G.me.team === e[1] && G.players.get(myId) && !(G.players.get(myId).out);
+        const txt = e[4] ? `新小队「${e[2]}」中途加入战场！当前 ${e[3]} 支小队` : `增援小队「${e[2]}」空降进场！当前 ${e[3]} 支小队`;
+        announce(txt, e[4] ? '#ffb42e' : '#ff8a5a'); sfx.siren();
+        G.feed.unshift({ t: performance.now(), text: txt, color: '#ffb42e' }); if (G.feed.length > 5) G.feed.pop();
+        void mine; break;
+      }
       case 'ct+': if (G.loot && G.conts && !G.conts.has(e[1])) { const c = { id: e[1], type: S.CONT_IDS[e[2]], x: e[3], y: e[4], z: e[5], st: e[6] }; G.contArr.push(c); G.conts.set(c.id, c); G.contDirty = 2; } break;
       case 'ct': if (G.loot && G.conts) { const c = G.conts.get(e[1]); if (c) { c.st = e[2]; G.contDirty = G.contDirty || 1; } } break;
       case 'adp': ringFx(e[1], e[2], e[3], 70, '#e0a030', 1000); ringFx(e[1], e[2], e[3], 100, '#e0a030', 1000, 300); break;   // 2.1 霍克：空投落点
@@ -2324,6 +2381,7 @@
         else if (p && !silent && G.me && p.team === G.me.team) { G.feed.unshift({ t: performance.now(), text: `${p.name} 成功撤离（${fmtV(e[2])}）`, color: '#5ee36a' }); if (G.feed.length > 5) G.feed.pop(); }
         break;
       }
+      case 'use': if (!silent) { const p = G.players.get(e[1]), I = S.LOOT.items[e[2]]; if (p && R3.emit) R3.emit(p.x, p.y, (p.z || 0) + 20, I && I.use && I.use.shield ? '#4fd8ff' : I && I.use && I.use.rush ? '#fff36b' : '#5ee36a', 16, 120, 1, { sys: 'pg', size: 9, life: 0.6, grav: -80, drag: 2 }); if (e[1] === myId && I) { sfx.pick(); announce(`使用了 ${I.name}`, '#5ee36a'); } } break;
       case 'kit': if (e[1] === myId && !silent) { sfx.pick(); announce('急救包生效 +60', '#5ee36a'); } break;
       case 'bp': {   // 乐园模式：气球被打爆
         const BC = ['#ff3ea5', '#1fd6ee', '#ffd23f', '#9cff2e', '#ff8a1f', '#b06bff'], c = BC[e[1] % BC.length];
@@ -2701,7 +2759,7 @@
     // 2.1：撤离模式——Tab 背包、F 搜索 / 拉闸、M 大地图；背包打开时只能走路
     if (G.loot) {
       if (k === 'Tab' || (k === 'Escape' && INV.open)) { invToggle(); return; }
-      if (k === 'KeyM') { G.bigMap = !G.bigMap; return; }
+      if (k === 'KeyM' || k === 'KeyN') { G.bigMap = !G.bigMap; return; }
       if (k === 'KeyF') { if (!lootUse() && INV.open) invToggle(false); return; }
       if (INV.open) { if (k === 'KeyR' && INV.drag) { INV.drag.s.rot ^= 1; drawGhost(); } else if (/^(Key[WASD]|Arrow|Space|Shift)/.test(k)) keys.add(k); return; }
     }
@@ -2709,6 +2767,7 @@
     if (k === 'KeyE') { G.qq++; G.edge = true; }   // 大招
     if (k === 'KeyR') { G.oq = (G.oq || 0) + 1; G.edge = true; }   // 超载技能
     if (isOut()) { if (k === 'ArrowLeft' || k === 'KeyA') specCycle(-1); if (k === 'ArrowRight' || k === 'KeyD') specCycle(1); }
+    if (k === 'KeyN') { G.bigMap = !G.bigMap; return; }   // 2.1.1：所有模式都能按 N 打开大地图
     if (k === 'KeyQ') { G.gq++; G.edge = true; }   // 驾驶员技能
     if (k >= 'Digit1' && k <= 'Digit4') send({ t: 'chat', k: +k.slice(5) - 1 });
     if (k === 'KeyM') toggleMute();
@@ -2780,6 +2839,7 @@
         else if (k === 'ov') { G.oq = (G.oq || 0) + 1; G.edge = true; }
         else if (k === 'menu') openSettings();
         else if (k === 'board') TT.board = !TT.board;
+        else if (k === 'map') { if (G) G.bigMap = !G.bigMap; }
         else if (k === 'chat') { if (TUT) send({ t: 'chat', k: (TT.chatK = ((TT.chatK || 0) + 1) % 4) }); else chatOpen(); }
       } else if (e.clientX < innerWidth * 0.45) {
         rec.kind = 'stick';
@@ -3604,7 +3664,7 @@
   }
   const itemTile = (k, cp, extra = '') => {
     const I = S.LOOT.items[k], R = S.LOOT.rare[I.r];
-    return `<div class="inv-it r${I.r}" style="--rc:${R.c};${extra}" title="${I.name} · ${R.name} · ${fmtV(I.v)}"><b>${I.name}</b><small>${fmtV(I.v)}</small></div>`;
+    return `<div class="inv-it r${I.r}${I.use ? ' usable' : ''}" style="--rc:${R.c};${extra}" title="${I.name} · ${R.name} · ${fmtV(I.v)}${I.use ? ' · ' + L(TOUCH ? '双击使用' : '双击使用') : ''}"><svg class="inv-ico" viewBox="0 0 56 56" fill="${R.c}" stroke="${R.c}">${LOOT_SHAPE[k] || '<circle cx="28" cy="28" r="14"/>'}</svg><b>${I.name}</b><small>${I.use ? '⚡ ' : ''}${fmtV(I.v)}</small></div>`;
   };
   function gridHtml(g, which, cp) {
     let h = `<div class="inv-grid" data-grid="${which}" style="width:${g.w * cp}px;height:${g.h * cp}px;--cp:${cp}px">`;
@@ -3630,7 +3690,7 @@
     c.items.forEach((k, i) => { const [w, hh] = S.itemDims(k, 0); h += itemTile(k, cp, `position:relative;width:${w * cp - 3}px;height:${hh * cp - 3}px" data-from="cont" data-i="${i}`); });
     for (let i = 0; i < c.hidden; i++) h += `<div class="inv-it inv-q" style="position:relative;width:${cp - 3}px;height:${cp - 3}px">${i === 0 ? '<i class="inv-prog"></i>' : ''}<b>?</b></div>`;
     h += '</div>';
-    h += `<p class="inv-hint">${TOUCH ? '点一下拿进背包 · 长按放进安全箱 · 拖动摆放' : '点击拿进背包 · 右键放进安全箱 · 拖动摆放（拖动时按 R 旋转）'}</p>`;
+    h += `<p class="inv-hint">${TOUCH ? '点一下拿进背包 · 长按放进安全箱 · 拖动摆放' : '点击拿进背包 · 右键放进安全箱 · 拖动摆放（拖动时按 R 旋转）'}</p><p class="inv-hint">${TOUCH ? '背包里的 ⚡ 消耗品双击使用' : '背包里的 ⚡ 消耗品双击使用'}</p>`;
     box.innerHTML = h;
   }
   // 搜索进度条（本地平滑）
@@ -3660,6 +3720,10 @@
       }
     };
     const srcOf = (el) => { const f = el.dataset.from; if (f === 'cont') { const i = +el.dataset.i, k = INV.cv && INV.cv.items[i]; return k ? { from: f, i, k, rot: 0 } : null; } const g = f === 'safe' ? G.bag.safe : G.bag.inv, it = g.items.find((x) => x.id === +el.dataset.id); return it ? { from: f, id: it.id, k: it.k, rot: it.rot } : null; };
+    const useIt = (el) => { const s = srcOf(el); if (s && s.from !== 'cont' && S.LOOT.items[s.k].use) { send({ t: 'lo', a: 'use', from: s.from, id: s.id }); return true; } return false; };
+    panel.addEventListener('dblclick', (e) => { const el = itemOf(e.target); if (el) useIt(el); });
+    let lastTap = { t: 0, el: null };
+    panel.addEventListener('pointerup', (e) => { if (!TOUCH) return; const el = itemOf(e.target); if (!el) return; const now = performance.now(); if (lastTap.el === el.dataset.id && now - lastTap.t < 320) { useIt(el); lastTap = { t: 0, el: null }; } else lastTap = { t: now, el: el.dataset.id }; });
     panel.addEventListener('contextmenu', (e) => { e.preventDefault(); const el = itemOf(e.target); if (!el) return; const s = srcOf(el); if (s) quick(s, true); });
     panel.addEventListener('pointerdown', (e) => {
       const el = itemOf(e.target); if (!el || e.button === 2) return;
@@ -3715,18 +3779,18 @@
     ctx.fillStyle = '#000d'; ctx.fillRect(0, 0, VW, VH);
     ctx.imageSmoothingEnabled = false; ctx.drawImage(G.mini, mx, my, mw, mh); ctx.imageSmoothingEnabled = true;
     ctx.strokeStyle = '#fff6'; ctx.lineWidth = 2; ctx.strokeRect(mx, my, mw, mh);
-    const LO = G.M.loot || {};
+    const LO = (G.loot && G.M.loot) || {};
     for (const d of LO.districts || []) txt(d.name, mx + d.x * S.CELL * ms, my + d.y * S.CELL * ms, 16, '#ffffffaa', 'center', 4);
     if (LO.hv) { const [hx, hy, hw, hh] = LO.hv; ctx.strokeStyle = '#ff3b52'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(mx + hx * S.CELL * ms, my + hy * S.CELL * ms, hw * S.CELL * ms, hh * S.CELL * ms); ctx.setLineDash([]); txt('高价值区 · 守卫', mx + (hx + hw / 2) * S.CELL * ms, my + hy * S.CELL * ms - 10, 13, '#ff6b7d', 'center', 3); }
-    if (G.lever) { ctx.fillStyle = '#ff9a3d'; ctx.fillRect(mx + G.lever[0] * ms - 5, my + G.lever[1] * ms - 5, 10, 10); txt('电闸', mx + G.lever[0] * ms, my + G.lever[1] * ms - 14, 12, '#ff9a3d', 'center', 3); }
-    for (const e of exList(o)) {
+    if (G.loot && G.lever) { ctx.fillStyle = '#ff9a3d'; ctx.fillRect(mx + G.lever[0] * ms - 5, my + G.lever[1] * ms - 5, 10, 10); txt('电闸', mx + G.lever[0] * ms, my + G.lever[1] * ms - 14, 12, '#ff9a3d', 'center', 3); }
+    for (const e of G.loot ? exList(o) : []) {
       const x = mx + e.x * ms, y = my + e.y * ms, c = EXT_COL[e.type];
       ctx.fillStyle = e.open ? c : '#777'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fill(); ctx.stroke();
       txt(S.LOOT.ext[e.type].name, x, y - 18, 13, e.open ? c : '#aaa', 'center', 3);
       txt(e.open ? (e.secs < 9999 && e.type !== 'normal' ? `开放中 · ${e.secs}秒` : '开放中') : e.type === 'lever' ? '需要拉闸' : `${e.secs} 秒后开放`, x, y + 18, 11, '#fff', 'center', 3);
     }
     for (const id of G.cur) { const p = G.players.get(id); if (!p || !(p.flags & 1) || (me && p.team !== me.team)) continue; ctx.fillStyle = G.colors[p.team]; ctx.strokeStyle = id === myId ? '#fff' : '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + p.x * ms, my + p.y * ms, id === myId ? 7 : 5, 0, 7); ctx.fill(); ctx.stroke(); }
-    txt(TOUCH ? '点地图关闭' : 'M 关闭地图', VW / 2, VH - 18, 13, '#9a9db5', 'center', 3);
+    txt(TOUCH ? '点地图关闭' : 'N / M 关闭地图', VW / 2, VH - 18, 13, '#9a9db5', 'center', 3);
   }
   // 1.6：搜刮撤离 HUD——背包、撤离读条、捡到东西的提示、撤离成功 / 阵亡
   function drawLootHud(o, me, cx) {
@@ -4186,7 +4250,7 @@
 
     // ---- 记分板 ----
     if ((keys.has('Tab') && !G.loot) || TT.board) drawScoreboard();
-    if (G.loot && G.bigMap) drawBigMap(G.obj, me);
+    if (G.bigMap) drawBigMap(G.obj, me);
     invTick();
 
     // ---- 准星：俯视模式跟着鼠标，触屏不显示 ----
@@ -5378,13 +5442,68 @@
       const online = kind === 'online';
       const st = online ? (onlineReady ? '已连接服务器 ✓ 进度由服务器保存' : '暂时没连上服务器，用的是离线缓存') : '保存在这台设备上';
       box.innerHTML = `<div class="who">${KIND_TAG[kind]}<br><b>${esc(session.name)}</b><small>${st}</small></div>
-        <button class="btn small ghost" id="acOut">${online ? '退出登录' : '切换账号'}</button>`;
+        ${online ? '' : '<button class="btn small" id="acExport">导出账号</button>'}<button class="btn small ghost" id="acOut">${online ? '退出登录' : '切换账号'}</button>`;
       $('acOut').onclick = logout;
+      const ex = $('acExport'); if (ex) ex.onclick = () => { saveProfile(); openXfer('export'); };
     }
   }
   $('loginForm').addEventListener('submit', submitLogin);
   for (const b of document.querySelectorAll('.lg-lang button')) { b.classList.toggle('sel', window.GBI18N && GBI18N.lang === b.dataset.lang); b.onclick = () => { if (GBI18N.lang !== b.dataset.lang) GBI18N.set(b.dataset.lang); }; }
   for (const b of document.querySelectorAll('.lg-tab')) b.onclick = () => { lgTab = b.dataset.tab; lgError(''); renderLogin(); sfx.click(); };
+  // ---------------- 2.1.1：账号转移（导出 / 导入）+ 游戏服务器地址 ----------------
+  function openXfer(kind) {
+    const dlg = $('xferDlg'), ta = $('xferCode'), btns = $('xferBtns');
+    dlg.classList.remove('hidden');
+    const close = () => dlg.classList.add('hidden');
+    if (kind === 'export') {
+      const code = LACC.exportCode(session.name) || '';
+      $('xferTitle').textContent = '导出账号'; ta.value = code; ta.readOnly = true;
+      $('xferNote').textContent = '把这段转移码复制到另一个浏览器 / 设备（比如 Edge、手机、HTML 文件版），在登录页点「导入账号」粘贴，然后用同样的账号名和密码登录。转移码里只有加盐后的密码哈希，没有明文密码；但拿到它的人可以看到你的进度，别发给陌生人。';
+      btns.innerHTML = '<button class="btn" id="xfCopy">复制转移码</button><button class="btn ghost" id="xfFile">下载为文件</button><button class="btn ghost" id="xfX">关闭</button>';
+      $('xfCopy').onclick = () => { ta.select(); try { (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => toast('已复制转移码'), () => { document.execCommand('copy'); toast('已复制转移码'); }); } catch (e) { document.execCommand('copy'); toast('已复制转移码'); } };
+      $('xfFile').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' })); a.download = `graffibots-${session.name}.gbacc.txt`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); };
+    } else {
+      $('xferTitle').textContent = '导入账号'; ta.value = ''; ta.readOnly = false; ta.placeholder = 'GBACC1.……';
+      $('xferNote').textContent = '在原来的浏览器 / 设备上登录后，打开「名片 → 导出账号」拿到转移码，粘贴到这里（或者选择导出的文件）。导入后用原来的密码登录。';
+      btns.innerHTML = '<button class="btn" id="xfGo">导入</button><label class="btn ghost xf-file">选择文件<input type="file" id="xfPick" accept=".txt,.gbacc,text/plain" hidden></label><button class="btn ghost" id="xfX">取消</button>';
+      $('xfPick').onchange = (e) => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { ta.value = String(r.result || '').trim(); }; r.readAsText(f); };
+      const go = (overwrite) => {
+        const res = LACC.importCode(ta.value, overwrite);
+        if (!res.ok && res.exists) { if (confirm(L(`这台设备上已经有账号「${res.name}」了。用转移码里的进度覆盖它吗？`))) go(true); return; }
+        if (!res.ok) { toast(res.err); return; }
+        close(); lgTab = 'login'; renderLogin(); $('lgName').value = res.name; $('lgPass').value = ''; $('lgPass').focus();
+        toast(`账号「${res.name}」导入成功，输入密码登录吧`, 3500);
+      };
+      $('xfGo').onclick = () => go(false);
+      if (!TOUCH) setTimeout(() => ta.focus(), 50);
+    }
+    $('xfX').onclick = close;
+  }
+  // 游戏服务器地址：所有版本（网页、HTML 文件、Windows、安卓）都可以连同一台 Node 服务器，用同一套在线账号
+  function serverUrl() { const s = store.get('server', '') || window.GB_SERVER_URL || ''; return normServer(s); }
+  function normServer(s) {
+    s = String(s || '').trim(); if (!s) return '';
+    if (!/^[a-z]+:\/\//i.test(s)) s = (/^(localhost|127\.|192\.168\.|10\.)/.test(s) ? 'ws://' : 'wss://') + s;
+    s = s.replace(/^http(s?):\/\//i, 'ws$1://');
+    if (!/\/ws\/?$/.test(s)) s = s.replace(/\/+$/, '') + '/ws';
+    return s;
+  }
+  function askServer() {
+    const cur = store.get('server', '') || window.GB_SERVER_URL || '';
+    const v = prompt(L('输入游戏服务器地址（运行 node server.js 的电脑或云服务器，例如 game.example.com 或 192.168.1.5:3000）。留空 = 不连服务器，使用本机账号。'), cur);
+    if (v === null) return;
+    store.set('server', v.trim());
+    toast(v.trim() ? `已保存服务器地址：${normServer(v)}，正在重新连接…` : '已改回本机账号模式', 3500);
+    setTimeout(() => location.reload(), 900);
+  }
+  $('lgImport').onclick = () => openXfer('import');
+  $('lgServer').onclick = askServer;
+  // 有的浏览器（比如 Edge 的某些隐私设置）不允许直接打开的 HTML 文件保存数据：提醒玩家
+  (function storageCheck() {
+    let ok = true;
+    try { localStorage.setItem('gb__t', '1'); ok = localStorage.getItem('gb__t') === '1'; localStorage.removeItem('gb__t'); } catch (e) { ok = false; }
+    if (!ok) { const w = $('lgWarn'); w.textContent = L('这个浏览器不允许这个页面保存数据（隐私模式，或者浏览器禁止本地 HTML 文件使用存储），账号和进度关掉页面就会丢。请换用普通窗口，或在浏览器设置里允许网站保存数据；也可以用官网网页版。'); w.classList.remove('hidden'); }
+  })();
   $('lgGuest').onclick = () => { enterAs({ kind: 'guest' }, store.get('profile', {}), '游客模式：进度存在这台设备上，随时可以在名片页注册账号'); };
 
   // ================= 启动 =================

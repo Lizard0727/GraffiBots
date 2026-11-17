@@ -1756,6 +1756,17 @@ class Game {
         this.sendBag(p); for (const q of this.viewers(c)) this.sendCont(q);
         return;
       }
+      case 'use': {   // 2.1.1：使用消耗品（急救针 / 护盾电池 / 肾上腺素 / 维修包）
+        const from = invOf(m.from), it = from.items.find((x) => x.id === (m.id | 0)), U = it && S.LOOT.items[it.k].use;
+        if (!U || (p.useT || 0) > this.time) return;
+        from.items.splice(from.items.indexOf(it), 1);
+        p.useT = this.time + 1;
+        if (U.heal) p.hp = Math.min(this.maxHpOf(p), p.hp + U.heal);
+        if (U.shield) { p.shield = Math.max(p.shield || 0, U.shield); p.shieldT = Math.max(p.shieldT || 0, 10); }
+        if (U.rush) p.rushT = Math.max(p.rushT || 0, U.rush);
+        this.ev(['use', p.id, it.k]);
+        this.sendBag(p); return;
+      }
       case 'lever': {
         const L = o.lever;
         if (!L || Math.hypot(p.x - L.x, p.y - L.y) > 70 || L.until > this.time) return;
@@ -1831,6 +1842,8 @@ class Game {
         if (p.exT >= LT.extTime) this.extract(p, inEx);
       } else { p.exT = Math.max(0, p.exT - dt * 2); if (why && (p.whyT = (p.whyT || 0) - dt) <= 0) { p.whyT = 3; this.toast(p, why); } }
     }
+    // 2.1.1：中途加入（有小队全灭后，排队的真人优先、否则 AI 增援小队从空出来的出生点杀进来）
+    if (this.tick % S.TICK === 0) this.lootReinforce();
     // 撤离点开放提示
     for (const e of o.ex) if (!e.told && this.exOpen(e)) { e.told = 1; this.ev(['exo', r1(e.x), r1(e.y)]); }
     // 所有真人都撤离或阵亡（或者场上只剩守卫）→ 结束
@@ -1852,6 +1865,80 @@ class Game {
     this.ev(['exd', p.id, v]);
     p.stats.obj += 1;
     if (this.chat && p.bot && Math.random() < 0.4) this.chat.say(p, 'endWin', { end: true, delay: 0.5 });
+  }
+  // ---- 2.1.1 中途加入 ----
+  lootSlots() {   // 全灭（全员出局）的小队编号 → 全灭的时间
+    const o = this.obj; o.wiped = o.wiped || {};
+    for (let t = 1; t <= this.teams; t++) {
+      if (o.wiped[t] != null) continue;
+      let n = 0, out = 0;
+      for (const p of this.players.values()) if (p.team === t && !p.guard) { n++; if (p.out) out++; }
+      if (n && out === n) o.wiped[t] = this.time;
+    }
+    return o.wiped;
+  }
+  lootJoinable() {   // 真人中途加入：还剩 5 分钟以上、有空出来的小队位置没被别人排上
+    if (!this.loot || this.over || this.timeLeft < S.LOOT.joinMin || (this.obj.joins || 0) >= S.LOOT.maxJoins) return false;
+    const free = Object.keys(this.lootSlots()).length;
+    return free > (this.obj.joinQ || []).length;
+  }
+  queueJoin(conns) { (this.obj.joinQ || (this.obj.joinQ = [])).push(conns); }
+  lootReinforce() {
+    const o = this.obj, LT = S.LOOT, w = this.lootSlots();
+    o.joinQ = o.joinQ || [];
+    for (const t of Object.keys(w).map(Number)) {
+      if ((o.joins || 0) >= LT.maxJoins || this.timeLeft < LT.joinMin * 0.8) { if (o.joinQ.length) this.joinFail(o.joinQ.splice(0)); break; }
+      const wait = this.time - w[t];
+      if (o.joinQ.length && wait >= 3) { this.addLateSquad(t, o.joinQ.shift()); continue; }
+      if (!o.joinQ.length && wait >= LT.botJoinWait && this.room.settings.bots !== false) this.addLateSquad(t, []);
+    }
+  }
+  joinFail(list) { for (const conns of list) for (const c of conns) { if (c.conn) c.conn.send({ t: 'err', msg: '这局已经不能中途加入了' }); if (this.room.members.has(c.id)) this.room.remove(c); } }
+  addLateSquad(t, conns) {
+    const o = this.obj;
+    o.joins = (o.joins || 0) + 1; delete o.wiped[t];
+    // 出生点：离场上活着的人最远的那个
+    const alive = [...this.players.values()].filter((p) => p.alive && !p.out && !p.guard);
+    let best = null, bd = -1;
+    for (const [x, y] of this.M.loot.spawns) {
+      const sx = x * S.CELL, sy = y * S.CELL;
+      const d = alive.reduce((m, p) => Math.min(m, Math.hypot(p.x - sx, p.y - sy)), 1e9);
+      if (d > bd) { bd = d; best = { x: sx, y: sy }; }
+    }
+    this.spawns[t] = best;
+    const n = Math.max(this.squad, conns.length), names = BOTS.nicks(n, this.room.settings.lang);
+    const botPw = this.room.settings.botPower || { lv: 5, bt: 1 }, added = [];
+    for (let i = 0; i < n; i++) {
+      const c = conns[i];
+      let p;
+      if (c) {
+        p = this.addPlayer(c.id, c.name, t, c.weapon, c.head, false, i, c.pilot, c.power || { lv: 1, bt: 0 });
+        p.looks = c.looks || null;
+        if (this.risk === 'high' && c.power && Array.isArray(c.power.gear)) this.applyGear(p, c.power.gear);
+        const sd = S.LOOT.safe[clamp((c.power && c.power.safe) | 0 || 1, 1, 3)]; p.safe = { w: sd[0], h: sd[1], items: [] };
+      } else {
+        const pil = S.PILOTS[randInt(S.PILOTS.length)];
+        o.botSeq = (o.botSeq || 0) + 1;
+        p = this.addPlayer(-800 - o.botSeq, names[i], t, Math.random() < 0.5 ? pil.weapon : S.WEAPON_ORDER[randInt(S.WEAPON_ORDER.length)], S.HEADS[randInt(S.HEADS.length)].id, true, i, pil.id, botPw);
+        p.persona = 'decent';
+        if (this.risk === 'high' && Math.random() < 0.6) { const bd2 = S.bagDims(['pack']); p.inv = { w: bd2[0], h: bd2[1], items: [] }; }
+      }
+      p.late = true;
+      added.push(p);
+    }
+    let squads = 0; const seen = new Set();
+    for (const p of this.players.values()) if (!p.guard && !p.out && !seen.has(p.team)) { seen.add(p.team); squads++; }
+    this.ev(['pjn', added.map((p) => [p.id, p.name, p.team, p.weapon, p.head, p.pilot, p.bot ? 1 : 0, p.lv, p.bt, p.looks || null])]);
+    const human = added.some((p) => !p.bot);
+    this.ev(['sqj', t, added[0].name, squads, human ? 1 : 0]);
+    for (const c of conns) {   // 真人：发开局信息 + 整张涂料图（和断线重连一样），直接进场
+      if (!c.conn || this.room.manual) continue;
+      c.conn.send(Object.assign(this.startMsg(), { resume: true, late: true }));
+      c.conn.send(this.gridMsg());
+      this.sendBag(this.players.get(c.id));
+    }
+    if (this.chat) for (const p of added) if (p.bot && Math.random() < 0.5) { this.chat.say(p, 'start', { delay: 1 + Math.random() * 2 }); break; }
+    return added;
   }
   contList() { return this.obj.conts.map((c) => [c.id, S.CONT_IDS.indexOf(c.type), r1(c.x), r1(c.y), r1(c.z), this.contState(c)]); }
   // 逃亡圈：各队分散在地图四周的空地上
@@ -2340,6 +2427,7 @@ class Game {
   }
 
   finish(winner) {
+    if (this.loot && this.obj.joinQ && this.obj.joinQ.length) this.joinFail(this.obj.joinQ.splice(0));
     if (this.over) return;
     S.useMap(this.M);
     this.over = true;
@@ -2984,6 +3072,19 @@ class Room {
     this.broadcastLobby();
   }
   start() {
+    // 2.1.1：联机服务器上开撤离行动——先找同难度、正在进行、有小队全灭空出位置的公开对局，直接中途加入
+    if (this.settings.mode === 'loot' && this.hub && !this.hub.local && !this.settings.party && this.members.size <= 4) {
+      for (const room of this.hub.rooms.values()) {
+        const g = room.game;
+        if (room === this || !g || !g.loot || g.risk !== (this.settings.risk || 'normal') || !g.lootJoinable()) continue;
+        const conns = [...this.members.values()];
+        for (const c of conns) { this.members.delete(c.id); room.members.set(c.id, c); c.room = room; c.team = 1; }
+        this.hub.rooms.delete(this.code);
+        g.queueJoin(conns);
+        for (const c of conns) c.conn.send({ t: 'joining', code: room.code, left: Math.round(g.timeLeft) });
+        return;
+      }
+    }
     if (this.settings.mode === 'loot') this.settings.squad = clamp(Math.max(this.members.size, this.settings.squad || this.members.size), 1, 4);   // 搜刮撤离：小队人数至少是房间人数
     this.state = 'playing';
     this.game = new Game(this);

@@ -1133,7 +1133,8 @@
       // 2.1：可搜索的容器——每种容器一个实例化网格（箱体 + 一道色带），颜色随状态变暗（开过 / 空了）
       const CV = { crate: [24, 18, 16, 0x9a6a3a, 0xffc46b], locker: [16, 11, 36, 0x5a7a9a, 0xc8d8ea], safe: [18, 16, 20, 0x3a3e4a, 0xd8b25a], pc: [20, 12, 14, 0x2a2d3a, 0x1fd6ee],
         med: [20, 14, 12, 0xf2f2f2, 0xff3b52], weapon: [36, 12, 10, 0x5a6a3a, 0xffd23f], duffel: [24, 12, 10, 0x2a2a30, 0xff8a1f], vault: [32, 32, 30, 0xb08a3a, 0xffe58a],
-        body: [22, 14, 8, 0x3a3448, 0xff3b52], pile: [16, 16, 8, 0x6a6a6a, 0xffffff] };
+        body: [22, 14, 8, 0x3a3448, 0xff3b52], pile: [16, 16, 8, 0x6a6a6a, 0xffffff],
+        fridge: [18, 14, 34, 0xe8eef4, 0x7ad0ff], server: [18, 16, 40, 0x1d1f26, 0x5ee36a], tools: [26, 12, 30, 0xc0392b, 0xffd23f] };
       W.contInst = {}; W.contCV = CV;
       const unit = new T.BoxGeometry(1, 1, 1); unit.translate(0, 0.5, 0);
       for (const type of S.CONT_IDS) {

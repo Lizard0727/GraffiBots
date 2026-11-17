@@ -163,6 +163,46 @@ const mk = (st) => { const room = new Room('L', null, { manual: true }); room.se
   ok(o.safeLv === 1 && E.power(o, 'blaze').safe === 1, '安全箱默认 1 级（2×2）');
   ok(E.apply(o, 'safeUp').ok && o.safeLv === 2 && E.apply(o, 'safeUp').ok && o.safeLv === 3 && !E.apply(o, 'safeUp').ok, '安全箱升到 3 级（3×3）后满级');
 }
+// ---- 2.1.1：中途加入 / AI 增援 / 消耗品 ----
+{
+  const g = mk({ squad: 2 }); g.countdown = 0;
+  const evs = []; const ev0 = g.ev.bind(g); g.ev = (e) => { evs.push(e); return ev0(e); };
+  ok(!g.lootJoinable(), '开局没有小队全灭：不能中途加入');
+  const t3 = [...g.players.values()].filter((p) => p.team === 3);
+  for (const p of t3) { p.alive = false; p.out = true; p.respawnT = 1e9; }
+  g.lootSlots();
+  ok(g.lootJoinable(), '第 3 小队全灭：空出一个位置可以中途加入');
+  const fake = { id: 4242, name: '路人甲', weapon: 'tactic', head: 'antenna', pilot: 'hawk', power: { lv: 3, bt: 0, safe: 2 }, conn: { send() {} } };
+  g.queueJoin([fake]);
+  ok(!g.lootJoinable(), '位置被排上之后，别人不能再排同一个位置');
+  g.time += 4; g.lootReinforce();
+  const me = g.players.get(4242), mates = [...g.players.values()].filter((p) => p.team === 3 && !p.out);
+  ok(me && me.team === 3 && me.alive && !me.out && mates.length === 2 && mates.some((p) => p.bot), `真人中途加入第 3 小队（AI 队友补满 ${mates.length} 人）`);
+  ok(me && me.safe.w * me.safe.h === 6, '中途加入的玩家带着自己的安全箱');
+  const sq = evs.find((e) => e[0] === 'sqj');
+  ok(sq && sq[1] === 3 && sq[4] === 1 && sq[3] === 6, `宣告加入：第 ${sq && sq[1]} 小队「${sq && sq[2]}」，当前 ${sq && sq[3]} 支小队`);
+  ok(evs.some((e) => e[0] === 'pjn' && e[1].some((a) => a[0] === 4242)), '新玩家信息同步给所有人');
+  const near = [...g.players.values()].filter((p) => !p.guard && !p.out && p.team !== 3).reduce((m, p) => Math.min(m, Math.hypot(p.x - me.x, p.y - me.y)), 1e9);
+  ok(near > 800, `从离别的小队最远的出生点进场（最近的敌人 ${Math.round(near)}）`);
+  // AI 增援：没人排队时，全灭 25 秒后 AI 小队进场
+  for (const p of [...g.players.values()].filter((p) => p.team === 4)) { p.alive = false; p.out = true; }
+  g.lootSlots(); g.time += 10; g.lootReinforce();
+  ok(![...g.players.values()].some((p) => p.team === 4 && !p.out), 'AI 增援要等一会儿');
+  g.time += 20; g.lootReinforce();
+  ok([...g.players.values()].filter((p) => p.team === 4 && !p.out && p.bot).length === 2 && evs.filter((e) => e[0] === 'sqj').length === 2, 'AI 增援小队进场并宣告');
+  g.timeLeft = 100; for (const p of [...g.players.values()].filter((p) => p.team === 5)) { p.alive = false; p.out = true; }
+  g.lootSlots(); g.time += 60; g.lootReinforce();
+  ok(!g.lootJoinable() && ![...g.players.values()].some((p) => p.team === 5 && !p.out), '剩余时间不够时不再有新小队加入');
+  // 消耗品
+  me.hp = 20; me.inv.items.push({ id: 9001, k: 'stim', x: 4, y: 2, rot: 0 }, { id: 9002, k: 'shieldc', x: 3, y: 2, rot: 0 });
+  g.lootOp(me, { a: 'use', from: 'inv', id: 9001 });
+  ok(me.hp === 70 && !me.inv.items.some((x) => x.id === 9001), '急救针：回复 50 生命，用掉就没了');
+  g.lootOp(me, { a: 'use', from: 'inv', id: 9002 });
+  ok(!me.shield, '1 秒内不能连续用两个');
+  g.time += 1.1; g.lootOp(me, { a: 'use', from: 'inv', id: 9002 });
+  ok(me.shield === 50, '护盾电池：50 护盾');
+  ok(Object.keys(S.LOOT.items).length >= 60 && S.CONT_IDS.includes('server') && S.CONT_IDS.includes('fridge') && S.CONT_IDS.includes('tools'), `物资 ${Object.keys(S.LOOT.items).length} 种、容器 ${S.CONT_IDS.length} 种`);
+}
 // ---- 高危：装备 ----
 {
   const o = E.newProfile('t'); o.coins = 5000;

@@ -183,6 +183,13 @@
 - **只保留俯视视角**：第三人称视角下线（狙击、迫击等机体在第三人称下优势过大）。
 - **平衡调整**：用 `node tools/balance.js [局数]` 让 AI 随机搭配打几百局，统计每个驾驶员 / 机体的胜率和 K/D，再按数据调整（具体数值见游戏内公告）。机体胜率差距从 34%–62% 缩小到大致 39%–60%，同时改进了近战机体的 AI。
 
+## 2.1.1 更新 · 中途加入 & 账号互通
+- **撤离中途加入**：小队全灭后空出的位置，联机时优先给排队的真人，否则 AI 增援小队空降；全场播报加入的小队和当前小队数（`Game.lootReinforce / addLateSquad`，`S.LOOT.joinMin / maxJoins / botJoinWait`）。联机开撤离会先找同难度、有空位的进行中对局。
+- **更多物资**：65 种物资、4 种消耗品（背包里双击使用）、新容器冰箱 / 服务器机柜 / 工具柜。
+- **大地图**：所有模式按 N 打开。
+- **账号互通**：本机账号可以「导出 / 导入」转移码（`GAcc.LocalAccounts.exportCode / importCode`），换浏览器 / 设备都能登录；`config.js` 的 `GB_SERVER_URL`（或登录页「连接游戏服务器」）让所有版本连同一台 `node server.js`，共用在线账号。
+- English: mid-raid squad joins with announcements, 31 new items and usable consumables, N for the full map, and account transfer codes plus a shared server address so one account works in every version.
+
 ## 2.1 更新 · 雇佣兵撤离（Update 2.1 · Mercenary Extraction）
 - **灰城禁区**：撤离模式的新地图，面积是旧地图的 10 倍（760×500 格），六个城区、带隔间的建筑、可以坐电梯上天台的高楼；中央灰石大厦是高价值区，Boss 小队「灰石指挥官 · 铁卫」在城区间巡逻。渲染按区块剔除、涂料贴图自动降分辨率、阴影跟随镜头。
 - **网格背包 + 搜索容器**：10 种容器（军需箱、保险柜、电脑、金库、遗骸……），按 F 打开，一件件搜出来自己挑；物资有大小，可拖动 / 旋转 / 丢弃；新增「至宝」品质；安全箱（2×2 → 3×3）阵亡不丢。
