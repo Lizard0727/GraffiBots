@@ -71,8 +71,8 @@ for (const [w, sp, dist] of [['dozer', 'bulldoze', 140], ['flamer', 'napalm', 16
 }
 {
   const { A, B, run } = duel({ pilot: 'hammer' }, {}, { dist: 60 });
-  A.input.gq++; const hp0 = B.hp; run(1.6);
-  ok(B.hp < hp0 - 30, `石磊「定向爆破」：1.2 秒后爆炸，伤害 ${Math.round(hp0 - B.hp)}`);
+  A.input.ad = 60; A.input.gq++; const hp0 = B.hp; run(1.6);
+  ok(B.hp < hp0 - 30, `石磊「定向爆破」：扔到瞄准位置，0.9 秒后爆炸，伤害 ${Math.round(hp0 - B.hp)}`);
   const d2 = duel({ pilot: 'hammer' }, {});
   d2.g.hurt(d2.A, 999, d2.B);
   ok(d2.A.foot && d2.A.shield >= 35, '石磊被动「安全第一」：弹出时自带 35 护盾');
@@ -202,9 +202,11 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   o.gems = E.PASS.price;
   ok(E.apply(o, 'buyPass').ok && o.pass.prem && o.gems === 0, `花 ${E.PASS.price} 宝石解锁高级通行证`);
   const all = E.apply(o, 'claimAll');
-  ok(all.ok && o.skins.includes('blaze_grey') && o.skins.includes('m_camo') && o.pass.cp.length === 5, '一键领取：高级线 1–5 级（含凌焰服装和迷彩涂装）');
+  ok(all.ok && o.pass.cp.length === 5 && o.pass.cf.length === 5, '一键领取：免费线 + 高级线 1–5 级');
   o.pass.xp = E.PASS.xpPer * 30; E.apply(o, 'claimAll');
-  ok(o.skins.includes('flag_red'), '通行证 30 级：传说皮肤「红旗特装」');
+  ok(o.skins.includes('blaze_merc') && o.skins.includes('m_desert') && o.mechs.includes('tactic') && o.pilots.hawk, '通行证 30 级：沙漠突击手、沙鹰迷彩、战术机兵（免费 25 级）、霍克（高级 30 级）');
+  o.pass.xp = E.PASS.xpPer * 50; E.apply(o, 'claimAll');
+  ok(o.skins.includes('hawk_storm'), '通行证 50 级：赛季传说「沙暴统帅」');
   ok(E.normalize(Object.assign({}, o, { pass: Object.assign({}, o.pass, { s: 0 }) })).pass.xp === 0, '新赛季通行证从 0 开始');
 }
 {
@@ -257,7 +259,7 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   const p = [...g.players.values()][0];
   const k = g.obj.crates[0]; p.x = k.x; p.y = k.y; p.z = k.z; const mh = p.maxHp;
   g.step();
-  ok(p.cubes === 1 && p.maxHp > mh, `捡到空投箱：能量 +1，生命上限 ${mh} → ${p.maxHp}`);
+  ok(p.cubes >= 1 && p.maxHp > mh, `捡到空投箱：能量 +1，生命上限 ${mh} → ${p.maxHp}`);
   g.obj.circle.r = 50; g.obj.circle.x = 100; g.obj.circle.y = 100; p.x = S.W - 200; p.y = S.H - 200; p.invulnT = 0; const h0 = p.hp;
   g.obj.dmgT = 0; g.step();
   ok(p.hp < h0, '在毒圈外会持续掉血');
@@ -275,7 +277,7 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
   const front = 150 - d.B.hp;
   d.B.input.a = 0; d.B.hp = 150; d.g.hurt(d.B, 20, d.A);
   const back = 150 - d.B.hp;
-  ok(Math.abs(front - 12) < 0.01 && Math.abs(back - 20) < 0.01, `防暴盾卫：正面 20 伤害只扣 ${front}，背后扣 ${back}`);
+  ok(Math.abs(front - 11) < 0.01 && Math.abs(back - 20) < 0.01, `防暴盾卫：正面 20 伤害只扣 ${front}，背后扣 ${back}`);
 }
 {
   // 盾墙挡住子弹

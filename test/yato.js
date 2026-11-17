@@ -43,7 +43,7 @@ const steps = (g, n) => { for (let i = 0; i < n; i++) g.step(); };
   const { g, A, B } = duel({ pilot: 'fu', weapon: 'warden' }, { pilot: 'blaze', weapon: 'blaster' });
   B.hp = 500; B.maxHp = 500; g.hurt(B, 20, A); const d0 = 500 - B.hp;
   B.hp = 500; B.slowT = 2; g.hurt(B, 20, A); const d1 = 500 - B.hp;
-  ok(Math.abs(d1 / d0 - 1.15) < 0.01, `符零被动「符咒共鸣」：减速目标伤害 ×${(d1 / d0).toFixed(2)}`);
+  ok(Math.abs(d1 / d0 - 1.1) < 0.01, `符零被动「符咒共鸣」：减速目标伤害 ×${(d1 / d0).toFixed(2)}`);
 }
 // 结界机兵：命中减速
 {
@@ -81,7 +81,7 @@ const steps = (g, n) => { for (let i = 0; i < n; i++) g.step(); };
   const { g: g2, A: A2, B: B2 } = duel({ pilot: 'aka', weapon: 'reaper' }, { pilot: 'blaze', weapon: 'blaster' });
   B2.hp = B2.maxHp = 999; A2.hp = A2.maxHp; g2.hurt(B2, 20, A2); const d0 = 999 - B2.hp;
   B2.hp = 999; A2.hp = A2.maxHp * 0.3; g2.hurt(B2, 20, A2); const d1 = 999 - B2.hp;
-  ok(Math.abs(d1 / d0 - 1.2) < 0.01, `赤镰被动「恶灵低语」：残血时伤害 ×${(d1 / d0).toFixed(2)}`);
+  ok(Math.abs(d1 / d0 - 1.22) < 0.01, `赤镰被动「恶灵低语」：残血时伤害 ×${(d1 / d0).toFixed(2)}`);
   void bh;
 }
 // 灵刃机兵：刀气 + 裂空斩

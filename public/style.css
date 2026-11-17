@@ -2237,3 +2237,107 @@ table.odds td:last-child { text-align: right; font-size: 18px; } table.odds b { 
 .trailer.s2 .tr-title b { color: #ffd35e; text-shadow: 0 0 24px #ff8a1f, 0 4px 0 #2a1a08; }
 .trailer.s2 .tr-name b { color: #ffb42e; }
 .ps-bottom { align-items: start; }
+
+/* =====================================================================
+   2.1：精致二次元界面（body.ui21，默认开启；设置里可以切回涂鸦风）
+   深海军蓝玻璃面板 + 金色细描边 + 柔光；大厅以角色立绘为中心
+   ===================================================================== */
+body.ui21 { --u-bg: #0b1020; --u-panel: linear-gradient(150deg, rgba(34,44,74,.88), rgba(14,19,36,.9)); --u-line: rgba(226,190,112,.55); --u-gold: #e8c47a; --u-gold2: #ffe7b0; --u-txt: #eef1fb; --u-sub: #9fa9c8; --u-glow: 0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12); }
+body.ui21 .screen, body.ui21 #title.home { background: radial-gradient(ellipse at 38% 58%, color-mix(in srgb, var(--pc, #7ab8ff) 30%, transparent) 0%, transparent 52%), radial-gradient(ellipse at 80% 10%, #3a4a8a55, transparent 50%), linear-gradient(180deg, #121a33 0%, #0b1020 70%, #070a14 100%) !important; }
+body.ui21 #title.home #menuBg { opacity: .12; mix-blend-mode: screen; filter: blur(1px); }
+body.ui21 #title.home::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(115deg, transparent 0 120px, rgba(255,255,255,.025) 120px 122px), radial-gradient(circle at 50% 120%, rgba(232,196,122,.18), transparent 50%); }
+/* 通用：按钮 / 面板 / 标题 */
+body.ui21 .btn { background: linear-gradient(180deg, #ffe7a8, #e0b25a) !important; color: #2a1d08 !important; border: 1px solid #fff3 !important; border-radius: 999px !important; box-shadow: 0 6px 18px rgba(224,178,90,.35), inset 0 1px 0 #fff8 !important; transform: none !important; font-weight: 700; }
+body.ui21 .btn:hover { filter: brightness(1.08); transform: translateY(-1px) !important; }
+body.ui21 .btn.ghost { background: rgba(255,255,255,.08) !important; color: var(--u-txt) !important; border: 1px solid var(--u-line) !important; box-shadow: none !important; }
+body.ui21 .btn:disabled { filter: grayscale(.7) brightness(.7); }
+body.ui21 .side-btn::before, body.ui21 .me-chip::before, body.ui21 .trophy-chip::before, body.ui21 .icon-btn::before, body.ui21 .ov-head .back::before { background: var(--u-panel) !important; box-shadow: var(--u-glow), 0 0 0 1px var(--u-line) !important; filter: none !important; border-radius: 16px; }
+body.ui21 .side-btn, body.ui21 .me-chip, body.ui21 .trophy-chip, body.ui21 .icon-btn, body.ui21 .ov-head .back { color: var(--u-txt) !important; }
+body.ui21 .icon-btn::before { border-radius: 50% !important; }
+body.ui21 .icon-btn:nth-of-type(2)::before { background: var(--u-panel) !important; }
+body.ui21 .icon-btn .gi, body.ui21 .side-ico .gi { filter: drop-shadow(0 0 4px rgba(232,196,122,.5)); }
+body.ui21 .bar i { background: linear-gradient(90deg, #7ab8ff, #e8c47a) !important; }
+body.ui21 .bar.gold i { background: linear-gradient(90deg, #e0b25a, #ffe7b0) !important; }
+/* 左侧菜单：细长玻璃标签，选中 / 悬停有金色光条 */
+body.ui21 .side-btn { transform: none !important; margin-right: 0; transition: transform .15s, filter .15s; }
+body.ui21 .side-btn:nth-child(odd) { transform: none !important; }
+body.ui21 .side-btn:hover { transform: translateX(6px) !important; filter: brightness(1.12); }
+body.ui21 .side-btn::after { content: ''; position: absolute; left: 0; top: 18%; bottom: 18%; width: 3px; border-radius: 3px; background: linear-gradient(180deg, transparent, var(--u-gold), transparent); opacity: .8; }
+body.ui21 .side-btn b { color: var(--u-txt) !important; font-size: 19px !important; letter-spacing: 2px; }
+body.ui21 .side-btn small { color: var(--u-sub) !important; font-weight: 400; }
+body.ui21 .home-logo { transform: none; }
+body.ui21 .home-logo b { color: #fff; text-shadow: 0 0 18px rgba(122,184,255,.6), 0 3px 0 #1a2448; font-size: 42px; }
+body.ui21 .home-logo b span { background: linear-gradient(180deg, #fff7d8, #e8c47a); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 3px 0 #3a2a10); }
+body.ui21 .home-logo i { color: #9fd0ff; text-shadow: none; transform: none; letter-spacing: 4px; font-size: 14px; }
+body.ui21 .home-logo .s1-badge { background: linear-gradient(90deg, #e0a030, #ffd35e); color: #2a1a08; border: 0; border-radius: 999px; transform: none; box-shadow: 0 4px 12px rgba(224,160,48,.4); }
+/* 顶栏 */
+body.ui21 .pass-chip, body.ui21 .wallet, body.ui21 .wallet .cur { background: var(--u-panel) !important; border: 1px solid var(--u-line) !important; box-shadow: var(--u-glow) !important; border-radius: 14px !important; color: var(--u-txt) !important; transform: none !important; }
+body.ui21 .pass-chip .pc-s { background: linear-gradient(135deg, #e0a030, #ff4d3d) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; }
+body.ui21 .trophy-chip b { color: var(--u-gold2) !important; }
+body.ui21 .home-top .conn { color: var(--u-sub); text-shadow: none; }
+/* 大厅中间：大幅角色立绘（无相框，底部渐隐），机甲在旁边 */
+body.ui21 .home-stage .hero-portrait { background: none !important; padding: 0 !important; transform: none !important; filter: drop-shadow(0 20px 30px rgba(0,0,0,.5)) drop-shadow(0 0 30px color-mix(in srgb, var(--pc, #7ab8ff) 40%, transparent)); width: min(34vw, 420px) !important; height: min(76vh, 600px) !important; left: -2% !important; top: 4% !important; border-radius: 0 !important; -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 100%); mask-image: linear-gradient(180deg, #000 70%, transparent 100%); animation: uiFloat 6s ease-in-out infinite; }
+body.ui21 .home-stage .hero-portrait svg { border: 0 !important; width: 100%; height: 100%; object-fit: cover; }
+body.ui21 .home-stage .hero-portrait svg > rect:first-of-type { opacity: 0; }
+body.ui21 .home-stage .hero-portrait::after { display: none; }
+@keyframes uiFloat { 50% { transform: translateY(-10px) !important; } }
+body.ui21 .hero-plate .hero-pilot b { color: #fff; text-shadow: 0 0 20px color-mix(in srgb, var(--pc, #7ab8ff) 70%, transparent), 0 3px 0 #0b1020 !important; transform: none; letter-spacing: 4px; }
+body.ui21 .hero-plate .hero-pilot b small { background: rgba(10,14,28,.7) !important; color: var(--u-gold2) !important; border: 1px solid var(--u-line) !important; border-radius: 999px !important; }
+body.ui21 .hero-plate .hero-pilot i { color: var(--u-sub); text-shadow: none; font-style: italic; }
+body.ui21 .pill { background: rgba(14,19,36,.82) !important; color: var(--u-txt) !important; border: 1px solid var(--u-line) !important; box-shadow: none !important; border-radius: 999px !important; transform: none !important; }
+/* 右侧：模式卡 / 对战按钮 */
+body.ui21 .mode-card, body.ui21 .loot-chip, body.ui21 .rank-chip { border: 1px solid var(--u-line) !important; border-radius: 18px !important; box-shadow: var(--u-glow) !important; transform: none !important; }
+body.ui21 .mode-card::before, body.ui21 .mode-card::after { display: none !important; }
+body.ui21 .mode-card b { text-shadow: 0 2px 8px rgba(0,0,0,.6) !important; }
+body.ui21 .mode-card .mode-ico { background: rgba(255,255,255,.14) !important; border: 1px solid #fff4 !important; transform: none; }
+body.ui21 .play-btn { transform: none !important; padding: 22px 10px 18px !important; }
+body.ui21 .play-btn::before { background: linear-gradient(180deg, #fff1c2 0%, #f2c45a 45%, #d8902a 100%) !important; border: 1px solid #fff8 !important; border-radius: 22px !important; box-shadow: 0 12px 30px rgba(242,196,90,.45), inset 0 2px 0 #fffc, inset 0 -4px 0 rgba(120,60,0,.35) !important; filter: none !important; }
+body.ui21 .play-btn::after { content: ''; position: absolute; inset: 0; left: 0; right: 0; bottom: 0; height: auto; z-index: -1; border-radius: 22px; background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.55) 45%, transparent 60%) !important; background-size: 250% 100% !important; animation: uiShine 3.2s ease-in-out infinite; filter: none !important; }
+@keyframes uiShine { 0% { background-position: 150% 0; } 60%, 100% { background-position: -100% 0; } }
+body.ui21 .play-btn span { color: #3a2208 !important; text-shadow: 0 1px 0 #fff8 !important; letter-spacing: 10px !important; font-size: 46px !important; }
+body.ui21 .play-btn small { color: #5a3a10 !important; }
+body.ui21 .play-btn:hover { animation: none; filter: brightness(1.06); }
+body.ui21 .team-row input { background: rgba(14,19,36,.85); border: 1px solid var(--u-line); color: var(--u-txt); border-radius: 999px; }
+/* 全屏面板 */
+body.ui21 .ov { background: radial-gradient(ellipse at 50% 0%, #2a3a7044, transparent 60%), linear-gradient(180deg, #111a33f5, #080c18f8) !important; backdrop-filter: blur(8px) !important; }
+body.ui21 .ov-head { border-bottom: 1px solid rgba(232,196,122,.25) !important; background: linear-gradient(180deg, rgba(255,255,255,.04), transparent); }
+body.ui21 .ov-head h2 { background: linear-gradient(180deg, #ffffff, #e8c47a); -webkit-background-clip: text; background-clip: text; color: transparent !important; text-shadow: none !important; transform: none !important; font-size: 32px !important; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+body.ui21 .ov-head small { background: none !important; color: var(--u-sub) !important; transform: none !important; font-family: inherit !important; }
+body.ui21 .ov-head .back::before { background: linear-gradient(180deg, #ffe7a8, #e0b25a) !important; }
+body.ui21 .ov-head .back { color: #2a1d08 !important; }
+/* 驾驶员卡：圆角立绘卡，名字压在底部渐变条上 */
+body.ui21 .pcard { background: linear-gradient(160deg, color-mix(in srgb, var(--pc, #7ab8ff) 35%, #1a2240), #0e1424) !important; padding: 0 !important; border: 1px solid var(--u-line) !important; border-radius: 16px !important; box-shadow: var(--u-glow) !important; transform: none !important; overflow: hidden !important; }
+body.ui21 .pcard svg { border: 0 !important; }
+body.ui21 .pcard .pname { bottom: 0 !important; padding: 26px 8px 8px !important; background: linear-gradient(180deg, transparent, rgba(8,12,24,.92)) !important; }
+body.ui21 .pcard .pname b { color: #fff !important; }
+body.ui21 .pcard .pname small { color: var(--u-gold2) !important; }
+body.ui21 .pcard:hover { transform: translateY(-4px) !important; box-shadow: 0 16px 30px rgba(0,0,0,.5), 0 0 0 1px var(--u-gold) !important; }
+body.ui21 .pcard.sel { box-shadow: 0 0 0 2px var(--u-gold), 0 0 24px rgba(232,196,122,.5) !important; transform: translateY(-4px) !important; }
+body.ui21 .pcard.sel::after { display: none; }
+body.ui21 .pcard.locked svg { filter: grayscale(1) brightness(.55); }
+body.ui21 .mcard2 { background: linear-gradient(160deg, #1d2644, #0e1424) !important; color: var(--u-txt) !important; border: 1px solid var(--u-line) !important; border-radius: 16px !important; box-shadow: var(--u-glow) !important; transform: none !important; }
+body.ui21 .mcard2.sel { box-shadow: 0 0 0 2px var(--u-gold), 0 0 24px rgba(232,196,122,.5) !important; }
+body.ui21 .skin-card, body.ui21 .chest-card, body.ui21 .gear-card, body.ui21 .mode-tile { border-radius: 16px !important; transform: none !important; }
+body.ui21 .home-stage .hero-portrait { width: min(27vw, 340px) !important; height: min(64vh, 500px) !important; left: 0 !important; top: 12% !important; }
+body.ui21 .me-chip .lvrow { background: none !important; border: 0; padding: 0; color: var(--u-txt); grid-template-columns: auto 1fr; }
+body.ui21 .me-chip .lvrow small { color: var(--u-sub) !important; }
+/* 加载画面 / 登录 */
+body.ui21 #boot { background: radial-gradient(ellipse at 50% 40%, #2a3a7066, transparent 60%), linear-gradient(180deg, #121a33, #070a14) !important; }
+body.ui21 #boot canvas { opacity: .25; }
+body.ui21 .bl-bar { background: rgba(255,255,255,.08) !important; border: 1px solid var(--u-line) !important; border-radius: 999px !important; box-shadow: none !important; }
+body.ui21 .bl-bar i { background: linear-gradient(90deg, #7ab8ff, #e8c47a) !important; border-radius: 999px; }
+body.ui21 #login .lg-card { background: var(--u-panel) !important; border: 1px solid var(--u-line) !important; border-radius: 22px !important; box-shadow: var(--u-glow) !important; color: var(--u-txt) !important; transform: none !important; }
+body.ui21 .dlg-card, body.ui21 .settings-box { border-radius: 20px !important; }
+body.ui21 .lb-map, body.ui21 .lb-opt button, body.ui21 .lb-stash, body.ui21 .lb-board, body.ui21 .lb-rec > div, body.ui21 .st-detail, body.ui21 .st-cell, body.ui21 .gear-card, body.ui21 .qrow, body.ui21 .quests { background: var(--u-panel) !important; color: var(--u-txt) !important; border: 1px solid var(--u-line) !important; border-radius: 14px !important; box-shadow: var(--u-glow) !important; transform: none !important; }
+body.ui21 .lb-opt button.sel { background: linear-gradient(180deg, #ffe7a8, #e0b25a) !important; color: #2a1d08 !important; }
+body.ui21 .lb-opt button small, body.ui21 .lb-map small { color: inherit; opacity: .8; }
+body.ui21 .skin-card { background: linear-gradient(160deg, color-mix(in srgb, var(--rc) 30%, #1a2240), #0e1424) !important; color: var(--u-txt) !important; border: 1px solid var(--rc) !important; border-radius: 16px !important; box-shadow: var(--u-glow) !important; }
+body.ui21 .skin-card small, body.ui21 .skin-card p { color: var(--u-sub) !important; }
+body.ui21 .shop-tabs button, body.ui21 .st-tabs button { background: rgba(255,255,255,.06) !important; color: var(--u-txt) !important; border: 1px solid var(--u-line) !important; border-radius: 999px !important; box-shadow: none !important; transform: none !important; }
+body.ui21 .shop-tabs button.sel, body.ui21 .st-tabs button.sel { background: linear-gradient(180deg, #ffe7a8, #e0b25a) !important; color: #2a1d08 !important; }
+body.ui21 .quests h4, body.ui21 .qrow b { color: var(--u-txt) !important; }
+body.ui21 .boot-load { background: radial-gradient(ellipse at 50% 40%, #2a3a7066, transparent 60%), linear-gradient(180deg, #121a33, #070a14) !important; }
+body.ui21 .bl-art .pol { background: linear-gradient(160deg, #2a3660, #0e1424); padding: 0 0 28px; border: 1px solid rgba(226,190,112,.6); border-radius: 16px; overflow: hidden; box-shadow: 0 16px 34px #000a; }
+body.ui21 .bl-art .pol svg { border: 0; }
+body.ui21 .bl-art .pol b { color: #ffe7b0; }
+body.ui21 .bl-logo b { text-shadow: 0 0 18px rgba(122,184,255,.6), 0 3px 0 #1a2448; }

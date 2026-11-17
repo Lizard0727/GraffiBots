@@ -224,6 +224,7 @@
       <label class="set-row"><span>帧率上限（电脑发热 / 卡顿时调低）</span><select data-set="fpsCap">${[[30, '30'], [60, '60'], [120, '120'], [0, '不限制']].map(([v, n]) => `<option value="${v}" ${fpsCap === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
       <label class="set-row toggle"><span>显示聊天消息（Enter 打字，Tab 切换全部 / 队伍）</span><input type="checkbox" data-set="chat" ${store.get('chat', true) ? 'checked' : ''}></label>
       <label class="set-row"><span>语言 / Language</span><select data-set="lang"><option value="zh" ${window.GBI18N && GBI18N.lang === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${window.GBI18N && GBI18N.lang === 'en' ? 'selected' : ''}>English</option></select></label>
+      <label class="set-row toggle"><span>精致界面（2.1 新风格；关闭后换回涂鸦风界面）</span><input type="checkbox" data-set="ui21" ${store.get('ui21', true) ? 'checked' : ''}></label>
       <label class="set-row toggle"><span>高画质（阴影 + 卡通描边，卡顿时可关闭）</span><input type="checkbox" data-set="hq" ${hqOn ? 'checked' : ''}></label>
       <div><div class="set-note" style="margin-bottom:6px">原创曲目试听：</div><div class="jukebox">${Object.entries(AU.TRACK_NAMES).map(([k, n]) => `<button data-track="${k}" class="${cur === k ? 'sel' : ''}">♪ ${n}</button>`).join('')}</div></div>
       <div class="set-note">所有音乐和音效都由浏览器实时合成，均为原创。主界面播放「霓虹喷漆街」，对战中播放「涂装突击」，最后 30 秒切换为「倒数冲刺」。</div>`;
@@ -243,6 +244,7 @@
           else if (cb.dataset.set === 'hq') { hqOn = cb.checked; store.set('hq', hqOn); R3.setQuality(hqOn); }
           else if (cb.dataset.set === 'chat') { store.set('chat', cb.checked); if (!cb.checked) $('chatLog').classList.add('hidden'); }
           else if (['aimAssist', 'autoQ', 'showFps'].includes(cb.dataset.set)) store.set(cb.dataset.set, cb.checked);
+          else if (cb.dataset.set === 'ui21') { store.set('ui21', cb.checked); document.body.classList.toggle('ui21', cb.checked); }
           else { shakeOn = cb.checked; store.set('shake', shakeOn); }
           renderSettings();
         };
@@ -258,6 +260,7 @@
     const n = AU.current();
     $('nowPlaying').textContent = AU.ctx && AU.ctx.state === 'running' ? (n ? `♪ 正在播放：${AU.TRACK_NAMES[n]}` : '♪') : '♪ 点击任意位置开启音乐';
   }
+  document.body.classList.toggle('ui21', store.get('ui21', true));   // 2.1：精致二次元界面（默认开）
   function openSettings() { renderSettings(); $('dlgClose').textContent = G && !G.over ? '继续对战' : '关闭'; $('settingsDlg').classList.remove('hidden'); }
   function closeSettings() { $('settingsDlg').classList.add('hidden'); if (G && !G.over) lockPointer(); }
   const perf = { n: 0, acc: 0, fps: 0, low: 0, done: false };

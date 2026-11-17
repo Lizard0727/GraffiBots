@@ -16,6 +16,20 @@
   const TIER = { 高级: 'Premium', 免费: 'Free' };
   // 带数字 / 名字的句式（先于片段替换）
   const PATTERNS = [
+    // ---- 2.1 撤离 / 通行证 ----
+    [/还有 (\d+) 件没搜/g, '$1 left to search'], [/(\d+) 秒后开放/g, 'opens in $1 s'], [/电闸冷却中 (\d+) 秒/g, 'Lever cooling down: $1 s'],
+    [/开放中 · (\d+)秒/g, 'Open · $1 s'], [/价格每小时整点刷新（还有 (\d+) 分钟）/g, 'Prices refresh every hour on the hour ($1 min left)'],
+    [/· 所有玩家同一个价格 · 低买高卖赚差价。/g, '· same price for everyone · buy low, sell high. '],
+    [/(\d+)\/(\d+) 格 · 价值 ([\d,]+)/g, '$1/$2 cells · Value $3'], [/安全箱 · (\d) 级/g, 'Safe Box · Lv.$1'], [/升到 (\d) 级/g, 'Upgrade to Lv.$1'],
+    [/^(\d)×(\d) 格。/g, '$1×$2 cells. '], [/^(\d)×(\d) 格$/g, '$1×$2 cells'], [/安全箱升到 (\d) 级！/g, 'Safe box upgraded to Lv.$1!'], [/买到「(.+)」/g, 'Bought “$1”'],
+    [/豪华版通行证已解锁！直升 (\d+) 级/g, 'Deluxe pass unlocked! +$1 tiers'], [/开启 ×(\d+)/g, 'Open ×$1'], [/金币宝箱 ×(\d+)/g, 'Coin chest ×$1'],
+    [/再获得 (\d+) 经验开下一个 · 已开 (\d+) 个/g, '$1 more XP for the next one · $2 opened'],
+    [/通行证满 (\d+) 级后，每 (\d+) 经验送一个金币宝箱（(\d+) 金币），没有上限/g, 'After pass tier $1, every $2 XP gives a coin chest ($3 coins), with no limit'],
+    [/升级豪华版 · (\d+) 宝石/g, 'Upgrade to Deluxe · $1 gems'], [/付费撤离 −(\d+) 金币/g, 'Paid extraction −$1 coins'],
+    [/背包物资丢失 · 安全箱保住 (\d+) 件（已存入仓库）/g, 'Backpack lost · $1 safe-box items kept (sent to warehouse)'],
+    [/电闸已拉下！拉闸撤离点开放 (\d+) 秒/g, 'Lever pulled! The Lever extraction is open for $1 s'],
+    [/S(\d+) 新驾驶员 · 高级通行证 30 级/g, 'S$1 new pilot · premium pass tier 30'], [/第 (\d+) 赛季 · 通行证正式推出/g, 'Season $1 · the pass is here'],
+    [/(\d+) 件物资 · 点击进入/g, '$1 items · tap to open'], [/通行证直升 (\d+) 级/g, 'Instantly gain $1 tiers'],
     // 1.9
     [/^排位赛 · 第 (\d+) 赛季$/g, 'Ranked · Season $1'], [/^还剩 (.+) · 下个赛季分数减半$/g, (m, t) => `${tr(t)} left · points are halved next season`],
     [/^\+(\d+) 分 · $/g, '+$1 · '], [/^ \+(\d+) 分$/g, ' +$1'], [/^ (-?\d+) 分（(.+)起 (-?\d+) 分）· 输了拿到 MVP 只扣一半$/g, (m, a, t, b) => ` ${a} (${b} from ${tr(t)}) · MVP on a loss only loses half`],

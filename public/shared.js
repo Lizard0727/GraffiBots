@@ -364,25 +364,25 @@
   //   kind: gun 子弹 / melee 近身挥击 / lob 抛投；shots 连发、pellets 散射、cost 每发弹药、quiet 草丛里开火不暴露、
   //   homing 自动锁定、ghost 穿墙、fx.slow 减速秒数、fx.reveal 暴露秒数、heal 命中回血
   S.SIDEARMS = {
-    blaze:  { name: '火花双枪', desc: '一次连开 2 枪，近中距离压制。', kind: 'gun', shots: 2, interval: 0.08, dmg: 8, range: 240, speed: 640, spread: 0.06, reload: 0.8, atkCd: 0.36 },
-    frost:  { name: '袖珍狙击枪', desc: '射程最远、单发伤害高，但开火很慢。', kind: 'gun', dmg: 22, range: 380, speed: 1150, reload: 1.15, atkCd: 0.7, size: 4, splat: 10 },
-    candy:  { name: '彩带喷枪', desc: '一次喷出 3 道彩带，近距离很难躲。', kind: 'gun', pellets: 3, arc: 0.42, dmg: 5, range: 200, speed: 560, reload: 0.8, atkCd: 0.38, splat: 14 },
-    titan:  { name: '涂料拳套', desc: '近身连拳，把敌人打飞。', kind: 'melee', dmg: 14, range: 46, arc: 1.8, kb: 140, lunge: 140, reload: 0.75, atkCd: 0.38 },
+    blaze:  { name: '火花双枪', desc: '一次连开 2 枪，近中距离压制。', kind: 'gun', shots: 2, interval: 0.08, dmg: 7.2, range: 240, speed: 640, spread: 0.06, reload: 0.8, atkCd: 0.36 },
+    frost:  { name: '袖珍狙击枪', desc: '射程最远、单发伤害高，但开火很慢。', kind: 'gun', dmg: 20, range: 380, speed: 1150, reload: 1.15, atkCd: 0.7, size: 4, splat: 10 },
+    candy:  { name: '彩带喷枪', desc: '一次喷出 3 道彩带，近距离很难躲。', kind: 'gun', pellets: 3, arc: 0.42, dmg: 4.8, range: 200, speed: 560, reload: 0.8, atkCd: 0.38, splat: 14 },
+    titan:  { name: '涂料拳套', desc: '近身连拳，把敌人打飞。', kind: 'melee', dmg: 13.6, range: 46, arc: 1.8, kb: 140, lunge: 140, reload: 0.75, atkCd: 0.38 },
     raven:  { name: '墨汁飞镖', desc: '在草丛和墨雾里投掷不会暴露自己。', kind: 'gun', dmg: 11, range: 290, speed: 760, quiet: true, reload: 0.85, atkCd: 0.34, size: 4 },
     aurora: { name: '铆钉枪', desc: '射速很快，每发只用半格弹药。', kind: 'gun', dmg: 6, range: 230, speed: 700, cost: 0.5, spread: 0.08, reload: 0.9, atkCd: 0.16, size: 4 },
     gale:   { name: '疾风弩', desc: '箭矢飞得很快，装填也最快。', kind: 'gun', dmg: 12, range: 300, speed: 1000, reload: 0.7, atkCd: 0.3, size: 4 },
     hex:    { name: '电击枪', desc: '射程短，命中后让敌人减速 0.8 秒。', kind: 'gun', dmg: 9, range: 210, speed: 800, fx: { slow: 0.8 }, reload: 0.9, atkCd: 0.4 },
-    chef:   { name: '平底锅', desc: '近身拍击，每次打中给自己回 4 点生命。', kind: 'melee', dmg: 15, range: 44, arc: 2.0, kb: 180, lunge: 120, heal: 4, reload: 0.75, atkCd: 0.42 },
+    chef:   { name: '平底锅', desc: '近身拍击，每次打中给自己回 4 点生命。', kind: 'melee', dmg: 13.5, range: 44, arc: 2.0, kb: 180, lunge: 120, heal: 4, reload: 0.75, atkCd: 0.42 },
     vet:    { name: '手雷', desc: '抛出一颗会越过墙的小手雷，小范围爆炸。', kind: 'lob', dmg: 18, r: 46, range: 250, T: 0.6, reload: 1.2, atkCd: 0.8 },
     yuzu:   { name: '迷你无人机', desc: '小无人机自动锁定准星附近的敌人。', kind: 'gun', homing: true, dmg: 8, range: 260, speed: 600, reload: 0.85, atkCd: 0.34, size: 5 },
     flag:   { name: '信号枪', desc: '打中的敌人会暴露 2.5 秒，全队都能看见。', kind: 'gun', dmg: 10, range: 270, speed: 700, fx: { reveal: 2.5 }, reload: 0.85, atkCd: 0.35 },
-    hammer: { name: '钉锤', desc: '挥得慢，但一锤很重，能把人砸退。', kind: 'melee', dmg: 18, range: 50, arc: 1.6, kb: 200, lunge: 100, reload: 0.95, atkCd: 0.62 },
+    hammer: { name: '钉锤', desc: '挥得慢，但一锤很重，能把人砸退。', kind: 'melee', dmg: 17.2, range: 50, arc: 1.6, kb: 200, lunge: 100, reload: 0.95, atkCd: 0.62 },
     echo:   { name: '口袋音箱', desc: '短距离音波，可以穿过墙壁。', kind: 'gun', ghost: true, dmg: 9, range: 180, speed: 520, reload: 0.85, atkCd: 0.4, size: 7 },
-    kaka:   { name: '扑克飞牌', desc: '一次甩出 3 张飞牌，扇形散开。', kind: 'gun', pellets: 3, arc: 0.32, dmg: 5, range: 240, speed: 700, reload: 0.8, atkCd: 0.36, size: 4 },
-    han:    { name: '警用电棍', desc: '近身电击，命中让敌人减速 0.6 秒。', kind: 'melee', dmg: 14, range: 44, arc: 1.5, kb: 110, lunge: 130, fx: { slow: 0.6 }, reload: 0.75, atkCd: 0.38 },
-    fu:     { name: '符纸飞镖', desc: '一次甩出 2 张符纸，命中的敌人减速 0.5 秒。', kind: 'gun', pellets: 2, arc: 0.18, dmg: 8, range: 260, speed: 760, fx: { slow: 0.5 }, reload: 0.85, atkCd: 0.36, size: 4 },
+    kaka:   { name: '扑克飞牌', desc: '一次甩出 3 张飞牌，扇形散开。', kind: 'gun', pellets: 3, arc: 0.32, dmg: 4.8, range: 240, speed: 700, reload: 0.8, atkCd: 0.36, size: 4 },
+    han:    { name: '警用电棍', desc: '近身电击，命中让敌人减速 0.6 秒。', kind: 'melee', dmg: 13.6, range: 44, arc: 1.5, kb: 110, lunge: 130, fx: { slow: 0.6 }, reload: 0.75, atkCd: 0.38 },
+    fu:     { name: '符纸飞镖', desc: '一次甩出 2 张符纸，命中的敌人减速 0.5 秒。', kind: 'gun', pellets: 2, arc: 0.18, dmg: 7.7, range: 260, speed: 760, fx: { slow: 0.5 }, reload: 0.85, atkCd: 0.36, size: 4 },
     hawk:   { name: '冲锋手枪', desc: '射速很快的冲锋手枪，适合边跑边打。', kind: 'gun', dmg: 6.5, range: 260, speed: 820, reload: 0.75, atkCd: 0.2, size: 4 },
-    aka:    { name: '断骨短镰', desc: '近身横扫一大片，刃口比别的近战武器更宽。', kind: 'melee', dmg: 15, range: 52, arc: 2.3, kb: 150, lunge: 150, reload: 0.8, atkCd: 0.42 },
+    aka:    { name: '断骨短镰', desc: '近身横扫一大片，刃口比别的近战武器更宽。', kind: 'melee', dmg: 14.5, range: 52, arc: 2.3, kb: 150, lunge: 150, reload: 0.8, atkCd: 0.42 },
   };
   S.sidearm = (pid) => Object.assign({ kind: 'gun', size: 5, splat: 12, trail: 0, cost: 1, spread: 0.04 }, S.PISTOL, S.SIDEARMS[String(pid || '').split('@')[0]] || {});
   S.BUSH_DETECT = 90;       // 草丛里的敌人在这个距离内会被看见
@@ -1529,7 +1529,7 @@
       seals: me.seals || 0, spirits: me.spirits || 0 };
   };
   // 强度参考（AI 在排位赛禁用阶段用）：tools/balance.js 跑出来的胜率
-  S.META = {"pilots":{"fu":0.558,"yuzu":0.534,"aurora":0.532,"flag":0.527,"hex":0.521,"candy":0.521,"gale":0.521,"blaze":0.517,"frost":0.512,"vet":0.508,"titan":0.497,"chef":0.478,"raven":0.477,"aka":0.475,"kaka":0.472,"echo":0.46,"hammer":0.459,"han":0.434},"mechs":{"blaster":0.574,"gatling":0.569,"charger":0.555,"dozer":0.553,"stinger":0.548,"roller":0.541,"megaphone":0.525,"bucket":0.523,"blade":0.521,"mortar":0.5,"reaper":0.476,"slinger":0.462,"fist":0.461,"wrecker":0.449,"flamer":0.448,"carrier":0.445,"phantom":0.438,"warden":0.438,"riot":0.428}};
+  S.META = {"pilots":{"vet":0.545,"echo":0.537,"candy":0.536,"aurora":0.532,"yuzu":0.522,"fu":0.52,"blaze":0.515,"kaka":0.507,"flag":0.505,"hawk":0.5,"hammer":0.484,"gale":0.482,"han":0.482,"hex":0.475,"aka":0.474,"chef":0.472,"frost":0.471,"raven":0.464,"titan":0.463},"mechs":{"gatling":0.572,"slinger":0.551,"riot":0.549,"reaper":0.536,"stinger":0.53,"blaster":0.514,"roller":0.51,"bucket":0.506,"charger":0.504,"warden":0.502,"phantom":0.5,"tactic":0.5,"mortar":0.484,"flamer":0.482,"dozer":0.48,"carrier":0.475,"wrecker":0.47,"megaphone":0.448,"blade":0.441,"fist":0.428}};
   // ---------------- 账号规则 ----------------
   S.ACCOUNT = {
     nameOk: (n) => typeof n === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,12}$/.test(n),
@@ -1554,9 +1554,88 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '2.0';
+  S.VERSION = '2.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '2.1', date: '2026-11-17', title: '2.1 更新 · 雇佣兵撤离', en_title: 'Update 2.1 · Mercenary Extraction', sections: [
+      ['全新撤离玩法：灰城禁区', [
+        '新地图「灰城禁区」：面积是旧撤离地图的 10 倍，六个城区（港口区、商业区、工业区、棚户区、研究园区、废弃公园），有内部隔间的建筑和能坐电梯上天台的高楼',
+        '中央「灰石大厦」是高价值区：重兵把守，金库里有至宝；Boss 小队「灰石指挥官 · 铁卫」带着 3 名护卫在城区之间巡逻',
+        '六支小队同场搜刮，M 打开大地图，小地图只显示自己周围']],
+      ['网格背包 + 搜索容器', [
+        '搜刮改成三角洲式：走到军需箱、储物柜、保险柜、电脑、医疗箱、武器箱、行李包、金库、遗骸旁边按 F（手机点 ✋）打开，物资一件件搜出来，你自己挑要拿的',
+        '网格背包：物资有大小，可以拖动摆放、拖动时按 R 旋转、拖到丢弃区扔掉；Tab 打开 / 关闭背包',
+        '新增「至宝」品质（红色）：融合核心、灰石王冠、机甲蓝图、黄金机兵',
+        '安全箱：阵亡也不会丢的格子（2×2，仓库里可以升到 2×3、3×3）；阵亡后背包留在遗骸里，别人可以搜走']],
+      ['五种撤离点 + 交易行', [
+        '普通撤离点到时间开放；付费撤离一直开放，成功后扣 800 金币；轻装撤离要求背包不超过 12 格；拉闸撤离要先去地图上拉下电闸，开放 150 秒；限时撤离只在第 4–7 分钟开放',
+        '仓库新增「交易行」：价格每小时整点浮动，所有玩家同一个价格，低买高卖赚差价（至宝和传说物资只收不卖）',
+        '仓库新增「安全箱」页：升级安全箱']],
+      ['S2 通行证「雇佣兵撤离」正式推出', [
+        '50 级通行证：免费线 25 级送新机体「战术机兵」，高级线 30 级送新驾驶员「霍克 · 佣兵」，50 级是赛季传说「沙暴统帅」',
+        '高级版 680 宝石；豪华版 1280 宝石：直升 15 级 + 专属动态名片框「沙鹰豪华框」（已有高级版可以补差价升级）',
+        '满 50 级后每 1500 经验开一个金币宝箱（500 金币），没有上限',
+        '新皮肤：沙暴统帅（赛季传说）、沙漠突击手（凌焰史诗）、雇佣兵制式 / 沙鹰迷彩涂装、曳光弹特效、沙鹰徽章头像、沙鹰豪华框',
+        '45 秒 3D 赛季动画：第一次打开通行证自动播放，可以重播',
+        '第一赛季通行证已结束，没领的奖励在更新礼包里补偿']],
+      ['新驾驶员「霍克」+ 新机体「战术机兵」', [
+        '霍克「佣兵」雇佣兵队长——技能「战术空投」：补给箱砸到瞄准的位置造成 40 伤害，之后 6 秒给附近队友回血、加快装填；被动「老练指挥」：自己和附近队友伤害 +6%，撤离模式搜索速度 +20%；超载「雇佣兵合约」；随身武器「冲锋手枪」',
+        '战术机兵：三连点射的战术步枪，射程 430，特性「穿甲首发」第一发伤害 ×1.25；大招「侦察无人机」暴露并标记 320 范围的敌人，被标记的敌人受到全队伤害 +12%']],
+      ['角色重做', [
+        '韩冰：闪光弹范围更大，被闪到的敌人「致盲」3 秒，受到全队伤害 +12%；被动改为对生命高于 70% 的敌人 +10%',
+        '卡卡：替身 2.5 秒后炸开（55 伤害 + 减速），隐身时移速 +25%；惊喜礼盒回复 80 生命并送 25% 大招充能',
+        '叶声：声波干扰额外让敌人装填 -30%、打断技能 0.6 秒；节拍同步队友装填 +20%，自己 +10%',
+        '石磊：炸药包可以扔到瞄准的位置（最远 220），伤害 86；弹出护盾 45 → 60',
+        '防暴盾卫：正面减伤 40% → 45%，盾墙更宽、持续 7 秒，立盾时自己获得 40 护盾',
+        '无人机母舰：蜂群 3 → 4 架，含维修无人机（8 秒内每秒回复 3% 生命），追踪更准',
+        '幻影机兵：隐身 4.5 秒，并在原地留下会炸开的残影']],
+      ['平衡调整（按模拟胜率，目标 48–52%）', [
+        '增强：重拳机兵、拆楼锤、影刃机兵、弹弓机兵、喇叭车、喷火罐车、灵刃机兵、结界机兵；岚每个队友减伤 12%、集结号 6 秒；赤镰残血阈值 50%、伤害 +22%；洛奇电磁脉冲范围和时间增加',
+        '削弱：滚刷机兵、毒针机兵、狙击机兵、泼桶机兵、旋转机兵；符零符咒共鸣 +15% → +10%；秦岳自爆 65 → 58；小柚涂地充能 +70% → +60%']],
+      ['界面全新风格', [
+        '精致二次元风格：深色玻璃面板、金色细描边、柔光按钮，大厅改为以角色立绘为中心；设置里可以切回涂鸦风',
+        '通行证界面重新设计：左侧赛季大图和里程碑，右侧 50 级奖励轨道和满级宝箱']],
+      ['更新奖励', ['信箱里有一份 2.1 更新礼包：300 宝石 + 金色空投 + 2000 金币']],
+    ], en: [
+      ['New Extraction: the Graycity Exclusion Zone', [
+        'New map “Graycity Exclusion Zone”: 10× the area of the old extraction maps, with six districts (Harbor, Downtown, Industrial, Slums, Research Park, Abandoned Park), buildings with interior rooms and towers you can ride lifts up to the rooftop',
+        'The central Grayco Tower is the high-value zone: heavily guarded, with Treasures in the vault. The boss squad “Grayco Commander · Ironguard” patrols between districts with 3 escorts',
+        'Six squads raid at once. Press M for the full map; the minimap shows only your surroundings']],
+      ['Grid backpack + searchable containers', [
+        'Looting is now tactical-shooter style: walk up to a supply crate, locker, safe, computer, med box, weapon case, duffel, vault or body and press F (✋ on mobile). Items are searched one by one and you choose what to take',
+        'Grid backpack: items have sizes — drag them around, press R while dragging to rotate, drag to the drop zone to discard. Tab opens / closes the backpack',
+        'New “Treasure” rarity (red): Fusion Core, Grayco Crown, Mech Blueprint, Golden Mech',
+        'Safe box: slots you keep even if you die (2×2, upgradable to 2×3 and 3×3 in the warehouse). When you die, your backpack stays in your body for others to loot']],
+      ['Five extraction types + the Market', [
+        'Normal extractions open on a timer; Paid extraction is always open but costs 800 coins on success; Light extraction requires 12 or fewer backpack cells; Lever extraction opens for 150 s after someone pulls the lever on the map; Timed extraction is only open from minute 4 to 7',
+        'New Market in the warehouse: prices change every hour on the hour and are the same for everyone — buy low, sell high (Treasures and Legendaries can only be sold)',
+        'New Safe Box tab in the warehouse: upgrade your safe box']],
+      ['Season 2 Pass “Mercenary Extraction” is here', [
+        '50-tier pass: the free track gives the new Tactical Bot mech at tier 25, the premium track gives the new pilot “Hawk · Merc” at tier 30, and tier 50 is the Season Legendary “Sandstorm Warlord”',
+        'Premium 680 gems; Deluxe 1280 gems: +15 tiers instantly and the exclusive animated “Sand Hawk Deluxe Frame” (Premium owners can upgrade for the difference)',
+        'After tier 50, every 1500 XP opens a coin chest (500 coins), with no limit',
+        'New skins: Sandstorm Warlord (Season Legendary), Desert Raider (Blaze, Epic), Merc Standard / Sand Hawk Camo paints, Tracer Rounds effect, Sand Hawk Badge avatar and the Sand Hawk Deluxe Frame',
+        '45-second 3D season trailer: plays the first time you open the pass, and can be replayed',
+        'The Season 1 pass has ended; unclaimed rewards are compensated in the update gift']],
+      ['New pilot “Hawk” + new mech “Tactical Bot”', [
+        'Hawk “Merc”, mercenary captain — Skill “Tactical Airdrop”: a supply crate slams down where you aim for 40 damage, then heals nearby allies and speeds up their reload for 6 s; Passive “Veteran Command”: +6% damage for you and nearby allies, +20% search speed in Extraction; Overload “Mercenary Contract”; Sidearm “Machine Pistol”',
+        'Tactical Bot: a 3-round-burst tactical rifle with 430 range; trait “AP Lead Round” — the first shot deals ×1.25 damage. Super “Recon Drone” reveals and marks enemies within 320 range; marked enemies take +12% damage from your whole team']],
+      ['Reworks', [
+        'Han Bing: Flashbang has a bigger area and “blinds” enemies for 3 s, making them take +12% damage from your team; passive now gives +10% vs enemies above 70% HP',
+        'Kaka: the decoy explodes after 2.5 s (55 damage + slow) and you move 25% faster while invisible; Surprise Box heals 80 and gives 25% Super charge',
+        'Ye Sheng: Sonic Jam also cuts enemy reload speed by 30% and interrupts skills for 0.6 s; Beat Sync gives allies +20% reload and herself +10%',
+        'Shi Lei: the charge can be thrown to where you aim (up to 220), 86 damage; eject shield 45 → 60',
+        'Riot Guard: frontal damage reduction 40% → 45%, the shield wall is wider and lasts 7 s, and you get a 40 shield when raising it',
+        'Drone Carrier: Swarm 3 → 4 drones including a repair drone (3% HP per second for 8 s), better homing',
+        'Phantom Bot: stays invisible for 4.5 s and leaves an exploding afterimage']],
+      ['Balance (from simulated win rates, target 48–52%)', [
+        'Buffed: Power Fist, Wrecking Hammer, Shadow Blade, Slingshot Bot, Megaphone Truck, Flamer Tank, Spirit Blade, Ward Bot; Lan −12% damage per ally and Rally lasts 6 s; Chi Lian low-HP threshold 50% and +22% damage; Loki’s EMP has more range and duration',
+        'Nerfed: Roller Bot, Stinger Bot, Sniper Bot, Bucket Bot, Gatling Bot; Fu Ling Talisman Resonance +15% → +10%; Qin Yue self-destruct 65 → 58; Xiao You paint charge +70% → +60%']],
+      ['All-new interface style', [
+        'A refined anime style: dark glass panels, thin gold outlines and soft glowing buttons, with the lobby centered on the character art. You can switch back to the graffiti style in Settings',
+        'Redesigned pass screen: season art and milestones on the left, the 50-tier reward track and the max-level chest on the right']],
+      ['Update reward', ['There’s a 2.1 update gift in your mailbox: 300 gems + a Golden Airdrop + 2000 coins']],
+    ] },
     { v: '2.0', date: '2026-11-16', title: '2.0 更新 · 机兵个性', en_title: 'Update 2.0 · Mech Identity', sections: [
       ['每台机体都不一样了', [
         '19 台机体各自有了专属的开火声、命中声和大招声：喷罐的嘶啪、旋转机兵的哒哒哒、狙击的轨道炮、拆楼锤的沉重一抡、喇叭车的嗡鸣……别人开火也听得见，越近越响',
