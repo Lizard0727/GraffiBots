@@ -492,7 +492,7 @@ footer a { color: var(--dust); }
     let html = card('web', true, `<span class="size">v${esc(D.version)}</span><a class="btn btn-play btn-sm" href="${esc(playUrl)}" target="_blank" rel="noopener">${esc(t('web_go'))}</a>`);
     for (const d of D.downloads) {
       let btn;
-      if (d.have) btn = `<span class="size">${mb(d.size)}</span><a class="btn btn-ghost btn-sm" href="${esc(d.file)}" download>${esc(t('dl_go'))}</a>`;
+      if (d.have) btn = `<span class="size">${mb(d.size)}</span><a class="btn btn-ghost btn-sm" href="${esc(d.file)}" download="${esc(d.name || '')}">${esc(t('dl_go'))}</a>`;
       else if (CFG.home) btn = `<span class="size">v${esc(D.version)}${d.size ? ' · ' + mb(d.size) : ''}</span><a class="btn btn-ghost btn-sm" href="${esc(CFG.home)}#download" target="_blank" rel="noopener">${esc(t('site_go'))}</a>`;
       else btn = `<span class="size">v${esc(D.version)}</span><a class="btn btn-sm" aria-disabled="true">${esc(t('not_yet'))}</a>`;
       html += card(d.id, false, btn);

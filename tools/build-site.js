@@ -53,15 +53,17 @@ const maps = S.MAPS.map((m, i) => ({ name: m.name, en: tr(m.name), isNew: i >= S
 
 // ---- 下载包 ----
 const apk = opt('--apk') || ['涂鸦机兵-GraffiBots.apk', 'GraffiBots.apk'].map((f) => path.join(DIST, f)).find((f) => fs.existsSync(f));
+// 2.1.2：每个包同时发布「带版本号」和「固定名字（latest）」两份；官网按钮用固定名字 + ?v=版本号，
+// 这样官网更新的那一刻，还开着旧页面的人点下载也不会 404（以前旧页面指向的旧版本文件已经被删掉了）
 const DL = [
-  { id: 'offline', src: path.join(DIST, '涂鸦机兵-单文件版.html'), file: `graffibots-${S.VERSION}-offline.html` },
-  { id: 'win', src: path.join(DIST, 'GraffiBots-Windows.zip'), file: `graffibots-${S.VERSION}-windows.zip` },
-  { id: 'full', src: path.join(DIST, 'GraffiBots.zip'), file: `graffibots-${S.VERSION}-full.zip` },
-  { id: 'apk', src: apk, file: `graffibots-${S.VERSION}.apk` },
+  { id: 'offline', src: path.join(DIST, '涂鸦机兵-单文件版.html'), file: `graffibots-${S.VERSION}-offline.html`, latest: 'graffibots-latest-offline.html' },
+  { id: 'win', src: path.join(DIST, 'GraffiBots-Windows.zip'), file: `graffibots-${S.VERSION}-windows.zip`, latest: 'graffibots-latest-windows.zip' },
+  { id: 'full', src: path.join(DIST, 'GraffiBots.zip'), file: `graffibots-${S.VERSION}-full.zip`, latest: 'graffibots-latest-full.zip' },
+  { id: 'apk', src: apk, file: `graffibots-${S.VERSION}.apk`, latest: 'graffibots-latest.apk' },
 ];
 const downloads = DL.map((d) => {
   const have = !!(d.src && fs.existsSync(d.src));
-  return { id: d.id, file: 'downloads/' + d.file, size: have ? fs.statSync(d.src).size : 0, have: have && argv.includes('--downloads') };
+  return { id: d.id, file: `downloads/${d.latest}?v=${S.VERSION}`, name: d.file, size: have ? fs.statSync(d.src).size : 0, have: have && argv.includes('--downloads') };
 });
 
 const data = {
@@ -156,7 +158,7 @@ if (out !== SITE) {
 }
 if (argv.includes('--downloads')) {
   fs.mkdirSync(path.join(out, 'downloads'), { recursive: true });
-  for (const d of DL) if (d.src && fs.existsSync(d.src)) { fs.copyFileSync(d.src, path.join(out, 'downloads', d.file)); console.log('  下载包', d.file); }
+  for (const d of DL) if (d.src && fs.existsSync(d.src)) { fs.copyFileSync(d.src, path.join(out, 'downloads', d.file)); fs.copyFileSync(d.src, path.join(out, 'downloads', d.latest)); console.log('  下载包', d.file, '+', d.latest); }
   else console.log('  （没有找到', d.id, '的安装包，官网上会显示「暂未提供」）');
   if (out !== SITE) fs.copyFileSync(path.join(SITE, 'data.js'), path.join(out, 'data.js'));
 }
