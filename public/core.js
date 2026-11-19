@@ -2847,7 +2847,7 @@ function botThink(g, p, dt) {
     const fight = enemy && ed < 300;
     const use = {
       rush: fight || p.foot, scan: !enemy && Math.random() < 0.05, cheer: hpK < 0.6, guard: fight && hpK < 0.75, smoke: (fight && hpK < 0.5) || p.foot,
-      turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
+      turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && (ed < 200 || (ed < 260 && hpK < 0.6)), bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
       rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
       seal: enemy && ed < 240, possess: fight && (hpK < 0.7 || ed < 120), airdrop: fight || hpK < 0.6,
       nano: (enemy && ed < 240) || hpK < 0.5, blink: (enemy && ed < 240 && ed > 90) || (p.foot && enemy && hpK < 0.4),
