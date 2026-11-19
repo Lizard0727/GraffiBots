@@ -80,7 +80,7 @@ for (const [w, sp, dist] of [['dozer', 'bulldoze', 140], ['flamer', 'napalm', 16
 {
   const { A, B, run } = duel({ pilot: 'echo' }, {}, { dist: 150 });
   B.sp = 200; A.input.gq++; run(0.1);
-  ok(B.sp < 200 && B.revealT > 3, `叶声「声波干扰」：敌人大招充能 200 → ${Math.round(B.sp)}，暴露 4 秒`);
+  ok(B.sp < 200 && B.jamT > 2 && !(B.revealT > 0), `叶声「声波干扰」：敌人大招充能 200 → ${Math.round(B.sp)}，装填变慢（2.2.1：不再暴露）`);
 }
 {
   const d1 = duel({}, { pilot: 'flag' }); d1.B.hp = 100; d1.g.hurt(d1.B, 20, d1.A); const solo = 100 - d1.B.hp;
@@ -292,7 +292,7 @@ ok(S.PILOTS.every((P) => S.OVERLOADS[P.id] && S.OVERLOADS[P.id].name), `14 位�
 {
   const d = duel({ pilot: 'han' }, {}, { dist: 120 });
   d.A.input.gq++; d.run(0.1);
-  ok(d.B.slowT > 1 && d.B.revealT > 3 && d.B.hp < 100, '韩冰「闪光弹」：前方敌人受伤、减速、暴露');
+  ok(d.B.slowT > 1 && d.B.blindT > 2 && !(d.B.revealT > 0) && d.B.hp < 100, '韩冰「闪光弹」：前方敌人受伤、减速、致盲（2.2.1：不再暴露）');
   const d2 = duel({}, { pilot: 'han', power: { lv: 5, bt: 1, tal: [] } });
   d2.B.ovT = 5; d2.A.hp = 100; d2.g.hurt(d2.B, 40, d2.A);
   ok(d2.A.hp < 100, `韩冰超载「反戈一击」：反弹 ${Math.round(100 - d2.A.hp)} 点伤害给攻击者`);

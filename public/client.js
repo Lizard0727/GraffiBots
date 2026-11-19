@@ -2410,6 +2410,12 @@
       case 'ct+': if (G.loot && G.conts && !G.conts.has(e[1])) { const c = { id: e[1], type: S.CONT_IDS[e[2]], x: e[3], y: e[4], z: e[5], st: e[6] }; G.contArr.push(c); G.conts.set(c.id, c); G.contDirty = 2; } break;
       case 'ct': if (G.loot && G.conts) { const c = G.conts.get(e[1]); if (c) { c.st = e[2]; G.contDirty = G.contDirty || 1; } } break;
       case 'adp': ringFx(e[1], e[2], e[3], 70, '#e0a030', 1000); ringFx(e[1], e[2], e[3], 100, '#e0a030', 1000, 300); break;   // 2.1 霍克：空投落点
+      case 'blk2': {   // 2.2.1 沈零：相位闪移（起点和落点各一圈，中间一道残光）
+        ringFx(e[2], e[3], e[4], 40, '#ff4f7a', 400); ringFx(e[5], e[6], e[7], 50, '#ff4f7a', 450);
+        for (let i = 0; i <= 6; i++) { const k = i / 6; R3.emit(e[2] + (e[5] - e[2]) * k, e[3] + (e[6] - e[3]) * k, (e[4] + (e[7] - e[4]) * k) + 18, '#ff4f7a', 2, 40, 0.6, { sys: 'pg', size: 10, life: 0.35, grav: 0, drag: 3 }); }
+        break;
+      }
+      case 'opn': { const p = G.players.get(e[1]); if (p && !silent) G.texts.push({ x: p.x, y: p.y, z: (p.z || 0) + 60, text: '先手！', color: '#ff4f7a', t: now }); break; }   // 2.2 枪骑：先手突刺
       case 'lev': if (!silent) { announce(`电闸已拉下！拉闸撤离点开放 ${e[2]} 秒`, '#ff9a3d'); sfx.siren(); } break;
       case 'lt-': {
         if (!G.loot) break;
@@ -3083,8 +3089,8 @@
   function visibleEnemy(p) {
     if (!(p.flags & 4)) return true;
     const me = G.me;
-    if (!me || G.rv[me.team]) return true;
-    return Math.hypot(p.x - me.px, p.y - me.py) < (me.pilot === 'hex' ? 170 : S.BUSH_DETECT);
+    if (!me || G.rv[me.team] || (p.buffs & 256)) return true;
+    return Math.hypot(p.x - me.px, p.y - me.py) < S.BUSH_DETECT;
   }
   // ---------------- 观战（生死之战出局 / 逃亡圈淘汰） ----------------
   const isOut = () => !!(G && G.me && !(G.me.flags & 1) && G.me.resp > 500 && (G.mode === 'elim' || G.teams > 2));
@@ -3630,8 +3636,14 @@
       }
       const bf = self ? me.buffs : p.buffs;
       if (bf) {
+        // 2.2.1：状态图标更多更清楚：暴露 / 标记 / 致盲 / 束缚 / 技能锁 / 中毒 / 封印
         const icons = []; if (bf & 1) icons.push('⚡'); if (bf & 2) icons.push('🐢'); if (bf & 4) icons.push('🚫'); if (bf & 16) icons.push('🔥');
+        if (bf & 2048) icons.push('🎯'); if (bf & 4096) icons.push('💫'); if (bf & 1024) icons.push('⛓'); if (bf & 8192) icons.push('🔒'); if (bf & 16384) icons.push('☠'); if (bf & 32768) icons.push('📜');
         if (icons.length) txt(icons.join(''), s.x + w / 2 + 12, y0 + 2, 12, '#fff', 'left', 0);
+        if (enemy && (bf & 256)) {   // 被暴露的敌人：头顶一个红色「👁 暴露」标签，草丛 / 隐身里也看得见
+          const pulse = 0.6 + 0.4 * Math.sin(now / 180);
+          ctx.globalAlpha = pulse; txt('👁 暴露', s.x, y0 - 24, 11, '#ff5a6a', 'center', 3); ctx.globalAlpha = 1;
+        }
       }
       const ch = G.chats.get(id);
       if (ch && !self) {
@@ -3828,6 +3840,27 @@
     return null;
   }
   // 大地图（M）：整张地图 + 撤离点 + 区域名
+  // 2.2.1：情报层——被暴露的敌人（扫描 / 声纳 / 侦察无人机 / 战场感知 / 信号枪…）在小地图和大地图上都看得见；
+  //   侦察无人机的范围、沈零的战场感知范围也画出来
+  function drawIntel(mx, my, ms, me, now, big) {
+    if (!me) return;
+    const scan = !!(G.rv && G.rv[me.team]);
+    for (const h of G.helpers || []) if (h[1] === 'recon' && h[5] === me.team) { ctx.strokeStyle = '#7ad0ff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(mx + h[2] * ms, my + h[3] * ms, 320 * ms, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    for (const id of G.cur) {
+      const p = G.players.get(id);
+      if (!p || !(p.flags & 1)) continue;
+      if (p.team === me.team) {
+        if (p.pilot === 'zero' || (id === myId && me.pilot === 'zero')) { const px = id === myId ? me.px : p.x, py = id === myId ? me.py : p.y; ctx.strokeStyle = '#ff4f7a88'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(mx + px * ms, my + py * ms, 260 * ms, 0, 7); ctx.stroke(); }
+        continue;
+      }
+      if (!(scan || (p.buffs & 256))) continue;
+      const x = mx + p.x * ms, y = my + p.y * ms, r = big ? 7 : 4.5;
+      ctx.fillStyle = '#ff3b52'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, y - r - 1); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r + 1); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#ff3b52'; ctx.globalAlpha = 0.35 + 0.35 * Math.sin(now / 160 + id); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+      if (big) txt(p.name, x, y - 14, 11, '#ff8a96', 'center', 3, true);
+    }
+  }
   function drawBigMap(o, me) {
     const pad = 40, aw = VW - pad * 2, ah = VH - pad * 2, k = Math.min(aw / S.GW, ah / S.GH), mw = S.GW * k, mh = S.GH * k, mx = (VW - mw) / 2, my = (VH - mh) / 2, ms = mw / S.W;
     ctx.fillStyle = '#000d'; ctx.fillRect(0, 0, VW, VH);
@@ -3843,6 +3876,7 @@
       txt(S.LOOT.ext[e.type].name, x, y - 18, 13, e.open ? c : '#aaa', 'center', 3);
       txt(e.open ? (e.secs < 9999 && e.type !== 'normal' ? `开放中 · ${e.secs}秒` : '开放中') : e.type === 'lever' ? '需要拉闸' : `${e.secs} 秒后开放`, x, y + 18, 11, '#fff', 'center', 3);
     }
+    drawIntel(mx, my, ms, me, performance.now(), true);
     for (const id of G.cur) { const p = G.players.get(id); if (!p || !(p.flags & 1) || (me && p.team !== me.team)) continue; ctx.fillStyle = G.colors[p.team]; ctx.strokeStyle = id === myId ? '#fff' : '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + p.x * ms, my + p.y * ms, id === myId ? 7 : 5, 0, 7); ctx.fill(); ctx.stroke(); }
     txt(TOUCH ? '点地图关闭' : 'N / M 关闭地图', VW / 2, VH - 18, 13, '#9a9db5', 'center', 3);
   }
@@ -3979,6 +4013,16 @@
     }
 
     drawWorldLabels(now);
+    if (G.me && (G.me.buffs & 4096) && (G.me.flags & 1)) {   // 2.2.1：被韩冰的闪光弹致盲——视野缩小到身边一圈
+      const s = R3.project(G.me.px, G.me.py, (G.me.pz || 0) + 20);
+      if (s) {
+        const gr = ctx.createRadialGradient(s.x, s.y, 70, s.x, s.y, 210);
+        gr.addColorStop(0, 'rgba(255,255,250,0)'); gr.addColorStop(0.35, 'rgba(235,235,225,0.75)'); gr.addColorStop(1, 'rgba(245,245,235,0.97)');
+        ctx.fillStyle = gr; ctx.fillRect(0, 0, VW, VH);
+        txt('💫 致盲', s.x, s.y - 90, 15, '#3a3d48', 'center', 0);
+      }
+    }
+    if (G.me && G.rv && G.rv[G.me.team] && !G.over) txt('👁 全队视野：所有敌人都暴露了', VW / 2, 96, 14, '#7ad0ff', 'center', 3);   // 2.2.1：白夜的义眼扫描
     // 大招白闪 + 速度线
     if (G.flashT && now - G.flashT < 260) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - (now - G.flashT) / 260)})`; ctx.fillRect(0, 0, VW, VH); }
     const wheelFast = TOP() && me && G.inp && G.inp.w && Math.hypot(me.pvx || 0, me.pvy || 0) > 280;
@@ -4236,6 +4280,7 @@
       ctx.restore();
     }
     if (G.mode === 'zone') { const Z = S.ZONE, C = S.CELL; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(mx + Z.x0 * C * ms, my + Z.y0 * C * ms, (Z.x1 - Z.x0) * C * ms, (Z.y1 - Z.y0) * C * ms); }
+    drawIntel(mx, my, ms, me, now, false);
     for (const id of G.cur) {
       const p = G.players.get(id);
       if (!p || !(p.flags & 1) || (me && p.team !== me.team)) continue;

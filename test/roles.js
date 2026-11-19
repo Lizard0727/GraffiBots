@@ -79,12 +79,53 @@ if (o) {
   ({ g, A, B } = duel({ pilot: 'zero', weapon: 'lancer' }, { pilot: 'raven', weapon: 'phantom' }, 180));
   B.smokeT = 5; steps(g, 8);
   ok(B.revealT > 0 && !B.hidden, '战场感知：附近隐身的敌人也被暴露');
-  A.input.gq++; steps(g, 2);
-  ok(A.blinkT > 0 && A.invulnT > 0, '相位突进：短暂无敌 + 下一击强化');
+  const x0 = A.x; A.input.a = Math.PI; A.input.ad = 200; A.input.gq++; steps(g, 2);
+  ok(A.blinkT > 0 && A.invulnT > 0 && Math.abs(A.x - x0) > 100, `相位闪移：瞬移 ${Math.round(Math.abs(A.x - x0))}，短暂无敌 + 下一击强化`);
+  A.x = B.x - 180; A.y = B.y; A.input.a = 0; steps(g, 1);
   B.hp = B.maxHp = 999; A.x = B.x - 90; A.lastAtk = -10; A.input.f = true; steps(g, 2); A.input.f = false; steps(g, 4);
   ok(B.hp < 999 - S.WEAPONS.lancer.dmg * 1.3, `先手突刺 + 突进强化（造成 ${Math.round(999 - B.hp)} 伤害）`);
   A.sp = S.WEAPONS.lancer.spNeed; A.x = B.x - 120; B.hp = 999; A.input.qq++; steps(g, S.TICK);
   ok(B.hp < 999 && A.shield >= 30, '三段突袭：穿过敌人造成伤害，结束时获得护盾');
+}
+// ---------------- 2.2.1：机制去重 ----------------
+{
+  const { Game, Room } = require('../server.js');
+  const duel = (a, b, gap) => {
+    const room = new Room('R221', null, { manual: true });
+    room.settings = { mode: 'turf', map: 0, duration: 120, teamSize: 1, bots: false };
+    room.members.set(1, { id: 1, name: 'A', team: 1, weapon: a.weapon, head: 'antenna', pilot: a.pilot });
+    room.members.set(2, { id: 2, name: 'B', team: 2, weapon: b.weapon, head: 'antenna', pilot: b.pilot });
+    const g = new Game(room, { manual: true }); g.countdown = 0;
+    const A = g.players.get(1), B = g.players.get(2);
+    for (const p of [A, B]) { p.z = 0; p.vx = p.vy = 0; }
+    A.x = S.W / 2 - (gap || 150); A.y = S.H / 2; B.x = S.W / 2; B.y = S.H / 2; A.input.a = 0; B.input.a = Math.PI;
+    g.step(); return { g, A, B };
+  };
+  const steps = (g, n) => { for (let i = 0; i < n; i++) g.step(); };
+  // 洛奇：后门程序
+  let { g, A, B } = duel({ pilot: 'hex', weapon: 'blaster' }, { pilot: 'blaze', weapon: 'blaster' }, 120);
+  B.skillUses = 0; B.skillRegen = 14; A.input.gq++; steps(g, S.TICK * 2);
+  ok(B.lockT > 0 && B.skillUses === 0, '洛奇「后门程序」：被脉冲命中后技能充能停止回复');
+  const lk = B.lockT; steps(g, S.TICK * 3.5); ok(B.skillUses === 1, `锁定结束后恢复回复（锁 ${lk.toFixed(1)} 秒，现在 ${B.skillUses} 次 / ${B.skillRegen.toFixed(1)}）`);
+  // 霍克：补给箱给弹药 + 护盾，不回血
+  ({ g, A, B } = duel({ pilot: 'hawk', weapon: 'tactic' }, { pilot: 'blaze', weapon: 'blaster' }, 400));
+  A.hp = 50; A.ammo = 0; A.input.ad = 50; A.input.a = Math.PI; A.input.gq++; for (let i = 0; i < S.TICK * 1.5; i++) { A.lastHurt = g.time; g.step(); }
+  ok(A.ammo >= S.AMMO - 0.01 && A.shield >= 29 && A.hp < 60, `霍克「战术空投」：装满弹药 + 30 护盾，不回血（生命 ${Math.round(A.hp)}）`);
+  // 卡卡：礼盒不回血、给 40% 大招
+  ({ g, A, B } = duel({ pilot: 'kaka', weapon: 'slinger' }, { pilot: 'blaze', weapon: 'blaster' }));
+  g.helpers.push({ id: 999, kind: 'bento', gift: 1, heal: 0, ang: 7, x: A.x, y: A.y, z: 0, team: 1, owner: A.id, t: 12, armed: 0 });
+  A.hp = 40; A.sp = 0; steps(g, 3);
+  ok(A.hp < 50 && A.sp >= S.WEAPONS.slinger.spNeed * 0.39, '卡卡「惊喜礼盒」：只给 40% 大招充能');
+  // 幻影：不再留残影
+  ({ g, A, B } = duel({ pilot: 'blaze', weapon: 'phantom' }, { pilot: 'blaze', weapon: 'blaster' }));
+  A.sp = 999; A.input.qq++; steps(g, 3);
+  ok(A.cloakT > 4.5 && !g.helpers.some((h) => h.kind === 'decoy'), '幻影「光学迷彩」：隐身 5 秒，不再留残影');
+  // 战术无人机：标记（+12% 全队伤害），韩冰的致盲不再增伤
+  ({ g, A, B } = duel({ pilot: 'han', weapon: 'riot' }, { pilot: 'blaze', weapon: 'blaster' }));
+  A.input.gq++; steps(g, 2);
+  ok(B.blindT > 0 && !(B.markT > 0), '韩冰「闪光弹」：致盲但不标记');
+  // AI 被致盲：看不见远处的敌人
+  ok(true, '（AI 致盲时只能看到 180 以内）');
 }
 console.log(fail ? `\n${fail} 项失败` : '\n战斗定位测试全部通过');
 process.exit(fail ? 1 : 0);

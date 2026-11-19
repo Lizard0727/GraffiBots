@@ -203,8 +203,8 @@
     aegis: { name: '盾墙', desc: '在面前立起一面 7 秒的宽大能量盾墙，挡住敌人的所有子弹（队友可以从后面开火），自己获得 40 点护盾。' },
     cluster: { name: '连环弹', desc: '朝瞄准方向扇形弹出 5 颗弹跳涂料球，每颗都会弹两次。' },
     shadowstep: { name: '影袭', desc: '瞬间冲向瞄准方向，穿过路上的敌人造成 60 点伤害，随后隐身 1.5 秒。' },
-    venom: { name: '毒雾', desc: '把毒雾罐扔到瞄准位置，5 秒内雾里的敌人持续中毒、减速并暴露位置。' },
-    cloak: { name: '光学迷彩', desc: '隐身 4.5 秒，移动速度 +25%，原地留下一个会炸开的残影；隐身时的第一击伤害 +50%（攻击后现形）。' },
+    venom: { name: '毒雾', desc: '把毒雾罐扔到瞄准位置，5 秒内雾里的敌人持续中毒并减速。' },
+    cloak: { name: '光学迷彩', desc: '隐身 5 秒，移动速度 +25%；隐身时的第一击伤害 +50%（攻击后现形）。' },
     barrier: { name: '结界展开', desc: '以自己为中心展开 6 秒的半透明结界：里面的队友受到的伤害 -30%、每秒回复 10 生命，闯进来的敌人减速 25%。' },
     recon: { name: '侦察无人机', desc: '放出一架侦察无人机飞到瞄准位置上空（最远 420）：8 秒内暴露 320 范围里的所有敌人，并标记他们——受到你全队的伤害 +12%。' },
     prism: { name: '相位冻结', desc: '朝瞄准位置（最远 460）投下相位棱镜，0.6 秒后展开：半径 140 内的敌人受到 45 点伤害，并被冻结 1.2 秒（几乎无法移动、不能攻击和放技能）。' },
@@ -233,14 +233,14 @@
     drone: { short: '无人机', name: '猫猫无人机', desc: '召唤跟随自己的无人机，6 秒内自动射击附近敌人。' },
     rally: { short: '集结', name: '集结号', desc: '插下反抗军旗帜，6 秒内自己和附近队友伤害 +20%、移动速度 +15%。' },
     blast: { short: '爆破', name: '定向爆破', desc: '把炸药包扔到瞄准的位置（最远 220），0.9 秒后爆炸，造成 86 点伤害并涂满周围。' },
-    jam: { short: '干扰', name: '声波干扰', desc: '附近敌人的大招充能减少 30%、装填速度 -30%（3 秒），技能被打断 0.6 秒，并暴露位置 4 秒（草丛里也藏不住）。' },
+    jam: { short: '干扰', name: '声波干扰', desc: '附近敌人（230 范围）的大招充能减少 25%、装填速度 -30%（3 秒），技能被打断 0.6 秒。' },
     decoy: { short: '替身', name: '魔术替身', desc: '原地留下一个替身，2.5 秒后炸开造成 55 点伤害并减速；自己隐身 2.5 秒，隐身时移动速度 +25%。' },
-    flash: { short: '闪光', name: '闪光弹', desc: '朝前方扔出闪光弹：扇形范围内的敌人受到 12 点伤害、减速 1.2 秒、0.8 秒内无法攻击、暴露 4 秒，并被「致盲」3 秒——受到你全队的伤害 +12%。' },
-    seal: { short: '封印', name: '封印符', desc: '朝瞄准方向甩出一张封印符，落地展开 2.5 秒符阵：阵里的敌人减速 40%、不能放技能和大招，并暴露位置。' },
-    airdrop: { short: '空投', name: '战术空投', desc: '呼叫补给箱砸到瞄准的位置（最远 260）：落地砸中敌人造成 40 点伤害；之后 6 秒，补给箱附近的队友每秒回复 8 生命、装填速度 +30%。' },
+    flash: { short: '闪光', name: '闪光弹', desc: '朝前方扔出闪光弹：扇形范围内的敌人受到 12 点伤害、减速 1.2 秒，并被「致盲」2.5 秒——视野缩小到身边一圈，看不到远处的东西。' },
+    seal: { short: '封印', name: '封印符', desc: '朝瞄准方向甩出一张封印符，落地展开 2.5 秒符阵：阵里的敌人减速 40%、不能放技能和大招。' },
+    airdrop: { short: '空投', name: '战术空投', desc: '呼叫补给箱砸到瞄准的位置（最远 260）：落地砸中敌人造成 40 点伤害；之后 6 秒，靠近补给箱的队友立刻装满弹药、获得 30 点护盾（每人一次），装填速度 +30%。' },
     possess: { short: '附身', name: '恶灵附身', desc: '4 秒内攻击吸血 35%，移动速度 +20%，受到的伤害 -15%。' },
     nano: { short: '纳米', name: '纳米雾场', desc: '把纳米雾罐扔到瞄准的位置（最远 240），展开 4 秒雾场：雾里的队友每秒回复 15 生命，敌人减速 30%、装填速度 -25%。' },
-    blink: { short: '突进', name: '相位突进', desc: '朝瞄准方向高速突进，突进瞬间无敌；2 秒内的下一次攻击伤害 +35%，并暴露突进方向前方 260 范围内的敌人 3 秒。' },
+    blink: { short: '闪移', name: '相位闪移', desc: '瞬间闪到瞄准方向（最远 220），可以穿过墙壁和掩体，闪移瞬间无敌；2 秒内的下一次攻击伤害 +35%。' },
   };
   // ---------------- 超载技能（突破 I 解锁，打出伤害充能；2.2：每局可以多次使用，但充能更慢） ----------------
   // dmg / def：伤害倍率 / 受伤倍率；spd：移速倍率；其余字段是专属效果
@@ -254,7 +254,7 @@
     raven: { name: '影袭', desc: '完全隐身，移动速度 +25%。', stealth: 1, spd: 1.25 },
     aurora: { name: '超频装配', desc: '弹药无限，攻击不用等装填。', infAmmo: 1 },
     gale: { name: '乘风', desc: '移动速度 +45%，立刻刷新技能冷却并回复 1 次技能充能。', spd: 1.45, skillReset: 1 },
-    hex: { name: '全网瘫痪', desc: '发动时全部敌人暴露并沉默 3 秒（不能放技能和大招）。', hack: 1 },
+    hex: { name: '全网瘫痪', desc: '发动时全部敌人沉默 3 秒（不能放技能和大招），并且每人失去 1 次技能充能。', hack: 1 },
     chef: { name: '满汉全席', desc: '立刻为自己和附近队友回复 50 生命，之后每秒回复 10。', burstHeal: 50, regen: 10 },
     vet: { name: '老兵不死', desc: '持续期间不会倒下，伤害 +20%。', undying: 1, dmg: 1.2 },
     yuzu: { name: '喵喵军团', desc: '召唤 2 架猫猫无人机，攻击速度 +20%。', drones: 2, rof: 1.2 },
@@ -458,7 +458,7 @@
       line: '追得上我的话，就来试试吧！', bio: '滑翔伞联赛三连冠，把机兵当成会走路的滑翔翼来开。长辫子和围巾是她在风里最好认的标志。' },
     { id: 'hex', name: '洛奇', code: '骇客', title: '天才黑客', weapon: 'charger', accent: '#c06bff', isNew: true,
       hair: '#2b2140', hair2: '#120a1c', skin: '#f4d9c6', eye: '#ff6bf0', style: 'undercut', eyeShape: 'cool', mouth: 'smirk', outfit: 'hacker',
-      skill: 'emp', passive: { name: '信号侦测', desc: '能看见更远处草丛里的敌人（170 范围）。' },
+      skill: 'emp', passive: { name: '后门程序', desc: '被电磁脉冲命中的敌人，3 秒内技能充能停止回复。' },
       line: '你的机兵，现在归我了。', bio: '十六岁黑进了城市所有的广告屏，只为播放自己的涂鸦动画。护目镜上永远滚动着看不懂的代码。' },
     { id: 'chef', name: '包大福', code: '大厨', title: '后勤大厨', weapon: 'bucket', accent: '#ff9f2e', isNew: true,
       hair: '#c4652c', hair2: '#7a3612', skin: '#ffd9b8', eye: '#7a4a24', style: 'chef', eyeShape: 'happy', mouth: 'grin', outfit: 'chefcoat',
@@ -493,7 +493,7 @@
     // ---- 1.4：常驻新驾驶员 ----
     { id: 'kaka', name: '卡卡', code: '魔术', title: '街头魔术师', weapon: 'slinger', accent: '#b06bff', isNew: true,
       hair: '#2a1f3a', hair2: '#120b1e', skin: '#ffe1cc', eye: '#ffd23f', style: 'swept', eyeShape: 'round', mouth: 'smirk', outfit: 'magician',
-      skill: 'decoy', passive: { name: '惊喜礼盒', desc: '击毁机体或击倒驾驶员时掉落一个礼盒，第一个碰到的队友回复 80 生命，并获得 25% 大招充能。' },
+      skill: 'decoy', passive: { name: '惊喜礼盒', desc: '击毁机体或击倒驾驶员时掉落一个礼盒，第一个碰到的队友获得 40% 大招充能。' },
       line: '看好了——涂料会从帽子里飞出来！', bio: '灰城夜市最受欢迎的街头魔术师，能把一罐喷漆变成一群鸽子。灰石集团没收了他的舞台，于是他把整座城市变成了舞台。' },
     // ---- 1.8：夜都决战（联动活动驾驶员，原创角色） ----
     { id: 'fu', name: '符零', code: '符咒', title: '夜都符术师', weapon: 'warden', accent: '#8a6bff', isNew: true, collab: 'yato',
@@ -507,7 +507,7 @@
     // ---- 2.1：S2 雇佣兵撤离（高级通行证 30 级） ----
     { id: 'hawk', name: '霍克', code: '佣兵', title: '雇佣兵队长', weapon: 'tactic', accent: '#e0a030', isNew: true, pass: 2,
       hair: '#3a2a1c', hair2: '#1a120a', skin: '#e2b48c', eye: '#7ad0ff', style: 'undercut', eyeShape: 'sharp', mouth: 'smirk', outfit: 'merc',
-      skill: 'airdrop', passive: { name: '老练指挥', desc: '自己和附近 260 范围内的队友伤害 +6%；撤离模式中搜索容器的速度 +20%。' },
+      skill: 'airdrop', passive: { name: '火力纪律', desc: '弹药装满时的第一次攻击伤害 +15%；撤离模式中搜索容器的速度 +20%。' },
       line: '合同上写的是撤离，不是送死——都跟紧我。', bio: '灰城禁区外最有名的雇佣兵小队「沙鹰」的队长，接过的撤离委托从没失手。灰石集团开出天价请他守大厦，他却带着整支小队站到了涂鸦这一边——「他们付的是钱，你们给的是这座城。」' },
     // ---- 2.2：灰石叛逃者（任务线「棱镜档案」「零号档案」） ----
     { id: 'doc', name: '姜黎', code: '博士', title: '灰石研究园区叛逃博士', weapon: 'prism', accent: '#5ff0d0', quest: 2, isNew: true,
@@ -552,7 +552,7 @@
   S.PILOT_ROLES = ['support', 'control', 'striker', 'scout'];
   // 副标签
   S.TAGS = { allround: '全能', paint: '涂地', burst: '爆发', aoe: '范围', dps: '持续火力', cc: '控场', dive: '切入', push: '推进', summon: '召唤', wall: '穿墙',
-    shield: '护盾', poke: '消耗', stealth: '隐身', vision: '视野', mobility: '机动', heal: '治疗', sustain: '续航', buff: '增益', trick: '诡计', zone: '区域' };
+    shield: '护盾', poke: '消耗', stealth: '隐身', vision: '视野', mobility: '机动', heal: '治疗', sustain: '续航', buff: '增益', trick: '诡计', zone: '区域', hack: '骇入' };
   // 定位 + 副标签 + 操作难度（1~5，越大越难；六边形里的「操作难度」直接用它）
   S.CLASS = {
     // ---- 机体 ----
@@ -564,7 +564,7 @@
     prism: ['sniper', 'cc', 4], lancer: ['assassin', 'dive', 5],
     // ---- 驾驶员 ----
     blaze: ['striker', 'mobility', 1], frost: ['scout', 'burst', 3], candy: ['support', 'heal', 2], titan: ['striker', 'shield', 1],
-    raven: ['scout', 'stealth', 3], aurora: ['support', 'summon', 2], gale: ['scout', 'mobility', 3], hex: ['control', 'vision', 3],
+    raven: ['scout', 'stealth', 3], aurora: ['support', 'summon', 2], gale: ['scout', 'mobility', 3], hex: ['control', 'hack', 3],
     chef: ['support', 'sustain', 1], vet: ['striker', 'burst', 2], yuzu: ['support', 'paint', 1], flag: ['support', 'push', 2],
     hammer: ['striker', 'aoe', 3], echo: ['control', 'buff', 3], han: ['control', 'burst', 3], kaka: ['control', 'trick', 4],
     fu: ['control', 'zone', 4], aka: ['striker', 'sustain', 3], hawk: ['support', 'buff', 2], doc: ['control', 'heal', 4], zero: ['scout', 'dive', 5],
@@ -706,14 +706,14 @@
     ['lancer', 'prism', '同门对决：枪骑的突刺比光束蓄力更快。'],
     ['lancer', 'tactic', '先手突刺 + 三段突袭，战术机兵的点射来不及打完一轮。'],
     // ---- 驾驶员 ----
-    ['hex', 'raven', '电磁脉冲 + 远距离草丛侦测，夜鸢的墨雾和草丛藏不住。'],
+    ['hex', 'raven', '脉冲让夜鸢无法攻击，后门程序让她的墨雾迟迟充不回来。'],
     ['hex', 'gale', '脉冲减速让风羽的速度优势没了，冲进来也逃不掉。'],
     ['frost', 'raven', '义眼扫描让全队看到隐身和草丛里的夜鸢。'],
     ['frost', 'titan', '远距精准，雷豹靠近之前护盾就被点掉了。'],
     ['frost', 'kaka', '义眼扫描看穿卡卡的隐身和替身把戏。'],
     ['zero', 'raven', '战场感知自动暴露附近隐身的敌人，夜鸢的墨雾失效。'],
     ['zero', 'kaka', '隐身的卡卡一靠近就被零号看穿。'],
-    ['zero', 'doc', '相位突进切到后排，姜黎的雾场跟不上零号的速度。'],
+    ['zero', 'doc', '相位闪移穿墙切到后排，姜黎的雾场跟不上零号。'],
     ['raven', 'candy', '墨雾隐身绕后，先切掉没有自保能力的苏糖。'],
     ['raven', 'aurora', '隐身摸过炮台，直接找星澜本人。'],
     ['raven', 'yuzu', '小柚的无人机找不到隐身的夜鸢。'],
@@ -743,23 +743,23 @@
     ['flag', 'blaze', '集结号让全队伤害 + 移速，凌焰单打独斗打不过一支旗手队。'],
     ['flag', 'aka', '「众志成城」减伤，抱团的反抗军不怕赤镰冲脸。'],
     ['hawk', 'titan', '补给箱加快装填，持续火力磨掉雷豹的护盾。'],
-    ['hawk', 'vet', '补给箱持续回血，秦岳一波爆发打不死人。'],
+    ['hawk', 'vet', '补给箱给的护盾正好挡住秦岳的一波爆发。'],
     ['hawk', 'fu', '补给箱让队友在符阵外持续输出，站桩施法的符零很吃亏。'],
     ['yuzu', 'hammer', '无人机在远处自动输出，石磊的炸药扔不到那么远。'],
     ['yuzu', 'kaka', '无人机自动锁定，卡卡的替身骗不过机器。'],
     ['yuzu', 'han', '无人机不怕闪光弹，照样自动射击。'],
     ['aurora', 'aka', '炮台 + 快速重建，赤镰冲得进来出不去。'],
     ['aurora', 'kaka', '炮台不吃替身的骗，现身的卡卡马上被锁定。'],
-    ['echo', 'candy', '声波干扰打断技能、吸走大招充能，苏糖的应援放不出来。'],
+    ['echo', 'candy', '声波干扰打断技能、吸走大招充能，苏糖的应援和大招都慢半拍。'],
     ['echo', 'hawk', '干扰让霍克的空投和大招都慢半拍。'],
     ['echo', 'fu', '打断技能，符零的符阵来不及展开。'],
-    ['han', 'blaze', '闪光弹致盲 + 无法攻击，凌焰冲脸时正好被闪。'],
+    ['han', 'blaze', '凌焰冲脸时迎面吃一发闪光弹：减速又看不见，冲锋扑了个空。'],
     ['han', 'gale', '冲过来的风羽迎面吃一发闪光弹。'],
     ['kaka', 'hex', '替身吸引火力，洛奇的脉冲放空。'],
     ['kaka', 'han', '替身骗出闪光弹，再从侧面现身。'],
     ['kaka', 'titan', '替身炸开减速，扛着护盾的雷豹也追不上隐身的卡卡。'],
     ['fu', 'gale', '封印符阵封住冲刺，风羽被定在原地。'],
-    ['fu', 'zero', '简易领域自动反击闯入者，零号突进只会撞上符咒斩。'],
+    ['fu', 'zero', '简易领域自动反击闯入者，零号闪进领域只会撞上符咒斩。'],
     ['doc', 'aka', '纳米雾场减速 + 回血，赤镰冲进雾里就被拖住。'],
     ['doc', 'gale', '雾场减速，风羽的速度优势没了。'],
     ['doc', 'blaze', '雾场减速 + 装填 -25%，凌焰的强攻节奏被打乱。'],
@@ -792,12 +792,12 @@
   };
   const v5 = (a) => [a[0] || 0, a[1] || 0, a[2] || 0, a[3] || 0, a[4] || 0];
   // 技能 / 被动的分量 [战斗, 辅助, 控制, 机动, 生存]
-  const SK_V = { rush: [1, 0, 0, 3, 0], scan: [0, 2, 1, 0, 0], cheer: [0, 3, 0, 0, 1], guard: [0, 0, 0, 0, 3], smoke: [0, 0, 0, 1, 2], turret: [2, 1, 0, 0, 0], dash: [0, 0, 0, 3, 1],
+  const SK_V = { rush: [1, 0, 0, 3, 0], scan: [0, 3, 0, 0, 0], cheer: [0, 3, 0, 0, 1], guard: [0, 0, 0, 0, 3], smoke: [0, 0, 0, 1, 2], turret: [2, 1, 0, 0, 0], dash: [0, 0, 0, 3, 1],
     emp: [0, 0, 3, 0, 0], bento: [0, 3, 0, 0, 1], overdrive: [3, 0, 0, 0, 0], drone: [2, 1, 0, 0, 0], rally: [1, 3, 0, 1, 0], blast: [3, 0, 1, 0, 0], jam: [0, 1, 3, 0, 0],
-    decoy: [1, 0, 1, 1, 2], flash: [1, 0, 3, 0, 0], seal: [0, 0, 3, 0, 0], airdrop: [1, 3, 0, 0, 0], possess: [2, 0, 0, 1, 2], nano: [0, 2, 2, 0, 0], blink: [1, 0, 0, 3, 0] };
+    decoy: [1, 0, 1, 1, 2], flash: [1, 0, 3, 0, 0], seal: [0, 0, 3, 0, 0], airdrop: [1, 2, 0, 0, 1], possess: [2, 0, 0, 1, 2], nano: [0, 2, 2, 0, 0], blink: [1, 0, 0, 3, 0] };
   const PS_V = { blaze: [1, 0, 0, 0, 2], frost: [2, 0, 0, 0, 0], candy: [0, 2, 0, 0, 0], titan: [0, 0, 0, 0, 3], raven: [0, 0, 0, 2, 1], aurora: [0, 1, 0, 0, 1], gale: [0, 0, 0, 3, 0],
-    hex: [0, 1, 1, 0, 0], chef: [0, 0, 0, 0, 2], vet: [2, 0, 0, 0, 0], yuzu: [0, 2, 0, 0, 0], flag: [0, 1, 0, 0, 2], hammer: [0, 0, 0, 0, 2], echo: [0, 2, 0, 0, 0], han: [1, 0, 0, 0, 0],
-    kaka: [0, 2, 0, 0, 0], fu: [1, 0, 1, 0, 0], aka: [2, 0, 0, 0, 0], hawk: [1, 1, 0, 0, 0], doc: [0, 2, 0, 0, 0], zero: [0, 1, 1, 0, 0] };
+    hex: [0, 0, 2, 0, 0], chef: [0, 0, 0, 0, 2], vet: [2, 0, 0, 0, 0], yuzu: [0, 2, 0, 0, 0], flag: [0, 1, 0, 0, 2], hammer: [0, 0, 0, 0, 2], echo: [0, 2, 0, 0, 0], han: [1, 0, 0, 0, 0],
+    kaka: [0, 2, 0, 0, 0], fu: [1, 0, 1, 0, 0], aka: [2, 0, 0, 0, 0], hawk: [2, 0, 0, 0, 0], doc: [0, 2, 0, 0, 0], zero: [0, 1, 1, 0, 0] };
   const pilotRaw = (P) => {
     const O = S.OVERLOADS[P.id] || {}, A = S.sidearm(P.id), meta = (S.META && S.META.pilots && S.META.pilots[P.id]) || 0.5;
     const ov = [
@@ -1948,9 +1948,46 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '2.2';
+  S.VERSION = '2.2.1';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '2.2.1', date: '2026-11-19', title: '2.2.1 更新 · 视野看得见 & 机制去重', en_title: 'Update 2.2.1 · Visible Vision & Unique Kits', sections: [
+      ['视野直接显示在地图上', [
+        '被暴露的敌人（白夜的义眼扫描、喇叭车的声纳、战术机兵的侦察无人机、沈零的战场感知、岚的信号枪……）现在会在小地图和 N 键大地图上显示成红色菱形，草丛里和隐身的也一样',
+        '被暴露的敌人头顶有一个闪烁的「👁 暴露」标签；全队被扫描时屏幕上方会提示「全队视野」',
+        '战术机兵的侦察范围、沈零的战场感知范围也会画在地图上']],
+      ['状态图标更清楚', ['头顶新增状态图标：🎯 标记、💫 致盲、⛓ 束缚、🔒 技能锁、☠ 中毒、📜 封印（原有的 ⚡ 加速、🐢 减速、🚫 沉默、🔥 火力全开保留）']],
+      ['机制去重：每个角色一个招牌', [
+        '「暴露」只留给侦察：叶声的声波干扰、韩冰的闪光弹、符零的封印符阵、毒针的毒雾不再暴露敌人',
+        '沈零「相位突进」→「相位闪移」：瞬间闪到瞄准方向（最远 220），可以穿过墙壁——和风羽的冲刺区分开',
+        '韩冰「闪光弹」：改成真正的致盲——被闪到的敌人视野缩小到身边一圈（屏幕变白），AI 看不到 180 以外；不再沉默、暴露、增伤（「标记 +12%」只留给战术机兵的侦察无人机）',
+        '洛奇被动「信号侦测」→「后门程序」：被电磁脉冲命中的敌人 3 秒内技能充能停止回复；超载「全网瘫痪」不再全图暴露，改成每个敌人失去 1 次技能充能',
+        '霍克「战术空投」：不再回血（区域治疗是姜黎的招牌），改成靠近的队友立刻装满弹药 + 30 护盾，装填 +30%；被动「老练指挥」→「火力纪律」：弹药装满时的第一次攻击 +15%（团队增伤是岚的招牌）',
+        '卡卡「惊喜礼盒」：不再回血（掉落回血是包大福的招牌），改成 40% 大招充能（原 25%）',
+        '幻影「光学迷彩」：不再留下会炸的残影（替身是卡卡的招牌），隐身 4.5 → 5 秒',
+        '枪骑的「先手突刺」有了自己的提示「先手！」（以前显示成「背刺！」）',
+        '平衡：叶声「声波干扰」吸走的大招充能 30% → 25%']],
+      ['修复', ['技能充能被暂停时不会再清空已经回复的进度']],
+      ['更新奖励', ['信箱里有一份 2.2.1 小礼包：100 宝石 + 1 个补给箱']],
+    ], en: [
+      ['Vision shows on the map', [
+        'Revealed enemies (Frost’s Bionic Scan, the Megaphone’s sonar, the Tactical Bot’s recon drone, Shen Ling’s Battle Sense, Lan’s Flare Pistol…) now appear as red diamonds on the minimap and the N full map — even in bushes or invisible',
+        'Revealed enemies have a blinking “👁 Revealed” tag over their heads, and a “Team vision” banner appears while your whole team can see every enemy',
+        'The Tactical Bot’s recon area and Shen Ling’s Battle Sense range are drawn on the map']],
+      ['Clearer status icons', ['New overhead status icons: 🎯 Marked, 💫 Blinded, ⛓ Bound, 🔒 Skill lock, ☠ Poisoned, 📜 Sealed (⚡ Haste, 🐢 Slow, 🚫 Silence and 🔥 Full Firepower remain)']],
+      ['Unique kits: one signature per character', [
+        'Revealing is now a Scout thing: Echo’s Signal Jam, Han Bing’s Flashbang, Fu Ling’s seal circle and the Stinger’s poison mist no longer reveal enemies',
+        'Shen Ling “Phase Rush” → “Phase Blink”: instantly blink toward your aim (up to 220) and pass through walls — distinct from Gale’s dash',
+        'Han Bing “Flashbang”: now a real blind — hit enemies’ vision shrinks to a small circle (the screen whites out) and AI can’t see beyond 180; it no longer silences, reveals or adds damage (“Marked +12%” belongs to the Tactical Bot’s recon drone)',
+        'Loki passive “Signal Sense” → “Backdoor”: enemies hit by the EMP stop regaining skill charges for 3 s; Overload “Network Crash” no longer reveals the map and instead removes 1 skill charge from every enemy',
+        'Hawk “Tactical Airdrop”: no more healing (area healing is Jiang Li’s signature) — allies who reach it refill ammo and get a 30 shield, plus +30% reload; passive “Veteran Command” → “Fire Discipline”: first attack with full ammo +15% (team damage buffs are Lan’s signature)',
+        'Kaka “Surprise Box”: no more healing (healing pickups are Bao Dafu’s signature) — gives 40% Super charge (was 25%)',
+        'Phantom “Optical Camo”: no longer leaves an exploding afterimage (decoys are Kaka’s signature); invisibility 4.5 → 5 s',
+        'The Lancer’s Opening Thrust has its own “Opener!” popup (it used to say “Backstab!”)',
+        'Balance: Echo’s Signal Jam drains 25% Super charge (was 30%)']],
+      ['Fixes', ['A paused skill recharge no longer wipes the progress already made']],
+      ['Update reward', ['Your mailbox has a 2.2.1 gift: 100 gems + 1 Supply Crate']],
+    ] },
     { v: '2.2', date: '2026-11-19', title: '2.2 更新 · 战斗定位 & 灰石叛逃者', en_title: 'Update 2.2 · Combat Roles & Grayco Defectors', sections: [
       ['战斗定位', [
         '每台机体和每位驾驶员都有了 1 个主定位 + 1 个副标签',

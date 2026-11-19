@@ -30,7 +30,7 @@ const steps = (g, n) => { for (let i = 0; i < n; i++) g.step(); };
   const { g, A, B } = duel({ pilot: 'fu', weapon: 'warden' }, { pilot: 'blaze', weapon: 'blaster' }, { gap: 150 });
   A.input.ad = 150; A.input.gq++; steps(g, 3);
   ok(g.helpers.some((h) => h.kind === 'sealz'), '符零：封印符落地展开符阵');
-  ok(B.sealT > 0 && B.slowT > 0 && B.revealT > 0, `符阵里的敌人减速、封印、暴露（seal ${B.sealT.toFixed(2)}）`);
+  ok(B.sealT > 0 && B.slowT > 0, `符阵里的敌人减速、封印（seal ${B.sealT.toFixed(2)}）`);
   const uses = B.skillUses; B.input.gq++; steps(g, 2);
   ok(B.skillUses === uses, '被封印时不能放技能');
   B.sp = S.WEAPONS[B.weapon].spNeed; B.input.qq++; steps(g, 2);
