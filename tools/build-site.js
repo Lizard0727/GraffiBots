@@ -48,6 +48,18 @@ const pilots = Object.values(S.PILOTS).map((p) => {
 });
 const mechs = Object.entries(S.WEAPONS).map(([id, w]) => ({ id, name: w.name, en: tr(w.name), role: w.role, en_role: tr(w.role), hp: w.hp, range: w.range || 0,
   tag: (E.SEASON_MECHS || []).includes(id) ? 'season' : questP.has(id) ? 'quest' : (E.STRIKE_MECHS || []).includes(id) ? 'strike' : '' }));
+// 2.2：战斗定位 / 六边形 / 克制关系
+const roleData = (kind, id) => {
+  const r = S.roleOf(id), R = S.ROLES[r.role], C = S.countersOf(id), F = S.fitOf(id), col = R.color;
+  const enAxes = S.HEX_AXES[kind].map((a) => ({ 破坏力: 'Power', 耐久: 'Durability', 速度: 'Speed', 射程: 'Range', 涂地: 'Painting', 操作难度: 'Difficulty', 战斗: 'Combat', 辅助: 'Support', 控制: 'Control', 机动: 'Mobility', 生存: 'Survival' })[a] || tr(a));
+  const one = (m) => ({ id: m.id, why: m.why, en_why: tr(m.why) });
+  return { role: r.role, tag: S.TAGS[r.tag], en_tag: tr(S.TAGS[r.tag]), color: col, hex: S.hexSvg(kind, id, { color: col, size: 200 }), en_hex: S.hexSvg(kind, id, { color: col, size: 200, labels: enAxes }),
+    beats: C.beats.map(one), weak: C.weak.map(one), modes: (F ? F.modes : []).map((m) => S.MODES[m].name), en_modes: (F ? F.modes : []).map((m) => tr(S.MODES[m].name)) };
+};
+for (const p of pilots) Object.assign(p, { r: roleData('pilot', p.id) });
+for (const m of mechs) Object.assign(m, { r: roleData('mech', m.id) });
+const roles = Object.fromEntries(Object.entries(S.ROLES).map(([k, R]) => [k, { kind: R.kind, name: R.name, en: { assault: R.kind === 'mech' ? 'Brawler' : 'Striker', suppress: 'Suppressor', sniper: 'Sniper', artillery: 'Artillery', tank: 'Tank', assassin: 'Assassin', support: 'Support', control: 'Controller', striker: 'Striker', scout: 'Scout' }[k], color: R.color, desc: R.desc, en_desc: tr(R.desc) }]));
+const ring = { mech: S.ROLE_RING.mech, pilot: S.ROLE_RING.pilot, why: Object.fromEntries(Object.entries(S.RING_WHY).map(([k, v]) => [k, { zh: v, en: tr(v) }])), edge: S.ROLE_EDGE };
 const modes = Object.entries(S.MODES).map(([id, m]) => ({ id, name: m.name, en: tr(m.name), desc: m.desc, en_desc: tr(m.desc), isNew: !!m.isNew }));
 const maps = S.MAPS.map((m, i) => ({ name: m.name, en: tr(m.name), isNew: i >= S.MAPS.length - NEW_MAPS }));
 
@@ -70,7 +82,7 @@ const data = {
   version: S.VERSION, date: latest.date, title: latest.title, en_title: latest.en_title,
   season: { name: E.SEASON && E.SEASON.name, ends: E.SEASON && E.SEASON.end },
   counts: { pilots: pilots.length, mechs: mechs.length, maps: maps.length, modes: modes.length, skins: (S.SKINS || []).length, talents: (S.TALENTS || []).length },
-  notes, pilots, mechs, modes, maps, downloads,
+  notes, pilots, mechs, modes, maps, downloads, roles, ring,
   // 最新版本的截图（换版本时改这里）
   shots: [
     { img: 'img/v14-park.jpg', cap: '乐园模式', en_cap: 'Park Mode', sub: '花车巡游 + 打气球', en_sub: 'Parade float + balloons' },

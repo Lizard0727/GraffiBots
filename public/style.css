@@ -2317,6 +2317,9 @@ body.ui21 .pcard.sel { box-shadow: 0 0 0 2px var(--u-gold), 0 0 24px rgba(232,19
 body.ui21 .pcard.sel::after { display: none; }
 body.ui21 .pcard.locked svg { filter: grayscale(1) brightness(.55); }
 body.ui21 .mcard2 { background: linear-gradient(160deg, #1d2644, #0e1424) !important; color: var(--u-txt) !important; border: 1px solid var(--u-line) !important; border-radius: 16px !important; box-shadow: var(--u-glow) !important; transform: none !important; }
+body.ui21 .mcard2 b { color: #fff !important; text-shadow: 0 2px 6px rgba(0,0,0,.6); }   /* 2.2：机体名字改成白色（以前是黑色，看不清） */
+body.ui21 .mcard2 small { color: var(--u-gold2) !important; }
+body.ui21 .mcard2.locked b { opacity: .75; }
 body.ui21 .mcard2.sel { box-shadow: 0 0 0 2px var(--u-gold), 0 0 24px rgba(232,196,122,.5) !important; }
 body.ui21 .skin-card, body.ui21 .chest-card, body.ui21 .gear-card, body.ui21 .mode-tile { border-radius: 16px !important; transform: none !important; }
 body.ui21 .home-stage .hero-portrait { width: min(27vw, 340px) !important; height: min(64vh, 500px) !important; left: 0 !important; top: 12% !important; }
@@ -2353,3 +2356,47 @@ body.ui21 .bl-logo b { text-shadow: 0 0 18px rgba(122,184,255,.6), 0 3px 0 #1a24
 #xferCode { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, Consolas, monospace; border-radius: 10px; padding: 8px; background: #0b1020; color: #cfe3ff; border: 1px solid #ffffff33; resize: vertical; word-break: break-all; }
 .xfer-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .xf-file { cursor: pointer; }
+
+/* ================= 2.2 战斗定位：定位标签、六边形面板、克制关系、章节任务线 ================= */
+.tag.rl { background: color-mix(in srgb, var(--rc) 22%, #0e1424) !important; color: #fff !important; border: 1px solid var(--rc) !important; }
+.role-panel { display: flex; flex-direction: column; gap: 14px; background: linear-gradient(160deg, #1a2342, #0e1424); color: #fff; border-radius: 14px; padding: 12px; border: 2px solid #0008; }
+.rp-top { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.rp-hex { flex: 0 0 auto; width: 220px; max-width: 100%; }
+.rp-hex .hexsvg { width: 100%; height: auto; display: block; }
+.rp-info { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.rp-info p { margin: 0; color: #c9d3e6; font-size: 13px; }
+.rp-role { display: flex; align-items: baseline; gap: 8px; }
+.rp-role b { font-size: 26px; color: var(--rc); font-family: var(--head); letter-spacing: 2px; }
+.rp-role span { padding: 2px 9px; border-radius: 99px; background: #ffffff14; color: #fff; font-size: 12px; font-weight: 700; }
+.rp-ring { display: flex; flex-direction: column; gap: 6px; }
+.rp-ring > div { background: #ffffff0a; border-radius: 10px; padding: 6px 9px; font-size: 13px; color: #fff; }
+.rp-ring small { display: block; color: #9aa6bd; font-size: 11.5px; margin-top: 3px; }
+.rl-chip { display: inline-block; padding: 1px 8px; border-radius: 6px; background: color-mix(in srgb, var(--rc) 30%, #0e1424); border: 1px solid var(--rc); color: #fff; font-weight: 800; font-size: 12px; }
+.rp-modes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rp-modes small { color: #9aa6bd; margin-right: 2px; }
+.rp-modes span { padding: 2px 9px; border-radius: 99px; background: #ffd23f22; border: 1px solid #ffd23f88; color: #ffe9a8; font-size: 12px; font-weight: 700; }
+.ctr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ctr-cols h4 { margin: 0 0 6px; font-size: 14px; letter-spacing: 1px; }
+.ctr-cols h4.good { color: #9cff2e; } .ctr-cols h4.bad { color: #ff6b5a; }
+.ctr-row { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; background: #ffffff0a; border: 1px solid #ffffff1a; border-radius: 10px; padding: 6px; margin-bottom: 6px; color: #fff; cursor: pointer; font: inherit; }
+.ctr-row:hover { background: #ffffff16; }
+.ctr-row .cf { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; background: #0e1424; display: block; }
+.ctr-row .cf svg, .ctr-row .cf img { width: 100%; height: 100%; display: block; }
+.ctr-row b { display: block; font-size: 13.5px; color: #fff; }
+.ctr-row small { display: block; color: #9aa6bd; font-size: 11.5px; line-height: 1.35; }
+@media (max-width: 640px) { .ctr-cols { grid-template-columns: 1fr; } .rp-hex { width: 180px; margin: 0 auto; } }
+.dcard .rl { display: block; font-style: normal; font-size: 10px; font-weight: 800; color: #fff; background: color-mix(in srgb, var(--rc) 45%, #0e1424); border-radius: 4px; margin-top: 2px; padding: 0 3px; }
+.dr-hint { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; margin: 6px 0; }
+.dr-hint .good { color: #9cff2e; } .dr-hint .bad { color: #ff8a7a; }
+/* 章节任务线：剧情台词 */
+.chap-step { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 12px; background: linear-gradient(160deg, #1a2342, #0e1424); border: 2px solid #0008; margin-bottom: 8px; color: #fff; }
+.chap-step.lock { opacity: .45; }
+.chap-step .cs-face { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 50%; overflow: hidden; background: #0e1424; border: 2px solid var(--ec, #fff); }
+.chap-step .cs-face svg { width: 100%; height: 100%; display: block; }
+.chap-step .cs-body { flex: 1; min-width: 0; }
+.chap-step .cs-line { margin: 0 0 6px; color: #e9eef8; font-size: 13px; }
+.chap-step .cs-line b { color: var(--ec, #fff); margin-right: 4px; }
+.chap-step .qrow { margin: 0; }
+.chap-lock { padding: 14px; border-radius: 12px; background: #1a2342; color: #e9eef8; text-align: center; margin-bottom: 10px; }
+/* 2.2：深色界面里，机体页左边的属性条文字也改成白色 */
+body.ui21 #hpLeft .statbars span, body.ui21 #hpLeft .statbars b, #ov-hero #hpLeft .statbars span, #ov-hero #hpLeft .statbars b { color: #fff !important; }

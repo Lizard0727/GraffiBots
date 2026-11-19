@@ -43,7 +43,7 @@
     },
     charger: {
       name: '狙击机兵', short: '狙击', role: '远程狙击', desc: '按住蓄力、松开射出贯穿直线，满蓄力伤害极高。蓄力时移动变慢，生命值低。',
-      hp: 80, spd: 0.95, reload: 1.9, atkCd: 0.3, attack: 'charge', chargeTime: 0.95, range: 720, dmg: 82, minDmg: 32,
+      hp: 92, spd: 0.95, reload: 1.8, atkCd: 0.3, attack: 'charge', chargeTime: 0.88, range: 720, dmg: 84, minDmg: 34,
       special: 'missiles', spNeed: 270, pierce: 0.7,
     },
     bucket: {
@@ -54,7 +54,7 @@
     gatling: {
       name: '旋转机兵', short: '旋转', role: '持续压制', desc: '每次攻击持续扫射 1 秒，射程远、火力持续，但装填慢。',
       hp: 100, spd: 0.88, reload: 2.8, atkCd: 0.3, attack: 'burst', shots: 12, interval: 0.075,
-      speed: 700, range: 380, dmg: 4.3, spread: 0.13, splat: 13, trail: 9, size: 5, special: 'beam', spNeed: 300, spinup: [0.72, 1.1],
+      speed: 700, range: 380, dmg: 4.3, spread: 0.13, splat: 13, trail: 9, size: 5, special: 'beam', spNeed: 300, spinup: [0.64, 1.04],
     },
     mortar: {
       name: '迫击机兵', short: '迫击', role: '曲射炮手', desc: '把涂料炮弹抛到瞄准的位置，能越过墙壁和掩体，落地爆炸涂一大片。',
@@ -101,13 +101,13 @@
     // ---- 1.4：常驻新机体 ----
     slinger: {
       name: '弹弓机兵', short: '弹弓', role: '弹跳炮手', desc: '弹射一颗会弹跳的涂料球：落地爆炸后再往前弹出去炸第二次，能越过掩体打击后排。',
-      hp: 105, spd: 1, reload: 1.0, atkCd: 0.5, attack: 'lob', range: 370, minRange: 60, dmg: 53, blast: 62, flight: 0.52, bounce: 1,
+      hp: 105, spd: 1, reload: 1.0, atkCd: 0.5, attack: 'lob', range: 370, minRange: 60, dmg: 50, blast: 62, flight: 0.52, bounce: 1,
       special: 'cluster', spNeed: 250, isNew: true,
     },
     // ---- 1.4：袭击！特攻队（刺客型机体，只能从「特攻队补给箱」开出） ----
     blade: {
       name: '影刃机兵', short: '影刃', role: '突袭刺客', desc: '高速突进挥出一记影刃，从背后命中伤害 +30%。移动极快，但生命值低，一定要找准时机切入。',
-      hp: 170, spd: 1.22, reload: 0.9, atkCd: 0.33, attack: 'punch', range: 68, arc: 1.9, dmg: 76, paintR: 54, kb: 120, lunge: 330, backstab: 1.4,
+      hp: 182, spd: 1.22, reload: 0.88, atkCd: 0.33, attack: 'punch', range: 68, arc: 1.9, dmg: 80, paintR: 54, kb: 120, lunge: 330, backstab: 1.4,
       special: 'shadowstep', spNeed: 180, strike: 1, isNew: true,
     },
     stinger: {
@@ -123,7 +123,7 @@
     // ---- 1.8：夜都决战（联动活动机体） ----
     warden: {
       name: '结界机兵', short: '结界', role: '结界支援', desc: '连发两枚符咒光弹，命中的敌人减速；同一个敌人连中 4 发会被符印束缚 0.7 秒。大招展开结界：把里面的敌人弹开，队友获得护盾、减伤并持续回血。',
-      hp: 128, spd: 0.98, reload: 1.0, atkCd: 0.44, attack: 'burst', shots: 2, interval: 0.1, speed: 760, range: 340, dmg: 21, slowHit: 0.35, ward: 4,
+      hp: 128, spd: 0.98, reload: 1.0, atkCd: 0.44, attack: 'burst', shots: 2, interval: 0.1, speed: 760, range: 340, dmg: 22.5, slowHit: 0.35, ward: 4,
       spread: 0.03, splat: 18, trail: 8, size: 6, special: 'barrier', spNeed: 240, collab: 'yato', isNew: true,
     },
     reaper: {
@@ -134,8 +134,19 @@
     // ---- 2.1：S2 雇佣兵撤离（通行证免费线 25 级） ----
     tactic: {
       name: '战术机兵', short: '战术', role: '精准点射', desc: '雇佣兵制式战术步枪：每轮 3 连发，射程远、弹道稳，第一发是穿甲首发。大招放出侦察无人机，标记一整片区域的敌人。',
-      hp: 110, spd: 1.02, reload: 1.2, atkCd: 0.42, attack: 'burst', shots: 3, interval: 0.09, speed: 900, range: 430, dmg: 12.5, lead: 1.25,
+      hp: 110, spd: 1.02, reload: 1.2, atkCd: 0.42, attack: 'burst', shots: 3, interval: 0.09, speed: 900, range: 430, dmg: 13.4, lead: 1.25,
       spread: 0.02, splat: 15, trail: 10, size: 5, special: 'recon', spNeed: 240, pass: 2, isNew: true,
+    },
+    // ---- 2.2：灰石叛逃者任务线（灰石集团试验机） ----
+    prism: {
+      name: '棱镜原型机', short: '棱镜', role: '折射狙击', desc: '灰石研究园区的实验型光束机：按住蓄力、松开射出一道棱镜光束，被命中的敌人减速。蓄满的一枪会折射到附近另一个敌人身上。',
+      hp: 106, spd: 0.97, reload: 1.5, atkCd: 0.3, attack: 'charge', chargeTime: 0.72, range: 640, dmg: 74, minDmg: 32, slowHit: 0.8, refract: { r: 200, k: 0.5 },
+      special: 'prism', spNeed: 250, quest: 2, isNew: true,
+    },
+    lancer: {
+      name: '枪骑原型机', short: '枪骑', role: '突刺刺客', desc: '灰石试验部队的王牌突击机：握着高周波长枪向前高速突刺，攻击距离比其他近战机体都远。超过 2 秒没出手，下一枪是伤害更高的「先手突刺」。',
+      hp: 162, spd: 1.2, reload: 0.92, atkCd: 0.36, attack: 'punch', range: 96, arc: 1.1, dmg: 69, paintR: 46, kb: 160, lunge: 330, opener: 1.35,
+      special: 'lancestorm', spNeed: 200, quest: 2, isNew: true,
     },
   };
   // 2.0：每台机体的攻击特性（机体页面显示；数值写在 S.WEAPONS 里）
@@ -144,7 +155,7 @@
     roller: { name: '甩刷冲锋', desc: '甩刷时向前冲一小步，冲刺中撞到的敌人会被滚压。' },
     charger: { name: '穿甲弹', desc: '蓄力到 90% 以上的一枪会贯穿第一个敌人，继续命中后面的敌人（第二个目标伤害 ×0.7）。' },
     bucket: { name: '近身爆发', desc: '在 110 距离以内命中的涂料伤害 +20%。' },
-    gatling: { name: '枪管预热', desc: '一轮 12 发越打越狠：伤害从 72% 一路涨到 110%。' },
+    gatling: { name: '枪管预热', desc: '一轮 12 发越打越狠：伤害从 64% 一路涨到 104%。' },
     mortar: { name: '黏稠墨水', desc: '炮弹炸开的地方会粘住敌人，减速 1.2 秒。' },
     fist: { name: '三连上勾拳', desc: '连续第 3 拳是上勾拳：伤害 ×1.3，把敌人打飞到空中。' },
     slinger: { name: '弹跳炮弹', desc: '炮弹落地爆炸后会沿原方向再弹一次。' },
@@ -160,8 +171,10 @@
     warden: { name: '符印束缚', desc: '同一个敌人连中 4 发会被束缚 0.7 秒，并额外受到 16 伤害。' },
     reaper: { name: '三连回旋斩', desc: '连续第 3 刀是 360° 回旋斩：伤害 ×1.3，一次斩出三道刀气。' },
     tactic: { name: '穿甲首发', desc: '每轮 3 连发的第一发是穿甲首发：伤害 ×1.25。' },
+    prism: { name: '棱镜折射', desc: '被光束命中的敌人减速 0.8 秒；蓄力到 90% 以上命中时，光束折射到 200 范围内另一个敌人（伤害 ×0.5）。' },
+    lancer: { name: '先手突刺', desc: '超过 2 秒没有攻击时，下一次突刺伤害 ×1.35。' },
   };
-  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'slinger', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot', 'blade', 'stinger', 'phantom', 'warden', 'reaper', 'tactic'];
+  S.WEAPON_ORDER = ['blaster', 'roller', 'charger', 'bucket', 'gatling', 'mortar', 'fist', 'slinger', 'dozer', 'flamer', 'carrier', 'wrecker', 'megaphone', 'riot', 'blade', 'stinger', 'phantom', 'warden', 'reaper', 'tactic', 'prism', 'lancer'];
   S.weaponRange = function (id) {
     const w = S.WEAPONS[id];
     if (id === 'charger') return 620;
@@ -170,6 +183,7 @@
     if (id === 'wrecker') return 108;
     if (id === 'blade') return 110;   // 算上突进距离
     if (id === 'reaper') return 230;  // 刀气
+    if (id === 'lancer') return 130;  // 算上突刺距离
     return w.range;
   };
 
@@ -193,24 +207,28 @@
     cloak: { name: '光学迷彩', desc: '隐身 4.5 秒，移动速度 +25%，原地留下一个会炸开的残影；隐身时的第一击伤害 +50%（攻击后现形）。' },
     barrier: { name: '结界展开', desc: '以自己为中心展开 6 秒的半透明结界：里面的队友受到的伤害 -30%、每秒回复 10 生命，闯进来的敌人减速 25%。' },
     recon: { name: '侦察无人机', desc: '放出一架侦察无人机飞到瞄准位置上空（最远 420）：8 秒内暴露 320 范围里的所有敌人，并标记他们——受到你全队的伤害 +12%。' },
+    prism: { name: '相位冻结', desc: '朝瞄准位置（最远 460）投下相位棱镜，0.6 秒后展开：半径 140 内的敌人受到 45 点伤害，并被冻结 1.2 秒（几乎无法移动、不能攻击和放技能）。' },
+    lancestorm: { name: '三段突袭', desc: '朝瞄准方向连续突进 3 段（每段可以重新瞄准），每段穿过的敌人受到 40 点伤害；突袭结束时获得 30 点护盾。' },
     rend: { name: '裂空斩', desc: '蓄力 0.35 秒，朝瞄准方向斩出一道巨大的灵能刀气：贯穿 520 距离内的所有敌人，造成 85 点伤害并击退，沿路涂满。' },
   };
   S.MISSILE = { range: 1100, max: 4, dmg: 100, min: 36 };   // 2.1.2：锁定导弹削弱（以前全图锁定、每发 140）
-  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis', 'cluster', 'shadowstep', 'venom', 'cloak', 'barrier', 'rend', 'recon'];
-  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm' || sp === 'cluster' || sp === 'shadowstep' || sp === 'venom' || sp === 'rend' || sp === 'recon';
+  S.SPECIAL_IDS = [null, 'storm', 'charge', 'missiles', 'bubble', 'beam', 'barrage', 'quake', 'bulldoze', 'napalm', 'swarm', 'whirl', 'sonic', 'aegis', 'cluster', 'shadowstep', 'venom', 'cloak', 'barrier', 'rend', 'recon', 'prism', 'lancestorm'];
+  S.superAimed = (sp) => sp === 'beam' || sp === 'barrage' || sp === 'quake' || sp === 'charge' || sp === 'bulldoze' || sp === 'napalm' || sp === 'cluster' || sp === 'shadowstep' || sp === 'venom' || sp === 'rend' || sp === 'recon' || sp === 'prism' || sp === 'lancestorm';
 
-  // ---------------- 驾驶员技能（每局 3 次，冷却 6 秒；驾驶员弹出后也能用） ----------------
-  S.SKILL_USES = 3; S.SKILL_CD = 6;
+  // ---------------- 驾驶员技能（2.2：充能制——最多存 2 次，每 15 秒回复 1 次；两次之间至少隔 3 秒；驾驶员弹出后也能用） ----------------
+  //   以前是「每台机体 3 次、重建刷新」，现在换机体不再刷新充能
+  S.SKILL_CHARGES = 2; S.SKILL_REGEN = 15; S.SKILL_CD = 3;
+  S.SKILL_USES = S.SKILL_CHARGES;   // 旧名字（测试 / 旧代码用）
   S.SKILLS = {
     rush: { short: '加速', name: '肾上腺素', desc: '3 秒内移动速度 +35%，装填速度翻倍。' },
     scan: { short: '扫描', name: '义眼扫描', desc: '5 秒内全队能看到所有敌人，包括草丛里和隐身的。' },
     cheer: { short: '应援', name: '应援音波', desc: '为自己和附近队友（200 范围）回复 50 点生命。' },
     guard: { short: '护盾', name: '钢铁护盾', desc: '获得可吸收 60 点伤害的护盾，持续 4 秒。' },
     smoke: { short: '墨雾', name: '墨雾', desc: '在脚下炸开一片己方涂料，并隐身 3 秒（攻击也不会现形）。' },
-    turret: { short: '炮台', name: '涂装炮台', desc: '在原地放下一座自动炮台，7 秒内攻击附近敌人。' },
+    turret: { short: '炮台', name: '涂装炮台', desc: '在原地放下一座自动炮台，6 秒内攻击附近敌人。' },
     dash: { short: '冲刺', name: '冲刺推进', desc: '朝移动方向高速冲刺，冲刺瞬间无敌。' },
-    emp: { short: '脉冲', name: '电磁脉冲', desc: '附近敌人（200 范围）减速 45%（3 秒），并在 1.4 秒内无法攻击。' },
-    bento: { short: '便当', name: '能量便当', desc: '在脚下放一份便当，第一个碰到的队友回复 90 点生命。' },
+    emp: { short: '脉冲', name: '电磁脉冲', desc: '附近敌人（200 范围）减速 45%（3 秒），并在 1.1 秒内无法攻击。' },
+    bento: { short: '便当', name: '能量便当', desc: '在脚下放一份便当，第一个碰到的队友回复 110 点生命。' },
     overdrive: { short: '火力', name: '火力全开', desc: '立即装满弹药，接下来 3 次攻击伤害 +40%。' },
     drone: { short: '无人机', name: '猫猫无人机', desc: '召唤跟随自己的无人机，6 秒内自动射击附近敌人。' },
     rally: { short: '集结', name: '集结号', desc: '插下反抗军旗帜，6 秒内自己和附近队友伤害 +20%、移动速度 +15%。' },
@@ -218,13 +236,15 @@
     jam: { short: '干扰', name: '声波干扰', desc: '附近敌人的大招充能减少 30%、装填速度 -30%（3 秒），技能被打断 0.6 秒，并暴露位置 4 秒（草丛里也藏不住）。' },
     decoy: { short: '替身', name: '魔术替身', desc: '原地留下一个替身，2.5 秒后炸开造成 55 点伤害并减速；自己隐身 2.5 秒，隐身时移动速度 +25%。' },
     flash: { short: '闪光', name: '闪光弹', desc: '朝前方扔出闪光弹：扇形范围内的敌人受到 12 点伤害、减速 1.2 秒、0.8 秒内无法攻击、暴露 4 秒，并被「致盲」3 秒——受到你全队的伤害 +12%。' },
-    seal: { short: '封印', name: '封印符', desc: '朝瞄准方向甩出一张封印符，落地展开 3 秒符阵：阵里的敌人减速 40%、不能放技能和大招，并暴露位置。' },
+    seal: { short: '封印', name: '封印符', desc: '朝瞄准方向甩出一张封印符，落地展开 2.5 秒符阵：阵里的敌人减速 40%、不能放技能和大招，并暴露位置。' },
     airdrop: { short: '空投', name: '战术空投', desc: '呼叫补给箱砸到瞄准的位置（最远 260）：落地砸中敌人造成 40 点伤害；之后 6 秒，补给箱附近的队友每秒回复 8 生命、装填速度 +30%。' },
     possess: { short: '附身', name: '恶灵附身', desc: '4 秒内攻击吸血 35%，移动速度 +20%，受到的伤害 -15%。' },
+    nano: { short: '纳米', name: '纳米雾场', desc: '把纳米雾罐扔到瞄准的位置（最远 240），展开 4 秒雾场：雾里的队友每秒回复 15 生命，敌人减速 30%、装填速度 -25%。' },
+    blink: { short: '突进', name: '相位突进', desc: '朝瞄准方向高速突进，突进瞬间无敌；2 秒内的下一次攻击伤害 +35%，并暴露突进方向前方 260 范围内的敌人 3 秒。' },
   };
-  // ---------------- 超载技能（突破 I 解锁，每局 1 次，打出伤害充能） ----------------
+  // ---------------- 超载技能（突破 I 解锁，打出伤害充能；2.2：每局可以多次使用，但充能更慢） ----------------
   // dmg / def：伤害倍率 / 受伤倍率；spd：移速倍率；其余字段是专属效果
-  S.OV_NEED = 360;      // 充满需要打出的伤害
+  S.OV_NEED = 480;      // 充满需要打出的伤害（2.2：360 → 480，用完可以重新充）
   S.OV_TIME = 6;        // 持续时间（突破 II 后 +2 秒、效果更强）
   S.OVERLOADS = {
     blaze: { name: '燃烧模式', desc: '伤害 +30%，移动速度 +20%。', dmg: 1.3, spd: 1.2 },
@@ -233,7 +253,7 @@
     titan: { name: '钢铁意志', desc: '受到的伤害 -50%，不会被击退。', def: 0.5, noKb: 1 },
     raven: { name: '影袭', desc: '完全隐身，移动速度 +25%。', stealth: 1, spd: 1.25 },
     aurora: { name: '超频装配', desc: '弹药无限，攻击不用等装填。', infAmmo: 1 },
-    gale: { name: '乘风', desc: '移动速度 +45%，立刻刷新技能冷却并多 1 次技能。', spd: 1.45, skillReset: 1 },
+    gale: { name: '乘风', desc: '移动速度 +45%，立刻刷新技能冷却并回复 1 次技能充能。', spd: 1.45, skillReset: 1 },
     hex: { name: '全网瘫痪', desc: '发动时全部敌人暴露并沉默 3 秒（不能放技能和大招）。', hack: 1 },
     chef: { name: '满汉全席', desc: '立刻为自己和附近队友回复 50 生命，之后每秒回复 10。', burstHeal: 50, regen: 10 },
     vet: { name: '老兵不死', desc: '持续期间不会倒下，伤害 +20%。', undying: 1, dmg: 1.2 },
@@ -246,6 +266,8 @@
     fu: { name: '简易领域', desc: '以自己为中心展开半径 170 的简易领域（跟着自己移动）：飞进领域的敌方子弹全部被中和；闯进领域的敌人会被自动反击——符咒斩 22 伤害、往外弹开、减速并封住技能；自己减伤 25%、伤害 +15%。', dmg: 1.15, def: 0.75, domain: { r: 170, counter: 22, cd: 0.7 } },   // 1.9.1：百符结界 → 简易领域
     aka: { name: '灵化爆发', desc: '伤害 +35%，受到的伤害 -20%，每次命中回复 6 生命。', dmg: 1.35, def: 0.8, hitHeal: 6 },
     hawk: { name: '雇佣兵合约', desc: '攻击速度 +30%，伤害 +15%，受到的伤害 -15%。', rof: 1.3, dmg: 1.15, def: 0.85 },
+    doc: { name: '协议覆写', desc: '附近 240 范围内的队友每秒回复 12 生命、受到的伤害 -15%；范围内的敌人减速 25%。', aura: { r: 240, heal: 12, def: 0.85 } },
+    zero: { name: '零式解放', desc: '移动速度 +30%，攻击速度 +25%；击毁机体或击倒驾驶员时立刻回复 1 次技能充能。', spd: 1.3, rof: 1.25, killCharge: 1 },
   };
   // ---------------- 天赋树（账号共用；每局最多装 3 个已点亮的天赋） ----------------
   S.TALENT_BRANCHES = [
@@ -267,8 +289,8 @@
     { id: 'p2', br: 'paint', tier: 2, cost: 1, name: '滑行高手', desc: '在己方涂料上移动速度 +6%' },
     { id: 'p3', br: 'paint', tier: 3, cost: 2, name: '涂地充能', desc: '涂地给的大招充能 +25%' },
     { id: 'p4', br: 'paint', tier: 4, cost: 2, name: '墨水回复', desc: '站在己方涂料上每秒回复 3 生命' },
-    { id: 's1', br: 'sup', tier: 1, cost: 1, name: '技能专精', desc: '技能冷却 -25%' },
-    { id: 's2', br: 'sup', tier: 2, cost: 1, name: '额外技能', desc: '每局技能次数 +1' },
+    { id: 's1', br: 'sup', tier: 1, cost: 1, name: '技能专精', desc: '技能充能速度 +20%' },
+    { id: 's2', br: 'sup', tier: 2, cost: 1, name: '额外技能', desc: '技能充能上限 +1' },
     { id: 's3', br: 'sup', tier: 3, cost: 2, name: '超载预热', desc: '超载技能充能速度 +20%' },
     { id: 's4', br: 'sup', tier: 4, cost: 2, name: '急救包', desc: '击毁机体或击倒驾驶员后回复 15 生命' },
     // ---- 1.1 新增：第 5、6 级 ----
@@ -383,6 +405,8 @@
     han:    { name: '警用电棍', desc: '近身电击，命中让敌人减速 0.6 秒。', kind: 'melee', dmg: 13.6, range: 44, arc: 1.5, kb: 110, lunge: 130, fx: { slow: 0.6 }, reload: 0.75, atkCd: 0.38 },
     fu:     { name: '符纸飞镖', desc: '一次甩出 2 张符纸，命中的敌人减速 0.5 秒。', kind: 'gun', pellets: 2, arc: 0.18, dmg: 7.7, range: 260, speed: 760, fx: { slow: 0.5 }, reload: 0.85, atkCd: 0.36, size: 4 },
     hawk:   { name: '冲锋手枪', desc: '射速很快的冲锋手枪，适合边跑边打。', kind: 'gun', dmg: 6.5, range: 260, speed: 820, reload: 0.75, atkCd: 0.2, size: 4 },
+    doc:    { name: '试剂枪', desc: '打出减速试剂弹，命中的敌人减速 0.6 秒。', kind: 'gun', dmg: 8.5, range: 260, speed: 760, fx: { slow: 0.6 }, reload: 0.85, atkCd: 0.36, size: 4 },
+    zero:   { name: '高周波匕首', desc: '近身快速突刺，向前冲得很远。', kind: 'melee', dmg: 13.2, range: 46, arc: 1.4, kb: 100, lunge: 190, reload: 0.78, atkCd: 0.34 },
     aka:    { name: '断骨短镰', desc: '近身横扫一大片，刃口比别的近战武器更宽。', kind: 'melee', dmg: 14.5, range: 52, arc: 2.3, kb: 150, lunge: 150, reload: 0.8, atkCd: 0.42 },
   };
   S.sidearm = (pid) => Object.assign({ kind: 'gun', size: 5, splat: 12, trail: 0, cost: 1, spread: 0.04 }, S.PISTOL, S.SIDEARMS[String(pid || '').split('@')[0]] || {});
@@ -485,6 +509,15 @@
       hair: '#3a2a1c', hair2: '#1a120a', skin: '#e2b48c', eye: '#7ad0ff', style: 'undercut', eyeShape: 'sharp', mouth: 'smirk', outfit: 'merc',
       skill: 'airdrop', passive: { name: '老练指挥', desc: '自己和附近 260 范围内的队友伤害 +6%；撤离模式中搜索容器的速度 +20%。' },
       line: '合同上写的是撤离，不是送死——都跟紧我。', bio: '灰城禁区外最有名的雇佣兵小队「沙鹰」的队长，接过的撤离委托从没失手。灰石集团开出天价请他守大厦，他却带着整支小队站到了涂鸦这一边——「他们付的是钱，你们给的是这座城。」' },
+    // ---- 2.2：灰石叛逃者（任务线「棱镜档案」「零号档案」） ----
+    { id: 'doc', name: '姜黎', code: '博士', title: '灰石研究园区叛逃博士', weapon: 'prism', accent: '#5ff0d0', quest: 2, isNew: true,
+      hair: '#2b3a4a', hair2: '#121a24', skin: '#fbe0cf', eye: '#5ff0ff', style: 'ponytail', eyeShape: 'cool', mouth: 'calm', outfit: 'labcoat',
+      skill: 'nano', passive: { name: '效率优化', desc: '技能充能速度 +25%；附近 220 范围内的队友技能充能速度 +10%。' },
+      line: '数据不会说谎——灰石集团会。', bio: '灰石研究园区「棱镜计划」的首席研究员，亲手设计了能把涂料「冻住」的相位技术。韩冰叛逃后寄给她一份档案，她才知道自己的发明被拿去刷白整座城。她清空了服务器里的全部数据，只带走了一台原型机。' },
+    { id: 'zero', name: '沈零', code: '零号', title: '灰石试验部队王牌', weapon: 'lancer', accent: '#ff4f7a', quest: 2, isNew: true,
+      hair: '#16161e', hair2: '#ff4f7a', skin: '#f3d3bf', eye: '#ff4f7a', style: 'undercut', eyeShape: 'sharp', mouth: 'calm', outfit: 'testsuit',
+      skill: 'blink', passive: { name: '战场感知', desc: '附近 260 范围内的敌人会自动暴露（包括草丛里和隐身的），全队都看得见。' },
+      line: '编号零，任务变更：保护这座城。', bio: '灰石集团试验部队的头号测试驾驶员，代号「零号」，在研究园区的训练舱里长大。姜黎叛逃那晚，她奉命追捕——一路追到城墙下，看见满墙的涂鸦，她第一次知道这座城本来的颜色。那天晚上，她关掉了自己的追踪器。' },
   ];
   const pilotCache = new Map();
   S.pilot = (id) => {
@@ -497,6 +530,332 @@
     }
     return S.PILOTS.find((p) => p.id === id) || S.PILOTS[0];
   };
+
+
+  // ================= 2.2 战斗定位 · 克制关系 · 六边形能力面板 =================
+  // 每台机体 / 每位驾驶员有 1 个主定位 + 1 个副标签。以后出新角色必须在 S.CLASS 里登记定位（test/roles.js 会检查）
+  S.ROLES = {
+    // 机体定位（武器决定）
+    assault:   { kind: 'mech', name: '突击', color: '#ff5a36', desc: '近身格斗：冲到敌人脸上打出爆发伤害。' },
+    suppress:  { kind: 'mech', name: '压制', color: '#ffb000', desc: '中距离连射：火力持续，正面对枪的主力。' },
+    sniper:    { kind: 'mech', name: '狙击', color: '#5fd3ff', desc: '远程点杀：在敌人够不着的距离打出高伤害。' },
+    artillery: { kind: 'mech', name: '炮击', color: '#9cff2e', desc: '投掷 / 曲射 / 穿墙：越过掩体打击躲起来的敌人。' },
+    tank:      { kind: 'mech', name: '重装', color: '#4fb8ff', desc: '前排坦克：血厚、减伤，挡在队友前面推进。' },
+    assassin:  { kind: 'mech', name: '刺客', color: '#c06bff', desc: '高速切入：绕到后排，秒掉脆皮目标。' },
+    // 驾驶员定位（技能 / 被动 / 超载决定）
+    support:   { kind: 'pilot', name: '支援', color: '#9cff2e', desc: '治疗、增益、补给：让队友打得更久、更狠。' },
+    control:   { kind: 'pilot', name: '控制', color: '#c06bff', desc: '减速、沉默、束缚：打乱敌人的节奏。' },
+    striker:   { kind: 'pilot', name: '突击', color: '#ff5a36', desc: '强化自己的输出和续航，正面硬打。' },
+    scout:     { kind: 'pilot', name: '侦察', color: '#5fd3ff', desc: '视野、机动、隐身：先发现敌人，再决定打不打。' },
+  };
+  S.MECH_ROLES = ['assault', 'suppress', 'sniper', 'artillery', 'tank', 'assassin'];
+  S.PILOT_ROLES = ['support', 'control', 'striker', 'scout'];
+  // 副标签
+  S.TAGS = { allround: '全能', paint: '涂地', burst: '爆发', aoe: '范围', dps: '持续火力', cc: '控场', dive: '切入', push: '推进', summon: '召唤', wall: '穿墙',
+    shield: '护盾', poke: '消耗', stealth: '隐身', vision: '视野', mobility: '机动', heal: '治疗', sustain: '续航', buff: '增益', trick: '诡计', zone: '区域' };
+  // 定位 + 副标签 + 操作难度（1~5，越大越难；六边形里的「操作难度」直接用它）
+  S.CLASS = {
+    // ---- 机体 ----
+    blaster: ['suppress', 'allround', 1], roller: ['assault', 'paint', 2], charger: ['sniper', 'burst', 5], bucket: ['assault', 'aoe', 2],
+    gatling: ['suppress', 'dps', 2], mortar: ['artillery', 'cc', 4], fist: ['assault', 'dive', 3], slinger: ['artillery', 'aoe', 3],
+    dozer: ['tank', 'push', 1], flamer: ['suppress', 'paint', 1], carrier: ['suppress', 'summon', 1], wrecker: ['tank', 'cc', 3],
+    megaphone: ['artillery', 'wall', 3], riot: ['tank', 'shield', 2], blade: ['assassin', 'dive', 5], stinger: ['assassin', 'poke', 3],
+    phantom: ['assassin', 'stealth', 4], warden: ['suppress', 'cc', 3], reaper: ['assault', 'burst', 4], tactic: ['sniper', 'vision', 2],
+    prism: ['sniper', 'cc', 4], lancer: ['assassin', 'dive', 5],
+    // ---- 驾驶员 ----
+    blaze: ['striker', 'mobility', 1], frost: ['scout', 'burst', 3], candy: ['support', 'heal', 2], titan: ['striker', 'shield', 1],
+    raven: ['scout', 'stealth', 3], aurora: ['support', 'summon', 2], gale: ['scout', 'mobility', 3], hex: ['control', 'vision', 3],
+    chef: ['support', 'sustain', 1], vet: ['striker', 'burst', 2], yuzu: ['support', 'paint', 1], flag: ['support', 'push', 2],
+    hammer: ['striker', 'aoe', 3], echo: ['control', 'buff', 3], han: ['control', 'burst', 3], kaka: ['control', 'trick', 4],
+    fu: ['control', 'zone', 4], aka: ['striker', 'sustain', 3], hawk: ['support', 'buff', 2], doc: ['control', 'heal', 4], zero: ['scout', 'dive', 5],
+  };
+  S.roleOf = (id) => { const c = S.CLASS[String(id || '').split('@')[0]]; return c ? { role: c[0], tag: c[1], diff: c[2] } : null; };
+  // 定位环：每个定位克制环里的下一个（机体 6 个、驾驶员 4 个）
+  S.ROLE_RING = { mech: ['suppress', 'assassin', 'sniper', 'tank', 'assault', 'artillery'], pilot: ['control', 'striker', 'support', 'scout'] };
+  S.RING_WHY = {
+    'suppress>assassin': '持续火力最怕的就是低血量的刺客冲进来——压制机体扫一轮就能把它打回去。',
+    'assassin>sniper': '狙击蓄力慢、血量低，刺客一个突进贴脸就结束了。',
+    'sniper>tank': '重装机体又大又慢，在狙击射程外根本摸不到人，只能一路挨打。',
+    'tank>assault': '突击机体的近身爆发打在厚血量和减伤上，打不穿还会被反推。',
+    'assault>artillery': '炮击机体有最小射程、近身很弱，突击冲过炮火就能贴身。',
+    'artillery>suppress': '压制机体站桩扫射，炮弹越过掩体落到它头上；射程也更远。',
+    'control>striker': '突击型驾驶员要贴脸打输出，减速、沉默和束缚正好打断他们的节奏。',
+    'striker>support': '支援型驾驶员自保能力弱，强攻一波爆发，回血还没到人就倒了。',
+    'support>scout': '侦察靠信息差打零散的消耗，治疗和增益能把这些消耗全部补回来。',
+    'scout>control': '控制技能都要靠近才能放，侦察先看见他们，保持距离就控不到。',
+  };
+  S.ROLE_EDGE = 0.06;   // 机体主定位克制对方：伤害 +6%（驾驶员定位环只作参考，不改数值）
+  S.ringBeats = (kind, a, b) => { const R = S.ROLE_RING[kind], i = R.indexOf(a); return i >= 0 && R[(i + 1) % R.length] === b; };
+  S.mechEdge = (wa, wb) => { const A = S.CLASS[wa], B = S.CLASS[wb]; return A && B && S.ringBeats('mech', A[0], B[0]) ? 1 + S.ROLE_EDGE : 1; };
+
+  // 适合的模式 + 弱项（每个角色都必须写；新角色也一样）
+  //   弱项只是设计参考（以后设计机制 / 平衡时用），不显示给玩家；适合的模式会在角色页显示成「推荐模式」
+  S.FIT = {
+    // ---- 机体 ----
+    blaster: [['turf', 'zone', 'elim'], '没有特别突出的长处：近身拼不过突击，远程打不过狙击。'],
+    roller: [['turf', 'zone', 'soccer'], '只能近身，被风筝和减速克得很死；冲锋之后容易被集火。'],
+    charger: [['elim', 'escort', 'loot'], '血量低、蓄力时移动慢；被贴脸就很难反打，涂地也很弱。'],
+    bucket: [['zone', 'turf', 'soccer'], '射程只有 240，空旷的地图上很难接近敌人。'],
+    gatling: [['zone', 'escort', 'raid'], '装填很慢、移动偏慢，被炮弹越过掩体轰炸时很难躲。'],
+    mortar: [['zone', 'seal', 'raid'], '有最小射程，贴身几乎打不到；炮弹飞得慢，打不中跑得快的目标。'],
+    fist: [['soccer', 'battery', 'escape4'], '只能打 76 范围内的敌人，被减速和远程消耗时很吃亏。'],
+    slinger: [['zone', 'turf', 'seal'], '近身很弱；炮弹会弹跳，在窄巷里不好控制落点。'],
+    dozer: [['escort', 'zone', 'soccer'], '移动慢、射程短，被狙击和炮击远远消耗时没有办法。'],
+    flamer: [['turf', 'zone', 'park'], '射程只有 220，打不到远处的敌人，空旷的地图上很吃亏。'],
+    carrier: [['escort', 'raid', 'loot'], '追踪弹飞得慢、伤害分散；近身没有自保能力。'],
+    wrecker: [['zone', 'escort', 'park'], '攻击要贴脸、出手慢；被风筝和减速时打不到人。'],
+    megaphone: [['zone', 'seal', 'escort'], '血量不高、攻速慢，正面对枪拼不过压制和刺客。'],
+    riot: [['escort', 'zone', 'battery'], '只有正面减伤，被绕后、被炮弹从天上砸时没有保护。'],
+    blade: [['elim', 'loot', 'escape8'], '血量低、容错小；被控制或正面硬拼时很快倒下，不适合守点。'],
+    stinger: [['elim', 'battery', 'loot'], '单发伤害低，靠毒素慢慢磨；被重装或治疗抗住就打不死人。'],
+    phantom: [['elim', 'escape8', 'loot'], '现身后很脆，被侦察、声纳暴露时打不出伏击。'],
+    warden: [['zone', 'raid', 'seal'], '自身伤害一般，靠束缚和结界打团；单挑能力弱。'],
+    reaper: [['elim', 'raid', 'escape4'], '近身才有最高伤害，被推开和减速后很难打出三连斩。'],
+    tactic: [['loot', 'elim', 'escort'], '每发伤害不高，被突击贴脸时打不过；涂地也一般。'],
+    prism: [['zone', 'seal', 'elim'], '血量低、蓄力时要站定；被刺客贴身或被炮弹从掩体后轰炸时很危险。'],
+    lancer: [['elim', 'loot', 'escape8'], '突刺方向固定，扑空就很危险；被盾牌正面挡住或被大锤横扫时吃亏。'],
+    // ---- 驾驶员 ----
+    blaze: [['elim', 'battery', 'escape4'], '没有任何控制和治疗，被控住就什么都做不了。'],
+    frost: [['elim', 'loot', 'escort'], '技能不打伤害，近身被切时没有自保能力。'],
+    candy: [['zone', 'escort', 'raid'], '自己没有伤害技能，被刺客和突击针对时很脆。'],
+    titan: [['zone', 'escort', 'soccer'], '只有自保，没有控制和输出加成；被风筝时帮不上队友。'],
+    raven: [['loot', 'escape8', 'elim'], '隐身会被扫描、声纳和战场感知看穿；团战贡献有限。'],
+    aurora: [['zone', 'raid', 'escort'], '炮台不会移动，进攻和打游击时用处不大。'],
+    gale: [['soccer', 'battery', 'escape4'], '冲刺只是位移，不打伤害；被减速和封印时最难受。'],
+    hex: [['zone', 'elim', 'seal'], '脉冲范围只有 200，要靠近才放得到；本人很脆。'],
+    chef: [['zone', 'raid', 'park'], '回血要等便当和脱战，被持续爆发时救不回来。'],
+    vet: [['elim', 'zone', 'escape4'], '技能都是短时爆发，被治疗和护盾抗住之后就没有后劲。'],
+    yuzu: [['turf', 'park', 'raid'], '本人很脆，无人机会被打掉；单挑能力弱。'],
+    flag: [['zone', 'escort', 'park'], '被动要队友在身边才有用，单独行动或被炸散时很弱。'],
+    hammer: [['zone', 'seal', 'escort'], '炸药包有延迟，打不中跑得快的目标；要靠近才扔得到。'],
+    echo: [['zone', 'raid', 'battery'], '干扰只削弱不杀人，对不靠技能的突击型驾驶员效果差。'],
+    han: [['elim', 'escort', 'zone'], '闪光弹只打前方扇形，被侧面或背后进攻时来不及转身。'],
+    kaka: [['elim', 'loot', 'escape8'], '替身骗不过自动锁定的无人机和炮台，也会被扫描看穿。'],
+    fu: [['seal', 'zone', 'raid'], '符阵要预判落点，被远程消耗、被打断技能时很吃亏。'],
+    aka: [['elim', 'raid', 'escape4'], '吸血要先打中人，被控制和减速拖住时续航就断了。'],
+    hawk: [['loot', 'escort', 'zone'], '补给箱要队友站过去才有用，单人作战时收益低。'],
+    doc: [['zone', 'seal', 'raid'], '雾场要扔准位置，本人很脆；被刺客和高机动角色切后排时很危险。'],
+    zero: [['loot', 'elim', 'escape8'], '技能偏单挑，团战里贡献有限；被护盾和领域反击时突进会扑空。'],
+  };
+  S.fitOf = (id) => { const f = S.FIT[String(id || '').split('@')[0]]; return f ? { modes: f[0], weak: f[1] } : null; };
+  // 个别克制：[克制方, 被克制方, 原因]
+  S.MATCHUPS = [
+    // ---- 机体 ----
+    ['charger', 'dozer', '推土机兵又大又慢，在狙击 720 的射程外根本摸不到你。'],
+    ['charger', 'gatling', '旋转机兵射程只有 380，狙击可以在它够不着的地方点名。'],
+    ['charger', 'wrecker', '拆楼锤必须贴脸，还没走到就被狙掉一大截血。'],
+    ['tactic', 'flamer', '喷火罐车射程短，战术步枪 430 的射程可以一直放风筝。'],
+    ['tactic', 'phantom', '侦察无人机能把隐身的幻影照出来。'],
+    ['tactic', 'warden', '战术步枪射程更远，站在结界外面就能点射。'],
+    ['blade', 'charger', '狙击蓄力时移动慢、血量低，影刃一个突进就能贴脸。'],
+    ['blade', 'mortar', '迫击炮有最小射程，影刃贴身后它几乎打不到。'],
+    ['blade', 'carrier', '母舰近身没有自保能力，影刃一贴身就很危险。'],
+    ['blade', 'prism', '棱镜原型机血量低、要蓄力，被影刃贴身就输了。'],
+    ['phantom', 'slinger', '隐身摸到弹弓机兵身边，弹跳炮弹来不及调头。'],
+    ['phantom', 'charger', '隐身绕到狙击身后，伏击一击就能打掉大半管血。'],
+    ['phantom', 'carrier', '隐身绕到母舰身后，追踪弹来不及转向。'],
+    ['stinger', 'fist', '毒针射程 400，重拳只能近身，一路被毒着靠近。'],
+    ['stinger', 'wrecker', '拆楼锤要贴脸才能打人，毒针边退边射，减速让它追不上。'],
+    ['stinger', 'megaphone', '喇叭车血量不高、攻速慢，毒针持续消耗很快就能磨死它。'],
+    ['gatling', 'blade', '持续扫射对低血量的影刃非常致命，它突进过来就被扫掉。'],
+    ['gatling', 'stinger', '旋转机兵火力更持续，毒针在正面对枪里拼不过。'],
+    ['gatling', 'roller', '滚刷冲锋的路上就被扫掉一半血。'],
+    ['gatling', 'lancer', '枪骑突刺进来要先吃满一轮扫射，血量撑不住。'],
+    ['flamer', 'phantom', '火焰覆盖面极大，隐身的幻影也会被烧出来。'],
+    ['flamer', 'blade', '近身喷火 + 点燃，影刃切进来就变成火球。'],
+    ['carrier', 'stinger', '无人机弹打不准也能命中，毒针机兵血量低扛不住。'],
+    ['carrier', 'mortar', '无人机射程 500，比迫击炮的 420 更远，还会自动追踪。'],
+    ['blaster', 'roller', '喷罐中距离连射，滚刷冲过来之前就被打掉一截。'],
+    ['blaster', 'slinger', '弹弓机兵近身很弱，喷罐的中距离连射正好克它。'],
+    ['warden', 'blade', '符印束缚 + 减速，影刃切进来就走不掉。'],
+    ['warden', 'fist', '减速光弹让重拳很难贴身。'],
+    ['warden', 'reaper', '结界里队友减伤回血，灵刃的爆发打不穿。'],
+    ['mortar', 'gatling', '炮弹越过掩体，砸在站桩扫射的旋转机兵头上。'],
+    ['mortar', 'riot', '炮弹从天上落下，防暴盾牌的正面护盾挡不住。'],
+    ['mortar', 'flamer', '炮弹射程 420，喷火罐车靠不过来。'],
+    ['mortar', 'prism', '光束需要直线视野，迫击炮躲在掩体后照样能轰它。'],
+    ['slinger', 'riot', '弹跳炮弹越过盾牌，落到盾卫身后爆炸。'],
+    ['slinger', 'dozer', '推土机兵太慢，弹跳炮弹两次爆炸都能命中。'],
+    ['slinger', 'warden', '弹跳炮弹越过结界边缘，直接落进结界里。'],
+    ['megaphone', 'riot', '音波穿过盾牌和墙壁，正面护盾没用。'],
+    ['megaphone', 'phantom', '被音波打中会暴露位置，幻影隐身打一下就现形。'],
+    ['megaphone', 'charger', '狙击躲在掩体后面也会被穿墙音波打到。'],
+    ['riot', 'blaster', '正面护盾挡掉近一半喷罐弹，近距离电击反打。'],
+    ['riot', 'carrier', '盾墙挡住所有追踪弹。'],
+    ['riot', 'lancer', '正面突刺全部扎在盾牌上，伤害大减。'],
+    ['dozer', 'roller', '推土铲把滚刷推开，近距离谁也冲不过推土机兵。'],
+    ['dozer', 'bucket', '血量厚、推得远，泼桶的近身爆发打不死它。'],
+    ['dozer', 'reaper', '推土机兵把灵刃推出近战范围，刀气也磨不动它。'],
+    ['wrecker', 'blade', '大锤横扫一大片，影刃切进来就被砸飞。'],
+    ['wrecker', 'fist', '拆楼锤攻击范围更大、血更厚，近身互殴更占优。'],
+    ['wrecker', 'bucket', '大锤一锤 88 伤害还带震荡，泼桶近身打不过。'],
+    ['wrecker', 'lancer', '大锤横扫的范围比长枪突刺更宽，枪骑很难躲开。'],
+    ['fist', 'mortar', '重拳移动最快，冲到迫击炮脸上它就没办法了。'],
+    ['fist', 'slinger', '弹弓机兵近身很弱，被重拳贴上就跑不掉。'],
+    ['roller', 'mortar', '滚刷冲锋冲过炮火，贴身碾压。'],
+    ['roller', 'tactic', '甩刷 + 冲锋，近距离一套带走战术机兵。'],
+    ['bucket', 'blaster', '近距离泼桶的伤害远超喷罐。'],
+    ['bucket', 'reaper', '泼桶近身一大片涂料，灵刃贴上来反而吃满伤害。'],
+    ['reaper', 'gatling', '刀气 230 压制慢吞吞的旋转机兵，回旋斩一套带走。'],
+    ['reaper', 'megaphone', '喇叭车血量低攻速慢，灵刃冲上去很快就能解决。'],
+    ['reaper', 'stinger', '刀气能打到中距离的毒针，毒针血量低扛不住。'],
+    ['prism', 'fist', '光束减速让重拳很难贴身，相位冻结直接把它定住。'],
+    ['prism', 'dozer', '相位冻结把推土机兵定在原地挨打。'],
+    ['prism', 'wrecker', '拆楼锤必须贴脸，被光束减速 + 冻结后根本靠不过来。'],
+    ['lancer', 'charger', '突刺距离长，一下就能刺到狙击脸上。'],
+    ['lancer', 'prism', '同门对决：枪骑的突刺比光束蓄力更快。'],
+    ['lancer', 'tactic', '先手突刺 + 三段突袭，战术机兵的点射来不及打完一轮。'],
+    // ---- 驾驶员 ----
+    ['hex', 'raven', '电磁脉冲 + 远距离草丛侦测，夜鸢的墨雾和草丛藏不住。'],
+    ['hex', 'gale', '脉冲减速让风羽的速度优势没了，冲进来也逃不掉。'],
+    ['frost', 'raven', '义眼扫描让全队看到隐身和草丛里的夜鸢。'],
+    ['frost', 'titan', '远距精准，雷豹靠近之前护盾就被点掉了。'],
+    ['frost', 'kaka', '义眼扫描看穿卡卡的隐身和替身把戏。'],
+    ['zero', 'raven', '战场感知自动暴露附近隐身的敌人，夜鸢的墨雾失效。'],
+    ['zero', 'kaka', '隐身的卡卡一靠近就被零号看穿。'],
+    ['zero', 'doc', '相位突进切到后排，姜黎的雾场跟不上零号的速度。'],
+    ['raven', 'candy', '墨雾隐身绕后，先切掉没有自保能力的苏糖。'],
+    ['raven', 'aurora', '隐身摸过炮台，直接找星澜本人。'],
+    ['raven', 'yuzu', '小柚的无人机找不到隐身的夜鸢。'],
+    ['gale', 'frost', '冲刺无敌贴脸，狙击手跟不上风羽的速度。'],
+    ['gale', 'vet', '高机动躲开秦岳的手雷和自爆。'],
+    ['gale', 'aurora', '炮台不会动，风羽绕开炮台直接切星澜。'],
+    ['blaze', 'candy', '肾上腺素冲脸，击杀回血让他越打越凶。'],
+    ['blaze', 'chef', '强攻节奏下，大福的便当还没放下人就倒了。'],
+    ['blaze', 'echo', '凌焰不靠技能吃饭，声波干扰对他影响很小，冲脸就赢。'],
+    ['titan', 'blaze', '钢铁护盾挡住凌焰的爆发，近身互殴打不过雷豹。'],
+    ['titan', 'aka', '护盾 + 高生命，赤镰的吸血吸不动。'],
+    ['titan', 'zero', '零号的突刺被护盾吸收，贴身后反被雷豹碾压。'],
+    ['vet', 'titan', '火力全开 + 自爆，硬碰硬时秦岳的爆发能打穿护盾。'],
+    ['vet', 'flag', '手雷越过墙壁，炸散聚在一起的旗手队伍。'],
+    ['vet', 'yuzu', '手雷越过墙壁，炸到躲在后面放无人机的小柚。'],
+    ['hammer', 'flag', '定向爆破专炸抱团的队伍，岚的「众志成城」一炸就散。'],
+    ['hammer', 'aurora', '一包炸药就能炸掉星澜的炮台。'],
+    ['hammer', 'doc', '纳米雾场里的队友扎堆，炸药包正好一锅端。'],
+    ['aka', 'chef', '恶灵吸血持续作战，大福的回血跟不上赤镰的伤害。'],
+    ['aka', 'hawk', '附身吸血 + 减伤，霍克的补给箱拼不过赤镰的续航。'],
+    ['aka', 'hex', '附身减伤硬吃脉冲，贴脸收掉脆皮的洛奇。'],
+    ['candy', 'vet', '应援音波一口回 50，秦岳的爆发打不死人。'],
+    ['candy', 'hammer', '炸药炸完，苏糖一个应援全队回满。'],
+    ['chef', 'frost', '便当回血 90，白夜一枪打掉的血很快就补回来了。'],
+    ['chef', 'zero', '零号突刺后打不死人，大福的回血让队友站得住。'],
+    ['chef', 'echo', '声波干扰削弱的是技能和大招，已经放好的便当照样能回满。'],
+    ['flag', 'blaze', '集结号让全队伤害 + 移速，凌焰单打独斗打不过一支旗手队。'],
+    ['flag', 'aka', '「众志成城」减伤，抱团的反抗军不怕赤镰冲脸。'],
+    ['hawk', 'titan', '补给箱加快装填，持续火力磨掉雷豹的护盾。'],
+    ['hawk', 'vet', '补给箱持续回血，秦岳一波爆发打不死人。'],
+    ['hawk', 'fu', '补给箱让队友在符阵外持续输出，站桩施法的符零很吃亏。'],
+    ['yuzu', 'hammer', '无人机在远处自动输出，石磊的炸药扔不到那么远。'],
+    ['yuzu', 'kaka', '无人机自动锁定，卡卡的替身骗不过机器。'],
+    ['yuzu', 'han', '无人机不怕闪光弹，照样自动射击。'],
+    ['aurora', 'aka', '炮台 + 快速重建，赤镰冲得进来出不去。'],
+    ['aurora', 'kaka', '炮台不吃替身的骗，现身的卡卡马上被锁定。'],
+    ['echo', 'candy', '声波干扰打断技能、吸走大招充能，苏糖的应援放不出来。'],
+    ['echo', 'hawk', '干扰让霍克的空投和大招都慢半拍。'],
+    ['echo', 'fu', '打断技能，符零的符阵来不及展开。'],
+    ['han', 'blaze', '闪光弹致盲 + 无法攻击，凌焰冲脸时正好被闪。'],
+    ['han', 'gale', '冲过来的风羽迎面吃一发闪光弹。'],
+    ['kaka', 'hex', '替身吸引火力，洛奇的脉冲放空。'],
+    ['kaka', 'han', '替身骗出闪光弹，再从侧面现身。'],
+    ['kaka', 'titan', '替身炸开减速，扛着护盾的雷豹也追不上隐身的卡卡。'],
+    ['fu', 'gale', '封印符阵封住冲刺，风羽被定在原地。'],
+    ['fu', 'zero', '简易领域自动反击闯入者，零号突进只会撞上符咒斩。'],
+    ['doc', 'aka', '纳米雾场减速 + 回血，赤镰冲进雾里就被拖住。'],
+    ['doc', 'gale', '雾场减速，风羽的速度优势没了。'],
+    ['doc', 'blaze', '雾场减速 + 装填 -25%，凌焰的强攻节奏被打乱。'],
+  ];
+  // 某个角色克制谁 / 被谁克制
+  S.countersOf = (id) => {
+    id = String(id || '').split('@')[0];
+    return { beats: S.MATCHUPS.filter((m) => m[0] === id).map((m) => ({ id: m[1], why: m[2] })), weak: S.MATCHUPS.filter((m) => m[1] === id).map((m) => ({ id: m[0], why: m[2] })) };
+  };
+
+  // ---- 六边形能力面板（A~E，按全体机体 / 驾驶员排名自动算：前 20% 是 A，依此类推；操作难度直接按 S.CLASS 的难度）----
+  S.HEX_AXES = { mech: ['破坏力', '耐久', '速度', '射程', '涂地', '操作难度'], pilot: ['战斗', '辅助', '控制', '机动', '生存', '操作难度'] };
+  S.GRADES = ['E', 'D', 'C', 'B', 'A'];
+  const mechRaw = (id) => {
+    const w = S.WEAPONS[id], meta = (S.META && S.META.mechs && S.META.mechs[id]) || 0.5;
+    let per = 0, area = 0, dur = 0;
+    switch (w.attack) {
+      case 'burst': per = w.shots * w.dmg * (w.homing ? 0.9 : 0.8); area = w.shots * w.splat * w.splat * 0.55 + (w.trail || 0) * w.range * 0.3; dur = w.shots * w.interval; break;
+      case 'fan': case 'flick': per = w.pellets * w.dmg * 0.7; area = w.pellets * w.splat * w.splat * 0.7 + (w.trail || 0) * w.range * 0.3; break;
+      case 'charge': per = w.dmg * 0.85; area = w.range * 26; dur = w.chargeTime; break;
+      case 'lob': per = w.dmg * (w.bounce ? 1.45 : 1) * (w.blast / 62); area = w.blast * w.blast * 1.6 * (w.bounce ? 1.6 : 1); break;
+      case 'punch': per = 0.62 * w.dmg * (0.75 + w.arc * 0.15) * (w.backstab ? 1.1 : 1) * (w.wave ? 1.25 : 1) * (w.opener ? 1.1 : 1); area = (w.paintR || 30) * (w.paintR || 30) * 2; break;
+    }
+    if (w.attack === 'flick') area += (w.rollWidth || 20) * w.lunge * 2;
+    const cyc = Math.max(w.reload, w.atkCd + dur);
+    per += (w.poison || 0) * 6 + (w.burn || 0) * 6 + (w.ward ? 8 : 0) + (w.lead ? w.dmg * 0.25 : 0);   // 中毒 / 着火 / 符印 / 穿甲首发
+    const dmg = (per * 0.6 + per * 3 / (3 * (w.atkCd + dur) + cyc * 0.6)) * (1 + (meta - 0.5) * 3);   // 单次爆发 + 一波交火（打空 3 格弹药 + 一点装填）
+    const hp = w.hp / (w.armor || 1) * (w.front ? 1.2 : 1);
+    return [dmg, hp, w.spd, S.weaponRange(id), area / cyc];
+  };
+  const v5 = (a) => [a[0] || 0, a[1] || 0, a[2] || 0, a[3] || 0, a[4] || 0];
+  // 技能 / 被动的分量 [战斗, 辅助, 控制, 机动, 生存]
+  const SK_V = { rush: [1, 0, 0, 3, 0], scan: [0, 2, 1, 0, 0], cheer: [0, 3, 0, 0, 1], guard: [0, 0, 0, 0, 3], smoke: [0, 0, 0, 1, 2], turret: [2, 1, 0, 0, 0], dash: [0, 0, 0, 3, 1],
+    emp: [0, 0, 3, 0, 0], bento: [0, 3, 0, 0, 1], overdrive: [3, 0, 0, 0, 0], drone: [2, 1, 0, 0, 0], rally: [1, 3, 0, 1, 0], blast: [3, 0, 1, 0, 0], jam: [0, 1, 3, 0, 0],
+    decoy: [1, 0, 1, 1, 2], flash: [1, 0, 3, 0, 0], seal: [0, 0, 3, 0, 0], airdrop: [1, 3, 0, 0, 0], possess: [2, 0, 0, 1, 2], nano: [0, 2, 2, 0, 0], blink: [1, 0, 0, 3, 0] };
+  const PS_V = { blaze: [1, 0, 0, 0, 2], frost: [2, 0, 0, 0, 0], candy: [0, 2, 0, 0, 0], titan: [0, 0, 0, 0, 3], raven: [0, 0, 0, 2, 1], aurora: [0, 1, 0, 0, 1], gale: [0, 0, 0, 3, 0],
+    hex: [0, 1, 1, 0, 0], chef: [0, 0, 0, 0, 2], vet: [2, 0, 0, 0, 0], yuzu: [0, 2, 0, 0, 0], flag: [0, 1, 0, 0, 2], hammer: [0, 0, 0, 0, 2], echo: [0, 2, 0, 0, 0], han: [1, 0, 0, 0, 0],
+    kaka: [0, 2, 0, 0, 0], fu: [1, 0, 1, 0, 0], aka: [2, 0, 0, 0, 0], hawk: [1, 1, 0, 0, 0], doc: [0, 2, 0, 0, 0], zero: [0, 1, 1, 0, 0] };
+  const pilotRaw = (P) => {
+    const O = S.OVERLOADS[P.id] || {}, A = S.sidearm(P.id), meta = (S.META && S.META.pilots && S.META.pilots[P.id]) || 0.5;
+    const ov = [
+      ((O.dmg || 1) - 1) * 10 + ((O.rof || 1) - 1) * 8 + (O.drones || 0) * 0.8 + (O.pulse || 0) / 12 + (O.infAmmo ? 2 : 0) + ((O.kb || 1) > 1 ? 0.5 : 0),
+      (O.regen || 0) / 6 + (O.burstHeal || 0) / 30 + (O.rally ? 2 : 0) + ((O.spGain || 1) - 1) * 2 + (O.aura ? O.aura.heal / 6 + 1 : 0),
+      (O.hack ? 3 : 0) + (O.frostHit ? 1.5 : 0) + (O.domain ? 2.5 : 0) + (O.pulse ? 0.5 : 0) + (O.aura ? 1 : 0),
+      ((O.spd || 1) - 1) * 8 + (O.stealth ? 1.5 : 0) + (O.skillReset ? 1 : 0) + (O.killCharge ? 0.5 : 0),
+      (1 - (O.def || 1)) * 8 + (O.undying ? 2.5 : 0) + (O.noKb ? 0.5 : 0) + (O.reflect ? 2 : 0) + (O.hitHeal || 0) / 4 + (O.stealth ? 0.5 : 0) + (O.aura ? (1 - O.aura.def) * 6 : 0),
+    ];
+    const sk = v5(SK_V[P.skill]), ps = v5(PS_V[P.id]);
+    const dps = (A.dmg * (A.shots || A.pellets || 1)) / Math.max(A.atkCd, A.reload * 0.6);
+    const out = sk.map((v, i) => v + ps[i] + ov[i] * 0.7);
+    out[0] += dps / 12 + (meta - 0.5) * 20;
+    if (A.kind === 'melee') out[4] += 0.3;
+    return out;
+  };
+  let hexCache = null;
+  const gradeAll = (ids, raw) => {
+    const rows = ids.map(raw), res = {};
+    ids.forEach((id) => { res[id] = []; });
+    for (let k = 0; k < 5; k++) {
+      const sorted = rows.map((r, i) => [r[k], i]).sort((a, b) => a[0] - b[0]);
+      sorted.forEach(([, i], rank) => { res[ids[i]][k] = Math.min(4, Math.floor((rank / ids.length) * 5)); });
+    }
+    return res;
+  };
+  // 返回 { grades: ['A','C',…6 个], vals: [0~4 …] }
+  S.hex = (kind, id) => {
+    if (!hexCache) {
+      hexCache = { mech: gradeAll(S.WEAPON_ORDER, mechRaw), pilot: gradeAll(S.PILOTS.map((P) => P.id), (pid) => pilotRaw(S.pilot(pid))) };
+    }
+    id = String(id || '').split('@')[0];
+    const v = (hexCache[kind][id] || [2, 2, 2, 2, 2]).slice(), c = S.CLASS[id], fx = S.HEX_FIX[id];
+    if (fx) for (const k in fx) v[k] = fx[k];
+    v.push(c ? c[2] - 1 : 2);
+    return { vals: v, grades: v.map((x) => S.GRADES[x]) };
+  };
+  S.hexReset = () => { hexCache = null; };
+  // 六边形面板 SVG（游戏和官网共用）；labels 可以换成英文
+  S.hexSvg = (kind, id, opt) => {
+    opt = opt || {};
+    const h = S.hex(kind, id), L = opt.labels || S.HEX_AXES[kind], col = opt.color || '#ffd23f', sz = opt.size || 220, c = sz / 2, R = sz * 0.3;
+    const pt = (i, r) => { const a = -Math.PI / 2 + i * Math.PI / 3; return [c + Math.cos(a) * r, c + Math.sin(a) * r]; };
+    const poly = (f) => [0, 1, 2, 3, 4, 5].map((i) => pt(i, f(i)).map((v) => v.toFixed(1)).join(',')).join(' ');
+    let s = `<svg class="hexsvg" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" xmlns="http://www.w3.org/2000/svg">`;
+    for (let k = 5; k >= 1; k--) s += `<polygon points="${poly(() => R * k / 5)}" fill="${k % 2 ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.08)'}" stroke="rgba(255,255,255,.18)" stroke-width="1"/>`;
+    for (let i = 0; i < 6; i++) { const [x, y] = pt(i, R); s += `<line x1="${c}" y1="${c}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.15)"/>`; }
+    s += `<polygon points="${poly((i) => R * (h.vals[i] + 1) / 5)}" fill="${col}" fill-opacity=".38" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    for (let i = 0; i < 6; i++) {
+      const [x, y] = pt(i, R + sz * 0.13), [gx, gy] = pt(i, R * (h.vals[i] + 1) / 5);
+      s += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="3" fill="#fff"/>`;
+      s += `<text x="${x.toFixed(1)}" y="${(y - 3).toFixed(1)}" text-anchor="middle" font-size="${sz * 0.055}" fill="#c9d3e6" font-weight="700">${L[i]}</text>`;
+      s += `<text x="${x.toFixed(1)}" y="${(y + sz * 0.075).toFixed(1)}" text-anchor="middle" font-size="${sz * 0.085}" fill="${col}" font-weight="900" font-family="Impact, sans-serif">${h.grades[i]}</text>`;
+    }
+    return s + '</svg>';
+  };
+  // 少数公式算不准的轴手动修正（下标：0 破坏力/战斗 … 4 涂地/生存；值 0=E … 4=A）
+  S.HEX_FIX = { gatling: { 0: 2 }, charger: { 0: 3 }, blaster: { 0: 1 }, titan: { 0: 2 } };
 
   S.levelFromXp =(xp) => Math.floor(Math.sqrt(Math.max(0, xp) / 120)) + 1;
   S.xpForLevel = (lv) => (lv - 1) * (lv - 1) * 120;
@@ -1564,7 +1923,7 @@
       seals: me.seals || 0, spirits: me.spirits || 0 };
   };
   // 强度参考（AI 在排位赛禁用阶段用）：tools/balance.js 跑出来的胜率
-  S.META = {"pilots":{"vet":0.545,"echo":0.537,"candy":0.536,"aurora":0.532,"yuzu":0.522,"fu":0.52,"blaze":0.515,"kaka":0.507,"flag":0.505,"hawk":0.5,"hammer":0.484,"gale":0.482,"han":0.482,"hex":0.475,"aka":0.474,"chef":0.472,"frost":0.471,"raven":0.464,"titan":0.463},"mechs":{"gatling":0.572,"slinger":0.551,"riot":0.549,"reaper":0.536,"stinger":0.53,"blaster":0.514,"roller":0.51,"bucket":0.506,"charger":0.504,"warden":0.502,"phantom":0.5,"tactic":0.5,"mortar":0.484,"flamer":0.482,"dozer":0.48,"carrier":0.475,"wrecker":0.47,"megaphone":0.448,"blade":0.441,"fist":0.428}};
+  S.META = {"pilots":{"echo":0.556,"aurora":0.555,"hawk":0.545,"han":0.524,"flag":0.522,"raven":0.518,"fu":0.512,"hex":0.51,"yuzu":0.51,"blaze":0.507,"vet":0.506,"aka":0.497,"frost":0.491,"hammer":0.49,"candy":0.483,"kaka":0.478,"chef":0.476,"zero":0.471,"gale":0.465,"titan":0.458,"doc":0.429},"mechs":{"gatling":0.571,"roller":0.551,"slinger":0.551,"flamer":0.55,"reaper":0.529,"bucket":0.528,"megaphone":0.528,"riot":0.522,"phantom":0.521,"carrier":0.517,"blaster":0.506,"mortar":0.486,"tactic":0.485,"warden":0.481,"fist":0.481,"stinger":0.475,"dozer":0.474,"blade":0.473,"lancer":0.464,"wrecker":0.455,"prism":0.426,"charger":0.42}};
   // ---------------- 账号规则 ----------------
   S.ACCOUNT = {
     nameOk: (n) => typeof n === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,12}$/.test(n),
@@ -1589,9 +1948,112 @@
   };
 
   // ---------------- 更新公告（每个版本第一次进大厅时弹出） ----------------
-  S.VERSION = '2.1.2';
+  S.VERSION = '2.2';
   // 每条公告：zh 写在 sections 里；en（可选）是英文版。官网（site/）和游戏里的公告用的是同一份数据
   S.PATCH_NOTES = [
+    { v: '2.2', date: '2026-11-19', title: '2.2 更新 · 战斗定位 & 灰石叛逃者', en_title: 'Update 2.2 · Combat Roles & Grayco Defectors', sections: [
+      ['战斗定位', [
+        '每台机体和每位驾驶员都有了 1 个主定位 + 1 个副标签',
+        '机体 6 种定位：突击（近战）、压制（中距连射）、狙击（远程）、炮击（投掷 / 曲射 / 穿墙）、重装（坦克）、刺客',
+        '驾驶员 4 种定位：支援、控制、突击、侦察',
+        '角色页和机体页都多了「定位」分页；选人阶段的卡片上也会显示定位']],
+      ['克制关系', [
+        '定位环：压制 → 刺客 → 狙击 → 重装 → 突击 → 炮击 → 压制（机体），控制 → 突击 → 支援 → 侦察 → 控制（驾驶员）',
+        '机体主定位克制对方时，伤害 +6%',
+        '每个角色还有 2~4 个具体的「克制」和「被克制」对象，每一条都写了原因',
+        '排位选人时会提示：你的选择克制对手的谁、对手的谁克制你；禁用阶段会提示克制你出战机体的是谁',
+        '官网新增「克制图」：定位环 + 全部克制关系']],
+      ['六边形能力面板', [
+        '每个角色都有一张 A~E 的六边形面板',
+        '机体：破坏力 / 耐久 / 速度 / 射程 / 涂地 / 操作难度；驾驶员：战斗 / 辅助 / 控制 / 机动 / 生存 / 操作难度',
+        '等级按游戏数值和模拟胜率在全体角色里排名自动算出（前 20% 是 A），官网也能看',
+        '角色页还会显示「推荐模式」']],
+      ['技能改成充能制', [
+        '驾驶员技能以前每台机体 3 次、重建后刷新；现在最多存 2 次充能，每 15 秒回复 1 次，两次之间至少隔 3 秒',
+        '重建机体不再刷新充能；技能按钮外圈显示充能回复进度',
+        '天赋「技能专精」：技能充能速度 +20%（原：冷却 -25%）；「额外技能」：充能上限 +1',
+        '风羽的超载「乘风」：立刻回复 1 次技能充能']],
+      ['超载可以多次使用', [
+        '超载以前每局只能放 1 次；现在放完可以重新充能、再放',
+        '充满需要打出的伤害 360 → 480（充得更慢）；超载进行中不会充能']],
+      ['新任务线「灰石叛逃者」（接着韩冰的故事）', [
+        '第一章「棱镜档案」：护送灰石研究园区的叛逃博士——第 4 步获得棱镜原型机，第 8 步获得驾驶员姜黎',
+        '第二章「零号档案」：完成第一章后开启，灰石试验部队的王牌追了上来——第 4 步获得枪骑原型机，第 8 步获得驾驶员沈零',
+        '每章 8 步，每一步都有一句剧情台词，按顺序完成和领取；普通对战和搜刮撤离都能推进',
+        '在「活动 → 任务」里']],
+      ['新驾驶员 · 姜黎「博士」（控制 · 治疗）', [
+        '技能「纳米雾场」：扔出纳米雾罐，4 秒内雾里的队友每秒回复 15 生命，敌人减速 30%、装填 -25%',
+        '被动「效率优化」：技能充能速度 +25%；附近的队友技能充能 +10%',
+        '超载「协议覆写」：附近队友每秒回复 12 生命、受到的伤害 -15%，范围里的敌人减速',
+        '弹出武器「试剂枪」：命中减速']],
+      ['新驾驶员 · 沈零「零号」（侦察 · 切入）', [
+        '技能「相位突进」：朝瞄准方向突进（瞬间无敌），下一次攻击 +35%，并暴露前方的敌人',
+        '被动「战场感知」：附近 260 范围内的敌人自动暴露，草丛和隐身也藏不住',
+        '超载「零式解放」：移动速度 +30%、攻击速度 +25%，击倒敌人立刻回复 1 次技能充能',
+        '弹出武器「高周波匕首」']],
+      ['新机体', [
+        '棱镜原型机（狙击 · 控场）：蓄力光束，命中减速；蓄满时折射到附近另一个敌人。大招「相位冻结」：0.6 秒后冻结一片区域里的敌人 1.2 秒',
+        '枪骑原型机（刺客 · 切入）：长枪突刺，攻击距离是近战里最远的；超过 2 秒没出手，下一枪是「先手突刺」（×1.35）。大招「三段突袭」：连续突进 3 段，可以重新瞄准']],
+      ['平衡调整（按 900 局模拟数据）', [
+        '旋转机兵「枪管预热」：起步伤害 72% → 64%，最高 110% → 104%｜弹弓机兵：伤害 53 → 50',
+        '狙击机兵：生命 80 → 92，蓄力 0.95 → 0.88 秒，满蓄力伤害 82 → 84，光束涂得更宽',
+        '影刃机兵：生命 170 → 182，伤害 76 → 80｜战术机兵：每发伤害 12.5 → 13.4｜结界机兵：伤害 21 → 22.5',
+        '洛奇「电磁脉冲」：无法攻击 1.4 → 1.1 秒｜符零「封印符」：符阵 3 → 2.5 秒｜星澜「涂装炮台」：7 → 6 秒｜包大福「能量便当」：回复 90 → 110',
+        '模拟胜率范围：机体约 42%–57%，驾驶员约 43%–56%']],
+      ['界面', ['机体卡片上的名字改成白色，更清楚']],
+      ['更新奖励', ['信箱里有一份 2.2 礼包：200 宝石 + 1 个军用箱 + 2000 金币']],
+    ], en: [
+      ['Combat roles', [
+        'Every mech and every pilot now has 1 main role + 1 sub-tag',
+        '6 mech roles: Brawler (melee), Suppressor (mid-range sustained fire), Sniper (long range), Artillery (thrown / lobbed / through walls), Tank, Assassin',
+        '4 pilot roles: Support, Controller, Striker, Scout',
+        'Pilot and mech pages have a new “Role” tab, and draft cards show each role']],
+      ['Counters', [
+        'Role cycle: Suppressor → Assassin → Sniper → Tank → Brawler → Artillery → Suppressor (mechs), Controller → Striker → Support → Scout → Controller (pilots)',
+        'When your mech’s main role counters the target’s, you deal +6% damage',
+        'Each character also lists 2–4 specific counters and threats, each with a reason',
+        'In the ranked draft you’re told who you counter and who counters you; the ban phase shows who counters your mech',
+        'New “Counter Chart” on the website: the role cycle plus every counter']],
+      ['Hexagon stat panels', [
+        'Every character has an A–E hexagon panel',
+        'Mechs: Power / Durability / Speed / Range / Painting / Difficulty; pilots: Combat / Support / Control / Mobility / Survival / Difficulty',
+        'Grades are ranked automatically across the whole roster from game numbers and simulated win rates (top 20% = A), and also shown on the website',
+        'Character pages also show “Recommended modes”']],
+      ['Skills now use charges', [
+        'Pilot skills used to be 3 per mech, refreshed on rebuild; now you store up to 2 charges, regaining 1 every 15 s, with at least 3 s between uses',
+        'Rebuilding no longer refreshes charges; the skill button’s outer ring shows the recharge progress',
+        'Talent “Skill Mastery”: skill charges regenerate 20% faster (was −25% cooldown); “Extra Skill”: +1 max charge',
+        'Gale’s Overload “Ride the Wind” instantly restores 1 skill charge']],
+      ['Overload can be used more than once', [
+        'Overload used to be once per match; now it recharges after use and can be fired again',
+        'Damage needed to fill it 360 → 480 (charges slower); it doesn’t charge while active']],
+      ['New quest line “Grayco Defectors” (continuing Han Bing’s story)', [
+        'Chapter 1 “Prism Files”: escort a defecting scientist from the Grayco research park — Prism Prototype at step 4, pilot Jiang Li at step 8',
+        'Chapter 2 “Zero Files”: opens after Chapter 1; the ace of Grayco’s test unit is on your trail — Lancer Prototype at step 4, pilot Shen Ling at step 8',
+        '8 steps per chapter, each with a line of story, completed and claimed in order; normal matches and Extraction both count',
+        'Find them in Events → Quests']],
+      ['New pilot · Jiang Li “Doc” (Controller · Healing)', [
+        'Skill “Nano Field”: throw a nano canister — for 4 s allies inside heal 15 HP/s, enemies are slowed 30% and reload 25% slower',
+        'Passive “Optimized”: skill charges regenerate 25% faster; nearby allies +10%',
+        'Overload “Protocol Override”: nearby allies heal 12 HP/s and take 15% less damage; enemies in range are slowed',
+        'On-foot weapon “Reagent Pistol”: slows on hit']],
+      ['New pilot · Shen Ling “Zero” (Scout · Dive)', [
+        'Skill “Phase Rush”: dash toward your aim (briefly invulnerable); your next attack deals +35% and enemies ahead are revealed',
+        'Passive “Battle Sense”: enemies within 260 are revealed automatically — bushes and invisibility don’t hide them',
+        'Overload “Zero Unleashed”: +30% move speed, +25% attack speed, and each takedown restores 1 skill charge',
+        'On-foot weapon “HF Knife”']],
+      ['New mechs', [
+        'Prism Prototype (Sniper · Crowd Control): a charged beam that slows on hit; full charge refracts to a second nearby enemy. Super “Phase Freeze”: after 0.6 s, freezes enemies in an area for 1.2 s',
+        'Lancer Prototype (Assassin · Dive): a lance thrust with the longest reach of any melee mech; after 2 s without attacking, the next thrust is an “Opening Thrust” (×1.35). Super “Triple Assault”: 3 dashes in a row, re-aimable']],
+      ['Balance (from 900 simulated matches)', [
+        'Gatling Bot “Barrel Spin-up”: starting damage 72% → 64%, max 110% → 104% | Slinger Bot: damage 53 → 50',
+        'Sniper Bot: HP 80 → 92, charge time 0.95 → 0.88 s, full-charge damage 82 → 84, wider paint line',
+        'Shadow Blade: HP 170 → 182, damage 76 → 80 | Tactical Bot: damage per shot 12.5 → 13.4 | Warden: damage 21 → 22.5',
+        'Loki “EMP”: can’t attack 1.4 → 1.1 s | Fu Ling “Seal Talisman”: circle 3 → 2.5 s | Aurora “Paint Turret”: 7 → 6 s | Bao Dafu “Energy Bento”: heals 90 → 110',
+        'Simulated win-rate range: mechs about 42%–57%, pilots about 43%–56%']],
+      ['UI', ['Names on mech cards are now white and easier to read']],
+      ['Update reward', ['Your mailbox has a 2.2 gift: 200 gems + 1 Military Crate + 2000 coins']],
+    ] },
     { v: '2.1.2', date: '2026-11-17', title: '2.1.2 更新 · 流畅度 & 撤离 AI', en_title: 'Update 2.1.2 · Smoothness & Extraction AI', sections: [
       ['修复「无限大招」', [
         '狙击机兵「锁定导弹」以前会锁定全图所有敌人，导弹伤害又给大招充能，打中后马上又能放，形成无限大招',

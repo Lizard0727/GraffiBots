@@ -388,7 +388,7 @@ class Game {
       hp: 100, ammo: S.AMMO, sp: 0, alive: true, respawnT: 0, invulnT: 0,
       lastHurt: -10, lastAtk: -10, atkCd: 0, burst: null, rollT: 0, charge: 0, prevFire: false,
       spT: 0, spKind: null, spWave: 0, shield: 0, shieldT: 0, sm: 1, carry: 0, hidden: false, wheel: false, firing: false,
-      foot: false, rebuildT: 0, skillUses: S.SKILL_USES + (tal.has('s2') ? 1 : 0), skillCd: 0, rushT: 0, slowT: 0, silenceT: 0, smokeT: 0, odN: 0, dmgMul: 1,
+      foot: false, rebuildT: 0, skillUses: S.SKILL_CHARGES + (tal.has('s2') ? 1 : 0), skillMax: S.SKILL_CHARGES + (tal.has('s2') ? 1 : 0), skillRegen: 0, skillCd: 0, rushT: 0, slowT: 0, silenceT: 0, smokeT: 0, odN: 0, dmgMul: 1,
       quakeT: 0, quakeArm: 0,
       input: { mx: 0, my: 0, a: team === 1 ? 0 : Math.PI, pt: 0, f: false, w: false, j: false, qq: 0, gq: 0, aq: 0, oq: 0, ad: 200 },
       lastQq: 0, lastGq: 0, lastAq: 0, sync: 0, lastPosT: 0, hitCd: {},
@@ -532,6 +532,17 @@ class Game {
     p.invulnT = Math.max(0, p.invulnT - dt);
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) p.shield = 0; }
     p.skillCd = Math.max(0, p.skillCd - dt);
+    if (p.skillUses < p.skillMax) {   // 2.2：技能充能制——每 15 秒回复 1 次（天赋「技能专精」+20%，姜黎 +25%，姜黎身边的队友 +10%）
+      let rk = (p.tal.has('s1') ? 1.2 : 1) * (p.pilot === 'doc' ? 1.25 : this.nearPilot(p, 'doc', 220) ? 1.1 : 1);
+      p.skillRegen += dt * rk;
+      if (p.skillRegen >= S.SKILL_REGEN) { p.skillRegen -= S.SKILL_REGEN; p.skillUses++; if (p.skillUses >= p.skillMax) p.skillRegen = 0; }
+    } else p.skillRegen = 0;
+    if (p.blinkT > 0) p.blinkT -= dt;
+    if (p.nanoT > 0) p.nanoT -= dt;
+    if (p.auraT > 0) p.auraT -= dt;
+    if (p.pilot === 'zero' && (this.tick % 6) === 0) {   // 2.2 沈零被动：战场感知——附近 220 的敌人自动暴露
+      for (const e of this.players.values()) if (e.alive && e.team !== p.team && !e.npc && Math.hypot(e.x - p.x, e.y - p.y) < 260 && Math.abs(e.z - p.z) < 120) e.revealT = Math.max(e.revealT, 0.4);
+    }
     p.rushT = Math.max(0, p.rushT - dt); p.slowT = Math.max(0, p.slowT - dt);
     p.silenceT = Math.max(0, p.silenceT - dt); p.smokeT = Math.max(0, p.smokeT - dt);
     p.rallyT = Math.max(0, p.rallyT - dt); p.revealT = Math.max(0, p.revealT - dt);
@@ -595,6 +606,7 @@ class Game {
       let rk = (p.rushT > 0 ? 2 : 1) * (wheel && own ? 1.6 : 1) * (p.tal.has('a2') ? 1.12 : 1);
       if (this.nearPilot(p, 'echo', 200)) rk *= 1.2; else if (p.pilot === 'echo') rk *= 1.1;   // 叶声被动：节拍同步（2.1：队友 +20%，范围 200；自己 +10%）
       if (p.jamT > 0) rk *= 0.7;
+      if (p.nanoT > 0) rk *= 0.75;                        // 2.2 纳米雾场：装填 -25%
       if (p.supT > 0) rk *= 1.3;                          // 2.1 霍克的补给箱                          // 2.1 叶声的声波干扰：装填 -30%
       p.ammo = Math.min(S.AMMO, p.ammo + (dt / rt) * rk);
     }
@@ -621,7 +633,7 @@ class Game {
     }
     if (inp.oq !== p.lastOq) {
       p.lastOq = inp.oq;
-      if (p.bt >= 1 && !p.ovUsed && p.ov >= S.OV_NEED && p.silenceT <= 0) this.activateOverload(p);
+      if (p.bt >= 1 && !(p.ovT > 0) && p.ov >= S.OV_NEED && p.silenceT <= 0) this.activateOverload(p);
     }
     if (p.spT > 0) this.updateSpecial(p, dt);
     if (p.quakeT > 0) {
@@ -673,6 +685,7 @@ class Game {
     const want = inp.f || pulse;
     if (want && p.atkCd <= 0 && p.ammo >= 1) {
       const OVr = p.ovT > 0 && S.OVERLOADS[p.pilot].rof;
+      p.openerOn = !!W.opener && this.time - p.lastAtk > 2;   // 2.2 枪骑：先手突刺
       p.ammo -= 1; p.atkCd = W.atkCd / (OVr || 1); p.lastAtk = this.time; this.takeOverdrive(p);
       if (p.cloakT > 0) { if (W.special === 'cloak') p.dmgMul *= 1.5; p.cloakT = 0; p.cloakFast = false; }   // 攻击会现形；幻影隐身第一击 +50%
       switch (W.attack) {
@@ -695,7 +708,10 @@ class Game {
     }
     return p.rollT > 0;
   }
-  takeOverdrive(p) { p.dmgMul = p.odN > 0 ? 1.4 : 1; if (p.odN > 0) p.odN--; }
+  takeOverdrive(p) {
+    p.dmgMul = p.odN > 0 ? 1.4 : 1; if (p.odN > 0) p.odN--;
+    if (p.blinkT > 0) { p.dmgMul *= 1.35; p.blinkT = 0; }   // 2.2 沈零：相位突进后的下一次攻击 +35%
+  }
   // 驾驶员的随身武器（S.SIDEARMS）
   fireSidearm(p, A, inp) {
     const fl = { ghost: A.ghost, fx: A.fx };
@@ -784,10 +800,12 @@ class Game {
       if (d > W.range + (t.rad || S.R) + 10 + (W.lunge || 0) * 0.1 || Math.abs(t.z - p.z) > (t.boss ? 120 : 40)) continue;   // 1.5：冲拳的前冲也算进攻击距离
       let da = Math.atan2(dy, dx) - a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
       if (Math.abs(da) > W.arc / 2) continue;
-      const dmg = W.dmg * p.dmgMul;
+      const dmg = W.dmg * p.dmgMul * (p.openerOn ? W.opener : 1);
+      if (p.openerOn) this.ev(['bs', t.id]);
       this.hurt(t, dmg, p, dx, dy, W.kb / (dmg * 1.8), upper ? 420 : 120);
       if (W.stagger) t.slowT = Math.max(t.slowT, W.stagger);   // 2.0 拆楼锤：震荡
     }
+    p.openerOn = false;
     this.pushBall(p, fx, fy, W.range, 1100);
     if (this.mode === 'park') for (const b of this.obj.balloons.slice()) if (Math.hypot(b.x - fx, b.y - fy) < W.range + 20) this.popBalloon(b, p.team, p);
     if (W.wave) { const V = W.wave; for (const da of spin ? [-0.45, 0, 0.45] : [0]) this.spawnProj(p, a + da, -0.03, V.speed, V.range, V.dmg, V.splat, 14, V.size, null, { kb: 1.4 }); }   // 1.8：灵刃的刀气（1.9.1 回旋斩三道）
@@ -883,7 +901,7 @@ class Game {
         break;
       case 'guard': p.shield = Math.max(p.shield, 60); p.shieldT = 4; break;
       case 'smoke': this.paint(p.x, p.y, p.z, 95, p.team, p); p.smokeT = 3; break;
-      case 'turret': this.helpers.push({ id: this.nextId++, kind: 'turret', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 7, cd: 0.3 }); break;
+      case 'turret': this.helpers.push({ id: this.nextId++, kind: 'turret', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 6, cd: 0.3 }); break;
       case 'dash': {
         let dx = p.input.mx, dy = p.input.my;
         if (Math.hypot(dx, dy) < 0.2) { dx = Math.cos(p.input.a); dy = Math.sin(p.input.a); }
@@ -891,7 +909,7 @@ class Game {
         break;
       }
       case 'emp':
-        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 200) { e.slowT = 3; e.silenceT = 1.4; e.charge = 0; e.burst = null; }
+        for (const e of this.players.values()) if (e.alive && e.team !== p.team && dist(e, p) < 200) { e.slowT = 3; e.silenceT = 1.1; e.charge = 0; e.burst = null; }
         break;
       case 'bento': this.helpers.push({ id: this.nextId++, kind: 'bento', x: p.x, y: p.y, z: p.z, team: p.team, owner: p.id, t: 15, armed: 0.6 }); break;
       case 'overdrive': p.ammo = S.AMMO; p.odN = 3; break;
@@ -932,21 +950,36 @@ class Game {
         break;
       case 'seal': {   // 1.8 符零：封印符阵
         const d = clamp(p.input.ad || 200, 60, 240), sx = clamp(p.x + Math.cos(p.input.a) * d, 20, S.W - 20), sy = clamp(p.y + Math.sin(p.input.a) * d, 20, S.H - 20);
-        this.helpers.push({ id: this.nextId++, kind: 'sealz', x: sx, y: sy, z: this.top(sx, sy), r: 105, team: p.team, owner: p.id, t: 3, cd: 0 });
+        this.helpers.push({ id: this.nextId++, kind: 'sealz', x: sx, y: sy, z: this.top(sx, sy), r: 105, team: p.team, owner: p.id, t: 2.5, cd: 0 });
         this.paint(sx, sy, this.top(sx, sy), 50, p.team, p);
         break;
       }
       case 'possess': p.possT = 4; break;   // 1.8 赤镰：恶灵附身
+      case 'nano': {   // 2.2 姜黎：纳米雾场——队友回血，敌人减速 + 装填变慢
+        const d = clamp(p.input.ad || 180, 40, 240), nx = clamp(p.x + Math.cos(p.input.a) * d, 20, S.W - 20), ny = clamp(p.y + Math.sin(p.input.a) * d, 20, S.H - 20), nz = this.top(nx, ny);
+        this.helpers.push({ id: this.nextId++, kind: 'nano', x: nx, y: ny, z: nz, r: 130, team: p.team, owner: p.id, t: 4, cd: 99 });
+        this.ev(['fg', r1(nx), r1(ny), r1(nz), 130, 4, p.team]);
+        break;
+      }
+      case 'blink': {   // 2.2 沈零：相位突进——朝瞄准方向突进，瞬间无敌；下一击 +25%；暴露前方的敌人
+        const a = p.input.a, ux = Math.cos(a), uy = Math.sin(a);
+        this.knock(p, ux, uy, 600, 0); p.invulnT = Math.max(p.invulnT, 0.3); p.blinkT = 2;
+        for (const e of this.players.values()) {
+          if (!e.alive || e.team === p.team) continue;
+          const dx = e.x - p.x, dy = e.y - p.y, along = dx * ux + dy * uy;
+          if (along > -40 && Math.hypot(dx, dy) < 260 + 140) e.revealT = Math.max(e.revealT, 3);
+        }
+        break;
+      }
     }
-    if (p.tal.has('s1')) p.skillCd *= 0.75;
   }
   // ---------------- 超载技能 ----------------
   activateOverload(p) {
     const O = S.OVERLOADS[p.pilot];
-    p.ovUsed = true; p.ov = 0; p.ovT = S.OV_TIME + (p.bt >= 2 ? 2 : 0) + (p.tal.has('s6') ? 2 : 0); p.ovPulse = 0;
+    p.ov = 0; p.ovT = S.OV_TIME + (p.bt >= 2 ? 2 : 0) + (p.tal.has('s6') ? 2 : 0); p.ovPulse = 0;
     this.ev(['ov', p.id, p.pilot, r1(p.x), r1(p.y), r1(p.z)]);
     const near = (r) => [...this.players.values()].filter((a) => a.alive && a.team === p.team && dist(a, p) < r);
-    if (O.skillReset) { p.skillCd = 0; p.skillUses++; }
+    if (O.skillReset) { p.skillCd = 0; p.skillUses = Math.min(p.skillMax, p.skillUses + 1); }
     if (O.stealth) p.smokeT = Math.max(p.smokeT, p.ovT);
     if (O.hack) {
       this.reveal[p.team] = this.time + p.ovT;
@@ -962,6 +995,13 @@ class Game {
   }
   overloadTick(p, O, dt) {
     const k = p.bt >= 2 ? 1.25 : 1;
+    if (O.aura) {   // 2.2 姜黎超载：协议覆写——队友回血减伤，敌人减速
+      for (const a of this.players.values()) {
+        if (!a.alive || Math.hypot(a.x - p.x, a.y - p.y) > O.aura.r || Math.abs(a.z - p.z) > 120) continue;
+        if (a.team === p.team) { a.hp = Math.min(this.maxHpOf(a), a.hp + O.aura.heal * k * dt); a.auraT = 0.3; a.auraDef = O.aura.def; }
+        else if (!a.boss) a.dslowT = Math.max(a.dslowT || 0, 0.3);
+      }
+    }
     if (O.regen) {
       const list = O.burstHeal ? [p] : [...this.players.values()].filter((a) => a.alive && a.team === p.team && dist(a, p) < 200);
       for (const a of list) a.hp = Math.min(this.maxHpOf(a), a.hp + O.regen * k * dt);
@@ -987,7 +1027,7 @@ class Game {
         if (h.armed > 0) return true;
         for (const a of this.players.values()) {
           if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < 26 && Math.abs(a.z - h.z) < 30) {
-            const hv = h.heal || 90; a.hp = Math.min(this.maxHpOf(a), a.hp + hv); this.ev(['heal', a.id, hv]);
+            const hv = h.heal || 110; a.hp = Math.min(this.maxHpOf(a), a.hp + hv); this.ev(['heal', a.id, hv]);
             if (h.gift && !a.foot) a.sp = Math.min(S.WEAPONS[a.weapon].spNeed, a.sp + S.WEAPONS[a.weapon].spNeed * 0.25);   // 2.1 卡卡的惊喜礼盒：还送 25% 大招充能
             return false;
           }
@@ -1002,6 +1042,27 @@ class Game {
       if (h.kind === 'supply') {   // 2.1 霍克的补给箱：先砸下来，再给附近队友回血 + 加快装填
         if (h.fall > 0) { h.fall -= dt; if (h.fall <= 0) { this.explode(h.x, h.y, h.z + 8, 70, 40, 24, h.team, o); this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, 70, 0]); this.paint(h.x, h.y, h.z, 50, h.team, o); } return true; }
         for (const a of this.players.values()) if (a.alive && a.team === h.team && Math.hypot(a.x - h.x, a.y - h.y) < h.r && Math.abs(a.z - h.z) < 60) { a.hp = Math.min(this.maxHpOf(a), a.hp + 8 * dt); a.supT = 0.3; }
+        return true;
+      }
+      if (h.kind === 'nano') {     // 2.2 姜黎的纳米雾场
+        for (const a of this.players.values()) {
+          if (!a.alive || Math.hypot(a.x - h.x, a.y - h.y) > h.r || Math.abs(a.z - h.z) > 70) continue;
+          if (a.team === h.team) a.hp = Math.min(this.maxHpOf(a), a.hp + 15 * dt);
+          else if (!a.boss) { a.dslowT = Math.max(a.dslowT || 0, 0.25); a.nanoT = 0.25; }
+        }
+        return true;
+      }
+      if (h.kind === 'phase') {    // 2.2 棱镜原型机：相位冻结（0.6 秒后展开）
+        if (h.t <= 0.05) {
+          for (const e of this.players.values()) {
+            if (!e.alive || e.team === h.team || Math.hypot(e.x - h.x, e.y - h.y) > h.r || Math.abs(e.z - h.z) > 90) continue;
+            this.hurt(e, 45, o, e.x - h.x, e.y - h.y, 0.3, 0);
+            if (!e.boss) { e.bindT = Math.max(e.bindT || 0, 1.2); e.silenceT = Math.max(e.silenceT, 1.2); e.charge = 0; e.burst = null; this.ev(['bind', e.id]); }
+          }
+          this.paint(h.x, h.y, h.z, 70, h.team, o);
+          this.ev(['bx', r1(h.x), r1(h.y), r1(h.z + 8), h.team, h.r, 2]);
+          return false;
+        }
         return true;
       }
       if (h.kind === 'recon') {    // 2.1 战术机兵的侦察无人机：暴露 + 标记
@@ -1111,7 +1172,7 @@ class Game {
     const range = W.range * (0.35 + 0.65 * ch);
     const mz = this.muzzle(p);
     let dmg = (W.minDmg + (W.dmg - W.minDmg) * ch) * p.dmgMul;
-    const pr = 10 + 6 * ch;
+    const pr = 13 + 8 * ch;   // 2.2：狙击 / 棱镜的光束涂得更宽
     let victim = null, lastPaint = -99, hitT = 0;
     const pierce = W.pierce && ch >= 0.9 && !p.foot, hits = [];   // 2.0 狙击：蓄满的一枪贯穿第一个敌人
     const b = this.obj.ball && this.obj.resetT <= 0 ? this.obj.ball : null;
@@ -1127,6 +1188,15 @@ class Game {
       if (p.pilot === 'frost' && hitT > W.range * 0.6) dmg *= 1.08;
       this.hurt(victim, dmg, p, mz.d.x, mz.d.y);
       if (hits[1]) { this.hurt(hits[1], dmg * W.pierce, p, mz.d.x, mz.d.y); this.ev(['prc', hits[1].id]); }
+      if (W.slowHit && !p.foot) victim.slowT = Math.max(victim.slowT, W.slowHit);   // 2.2 棱镜：光束减速
+      if (W.refract && ch >= 0.9 && !p.foot && victim.alive !== undefined) {         // 2.2 棱镜折射：跳到附近另一个敌人
+        let best = null, bd = W.refract.r;
+        for (const t of this.players.values()) { if (!t.alive || t === victim || t.team === p.team) continue; const d = Math.hypot(t.x - victim.x, t.y - victim.y); if (d < bd && Math.abs(t.z - victim.z) < 80) { bd = d; best = t; } }
+        if (best) {
+          this.hurt(best, dmg * W.refract.k, p, best.x - victim.x, best.y - victim.y); best.slowT = Math.max(best.slowT, W.slowHit || 0);
+          this.ev(['ln', r1(victim.x), r1(victim.y), r1(victim.z + 18), r1(best.x), r1(best.y), r1(best.z + 18), p.team, 0.6, p.id]);
+        }
+      }
     }
     this.paint(end.x, end.y, this.top(end.x, end.y), 18 + 12 * ch, p.team, p);
     this.ev(['ln', r1(mz.x), r1(mz.y), r1(mz.z), r1(end.x), r1(end.y), r1(end.z), p.team, r2(ch), p.id]);
@@ -1180,6 +1250,7 @@ class Game {
       if (by.team !== t.team && (by.pilot === 'hawk' || this.nearPilot(by, 'hawk', 260))) dmg *= 1.06;   // 2.1 霍克被动：老练指挥              // 2.1 韩冰的闪光弹：致盲
       if (by.pilot === 'fu' && t.slowT > 0) dmg *= 1.1;                        // 符零被动：符咒共鸣
       if (by.pilot === 'aka' && by.hp < this.maxHpOf(by) * 0.5) dmg *= 1.22;   // 赤镰被动：恶灵低语
+      if (by.team !== t.team && !by.foot && !t.foot && !t.npc && !t.boss) dmg *= S.mechEdge(by.weapon, t.weapon);   // 2.2：机体定位克制 +6%
       const BW = !by.foot && S.WEAPONS[by.weapon];
       if (BW && BW.backstab && by.team !== t.team) {   // 刺客机体：从背后命中（在目标朝向 ±110° 以外）伤害提高
         let da = Math.atan2(by.y - t.y, by.x - t.x) - t.input.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
@@ -1198,6 +1269,7 @@ class Game {
     if (!t.foot && S.WEAPONS[t.weapon].armor) dmg *= S.WEAPONS[t.weapon].armor;   // 重装机体减伤
     if (t.tal && t.tal.has('d4') && t.hp < this.maxHpOf(t) * 0.3) dmg *= 0.85;
     if (t.possT > 0) dmg *= 0.85;   // 恶灵附身
+    if (t.auraT > 0) dmg *= t.auraDef || 0.85;   // 2.2 姜黎的协议覆写
     for (const h of this.helpers) if (h.kind === 'dome' && h.team === t.team && Math.hypot(t.x - h.x, t.y - h.y) < h.r && Math.abs(t.z - h.z) < 90) { dmg *= 0.7; break; }   // 己方结界
     if (t.pilot === 'flag') {   // 岚被动：附近每个队友 -10%（1.9.1：-8% → -10%，范围 200 → 260）
       let n = 0;
@@ -1229,14 +1301,15 @@ class Game {
       const bo = by.ovT > 0 ? S.OVERLOADS[by.pilot] : null;
       by.sp = Math.min(S.WEAPONS[by.weapon].spNeed, by.sp + dmg * (by.pilot === 'candy' ? 1.3 : 1) * (by.tal.has('a3') ? 1.15 : 1) * (bo && bo.spGain ? bo.spGain : 1));
     }
-    // 超载充能：突破 I 以后，每局一次
-    if (by && by !== t && by.team !== t.team && by.bt >= 1 && !by.ovUsed && by.ovT <= 0 && this.players.has(by.id)) by.ov = Math.min(S.OV_NEED, by.ov + dmg * (by.tal.has('s3') ? 1.2 : 1));
+    // 超载充能：突破 I 以后（2.2：可以多次使用，放完重新充）
+    if (by && by !== t && by.team !== t.team && by.bt >= 1 && by.ovT <= 0 && this.players.has(by.id)) by.ov = Math.min(S.OV_NEED, by.ov + dmg * (by.tal.has('s3') ? 1.2 : 1));
     this.ev(['hit', t.id, by ? by.id : 0, 0, Math.round(dmg)]);
     if (t.hp <= 0) { if (t.boss) this.bossDown(t, by); else if (t.foot || t.spirit) this.kill(t, by); else this.wreck(t, by); }
   }
   onTakedown(by, t) {
     if (!by || !this.players.has(by.id)) return;
     by.stats.kills++;
+    if (by.ovT > 0 && S.OVERLOADS[by.pilot] && S.OVERLOADS[by.pilot].killCharge) by.skillUses = Math.min(by.skillMax, by.skillUses + 1);   // 2.2 沈零：零式解放
     if (t && t.hitBy) { for (const id in t.hitBy) { const q = this.players.get(+id); if (q && q !== by && q.team !== t.team && this.time - t.hitBy[id] < 8) q.stats.assists++; } t.hitBy = null; }
     if (this.chat && t) this.chat.onKill(by, t);
     if (by.pilot === 'kaka' && t) this.helpers.push({ id: this.nextId++, kind: 'bento', gift: 1, heal: 80, ang: 7, x: t.x, y: t.y, z: this.top(t.x, t.y), team: by.team, owner: by.id, t: 12, armed: 0.4 });   // 卡卡被动：惊喜礼盒
@@ -1447,6 +1520,16 @@ class Game {
         p.invulnT = Math.max(p.invulnT, 0.4); p.cloakT = 1.5; p.cloakFast = true;
         break;
       }
+      case 'prism': {   // 2.2 棱镜原型机：相位冻结
+        p.spT = 0.3;
+        const d = clamp(p.input.ad || 300, 80, 460), px = clamp(p.x + Math.cos(a) * d, 20, S.W - 20), py = clamp(p.y + Math.sin(a) * d, 20, S.H - 20);
+        this.helpers.push({ id: this.nextId++, kind: 'phase', x: px, y: py, z: this.top(px, py), r: 140, team: p.team, owner: p.id, t: 0.65, cd: 99 });
+        this.ev(['ln', r1(p.x), r1(p.y), r1(p.z + S.MUZZLE), r1(px), r1(py), r1(this.top(px, py) + 4), p.team, 0.5, p.id]);
+        break;
+      }
+      case 'lancestorm':   // 2.2 枪骑原型机：三段突袭（每 0.26 秒一段，可以重新瞄准）
+        p.spT = 0.85; p.lsN = 3; p.lsT = 0; p.lsHit = {};
+        break;
       case 'venom': {   // 毒针：毒雾罐
         p.spT = 0.3;
         const d = clamp(p.input.ad || 260, 80, 420);
@@ -1531,6 +1614,23 @@ class Game {
   updateSpecial(p, dt) {
     p.spT -= dt;
     switch (p.spKind) {
+      case 'lancestorm':
+        p.lsT -= dt;
+        if (p.lsN > 0 && p.lsT <= 0) {
+          p.lsN--; p.lsT = 0.26;
+          const a = p.input.a, ux = Math.cos(a), uy = Math.sin(a), d = 170;
+          for (const t of this.players.values()) {
+            if (!t.alive || t.team === p.team) continue;
+            const dx = t.x - p.x, dy = t.y - p.y, along = dx * ux + dy * uy, across = Math.abs(-dx * uy + dy * ux);
+            if (along > -10 && along < d + 30 && across < 34 + (t.rad || 0) && Math.abs(t.z - p.z) < (t.boss ? 120 : 40)) this.hurt(t, 40, p, ux, uy, 1.1, 40);
+          }
+          this.paint(p.x + ux * d * 0.5, p.y + uy * d * 0.5, p.z, 36, p.team, p);
+          this.knock(p, ux, uy, d * 3.4, 0);
+          p.invulnT = Math.max(p.invulnT, 0.22);
+          this.ev(['pu', p.id, r2(a)]);
+          if (p.lsN === 0) { p.shield = Math.max(p.shield, 30); p.shieldT = Math.max(p.shieldT, 4); }
+        }
+        break;
       case 'storm': {
         const elapsed = 0.8 - p.spT;
         while (p.spWave < 3 && elapsed >= p.spWave * 0.35) {
@@ -1983,7 +2083,7 @@ class Game {
     this.projs = []; this.shells = []; this.helpers = []; this.bombs = []; this.missiles = [];
     for (const p of this.players.values()) {
       p.out = false; p.alive = true; p.foot = false; p.spT = 0; p.spKind = null; p.ovT = 0; p.shield = 0; p.shieldT = 0;
-      p.sp = Math.floor(p.sp * 0.5); p.skillUses = S.SKILL_USES + (p.tal.has('s2') ? 1 : 0); p.skillCd = 0; p.rebuildT = 0;
+      p.sp = Math.floor(p.sp * 0.5); p.rebuildT = 0;   // 2.2：重建不再刷新技能充能
       this.respawn(p); p.invulnT = 2;
     }
     this.ev(['rs', o.round]);
@@ -2423,7 +2523,7 @@ class Game {
         Math.ceil((p.foot ? p.rebuildT : p.respawnT) * 10), p.carry, Math.round(p.sm * 100), Math.round(p.charge * 100), r1(p.shield), p.sync,
         r1(p.vx + (p.kx || 0)), r1(p.vy + (p.ky || 0)), S.SPECIAL_IDS.indexOf(p.spKind), r1(p.z), r2(p.input.pt), Math.round(p.vz || 0),
         this.maxHpOf(p), p.skillUses, Math.ceil(p.skillCd * 10), buffs,
-        Math.round((p.ov / S.OV_NEED) * 100), Math.ceil(p.ovT * 10), (p.bt >= 1 ? 1 : 0) | (p.ovUsed ? 2 : 0)]);
+        Math.round((p.ov / S.OV_NEED) * 100), Math.ceil(p.ovT * 10), (p.bt >= 1 ? 1 : 0) | (p.skillMax << 2), Math.round((p.skillRegen / S.SKILL_REGEN) * 100)]);
     }
     const msg = { t: 's', k: this.tick, tl: Math.max(0, Math.round(this.timeLeft * 10) / 10), cd: Math.max(0, Math.round(this.countdown * 10) / 10), p: pl, d: this.diff, e: this.events, o: this.objState(),
       rv: [0, this.reveal[1] > this.time ? 1 : 0, this.reveal[2] > this.time ? 1 : 0],
@@ -2722,14 +2822,14 @@ function botThink(g, p, dt) {
   // 大招
   if (!p.foot && p.sp >= W.spNeed && p.spT <= 0) {
     const sp = W.special;
-    const reach = { beam: 700, missiles: 1000, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480, recon: 420 }[sp];
+    const reach = { beam: 700, missiles: 1000, storm: 220, bubble: 260, charge: 260, barrage: 420, quake: 260, bulldoze: 380, napalm: 420, swarm: 420, whirl: 200, sonic: 220, aegis: 320, cluster: 360, shadowstep: 250, venom: 400, cloak: 450, barrier: 220, rend: 480, recon: 420, prism: 460, lancestorm: 320 }[sp];
     if ((enemy && ed < reach) || Math.random() < (P.waste ? 0.015 : P.smart ? 0 : 0.002)) {   // 猪队友乱放大招
       inp.qq++;
       if (enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z + 16); inp.a = a2.a; inp.pt = a2.pt; inp.ad = ed; }
     }
   }
   // 超载：充满了就在交战时放
-  if (p.bt >= 1 && !p.ovUsed && p.ov >= S.OV_NEED && enemy && ed < 320 && Math.random() < P.ov) inp.oq++;
+  if (p.bt >= 1 && !(p.ovT > 0) && p.ov >= S.OV_NEED && enemy && ed < 320 && Math.random() < P.ov) inp.oq++;
   // 驾驶员技能
   if (p.skillUses > 0 && p.skillCd <= 0 && Math.random() < P.skill) {
     const sk = S.pilot(p.pilot).skill;
@@ -2739,10 +2839,13 @@ function botThink(g, p, dt) {
       turret: fight, dash: (p.foot && enemy) || (p.weapon === 'fist' && enemy && ed < 260 && ed > 90), emp: enemy && ed < 160, bento: hpK < 0.55, decoy: fight && (hpK < 0.6 || ed < 120), overdrive: fight && p.ammo < 1, drone: fight,
       rally: fight, blast: enemy && ed < 200, jam: enemy && ed < 210, flash: enemy && ed < 220,
       seal: enemy && ed < 240, possess: fight && (hpK < 0.7 || ed < 120), airdrop: fight || hpK < 0.6,
+      nano: (enemy && ed < 240) || hpK < 0.5, blink: (enemy && ed < 330 && ed > 110) || (p.foot && enemy && hpK < 0.4),
     }[sk] || (P.waste && Math.random() < 0.3);
     if (use) {
       if (sk === 'dash' && enemy && !p.foot) { inp.mx = Math.cos(aim.a); inp.my = Math.sin(aim.a); }
       if ((sk === 'blast' || sk === 'airdrop') && enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z); inp.a = a2.a; inp.ad = sk === 'airdrop' && hpK < 0.6 ? 0 : ed; }
+      if (sk === 'nano' && enemy) { const a2 = aimAt(p, (enemy.x + p.x) / 2, (enemy.y + p.y) / 2, enemy.z); inp.a = a2.a; inp.ad = Math.min(240, ed / 2 + 40); }
+      if (sk === 'blink' && enemy) { const a2 = aimAt(p, enemy.x, enemy.y, enemy.z); inp.a = a2.a; if (p.foot && hpK < 0.4) inp.a += Math.PI; }
       if (sk === 'seal' && enemy) { const a2 = aimAt(p, enemy.x + enemy.vx * 0.3, enemy.y + enemy.vy * 0.3, enemy.z); inp.a = a2.a; inp.ad = ed; }
       inp.gq++;
     }
@@ -3254,7 +3357,7 @@ function handle(hub, c, m) {
     case 'ping': c.conn.send({ t: 'pong', ts: m.ts }); break;
     case 'lo': if (r && r.game && r.game.loot) r.game.lootOp(r.game.players.get(c.id), m); break;   // 2.1：背包 / 容器操作
     case 'dbgSp': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) me.sp = S.WEAPONS[me.weapon].spNeed; } break;   // 调试：大招充满
-    case 'dbgOv': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) { me.bt = Math.max(me.bt, 1); me.ovUsed = false; me.ov = S.OV_NEED; r.game.activateOverload(me); } } break;   // 调试：立刻放超载
+    case 'dbgOv': if (hub.debug && r && r.game) { const me = r.game.players.get(c.id); if (me && me.alive) { me.bt = Math.max(me.bt, 1); me.ov = S.OV_NEED; r.game.activateOverload(me); } } break;   // 调试：立刻放超载
     case 'dbgFinish': if (hub.debug && r && r.game && r.hostId === c.id) { const g = r.game, me = g.players.get(c.id); if (g.loot) { me.extracted = true; me.out = true; me.alive = false; g.obj.banked[c.id] = ['scrap']; } g.finish(me ? me.team : 1); } break;   // 只在测试服务器（GB_DEBUG=1）里可用
     // ---------------- 1.7：好友（服务器转发：好友码 → 连接）----------------
     case 'socHello': {   // 上线 / 更新状态：{ fid, card: { name, pilot, tr, rank, st, code, n } }

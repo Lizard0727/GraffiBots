@@ -547,6 +547,25 @@
         <div class="dr-bans">${D.bans.length ? D.bans.map(banChip).join('') : D.turns.some((t2) => t2.t === 'ban') ? '<small>还没有禁用</small>' : `<small>${RT()[D.ti].name}还没有禁用阶段</small>`}</div></div>
       <div class="dr-team b">${D.B.map((x, i) => drCard(x, 'B', i)).join('')}</div>`;
   }
+  // 2.2：选人时的克制提示——对手已经选了什么、你的选择克制谁 / 被谁克制
+  function drHint(isBan) {
+    const D = draft, foes = D.B.filter((x) => x.pick).map((x) => x.pick), out = [];
+    const nm = (k, id) => (k === 'pilot' ? S.pilot(id).name : S.WEAPONS[id].short);
+    if (isBan) {
+      const th = S.countersOf(profile.weapon).weak.filter((m) => !drBanned('mech', m.id)).slice(0, 2);
+      if (th.length) out.push(`<span class="bad">克制你的「${S.WEAPONS[profile.weapon].short}」：${th.map((m) => nm('mech', m.id)).join('、')}</span>`);
+    } else {
+      for (const [k, id] of [['mech', D.sel.mech], ['pilot', D.sel.pilot]]) {
+        if (!id) continue;
+        const C = S.countersOf(id), fk = k === 'mech' ? 'mech' : 'pilot';
+        const good = C.beats.filter((m) => foes.some((f) => f[fk] === m.id)), bad = C.weak.filter((m) => foes.some((f) => f[fk] === m.id));
+        if (good.length) out.push(`<span class="good">克制对手的 ${good.map((m) => nm(k, m.id)).join('、')}</span>`);
+        if (bad.length) out.push(`<span class="bad">小心：对手的 ${bad.map((m) => nm(k, m.id)).join('、')} 克制你</span>`);
+      }
+      if (D.sel.mech) for (const f of foes) { if (f.mech && S.mechEdge(D.sel.mech, f.mech) > 1) { out.push(`<span class="good">定位克制：${S.ROLES[S.CLASS[D.sel.mech][0]].name} → ${S.ROLES[S.CLASS[f.mech][0]].name}（${nm('mech', f.mech)}）伤害 +${Math.round(S.ROLE_EDGE * 100)}%</span>`); break; } }
+    }
+    return out.length ? `<div class="dr-hint">${out.join('')}</div>` : '';
+  }
   function renderDraft() {
     const D = draft; if (!D) return;
     const T = !D.done && D.turns[D.cur], mine = T && T.who.who === 'me', isBan = T && T.t === 'ban';
@@ -557,12 +576,13 @@
       const tk = drTaken();
       const card = (k, id) => { const own = k === 'pilot' ? !!profile.pilots[id] : profile.mechs.includes(id), b = drBanned(k, id), taken = k === 'pilot' ? tk.p.has(id) : tk.m.has(id);
         const sel = isBan ? D.sel.ban && D.sel.ban.k === k && D.sel.ban.id === id : D.sel[k] === id, dis = b || taken || (!isBan && !own);
-        return `<button class="dcard ${sel ? 'sel' : ''} ${b ? 'banned' : ''} ${taken ? 'taken' : ''} ${!isBan && !own ? 'notown' : ''}" data-k="${k}" data-id="${id}" ${dis ? 'disabled' : ''}>${k === 'pilot' ? pilotFace(id) : mechFace(id)}${k === 'pilot' ? S.pilot(id).name : S.WEAPONS[id].short}${taken ? '<i>已被选</i>' : b ? '<i>禁用</i>' : ''}</button>`; };
+        return `<button class="dcard ${sel ? 'sel' : ''} ${b ? 'banned' : ''} ${taken ? 'taken' : ''} ${!isBan && !own ? 'notown' : ''}" data-k="${k}" data-id="${id}" ${dis ? 'disabled' : ''}>${k === 'pilot' ? pilotFace(id) : mechFace(id)}${k === 'pilot' ? S.pilot(id).name : S.WEAPONS[id].short}<em class="rl" style="--rc:${S.ROLES[S.CLASS[id][0]].color}">${S.ROLES[S.CLASS[id][0]].name}</em>${taken ? '<i>已被选</i>' : b ? '<i>禁用</i>' : ''}</button>`; };
       const pilots = isBan ? S.PILOTS.map((P) => P.id) : S.PILOTS.map((P) => P.id).filter((id) => profile.pilots[id]);
       const mechs = isBan ? S.WEAPON_ORDER : S.WEAPON_ORDER.filter((id) => profile.mechs.includes(id));
       const ok = isBan ? !!D.sel.ban : D.sel.pilot && D.sel.mech;
       grid = `<div class="dr-pick"><div class="draft-grid"><h3>驾驶员</h3><div class="draft-cards">${pilots.map((id) => card('pilot', id)).join('')}</div><h3>机体</h3><div class="draft-cards">${mechs.map((id) => card('mech', id)).join('')}</div></div>
         <div class="dr-lock"><p>${isBan ? (D.sel.ban ? `禁用：<b>${D.sel.ban.k === 'pilot' ? S.pilot(D.sel.ban.id).name : S.WEAPONS[D.sel.ban.id].name}</b>` : '点一个要禁用的驾驶员或机体') : `出战：<b>${D.sel.pilot ? S.pilot(D.sel.pilot).name : '?'}</b> + <b>${D.sel.mech ? S.WEAPONS[D.sel.mech].name : '?'}</b>`}</p>
+        ${drHint(isBan)}
         <button class="btn big" id="drLock" ${ok ? '' : 'disabled'}>${isBan ? '确认禁用' : '锁定'}</button>${isBan ? '<button class="btn small ghost" id="drSkip">不禁用</button>' : ''}</div></div>`;
     } else grid = `<div class="dr-wait">${D.done ? '选人完成，马上开战！' : '等待其他玩家……你可以先看看双方的阵容'}</div>`;
     $('draftBody').innerHTML = `<div class="dr2"><div class="dr-top" id="drTop"></div>${grid}</div>`;
@@ -834,8 +854,8 @@
       sfx.win(); toast(`获得皮肤「${K.name}」！`);
       heroWear(K.id);
     };
-    for (const b of document.querySelectorAll('#ov-hero [data-hero]')) b.onclick = () => { const [k, id] = b.dataset.hero.split(':'); HERO.from = HERO.from || null; HERO.kind = k; HERO.id = id; HERO.skin = null; HERO.tab = k === 'pilot' ? 'abil' : 'stat'; if (k === 'mech') R3.previewMode('auto'); renderHero(); sfx.click(); };
-    for (const b of document.querySelectorAll('#ov-hero [data-go]')) b.onclick = () => { if (b.dataset.go === 'events' && HERO.id && isCollab(HERO.id)) { EVSEL.tab = 'limited'; EVSEL.id = 'ev:yato'; } openOv(b.dataset.go); sfx.click(); };
+    for (const b of document.querySelectorAll('#ov-hero [data-hero]')) b.onclick = () => { const [k, id] = b.dataset.hero.split(':'); HERO.from = HERO.from || null; HERO.kind = k; HERO.id = id; HERO.skin = null; HERO.tab = HERO.tab === 'role' ? 'role' : k === 'pilot' ? 'abil' : 'stat'; if (k === 'mech') R3.previewMode('auto'); renderHero(); sfx.click(); };
+    for (const b of document.querySelectorAll('#ov-hero [data-go]')) b.onclick = () => { if (b.dataset.go === 'events' && HERO.id && isCollab(HERO.id)) { EVSEL.tab = 'limited'; EVSEL.id = 'ev:yato'; } else if (b.dataset.go === 'events' && HERO.id && E.QUEST_ONLY.includes(HERO.id)) { const qs = E.questSource(HERO.id); EVSEL.tab = 'task'; EVSEL.id = qs.id === 'story' ? 'story' : 'tl:' + qs.id; } openOv(b.dataset.go); sfx.click(); };
     const sel = $('hpSelect');
     if (sel) sel.onclick = () => {
       if (pilot) profile.pilot = HERO.id; else profile.weapon = HERO.id;
@@ -861,24 +881,26 @@
     const skinId = HERO.skin != null ? HERO.skin : own ? wsP : '';
     $('ov-hero').style.setProperty('--pc', P.accent);
     const cap = own ? E.lvCap(q.bt) : 5, bonus = own ? Math.round((E.statMul(q.lv) - 1) * 100) : 0;
-    $('hpLeft').innerHTML = `<div class="hp-tags"><span class="tag ${tag[1]}">${tag[0]}</span><span class="tag role">${P.title}</span></div>
+    $('hpLeft').innerHTML = `<div class="hp-tags"><span class="tag ${tag[1]}">${tag[0]}</span>${roleChip(P.id)}<span class="tag role">${P.title}</span></div>
       <h1 class="hp-name">${P.name}</h1><div class="hp-code">「${P.code}」</div>
       ${own ? `<div class="hp-power"><div class="pw-lv"><small>等级</small><b>${q.lv}</b></div><div class="pw-main"><div class="pw-bar"><i style="width:${Math.round(q.lv / E.MAX_LV * 100)}%"></i><em style="left:${Math.round(cap / E.MAX_LV * 100)}%"></em><span>${q.lv} / ${cap}${cap < E.MAX_LV ? '（突破后上限更高）' : ''}</span></div>
         <div class="pw-bt">突破 ${[1, 2].map((i) => `<i class="bt ${q.bt >= i ? 'on' : ''}">${i === 1 ? 'Ⅰ' : 'Ⅱ'}</i>`).join('')}<small>生命 / 伤害 +${bonus}%</small></div></div></div>`
-        : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${isCollab(P.id) ? collabHow(P.id) : E.QUEST_ONLY.includes(P.id) ? `完成「活动 → ${E.STORY.name}」全部任务免费获得` : E.SEASON_PILOTS.includes(P.id) ? '街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '角色宝箱、街头宝箱都可能开出，也可能出现在限时购买里'}</small></div></div>`}
+        : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${isCollab(P.id) ? collabHow(P.id) : E.QUEST_ONLY.includes(P.id) ? `完成「活动 → 任务 → ${E.questSource(P.id).name}」全部任务免费获得` : E.SEASON_PILOTS.includes(P.id) ? '街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '角色宝箱、街头宝箱都可能开出，也可能出现在限时购买里'}</small></div></div>`}
       <div class="hp-mini">
         <div><small>技能</small><b>${sk.name}</b></div><div><small>被动</small><b>${P.passive.name}</b></div>
         <div><small>弹出武器</small><b>${SA.name}</b></div><div><small>擅长机体</small><b>${rec.name}</b></div>
       </div>
       <blockquote class="hp-line">“${P.line}”</blockquote>`;
-    const tabs = [['abil', '能力'], ['up', '升级'], ['skin', '皮肤'], ['story', '介绍']];
+    const tabs = [['abil', '能力'], ['role', '定位'], ['up', '升级'], ['skin', '皮肤'], ['story', '介绍']];
     $('hpTabs').innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}" class="${HERO.tab === k ? 'sel' : ''}">${n}</button>`).join('');
     let body = '';
     if (HERO.tab === 'abil') {
-      body = `<div class="abil big"><b>${ic('skill', P.accent)}技能 · ${sk.name}<small>Q 键 · 每局 ${S.SKILL_USES} 次</small></b><p>${sk.desc}</p></div>
+      body = `<div class="abil big"><b>${ic('skill', P.accent)}技能 · ${sk.name}<small>Q 键 · 充能 ${S.SKILL_CHARGES} 次 · 每 ${S.SKILL_REGEN} 秒回复 1 次</small></b><p>${sk.desc}</p></div>
         <div class="abil big"><b>${ic('passive', P.accent)}被动 · ${P.passive.name}<small>一直生效</small></b><p>${P.passive.desc}</p></div>
         <div class="abil big"><b>${ic('pilot', P.accent)}弹出武器 · ${SA.name}<small>机体被打爆后</small></b><p>${SA.desc}</p></div>
-        <div class="abil big ovl ${own && q.bt >= 1 ? '' : 'locked'}"><b>${ic('super', '#b78cff')}超载 · ${OV.name}<small>${own && q.bt >= 1 ? 'R 键 · 每局 1 次' : '突破 I 解锁'}</small></b><p>${OV.desc} 打出 ${S.OV_NEED} 点伤害充满，持续 ${S.OV_TIME} 秒（突破 II 后 ${S.OV_TIME + 2} 秒，效果更强）。</p></div>`;
+        <div class="abil big ovl ${own && q.bt >= 1 ? '' : 'locked'}"><b>${ic('super', '#b78cff')}超载 · ${OV.name}<small>${own && q.bt >= 1 ? 'R 键 · 可以多次使用' : '突破 I 解锁'}</small></b><p>${OV.desc} 打出 ${S.OV_NEED} 点伤害充满（放完可以重新充），持续 ${S.OV_TIME} 秒（突破 II 后 ${S.OV_TIME + 2} 秒，效果更强）。</p></div>`;
+    } else if (HERO.tab === 'role') {
+      body = rolePanel('pilot', P.id, P.accent);
     } else if (HERO.tab === 'up') {
       const rows = [];
       for (let lv = 1; lv <= E.MAX_LV; lv++) {
@@ -910,16 +932,35 @@
       ? `${profile.weapon !== P.weapon && E.hasMech(profile, P.weapon) ? `<button class="btn ghost" id="hpRec">换上擅长机体「${rec.name}」</button>` : ''}<button class="btn big hp-sel ${using ? 'on' : ''}" id="${using ? '' : 'hpSelect'}" ${using ? 'disabled' : ''}>${using ? '✓ 出战中' : '选择出战'}</button>`
       : `<button class="btn big" data-go="${E.QUEST_ONLY.includes(P.id) || isCollab(P.id) ? 'events' : 'chests'}">${isCollab(P.id) ? '去夜都决战' : E.QUEST_ONLY.includes(P.id) ? '去完成任务' : '去开宝箱'}</button>`;
   }
+  // 2.2：定位标签 + 「定位」页（六边形面板、推荐模式、克制关系）
+  function roleChip(id) { const r = S.roleOf(id); if (!r) return ''; const R = S.ROLES[r.role]; return `<span class="tag rl" style="--rc:${R.color}">${R.name} · ${S.TAGS[r.tag]}</span>`; }
+  function rolePanel(kind, id, color) {
+    const r = S.roleOf(id), R = S.ROLES[r.role], ring = S.ROLE_RING[kind], i = ring.indexOf(r.role);
+    const nx = ring[(i + 1) % ring.length], pv = ring[(i + ring.length - 1) % ring.length];
+    const C = S.countersOf(id), fit = S.fitOf(id);
+    const face = (x) => (kind === 'pilot' ? `<span class="cf face">${GP.portrait(S.pilot(x), { face: true })}</span>` : `<span class="cf mech">${mechFace(x)}</span>`);
+    const nm = (x) => (kind === 'pilot' ? S.pilot(x).name : S.WEAPONS[x].name);
+    const row = (m) => `<button class="ctr-row" data-hero="${kind}:${m.id}">${face(m.id)}<div><b>${nm(m.id)}</b><small>${m.why}</small></div></button>`;
+    const chip = (k) => `<span class="rl-chip" style="--rc:${S.ROLES[k].color}">${S.ROLES[k].name}</span>`;
+    return `<div class="role-panel">
+      <div class="rp-top"><div class="rp-hex">${S.hexSvg(kind, id, { color })}</div>
+        <div class="rp-info"><div class="rp-role" style="--rc:${R.color}"><b>${R.name}</b><span>${S.TAGS[r.tag]}</span></div><p>${R.desc}</p>
+          <div class="rp-ring"><div>${chip(r.role)} ➜ ${chip(nx)}<small>${S.RING_WHY[r.role + '>' + nx]}</small></div><div>${chip(pv)} ➜ ${chip(r.role)}<small>${S.RING_WHY[pv + '>' + r.role]}</small></div></div>
+          ${kind === 'mech' ? `<p class="hp-note">机体定位克制对方时，伤害 +${Math.round(S.ROLE_EDGE * 100)}%。</p>` : ''}
+          ${fit ? `<div class="rp-modes"><small>推荐模式</small>${fit.modes.map((m) => `<span>${S.MODES[m].name}</span>`).join('')}</div>` : ''}</div></div>
+      <div class="ctr-cols"><div><h4 class="good">克制</h4>${C.beats.map(row).join('')}</div><div><h4 class="bad">被克制</h4>${C.weak.map(row).join('')}</div></div>
+    </div>`;
+  }
   function renderMechPage(tag) {
     const id = HERO.id, W = S.WEAPONS[id], sp = S.SPECIALS[W.special], own = E.hasMech(profile, id);
     const P = S.pilot(profile.pilot);
     $('ov-hero').style.setProperty('--pc', '#ffb000');
-    $('hpLeft').innerHTML = `<div class="hp-tags"><span class="tag ${tag[1]}">${tag[0]}</span><span class="tag role">${W.role}</span></div>
+    $('hpLeft').innerHTML = `<div class="hp-tags"><span class="tag ${tag[1]}">${tag[0]}</span>${roleChip(id)}<span class="tag role">${W.role}</span></div>
       <h1 class="hp-name">${W.name}</h1><div class="hp-code">${W.short ? `「${W.short}」` : ''}</div>
-      ${own ? '' : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这台机体</b><small>${isCollab(id) ? collabHow(id) : E.QUEST_ONLY.includes(id) ? `任务机体：完成「活动 → ${E.STORY.name}」3 个任务免费获得` : E.STRIKE_MECHS.includes(id) ? '特攻队补给箱（活动任务、乐园祭商店）有概率开出' : '街头宝箱（补给箱 / 军用箱 / 金色空投）或限时购买'}</small></div></div>`}
+      ${own ? '' : `<div class="hp-lockcard">${ic('lock')}<div><b>还没有这台机体</b><small>${isCollab(id) ? collabHow(id) : E.QUEST_ONLY.includes(id) ? `任务机体：完成「活动 → 任务 → ${E.questSource(id).name}」第 ${E.questSource(id).step} 步免费获得` : E.STRIKE_MECHS.includes(id) ? '特攻队补给箱（活动任务、乐园祭商店）有概率开出' : '街头宝箱（补给箱 / 军用箱 / 金色空投）或限时购买'}</small></div></div>`}
       <div class="statbars big">${mechStats(id).map(([k, v, f]) => `<div><span>${k}</span><i><em style="width:${Math.round(f * 100)}%"></em></i><b>${v}</b></div>`).join('')}</div>
       <div class="hp-mini"><div><small>攻击方式</small><b>${ATTACK_NAME[W.attack] || W.attack}</b></div><div><small>大招</small><b>${sp.name}</b></div></div>`;
-    const tabs = [['stat', '武器'], ['super', '大招'], ['skin', '涂装'], ['pilots', '驾驶员']];
+    const tabs = [['stat', '武器'], ['role', '定位'], ['super', '大招'], ['skin', '涂装'], ['pilots', '驾驶员']];
     $('hpTabs').innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}" class="${HERO.tab === k ? 'sel' : ''}">${n}</button>`).join('');
     let body = '';
     if (HERO.tab === 'stat') {
@@ -929,6 +970,8 @@
         <div class="kv"><div><small>生命</small><b>${W.hp}</b></div><div><small>每次攻击伤害</small><b>${Math.round(perAtk)}</b></div><div><small>射程</small><b>${S.weaponRange(id)}</b></div>
         <div><small>移动速度</small><b>${Math.round(W.spd * 100)}%</b></div><div><small>弹药装填</small><b>${W.reload} 秒</b></div><div><small>攻击间隔</small><b>${W.atkCd} 秒</b></div></div>
         <p class="hp-note">数值为 1 级；驾驶员每升 1 级，生命和伤害 +4%。</p>`;
+    } else if (HERO.tab === 'role') {
+      body = rolePanel('mech', id, S.ROLES[S.CLASS[id][0]].color);
     } else if (HERO.tab === 'super') {
       body = `<div class="abil big"><b>${ic('super')}大招 · ${sp.name}<small>E 键 / 右键 · 充能 ${W.spNeed}</small></b><p>${sp.desc}</p></div><p class="hp-note">打中敌人给大招充能，涂地也会充一点。</p>`;
     } else if (HERO.tab === 'skin') {
@@ -2154,7 +2197,7 @@
     me.hp = a[4]; me.ammo = a[5] / 100; me.tank = a[5] / 3; me.sp = a[6]; me.flags = a[7]; me.resp = a[8] / 10; me.carry = a[9];
     me.sm = a[10] / 100; me.charge = a[11] / 100; me.shield = a[12]; me.spk = a[16];
     me.maxHp = a[20] || 100; me.skUses = a[21]; me.skCd = (a[22] || 0) / 10; me.buffs = a[23] || 0;
-    me.ovk = (a[24] || 0) / 100; me.ovT = (a[25] || 0) / 10; me.ovOn = !!((a[26] || 0) & 1); me.ovUsed = !!((a[26] || 0) & 2);
+    me.ovk = (a[24] || 0) / 100; me.ovT = (a[25] || 0) / 10; me.ovOn = !!((a[26] || 0) & 1); me.ovUsed = false; me.skMax = ((a[26] || 0) >> 2) & 7 || S.SKILL_CHARGES; me.skRegen = (a[27] || 0) / 100;
     const alive = a[7] & 1;
     if (a[13] !== G.sync || !alive) {
       G.sync = a[13];
@@ -2483,6 +2526,7 @@
     megaphone: { kick: 1, mz: 'sonic', tr: 'ring', imp: 'ring' }, riot: { kick: 1.7, mz: 'zap', tr: 'zap', imp: 'zap' }, blade: { kick: 0.9, sw: 'slash' },
     stinger: { kick: 0.35, mz: 'needle', tr: 'needle', imp: 'toxic' }, phantom: { kick: 0.6, mz: 'silent', tr: 'shadow', imp: 'shadow' },
     warden: { kick: 0.5, mz: 'charm', tr: 'charm', imp: 'charm' }, reaper: { kick: 1, sw: 'spirit' }, tactic: { kick: 0.9, mz: 'tracer', tr: 'tracer', imp: 'spark' },
+    prism: { kick: 2.2 }, lancer: { kick: 1.2, sw: 'slash' },
   };
   const wOf = (p) => (p && !p.foot && !(p.flags & 512) ? p.weapon : null);   // 机体形态才有机体手感（弹出来的驾驶员用随身武器）
   function mechVol(x, y) { const me = G.me; if (!me) return 0; const d = Math.hypot(me.px - x, me.py - y); return d > 560 ? 0 : 0.12 + 0.38 * (1 - d / 560); }
@@ -2977,7 +3021,8 @@
     ov.classList.toggle('dim', !!me.ovUsed);
     const sk = $('tSkill');
     sk.classList.toggle('dim', !(me.skUses > 0) || me.skCd > 0);
-    sk.dataset.n = me.skUses == null ? 3 : me.skUses;
+    sk.dataset.n = me.skUses == null ? S.SKILL_CHARGES : me.skUses;
+    sk.style.setProperty('--rg', me.skUses < (me.skMax || S.SKILL_CHARGES) ? me.skRegen || 0 : 0);
     $('tFire').style.setProperty('--ammo', me.ammo == null ? 3 : me.ammo);
     if (TT.wheel && TT.aiming) $('tWheel').classList.remove('lit');
     if (TT.aiming) TT.wheel = false;
@@ -4137,12 +4182,12 @@
         ring(bx, by, 40, am / 3, '#ffae2e', foot ? S.sidearm(me.pilot).name : W.short, '左键 · ' + Math.floor(am) + '/3');
         const spk = foot ? 0 : Math.min(1, me.sp / W.spNeed);
         ring(bx - 104, by + 6, 32, spk, '#ffdf2e', foot ? '—' : '大招', 'E / 右键', spk >= 1 && !foot, !!foot);
-        const sk = S.SKILLS[P.skill], uses = me.skUses == null ? 3 : me.skUses;
-        ring(bx - 186, by + 12, 26, me.skCd > 0 ? 1 - me.skCd / S.SKILL_CD : 1, P.accent, sk.short, `Q · 剩 ${uses}`, false, uses <= 0);
-        if (me.ovOn) {
-          const used = me.ovUsed && !(me.ovT > 0);
-          ring(bx - 258, by + 16, 24, me.ovT > 0 ? me.ovT / (S.OV_TIME + 2) : used ? 0 : me.ovk, '#b78cff', me.ovT > 0 ? me.ovT.toFixed(0) + '秒' : '超载', used ? 'R · 已用' : 'R', !me.ovUsed && me.ovk >= 1, used);
-        }
+        const sk = S.SKILLS[P.skill], uses = me.skUses == null ? S.SKILL_CHARGES : me.skUses, smax = me.skMax || S.SKILL_CHARGES;
+        // 2.2 充能制：没有充能时圈显示回复进度；有充能但在间隔里时显示间隔
+        const skK = uses <= 0 ? me.skRegen || 0 : me.skCd > 0 ? 1 - me.skCd / S.SKILL_CD : 1;
+        ring(bx - 186, by + 12, 26, skK, P.accent, sk.short, `Q · ${uses}/${smax}`, false, uses <= 0);
+        if (uses < smax) { ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bx - 186, by + 12, 33, -Math.PI / 2, -Math.PI / 2 + (me.skRegen || 0) * Math.PI * 2); ctx.stroke(); }
+        if (me.ovOn) ring(bx - 258, by + 16, 24, me.ovT > 0 ? me.ovT / (S.OV_TIME + 2) : me.ovk, '#b78cff', me.ovT > 0 ? me.ovT.toFixed(0) + '秒' : '超载', 'R', !(me.ovT > 0) && me.ovk >= 1, false);
         txt('空格 跳跃 · Shift 滚轮', bx - 70, by - 64, 11, '#9a9db5', 'center', 3);
       }
       if (foot && alive) {
@@ -4815,8 +4860,8 @@
     for (const id of E.TASKLINE_ORDER) {
       const L = E.TASKLINES[id], st = E.taskState(profile, id);
       if (id === 'rookie' && st.c.every(Boolean)) continue;
-      const nd = st.c.filter(Boolean).length;
-      out.task.push({ id: 'tl:' + id, name: L.name, color: L.color, sub: `${nd} / ${L.steps.length} 已领`, can: L.steps.some((q, i) => st.p[i] >= q[1] && !st.c[i]), isNew: id === 'loot' });
+      const nd = st.c.filter(Boolean).length, open = !L.chapter || E.chapterOpen(profile, id);
+      out.task.push({ id: 'tl:' + id, name: L.chapter ? `第${L.chapter === 1 ? '一' : '二'}章 · ${L.name}` : L.name, color: L.color, sub: open ? `${nd} / ${L.steps.length} 已领` : `完成「${E.TASKLINES[L.need].name}」后开启`, can: open && L.steps.some((q, i) => st.p[i] >= q[1] && !st.c[i] && (!L.chapter || i === 0 || st.c[i - 1])), isNew: !!L.chapter && nd < L.steps.length, off: !open });
     }
     return out;
   }
@@ -4842,6 +4887,7 @@
     for (const b2 of pg.querySelectorAll('[data-task]')) b2.onclick = async () => {
       const r = await eco('claimTask', { id: b2.dataset.task, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
       sfx.win(); showGain(r.items, E.TASKLINES[b2.dataset.task].name);
+      const it = r.items[0]; if (it && (it.k === 'pilot' || it.k === 'mech')) toast(it.k === 'pilot' ? `「${S.pilot(it.id).name}」加入了反抗军！` : `获得机体「${S.WEAPONS[it.id].name}」！`, 3200);
     };
     for (const b2 of pg.querySelectorAll('[data-shop]')) b2.onclick = async () => {
       const r = await eco('eventShop', { id: b2.dataset.shop, i: +b2.dataset.i }); if (!r.ok) return toast(r.err);
@@ -4871,6 +4917,17 @@
         `<div class="ev-sec"><h4>任务</h4><div class="ev-quests">${E.STORY.steps.map((q, i) => qrow(q, profile.story.p[i])).join('')}</div></div>
         <div class="ev-sec"><h4>奖励</h4><div class="ev-rewards">${E.STORY.rewards.map(([n, it]) => { const got = profile.story.c.includes(n), can = done >= n && !got; const nm = it.k === 'pilot' ? `驾驶员「${S.pilot(it.id).name}」` : `机体「${S.WEAPONS[it.id].name}」`;
           return `<button class="btn small ${got ? 'ghost' : ''}" data-story="${n}" ${can ? '' : 'disabled'}>完成 ${n} 个：${nm}${got ? ' ✓' : ''}</button>`; }).join('')}</div></div>`;
+    }
+    if (id.startsWith('tl:') && E.TASKLINES[id.slice(3)].chapter) {   // 2.2：章节任务线（每一步有一句剧情台词，按顺序领取）
+      const tid = id.slice(3), L = E.TASKLINES[tid], st = E.taskState(profile, tid), open = E.chapterOpen(profile, tid), PP = S.pilot(L.pilot);
+      const steps = L.steps.map((q, i) => {
+        const sp = S.pilot(q[3]), seen = i === 0 || st.p[i - 1] >= L.steps[i - 1][1], can = open && st.p[i] >= q[1] && !st.c[i] && (i === 0 || st.c[i - 1]);
+        return `<div class="chap-step ${seen ? '' : 'lock'}" style="--ec:${sp.accent}"><div class="cs-face">${GP.portrait(sp, { face: true })}</div><div class="cs-body"><p class="cs-line"><b>${sp.name}</b>${seen ? q[4] : '……'}</p>
+          ${qrow(q, st.p[i], `<button class="btn small ${st.c[i] ? 'ghost' : ''}" data-task="${tid}" data-i="${i}" ${can ? '' : 'disabled'}>${st.c[i] ? '已领' : rewardLabel(q[2])}</button>`)}</div></div>`;
+      }).join('');
+      return banner(L.color, `章节任务 · 第${L.chapter === 1 ? '一' : '二'}章`, L.name, L.desc, `<div class="eb-duo">${GP.portrait(PP)}</div>`) +
+        (open ? '' : `<div class="chap-lock">完成「${E.TASKLINES[L.need].name}」并领完全部奖励后开启</div>`) +
+        `<div class="ev-sec"><h4>剧情任务<small>普通对战和搜刮撤离都能推进 · 按顺序完成</small></h4>${steps}</div>`;
     }
     if (id.startsWith('tl:')) {
       const tid = id.slice(3), L = E.TASKLINES[tid], st = E.taskState(profile, tid);
@@ -5246,7 +5303,7 @@
     if (!q) {
       const inStarter = E.STARTER_PILOTS.includes(P.id);
       if (isCollab(P.id)) return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${collabHow(P.id)}</small></div><button class="btn small" id="goChest">去看看</button></div>`;
-      if (E.QUEST_ONLY.includes(P.id)) return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>任务角色：在「活动 → ${E.STORY.name}」完成全部任务免费获得</small></div><button class="btn small" id="goChest">去看看</button></div>`;
+      if (E.QUEST_ONLY.includes(P.id)) return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>任务角色：在「活动 → 任务 → ${E.questSource(P.id).name}」完成全部任务免费获得</small></div><button class="btn small" id="goChest">去看看</button></div>`;
       return `<div class="upg locked">${ic('lock')}<div><b>还没有这位驾驶员</b><small>${inStarter ? '常驻角色：新手宝箱、角色宝箱、街头宝箱都可能开出' : E.SEASON_PILOTS.includes(P.id) ? '赛季角色：街头宝箱（补给箱 / 军用箱 / 金色空投）可能开出' : '常驻角色：角色宝箱、街头宝箱都可能开出'}</small></div><button class="btn small" id="goChest">去宝箱</button></div>`;
     }
     const cap = E.lvCap(q.bt), bonus = Math.round((E.statMul(q.lv) - 1) * 100);
@@ -5265,7 +5322,7 @@
       <div class="upg-act">${act}</div></div>`;
   }
   function bindUpgrade(P) {
-    const g = $('goChest'); if (g) g.onclick = () => { if (isCollab(P.id)) { EVSEL.tab = 'limited'; EVSEL.id = 'ev:yato'; } openOv(E.QUEST_ONLY.includes(P.id) || isCollab(P.id) ? 'events' : 'chests'); };
+    const g = $('goChest'); if (g) g.onclick = () => { if (isCollab(P.id)) { EVSEL.tab = 'limited'; EVSEL.id = 'ev:yato'; } else if (E.QUEST_ONLY.includes(P.id)) { const qs = E.questSource(P.id); EVSEL.tab = 'task'; EVSEL.id = qs.id === 'story' ? 'story' : 'tl:' + qs.id; } openOv(E.QUEST_ONLY.includes(P.id) || isCollab(P.id) ? 'events' : 'chests'); };
     const u = $('doUp');
     if (u) u.onclick = async () => { const r = await eco('upgrade', { pilot: P.id }); if (!r.ok) return toast(r.err); sfx.win(); toast(`${P.name} 升到了 ${r.lv} 级！`); };
     const b = $('doBreak');

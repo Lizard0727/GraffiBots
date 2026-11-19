@@ -25,7 +25,7 @@
 <meta name="twitter:description" content="GraffiBots official site: a 4v4 paint-mech brawler where you spray a gray city back into color. Play free in your browser or download the offline and Android versions.">
 <meta name="twitter:image" content="https://lizard0727.github.io/GraffiBots/img/v14-summer.jpg">
 <meta property="og:url" content="https://lizard0727.github.io/GraffiBots/">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"涂鸦机兵 GraffiBots","alternateName":"GraffiBots","description":"涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。","inLanguage":["zh-CN","en"],"genre":["Action","Shooter","Multiplayer"],"gamePlatform":["Web browser","Android"],"applicationCategory":"Game","operatingSystem":"Windows, macOS, Linux, Android","playMode":["MultiPlayer","SinglePlayer"],"numberOfPlayers":{"@type":"QuantitativeValue","minValue":1,"maxValue":8},"softwareVersion":"2.1.2","datePublished":"2026-11-13","dateModified":"2026-11-17","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://lizard0727.github.io/GraffiBots/img/v14-summer.jpg","url":"https://lizard0727.github.io/GraffiBots/"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"涂鸦机兵 GraffiBots","alternateName":"GraffiBots","description":"涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。","inLanguage":["zh-CN","en"],"genre":["Action","Shooter","Multiplayer"],"gamePlatform":["Web browser","Android"],"applicationCategory":"Game","operatingSystem":"Windows, macOS, Linux, Android","playMode":["MultiPlayer","SinglePlayer"],"numberOfPlayers":{"@type":"QuantitativeValue","minValue":1,"maxValue":8},"softwareVersion":"2.2","datePublished":"2026-11-13","dateModified":"2026-11-19","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://lizard0727.github.io/GraffiBots/img/v14-summer.jpg","url":"https://lizard0727.github.io/GraffiBots/"}</script>
 <!-- seo:end -->
 <style>
 @font-face { font-family: 'GBHead'; src: url('fonts/huangyou.woff2') format('woff2'); font-display: swap; }
@@ -197,6 +197,40 @@ b.new { color: var(--ny); font-weight: 800; }
 .acts button[disabled] { opacity: .45; cursor: default; transform: none; }
 @media (max-width: 820px) { .stage-wrap { grid-template-columns: minmax(0, 1fr); } .stage { max-height: 420px; aspect-ratio: 1; } .abils { grid-template-columns: minmax(0, 1fr); } }
 .mechs { margin-top: 38px; overflow-x: auto; }
+/* 2.2 定位 · 六边形 · 克制图 */
+.rchip { display: inline-block; padding: 2px 9px; border-radius: 6px; border: 2px solid var(--rc); background: color-mix(in srgb, var(--rc) 25%, transparent); color: #fff; font-weight: 800; font-size: 13px; white-space: nowrap; }
+.rchip i { font-style: normal; opacity: .8; font-weight: 600; margin-left: 4px; }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.mcard { background: #ffffff08; border: 1px solid var(--seam); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.mcard h4 { margin: 0; font: 20px/1.2 var(--f-head); }
+.mcard .sub { color: var(--grey); font-size: 13px; }
+.mcard svg, .stage-hex svg { width: 100%; max-width: 200px; height: auto; align-self: center; }
+.mcard .sticker { font-size: 12px; margin-left: 6px; }
+.stage-role { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.stage-hex { flex: 0 0 170px; }
+.stage-ctr { flex: 1 1 180px; font-size: 13px; line-height: 1.5; }
+.stage-ctr b.g { color: #9cff2e; } .stage-ctr b.r { color: #ff7a6a; }
+.rings { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.ring { background: #ffffff08; border: 1px solid var(--seam); border-radius: 16px; padding: 14px; }
+.ring h3 { margin: 0 0 6px; font: 22px/1.2 var(--f-head); }
+.ring svg { width: 100%; max-width: 360px; height: auto; display: block; margin: 0 auto; }
+.ring ol { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; color: #d9d6e2; }
+.ring ol li { margin: 4px 0; }
+.ring .rnote { font-size: 13px; color: var(--grey); margin: 8px 0 0; }
+.ctr-grid summary .rchip, .mcard .rchip { align-self: flex-start; }
+.ctr-tabs { display: flex; gap: 8px; margin: 0 0 12px; }
+.ctr-tabs button { font: inherit; padding: 6px 14px; border-radius: 99px; border: 2px solid var(--seam); background: transparent; color: #fff; cursor: pointer; font-weight: 800; }
+.ctr-tabs button[aria-pressed="true"] { background: var(--ny); color: var(--ink); border-color: var(--ny); }
+.ctr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.ctr-grid details { background: #ffffff08; border: 1px solid var(--seam); border-radius: 12px; padding: 10px 12px; }
+.ctr-grid summary { cursor: pointer; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.ctr-grid summary::-webkit-details-marker { display: none; }
+.ctr-grid summary b { font: 18px/1.2 var(--f-head); }
+.ctr-grid .ln { font-size: 13px; color: #d9d6e2; }
+.ctr-grid .ln em { font-style: normal; font-weight: 800; }
+.ctr-grid .ln em.g { color: #9cff2e; } .ctr-grid .ln em.r { color: #ff7a6a; }
+.ctr-grid ul { margin: 8px 0 0; padding-left: 16px; font-size: 12.5px; color: #c9c5d4; }
+.ctr-grid ul li { margin: 3px 0; }
 .mechs table { width: 100%; border-collapse: collapse; min-width: 560px; font-variant-numeric: tabular-nums; }
 .mechs th { text-align: left; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey); font-weight: 700; padding: 0 12px 8px; border-bottom: 2px solid var(--seam); }
 .mechs td { padding: 9px 12px; border-bottom: 1px solid var(--seam); font-size: 14px; }
@@ -276,9 +310,9 @@ footer a { color: var(--dust); }
 <!-- noscript:start（由 tools/build-site.js 生成：搜索引擎和关掉 JavaScript 的人看到的内容） -->
 <noscript><div class="wrap" style="padding-block:24px">
 <h1>涂鸦机兵 GraffiBots</h1><p>涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。</p><p>GraffiBots official site: a 4v4 paint-mech brawler where you spray a gray city back into color. Play free in your browser or download the offline and Android versions.</p>
-<p>当前版本 2.1.2（2026-11-17）。驾驶员 19 位 · 机兵 20 台 · 地图 17 张 · 玩法 12 种。</p>
-<h2>2.1.2 更新 · 流畅度 &amp; 撤离 AI</h2><h3>修复「无限大招」</h3><ul><li>狙击机兵「锁定导弹」以前会锁定全图所有敌人，导弹伤害又给大招充能，打中后马上又能放，形成无限大招</li><li>现在：放大招后 3 秒内造成的伤害和涂地都不再给大招充能（所有机体都一样）</li><li>锁定导弹只锁定 1100 范围内、看得见的最近 4 个敌人（草丛里 / 隐身的锁不到），每发最多 100 伤害（原 140），大招充能 240 → 270</li></ul><h3>帧率优化（彻查）</h3><ul><li>查出来主要卡在「绘制次数」：一局普通对战每帧要画 937 次，其中阴影那一遍几乎把整个场景又画了一遍。现在降到约 360 次（−62%），撤离地图从 588 降到约 325</li><li>场地围栏、远景城市的几百个零件合并成几块网格；机兵和驾驶员只有大的部件投影子；阴影改成隔帧更新</li><li>高画质渲染分辨率上限 1.5 → 1.25 倍，界面画布最多 1.5 倍，后期抗锯齿 4x → 2x</li><li>自动调节画质会一档档降：分辨率 → 关阴影 → 关泛光 → 再降分辨率，帧率回来后再慢慢调回</li><li>浏览器没有开显卡加速（软件渲染，帧率只有 20–30）时会提醒并自动切到低画质；设置里能看到显卡名称</li></ul><h3>电梯修复</h3><ul><li>电梯以前是把人弹上去，撞到楼墙会被弹回来掉下去；现在是真正的电梯：沿电梯井升到楼顶高度，再平移到楼顶上，14 部电梯全部能用</li></ul><h3>撤离 AI 大改</h3><ul><li>每支 AI 小队有自己的打法：早撤型（拿一点就走、能不打就不打）、阴人型（拿够本钱后蹲在撤离点附近阴人，专挑身上值钱的）、均衡型（能多拿就多拿，残血就撤）、贪心型（拿到最后一刻，残血也不太跑）</li><li>AI 会判断容器值不值得开：按容器类型估算价值，再算上距离、附近的敌人和背包剩余空间；别人留下的高价值遗骸会去抢</li><li>战斗中残血会边打边撤，会用急救针 / 维修包 / 护盾电池 / 肾上腺素</li><li>模拟测试：每局成功撤离的 AI 从 3–5 / 18 提高到约 15 / 30</li></ul><h3>更新奖励</h3><ul><li>信箱里有一份 2.1.2 小礼包：80 宝石 + 2 个补给箱</li></ul>
-<h2>驾驶员</h2><ul><li>凌焰（Blaze）：热血突击手，随身武器「火花双枪」</li><li>白夜（Frost）：冷面狙击手，随身武器「袖珍狙击枪」</li><li>苏糖（Candy）：元气偶像主播，随身武器「彩带喷枪」</li><li>雷豹（Titan）：重装开路者，随身武器「涂料拳套」</li><li>夜鸢（Raven）：神秘涂鸦师，随身武器「墨汁飞镖」</li><li>星澜（Aurora）：天才机兵工程师，随身武器「铆钉枪」</li><li>风羽（Gale）：天空竞速手，随身武器「疾风弩」</li><li>洛奇（Hex）：天才黑客，随身武器「电击枪」</li><li>包大福（Bao）：后勤大厨，随身武器「平底锅」</li><li>秦岳（Qin）：退役王牌，随身武器「手雷」</li><li>小柚（Yuzu）：无人机少女，随身武器「迷你无人机」</li><li>岚（Lan）：灰城反抗军队长，随身武器「信号枪」</li><li>石磊（Rocky）：拆迁队工头，随身武器「钉锤」</li><li>叶声（Echo）：地下电台 DJ，随身武器「口袋音箱」</li><li>韩冰（Han）：灰石集团前安保主管，随身武器「警用电棍」</li><li>卡卡（Kaka）：街头魔术师，随身武器「扑克飞牌」</li><li>符零（Sigil）：夜都符术师，随身武器「符纸飞镖」</li><li>赤镰（Crimson）：恶灵宿主，随身武器「断骨短镰」</li><li>霍克（Hawk）：雇佣兵队长，随身武器「冲锋手枪」</li></ul>
+<p>当前版本 2.2（2026-11-19）。驾驶员 21 位 · 机兵 22 台 · 地图 17 张 · 玩法 12 种。</p>
+<h2>2.2 更新 · 战斗定位 &amp; 灰石叛逃者</h2><h3>战斗定位</h3><ul><li>每台机体和每位驾驶员都有了 1 个主定位 + 1 个副标签</li><li>机体 6 种定位：突击（近战）、压制（中距连射）、狙击（远程）、炮击（投掷 / 曲射 / 穿墙）、重装（坦克）、刺客</li><li>驾驶员 4 种定位：支援、控制、突击、侦察</li><li>角色页和机体页都多了「定位」分页；选人阶段的卡片上也会显示定位</li></ul><h3>克制关系</h3><ul><li>定位环：压制 → 刺客 → 狙击 → 重装 → 突击 → 炮击 → 压制（机体），控制 → 突击 → 支援 → 侦察 → 控制（驾驶员）</li><li>机体主定位克制对方时，伤害 +6%</li><li>每个角色还有 2~4 个具体的「克制」和「被克制」对象，每一条都写了原因</li><li>排位选人时会提示：你的选择克制对手的谁、对手的谁克制你；禁用阶段会提示克制你出战机体的是谁</li><li>官网新增「克制图」：定位环 + 全部克制关系</li></ul><h3>六边形能力面板</h3><ul><li>每个角色都有一张 A~E 的六边形面板</li><li>机体：破坏力 / 耐久 / 速度 / 射程 / 涂地 / 操作难度；驾驶员：战斗 / 辅助 / 控制 / 机动 / 生存 / 操作难度</li><li>等级按游戏数值和模拟胜率在全体角色里排名自动算出（前 20% 是 A），官网也能看</li><li>角色页还会显示「推荐模式」</li></ul><h3>技能改成充能制</h3><ul><li>驾驶员技能以前每台机体 3 次、重建后刷新；现在最多存 2 次充能，每 15 秒回复 1 次，两次之间至少隔 3 秒</li><li>重建机体不再刷新充能；技能按钮外圈显示充能回复进度</li><li>天赋「技能专精」：技能充能速度 +20%（原：冷却 -25%）；「额外技能」：充能上限 +1</li><li>风羽的超载「乘风」：立刻回复 1 次技能充能</li></ul><h3>超载可以多次使用</h3><ul><li>超载以前每局只能放 1 次；现在放完可以重新充能、再放</li><li>充满需要打出的伤害 360 → 480（充得更慢）；超载进行中不会充能</li></ul><h3>新任务线「灰石叛逃者」（接着韩冰的故事）</h3><ul><li>第一章「棱镜档案」：护送灰石研究园区的叛逃博士——第 4 步获得棱镜原型机，第 8 步获得驾驶员姜黎</li><li>第二章「零号档案」：完成第一章后开启，灰石试验部队的王牌追了上来——第 4 步获得枪骑原型机，第 8 步获得驾驶员沈零</li><li>每章 8 步，每一步都有一句剧情台词，按顺序完成和领取；普通对战和搜刮撤离都能推进</li><li>在「活动 → 任务」里</li></ul><h3>新驾驶员 · 姜黎「博士」（控制 · 治疗）</h3><ul><li>技能「纳米雾场」：扔出纳米雾罐，4 秒内雾里的队友每秒回复 15 生命，敌人减速 30%、装填 -25%</li><li>被动「效率优化」：技能充能速度 +25%；附近的队友技能充能 +10%</li><li>超载「协议覆写」：附近队友每秒回复 12 生命、受到的伤害 -15%，范围里的敌人减速</li><li>弹出武器「试剂枪」：命中减速</li></ul><h3>新驾驶员 · 沈零「零号」（侦察 · 切入）</h3><ul><li>技能「相位突进」：朝瞄准方向突进（瞬间无敌），下一次攻击 +35%，并暴露前方的敌人</li><li>被动「战场感知」：附近 260 范围内的敌人自动暴露，草丛和隐身也藏不住</li><li>超载「零式解放」：移动速度 +30%、攻击速度 +25%，击倒敌人立刻回复 1 次技能充能</li><li>弹出武器「高周波匕首」</li></ul><h3>新机体</h3><ul><li>棱镜原型机（狙击 · 控场）：蓄力光束，命中减速；蓄满时折射到附近另一个敌人。大招「相位冻结」：0.6 秒后冻结一片区域里的敌人 1.2 秒</li><li>枪骑原型机（刺客 · 切入）：长枪突刺，攻击距离是近战里最远的；超过 2 秒没出手，下一枪是「先手突刺」（×1.35）。大招「三段突袭」：连续突进 3 段，可以重新瞄准</li></ul><h3>平衡调整（按 900 局模拟数据）</h3><ul><li>旋转机兵「枪管预热」：起步伤害 72% → 64%，最高 110% → 104%｜弹弓机兵：伤害 53 → 50</li><li>狙击机兵：生命 80 → 92，蓄力 0.95 → 0.88 秒，满蓄力伤害 82 → 84，光束涂得更宽</li><li>影刃机兵：生命 170 → 182，伤害 76 → 80｜战术机兵：每发伤害 12.5 → 13.4｜结界机兵：伤害 21 → 22.5</li><li>洛奇「电磁脉冲」：无法攻击 1.4 → 1.1 秒｜符零「封印符」：符阵 3 → 2.5 秒｜星澜「涂装炮台」：7 → 6 秒｜包大福「能量便当」：回复 90 → 110</li><li>模拟胜率范围：机体约 42%–57%，驾驶员约 43%–56%</li></ul><h3>界面</h3><ul><li>机体卡片上的名字改成白色，更清楚</li></ul><h3>更新奖励</h3><ul><li>信箱里有一份 2.2 礼包：200 宝石 + 1 个军用箱 + 2000 金币</li></ul>
+<h2>驾驶员</h2><ul><li>凌焰（Blaze）：热血突击手，随身武器「火花双枪」</li><li>白夜（Frost）：冷面狙击手，随身武器「袖珍狙击枪」</li><li>苏糖（Candy）：元气偶像主播，随身武器「彩带喷枪」</li><li>雷豹（Titan）：重装开路者，随身武器「涂料拳套」</li><li>夜鸢（Raven）：神秘涂鸦师，随身武器「墨汁飞镖」</li><li>星澜（Aurora）：天才机兵工程师，随身武器「铆钉枪」</li><li>风羽（Gale）：天空竞速手，随身武器「疾风弩」</li><li>洛奇（Hex）：天才黑客，随身武器「电击枪」</li><li>包大福（Bao）：后勤大厨，随身武器「平底锅」</li><li>秦岳（Qin）：退役王牌，随身武器「手雷」</li><li>小柚（Yuzu）：无人机少女，随身武器「迷你无人机」</li><li>岚（Lan）：灰城反抗军队长，随身武器「信号枪」</li><li>石磊（Rocky）：拆迁队工头，随身武器「钉锤」</li><li>叶声（Echo）：地下电台 DJ，随身武器「口袋音箱」</li><li>韩冰（Han）：灰石集团前安保主管，随身武器「警用电棍」</li><li>卡卡（Kaka）：街头魔术师，随身武器「扑克飞牌」</li><li>符零（Sigil）：夜都符术师，随身武器「符纸飞镖」</li><li>赤镰（Crimson）：恶灵宿主，随身武器「断骨短镰」</li><li>霍克（Hawk）：雇佣兵队长，随身武器「冲锋手枪」</li><li>姜黎（Jiang Li）：灰石研究园区叛逃博士，随身武器「试剂枪」</li><li>沈零（Shen Ling）：灰石试验部队王牌，随身武器「高周波匕首」</li></ul>
 <h2>玩法</h2><ul><li>涂地大战：比赛结束时涂色面积更大的队伍获胜。最后 30 秒局势将被隐藏！</li><li>抢占据点：把中央据点涂到 70% 即可占领，占领期间己方倒计时减少，先归零者获胜。</li><li>护送宝物：抢下中央的宝物核心，带到敌方一侧的终点台得分（持有者受到的伤害降低 25%），先得 3 分获胜。</li><li>漆弹足球：用涂料子弹、炸弹和身体把大球推进对方球门，先进 5 球获胜。</li><li>电池掠夺：收集地图上的能量电池送回己方基地，被击倒会掉落全部电池，先存满 40 个获胜。</li><li>生死之战：只有一条命：机体被打爆不会重建，驾驶员也倒下就出局。先把对面全队消灭赢一局，三局两胜。</li><li>逃亡圈 · 四队：4 队 × 2 人分散空降。灰色毒圈不断缩小，捡空投箱变强，只有一条命，最后活下来的队伍获胜。</li><li>乐园模式：嘉年华花车沿着环形路线巡游：花车光圈里人多的队伍每秒得 1 分，打爆飘着的气球再得 3 分。先到 100 分获胜。</li><li>搜刮撤离：超大地图上搜刮物资、和其他小队争夺，在撤离点读条 10 秒成功撤离，带出来的物资存进仓库。只有一条命，阵亡或没来得及撤离，这局搜到的东西全部丢失。</li><li>逃亡圈 · 单人：8 名驾驶员各自为战。毒圈缩小、空投箱变强、只有一条命，活到最后就是赢家。</li><li>咒灵讨伐：最多 4 人合作讨伐巨型咒灵「百目」：它会砸地、放弹幕、召唤小咒灵、冲撞，血量过半后进入狂暴。4 分钟内打倒它就赢了！</li><li>封印争夺：打倒四处游荡的咒灵会掉落封印石，地图上也会不时出现。把封印石带回己方祭坛存起来，被击倒会掉落身上全部封印石。先存满 25 个获胜！</li></ul>
 <p><a href="#download">下载 / Download</a> · <a href="#updates">更新日志 / Patch notes</a></p>
 </div></noscript>
@@ -289,6 +323,7 @@ footer a { color: var(--dust); }
     <nav class="nav" aria-label="主导航">
       <a href="#home" data-route="home" data-t="nav_home">首页</a>
       <a href="#updates" data-route="updates" data-t="nav_upd">更新日志</a>
+      <a href="#counters" class="wide" data-t="nav_ctr">克制图</a>
       <a href="#download" data-t="nav_dl">下载</a>
     </nav>
     <div class="lang" role="group" aria-label="Language">
@@ -332,7 +367,18 @@ footer a { color: var(--dust); }
         <div class="stage-info" id="stageInfo" aria-live="polite"></div>
       </div>
       <div class="roster" id="roster" role="group"></div>
-      <div class="mechs"><table><thead><tr><th data-t="th_mech"></th><th data-t="th_role"></th><th data-t="th_hp"></th><th data-t="th_range"></th></tr></thead><tbody id="mechRows"></tbody></table></div>
+      <h3 class="maps-h" data-t="mechs_h"></h3>
+      <div class="mgrid" id="mechGrid"></div>
+    </div>
+  </section>
+
+  <section class="band" id="counters">
+    <div class="wrap">
+      <header class="sec-h" style="--hl: var(--np)"><h2 data-t="ctr_h"></h2><p data-t="ctr_p"></p></header>
+      <div class="rings" id="rings"></div>
+      <h3 class="maps-h" data-t="ctr_list_h"></h3>
+      <div class="ctr-tabs" id="ctrTabs"></div>
+      <div class="ctr-grid" id="ctrGrid"></div>
     </div>
   </section>
 
@@ -392,6 +438,8 @@ footer a { color: var(--dust); }
       poster_tag: '最新版本', poster_go: '看看更新了什么 →', updated: (d) => `${d} 更新`,
       all_notes: '完整更新日志 →', more_items: (n) => `还有 ${n} 项 →`,
       roster_h: '驾驶员与机兵', roster_p: '驾驶员和机兵分开选：每位驾驶员有自己的技能、被动、超载和 3D 模型，坐进哪台机兵都行。机兵被打爆后驾驶员会弹出，拿出自己的专属武器继续战斗。',
+      nav_ctr: '克制图', mechs_h: '机兵 · 六边形能力面板', ctr_h: '克制图', ctr_p: '每台机兵、每位驾驶员都有一个主定位。定位之间按环形互相克制：机兵主定位克制对方时伤害 +6%。每个角色还有具体的克制对象——点开卡片看原因。',
+      ctr_list_h: '个别克制', ring_mech: '机兵定位环', ring_pilot: '驾驶员定位环', ring_note: '箭头指向被克制的一方', tab_mech: '机兵', tab_pilot: '驾驶员', beats: '克制', weak: '被克制', rec_modes: '推荐模式', edge_note: (n) => `机兵主定位克制对方：伤害 +${n}%`, ring_pilot_note: '驾驶员定位环只作参考，不改变数值。',
       season: '赛季', quest: '任务', strike: '特攻队', side: '弹出武器', skill: '技能', passive: '被动', ov: '超载', fav: '擅长机兵',
       act_hello: '打招呼', act_attack: '攻击', act_victory: '庆祝', act_show: '整套动作', drag: '拖动可以旋转', loading3d: '正在加载 3D 模型…', no3d: '你的浏览器不支持 3D，显示的是渲染图', th_mech: '机兵', th_role: '定位', th_hp: '生命', th_range: '射程',
       modes_h: '玩法', modes_p: '每种玩法都有 4 对 4 的快速对战，也可以开房间和朋友打。', maps_h: '地图',
@@ -417,6 +465,8 @@ footer a { color: var(--dust); }
       poster_tag: 'Latest version', poster_go: 'See what changed →', updated: (d) => `Updated ${d}`,
       all_notes: 'Full patch notes →', more_items: (n) => `${n} more →`,
       roster_h: 'Pilots & mechs', roster_p: 'Pick a pilot and a mech separately: every pilot has their own skill, passive, overload and 3D model, and can drive any mech. When a mech is destroyed the pilot ejects and keeps fighting with their own sidearm.',
+      nav_ctr: 'Counters', mechs_h: 'Mechs · hexagon stat panels', ctr_h: 'Counter Chart', ctr_p: 'Every mech and pilot has a main role. Roles counter each other in a cycle: when your mech’s main role counters the target’s, you deal +6% damage. Each character also has specific counters — open a card to see why.',
+      ctr_list_h: 'Specific counters', ring_mech: 'Mech role cycle', ring_pilot: 'Pilot role cycle', ring_note: 'Arrows point at the countered role', tab_mech: 'Mechs', tab_pilot: 'Pilots', beats: 'Counters', weak: 'Countered by', rec_modes: 'Recommended modes', edge_note: (n) => `Mech role counter: +${n}% damage`, ring_pilot_note: 'The pilot cycle is a guide only and doesn’t change any numbers.',
       season: 'SEASON', quest: 'QUEST', strike: 'STRIKE', side: 'Sidearm', skill: 'Skill', passive: 'Passive', ov: 'Overload', fav: 'Favorite mech',
       act_hello: 'Hello', act_attack: 'Attack', act_victory: 'Celebrate', act_show: 'Full routine', drag: 'Drag to rotate', loading3d: 'Loading 3D model…', no3d: '3D isn\'t supported in this browser, showing a render', th_mech: 'Mech', th_role: 'Role', th_hp: 'HP', th_range: 'Range',
       modes_h: 'Modes', modes_p: 'Every mode has 4v4 quick matches, or open a room and play with friends.', maps_h: 'Maps',
@@ -479,8 +529,8 @@ footer a { color: var(--dust); }
     $('roster').innerHTML = D.pilots.map((p) => `<button type="button" class="pc" data-id="${esc(p.id)}" aria-pressed="${p.id === sel}" style="--acc:${esc(p.accent)}"><div class="art">${p.img ? `<img src="${esc(p.img)}" alt="${esc(nm(p))}" loading="lazy" width="360" height="440">` : p.svg}</div>${p.tag ? `<span class="sticker ${p.tag}">${esc(t(p.tag))}</span>` : ''}<div class="meta"><b>${esc(nm(p))}</b><span>${esc(L(p, 'title'))}</span><em>${esc(t('side'))} · ${esc(L(p, 'side'))}</em></div></button>`).join('');
     for (const btn of $('roster').querySelectorAll('.pc')) btn.addEventListener('click', () => { sel = btn.dataset.id; for (const o of $('roster').querySelectorAll('.pc')) o.setAttribute('aria-pressed', o === btn); renderStage(true); });
     renderStage(false);
-    const maxHp = Math.max(...D.mechs.map((m) => m.hp)), maxR = Math.max(...D.mechs.map((m) => m.range));
-    $('mechRows').innerHTML = D.mechs.map((m) => `<tr><td>${esc(nm(m))}${m.tag ? `<span class="sticker ${m.tag}">${esc(t(m.tag))}</span>` : ''}</td><td>${esc(L(m, 'role'))}</td><td class="num">${m.hp}<i class="bar" style="width:${Math.round(m.hp / maxHp * 60)}px"></i></td><td class="num">${m.range || '—'}${m.range ? `<i class="bar r" style="width:${Math.round(m.range / maxR * 60)}px"></i>` : ''}</td></tr>`).join('');
+    $('mechGrid').innerHTML = D.mechs.map((m) => `<article class="mcard"><h4>${esc(nm(m))}${m.tag ? `<span class="sticker ${m.tag}">${esc(t(m.tag))}</span>` : ''}</h4>${rchip(m.r)}<span class="sub">${esc(L(m, 'role'))}</span>${lang === 'en' ? m.r.en_hex : m.r.hex}</article>`).join('');
+    renderCounters();
     // 玩法 / 地图
     const MC = ['var(--ny)', 'var(--nc)', 'var(--np)', 'var(--ng)'];
     $('modes').innerHTML = D.modes.map((m, i) => `<article class="mode" style="--mc:${MC[i % 4]}"><h3>${esc(nm(m))}</h3>${m.isNew ? '<span class="sticker">NEW</span>' : ''}<p>${esc(L(m, 'desc'))}</p></article>`).join('');
@@ -507,6 +557,33 @@ footer a { color: var(--dust); }
     route(false);
   }
 
+  // ---------- 2.2 克制图 ----------
+  const RN = (k) => (lang === 'en' ? D.roles[k].en : D.roles[k].name);
+  const rchip = (r) => `<span class="rchip" style="--rc:${esc(r.color)}">${esc(RN(r.role))}<i>${esc(lang === 'en' ? r.en_tag : r.tag)}</i></span>`;
+  const byId = (kind, id) => (kind === 'pilot' ? D.pilots : D.mechs).find((x) => x.id === id);
+  let ctrKind = 'mech';
+  function ringSvg(list) {
+    const n = list.length, c = 180, R = 120, pts = list.map((k, i) => { const a = -Math.PI / 2 + (i / n) * Math.PI * 2; return [c + Math.cos(a) * R, c + Math.sin(a) * R]; });
+    let s = `<svg viewBox="0 0 360 360" xmlns="http://www.w3.org/2000/svg"><defs><marker id="ah${n}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fff"/></marker></defs>`;
+    for (let i = 0; i < n; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % n], dx = x1 - x0, dy = y1 - y0, L2 = Math.hypot(dx, dy), k0 = 40 / L2, k1 = 1 - 44 / L2;
+      s += `<line x1="${(x0 + dx * k0).toFixed(1)}" y1="${(y0 + dy * k0).toFixed(1)}" x2="${(x0 + dx * k1).toFixed(1)}" y2="${(y0 + dy * k1).toFixed(1)}" stroke="#fff" stroke-width="3" marker-end="url(#ah${n})" opacity=".85"/>`;
+    }
+    list.forEach((k, i) => { const [x, y] = pts[i], col = D.roles[k].color; s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="36" fill="${col}" fill-opacity=".25" stroke="${col}" stroke-width="3"/><text x="${x.toFixed(1)}" y="${(y + 6).toFixed(1)}" text-anchor="middle" fill="#fff" font-size="${lang === 'en' ? (RN(k).length > 8 ? 11 : 13) : 18}" font-weight="800">${esc(RN(k))}</text>`; });
+    return s + '</svg>';
+  }
+  function renderCounters() {
+    const R = D.ring, why = (a, b) => { const w = R.why[a + '>' + b]; return w ? (lang === 'en' ? w.en : w.zh) : ''; };
+    const ringBox = (kind, list) => `<div class="ring"><h3>${esc(t(kind === 'mech' ? 'ring_mech' : 'ring_pilot'))}</h3>${ringSvg(list)}<ol>${list.map((k, i) => { const nx = list[(i + 1) % list.length]; return `<li><b>${esc(RN(k))} → ${esc(RN(nx))}</b>：${esc(why(k, nx))}</li>`; }).join('')}</ol><p class="rnote">${esc(t('ring_note'))} · ${esc(kind === 'mech' ? t('edge_note')(Math.round(R.edge * 100)) : t('ring_pilot_note'))}</p></div>`;
+    $('rings').innerHTML = ringBox('mech', R.mech) + ringBox('pilot', R.pilot);
+    $('ctrTabs').innerHTML = ['mech', 'pilot'].map((k) => `<button type="button" data-k="${k}" aria-pressed="${ctrKind === k}">${esc(t(k === 'mech' ? 'tab_mech' : 'tab_pilot'))}</button>`).join('');
+    for (const b of $('ctrTabs').querySelectorAll('button')) b.addEventListener('click', () => { ctrKind = b.dataset.k; renderCounters(); });
+    const list = ctrKind === 'mech' ? D.mechs : D.pilots;
+    const names = (arr) => arr.map((m) => esc(nm(byId(ctrKind, m.id)))).join(lang === 'en' ? ', ' : '、');
+    $('ctrGrid').innerHTML = list.map((x) => `<details><summary><b>${esc(nm(x))}</b>${rchip(x.r)}<span class="ln"><em class="g">${esc(t('beats'))}</em> ${names(x.r.beats)}</span><span class="ln"><em class="r">${esc(t('weak'))}</em> ${names(x.r.weak)}</span></summary>
+      <ul>${x.r.beats.map((m) => `<li><em style="color:#9cff2e">▲ ${esc(nm(byId(ctrKind, m.id)))}</em> ${esc(lang === 'en' ? m.en_why : m.why)}</li>`).join('')}${x.r.weak.map((m) => `<li><em style="color:#ff7a6a">▼ ${esc(nm(byId(ctrKind, m.id)))}</em> ${esc(lang === 'en' ? m.en_why : m.why)}</li>`).join('')}</ul></details>`).join('');
+  }
+
   // ---------- 3D 驾驶员展示台（用游戏自己的渲染代码，选中时播放展示动作） ----------
   function renderStage(picked) {
     const p = D.pilots.find((x) => x.id === sel);
@@ -516,6 +593,7 @@ footer a { color: var(--dust); }
     const ab = (k, name, desc, cls) => `<div class="abil ${cls || ''}"><span class="k">${esc(t(k))}</span><b>${esc(name)}</b><p>${esc(desc)}</p></div>`;
     $('stageInfo').innerHTML = `<span class="code">「${esc(L(p, 'code'))}」</span><h3>${esc(nm(p))}</h3><div class="ttl">${esc(L(p, 'title'))} · ${esc(t('fav'))}：${esc(L(p, 'mech'))}</div>
       <blockquote>“${esc(L(p, 'line'))}”</blockquote>
+      <div class="stage-role"><div class="stage-hex">${lang === 'en' ? p.r.en_hex : p.r.hex}</div><div class="stage-ctr">${rchip(p.r)}<br><b class="g">${esc(t('beats'))}</b> ${p.r.beats.map((m) => esc(nm(byId('pilot', m.id)))).join(lang === 'en' ? ', ' : '、')}<br><b class="r">${esc(t('weak'))}</b> ${p.r.weak.map((m) => esc(nm(byId('pilot', m.id)))).join(lang === 'en' ? ', ' : '、')}<br><b>${esc(t('rec_modes'))}</b> ${esc((lang === 'en' ? p.r.en_modes : p.r.modes).join(' · '))}</div></div>
       <div class="abils">${ab('side', L(p, 'side'), L(p, 'side_desc'), 'side')}${ab('skill', L(p, 'skill'), L(p, 'skill_desc'))}${ab('passive', L(p, 'passive'), L(p, 'passive_desc'))}${ab('ov', L(p, 'ov'), L(p, 'ov_desc'))}</div>
       <div class="acts">${['show', 'hello', 'attack', 'victory'].map((a) => `<button type="button" data-act="${a}" ${R3.state === 'live' ? '' : 'disabled'}>${esc(t('act_' + a))}</button>`).join('')}</div>`;
     for (const b of $('stageInfo').querySelectorAll('[data-act]')) b.addEventListener('click', () => { if (R3.api) R3.api.charAction(b.dataset.act); });

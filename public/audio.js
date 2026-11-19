@@ -344,6 +344,8 @@
     megaphone() { tone(220, 0.14, 'square', 0.03, 0.9); tone(330, 0.14, 'square', 0.02, 0.9); tone(110, 0.16, 'sawtooth', 0.03, 1.2); },   // 喇叭：嗡——
     riot() { noise(0.1, 0.08, 1500, 'lowpass'); tone(160, 0.08, 'square', 0.04, 0.5); tone(2400, 0.05, 'square', 0.012, 0.6); },   // 盾卫：电击散弹
     blade() { noise(0.07, 0.05, 6500, 'highpass', 0, 2000); tone(2600, 0.05, 'sine', 0.025, 0.8); },               // 影刃：唰
+    prism() { tone(2600, 0.18, 'sine', 0.03, 0.4); tone(3900, 0.12, 'triangle', 0.02, 0.6, 0.02); noise(0.12, 0.04, 5000, 'bandpass', 0, 9000); },   // 2.2 棱镜：晶体光束
+    lancer() { noise(0.09, 0.06, 3200, 'bandpass', 0, 7000); tone(900, 0.08, 'sawtooth', 0.03, 2.2); },   // 2.2 枪骑：突刺
     stinger() { tone(2100, 0.05, 'sine', 0.03, 0.5); noise(0.03, 0.025, 7000, 'highpass'); },                       // 毒针：咻
     phantom() { noise(0.05, 0.03, 1100); tone(320, 0.04, 'sine', 0.025, 0.8); },                                   // 幻影：消音
     warden() { tone(880, 0.09, 'triangle', 0.03); tone(1320, 0.07, 'triangle', 0.02, 0, 0.02); },                  // 结界：铃
@@ -360,7 +362,7 @@
     zap() { tone(2400, 0.05, 'square', 0.02, 0.5); noise(0.04, 0.03, 4000, 'highpass'); },
   };
   const HIT_OF = { blaster: 'tick', roller: 'splat', charger: 'ding', bucket: 'splat', gatling: 'tick', mortar: 'thud', fist: 'thud', slinger: 'thud', dozer: 'thud', flamer: 'tick',
-    carrier: 'ding', wrecker: 'thud', megaphone: 'sonic', riot: 'zap', blade: 'slash', stinger: 'ding', phantom: 'slash', warden: 'charm', reaper: 'slash', tactic: 'tick' };
+    carrier: 'ding', wrecker: 'thud', megaphone: 'sonic', riot: 'zap', blade: 'slash', stinger: 'ding', phantom: 'slash', warden: 'charm', reaper: 'slash', tactic: 'tick', prism: 'ding', lancer: 'slash' };
   const SUPER = {
     storm() { for (let i = 0; i < 6; i++) noise(0.05, 0.05, 2400 + i * 300, 'bandpass', i * 0.05); tone(300, 0.4, 'sawtooth', 0.04, 2); },
     charge() { tone(90, 0.6, 'sawtooth', 0.06, 2.4); noise(0.5, 0.05, 300, 'lowpass', 0, 1200); },
@@ -382,6 +384,8 @@
     cloak() { for (let i = 0; i < 4; i++) tone(1600 - i * 250, 0.12, 'sine', 0.025, 1, i * 0.06); },
     barrier() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.5, 'triangle', 0.03, 1, i * 0.06)); },
     rend() { noise(0.35, 0.06, 1200, 'bandpass', 0, 6000); tone(200, 0.35, 'sawtooth', 0.04, 3); },
+    prism() { [1760, 2349, 3136].forEach((f, i) => tone(f, 0.25, 'sine', 0.03, 0.5, i * 0.07)); noise(0.4, 0.03, 6000, 'bandpass', 0.2, 1500); },
+    lancestorm() { for (let i = 0; i < 3; i++) { noise(0.08, 0.06, 3500, 'bandpass', i * 0.26, 7000); tone(700 + i * 200, 0.08, 'sawtooth', 0.03, 2, i * 0.26); } },
   };
   const SKILL = {
     rush() { tone(300, 0.2, 'sawtooth', 0.04, 2.5); }, scan() { [1200, 1600, 2000].forEach((f, i) => tone(f, 0.08, 'sine', 0.03, 1, i * 0.08)); },
@@ -394,6 +398,8 @@
     decoy() { tone(700, 0.2, 'sine', 0.03, 0.5); }, flash() { tone(2400, 0.15, 'sine', 0.04, 0.3); noise(0.1, 0.04, 6000, 'highpass'); },
     seal() { [988, 1318].forEach((f, i) => tone(f, 0.2, 'triangle', 0.04, 1, i * 0.05)); noise(0.2, 0.03, 2500, 'bandpass', 0, 5000); },
     possess() { tone(110, 0.5, 'sawtooth', 0.05, 0.6); noise(0.4, 0.04, 300, 'lowpass'); },
+    nano() { noise(0.5, 0.04, 1800, 'bandpass', 0, 600); [660, 880].forEach((f, i) => tone(f, 0.15, 'sine', 0.03, 1, i * 0.1)); },
+    blink() { noise(0.15, 0.06, 5000, 'bandpass', 0, 800); tone(1200, 0.1, 'sine', 0.03, 0.3); },
   };
   A.mechFire = (id, vol = 1, big) => { if (!AC || (!big && !rl('mf' + id + (vol < 1 ? 'o' : ''), id === 'gatling' ? 45 : id === 'flamer' ? 80 : vol < 1 ? 70 : 40))) return; VS = vol; try { (big && FIRE[id + 'Big'] ? FIRE[id + 'Big'] : FIRE[id] || FIRE.blaster)(); } finally { VS = 1; } };
   A.mechHit = (id) => { if (!AC || !rl('mh', 45)) return; (HIT[HIT_OF[id]] || HIT.tick)(); };

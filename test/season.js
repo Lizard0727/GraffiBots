@@ -91,12 +91,14 @@ for (const [w, sp, dist] of [['dozer', 'bulldoze', 140], ['flamer', 'napalm', 16
 {
   const { A, run, events } = duel({ pilot: 'blaze', power: { lv: 5, bt: 1, tal: [] } }, {});
   A.input.oq++; run(0.1);
-  ok(A.ovT === 0 && !A.ovUsed, '没充满时按 R 没反应');
+  ok(A.ovT === 0, '没充满时按 R 没反应');
   A.ov = S.OV_NEED; A.input.oq++; run(0.1);
-  ok(A.ovT > 5 && A.ovUsed && events.some((e) => e[0] === 'ov'), '充满后发动超载「燃烧模式」，持续 6 秒');
+  ok(A.ovT > 5 && A.ov === 0 && events.some((e) => e[0] === 'ov'), '充满后发动超载「燃烧模式」，持续 6 秒');
   ok(A.sm > S.WEAPONS.blaster.spd * 1.19, '燃烧模式：移动速度 +20%');
-  A.ov = S.OV_NEED; A.ovT = 0; A.input.oq++; run(0.1);
-  ok(A.ovT === 0, '每局只能用一次');
+  const t0 = A.ovT; A.ov = S.OV_NEED; A.input.oq++; run(0.1);
+  ok(A.ovT < t0 && A.ov === S.OV_NEED, '超载进行中不能再放一次');
+  A.ovT = 0; run(0.05); A.input.oq++; run(0.1);
+  ok(A.ovT > 5, '2.2：超载结束后重新充满，可以再放一次');
 }
 {
   const { A, run } = duel({ pilot: 'blaze', power: { lv: 4, bt: 0, tal: [] } }, {});

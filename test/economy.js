@@ -53,7 +53,7 @@ ok(p.weapon === 'charger', '可以换成已有的机体');
     const r = E.apply(q, 'buy', { chest: 'airdrop' }, rnd);
     for (const it of r.items) if (it.k === 'pilot' && before.has(it.id)) dupBad = true;
   }
-  ok(!dupBad && Object.keys(q.pilots).length === S.PILOTS.length - 1 - E.COLLAB.pilots.length - E.PASS_ONLY.pilots.length && q.mechs.length === S.WEAPON_ORDER.length - 1 - E.STRIKE_MECHS.length - E.COLLAB.mechs.length - E.PASS_ONLY.mechs.length && !E.COLLAB.pilots.some((x) => q.pilots[x]) && !E.COLLAB.mechs.some((x) => q.mechs.includes(x)) && !q.pilots.han && !q.mechs.includes('riot') && !E.STRIKE_MECHS.some((m) => q.mechs.includes(m)), '不会抽到重复角色，开够了能集齐宝箱里的全部驾驶员和机体（任务角色、特攻队机体、联动角色不在普通宝箱里）');
+  ok(!dupBad && Object.keys(q.pilots).length === S.PILOTS.length - E.QUEST_ONLY.filter((x) => !S.WEAPONS[x]).length - E.COLLAB.pilots.length - E.PASS_ONLY.pilots.length && q.mechs.length === S.WEAPON_ORDER.length - E.QUEST_ONLY.filter((x) => S.WEAPONS[x]).length - E.STRIKE_MECHS.length - E.COLLAB.mechs.length - E.PASS_ONLY.mechs.length && !E.COLLAB.pilots.some((x) => q.pilots[x]) && !E.COLLAB.mechs.some((x) => q.mechs.includes(x)) && !q.pilots.han && !q.mechs.includes('riot') && !E.STRIKE_MECHS.some((m) => q.mechs.includes(m)), '不会抽到重复角色，开够了能集齐宝箱里的全部驾驶员和机体（任务角色、特攻队机体、联动角色不在普通宝箱里）');
   const r = E.apply(q, 'buy', { chest: 'airdrop' }, () => 0);
   ok(r.items.some((i) => i.dup) && !r.items.some((i) => i.k === 'pilot'), '全部拥有后，角色 / 机体奖励换成金币');
 }

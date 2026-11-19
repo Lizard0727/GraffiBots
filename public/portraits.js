@@ -332,6 +332,15 @@
         s += `<path d="M104,226 Q120,280 172,286" fill="none" stroke="${LINE}" stroke-width="4"/><circle cx="176" cy="286" r="8" fill="#2a2d3a" ${ol(2)}/>`;
         s += `<path d="M300,96 v-26 l14,-4 v22" fill="none" stroke="${a}" stroke-width="4"/><circle cx="296" cy="96" r="5" fill="${a}"/><circle cx="310" cy="88" r="5" fill="${a}"/>`;
         break;
+      case 'doc': // 2.2 姜黎：细框眼镜 + 头发上别着笔
+        for (const x of [164, 236]) s += `<rect x="${x - 26}" y="${196}" width="52" height="30" rx="10" fill="rgba(160,250,255,0.18)" stroke="${LINE}" stroke-width="3.6"/>`;
+        s += `<path d="M190,208 L210,208" stroke="${LINE}" stroke-width="3.6"/>`;
+        s += `<g transform="rotate(-32 286 120)"><rect x="270" y="112" width="48" height="9" rx="4" fill="${a}" ${ol(2)}/><rect x="310" y="112" width="10" height="9" fill="#2a2d3a"/></g>`;
+        break;
+      case 'zero': // 2.2 沈零：单边红色目镜 + 耳侧编号 0
+        s += `<path d="M212,190 L290,182 L286,214 L214,218 Z" fill="rgba(255,79,122,0.55)" ${ol(3)}/><path d="M222,198 L278,194" stroke="#fff" stroke-width="3" opacity="0.7"/>`;
+        s += `<rect x="92" y="190" width="24" height="40" rx="8" fill="#2a2d3a" ${ol(2.4)}/><text x="104" y="218" text-anchor="middle" font-size="20" font-family="Impact, sans-serif" fill="${a}">0</text>`;
+        break;
       case 'han': // 战术护目镜 + 耳麦 + 眉骨疤
         s += path(shape([[118, 176], [200, 166], [282, 176], [278, 200], [200, 192], [122, 200]]), 'rgba(122,240,255,0.55)', ol(3));
         s += `<path d="M130,182 L270,182" stroke="#ffffff" stroke-width="3" opacity="0.7"/>`;
@@ -602,6 +611,25 @@
         for (const side of [-1, 1]) for (let k = 0; k < 3; k++) { const x = 200 + side * (110 + k * 22), y = 360 + k * 6; s += path(`M${x - 10},${y} L${x + side * 6},${y - 44 + k * 10} L${x + 10},${y} Z`, '#7af0ff', ol(2)); }
         s += `<path d="M200,404 l10,14 l-10,14 l-10,-14 Z" fill="#ff6ec4" ${ol(2)}/>`;
         s += `<path d="M90,480 Q200,500 310,480" stroke="#7af0ff" stroke-width="6" fill="none"/>`;
+        break;
+      }
+      case 'labcoat': {   // 2.2 姜黎：白大褂 + 深色高领 + 工牌 + 胸前口袋里的笔
+        s += path(shape(SH), '#f2f5f7', ol(3));
+        s += path(shape([[160, 340, 1], [200, 360], [240, 340, 1], [236, 520, 1], [164, 520, 1]]), '#2b3a4a', ol(3));
+        s += path(shape([[96, 372], [160, 342], [176, 440], [150, 520, 1], [76, 520, 1]]), '#e6ebef', ol(2.6));
+        s += path(shape(mirrorPts([[96, 372], [160, 342], [176, 440], [150, 520, 1], [76, 520, 1]])), '#e6ebef', ol(2.6));
+        s += `<rect x="238" y="430" width="40" height="52" rx="5" fill="#ffffff" ${ol(2.4)}/><rect x="244" y="438" width="28" height="14" rx="2" fill="${a}"/><path d="M246,462 h24 M246,470 h16" stroke="#8a94a0" stroke-width="3"/>`;
+        s += `<path d="M258,430 L250,372" stroke="${a}" stroke-width="3"/>`;
+        s += `<rect x="120" y="420" width="44" height="34" rx="4" fill="#dfe6ea" ${ol(2)}/><rect x="128" y="404" width="5" height="24" fill="#2a2d3a"/><rect x="138" y="408" width="5" height="20" fill="${a}"/>`;
+        break;
+      }
+      case 'testsuit': {   // 2.2 沈零：黑色试验驾驶服 + 发光线条 + 编号 00 + 灰石标志被划掉
+        s += path(shape(SH), '#16161e', ol(3));
+        s += path(shape([[120, 380], [168, 340], [200, 372], [232, 340], [280, 380], [270, 520, 1], [130, 520, 1]]), '#23232e', ol(2.6));
+        s += `<path d="M110,400 L176,520 M290,400 L224,520" stroke="${a}" stroke-width="5" opacity="0.9"/>`;
+        s += `<path d="M168,340 L200,372 L232,340" fill="none" stroke="${a}" stroke-width="4"/>`;
+        s += `<text x="200" y="460" text-anchor="middle" font-size="40" font-family="Impact, sans-serif" fill="#e9eef2" opacity="0.9">00</text>`;
+        s += `<rect x="96" y="420" width="46" height="22" rx="3" fill="#9aa0a8" ${ol(2)}/><text x="119" y="436" text-anchor="middle" font-size="11" font-family="Impact, sans-serif" fill="#2a2d3a">GRAYCO</text><path d="M92,446 L148,416" stroke="${a}" stroke-width="5" stroke-linecap="round"/>`;
         break;
       }
       case 'engineer': {

@@ -1328,6 +1328,25 @@
         add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
         break;
       }
+      case 'prism': {     // 2.2 棱镜原型机：白色长枪管 + 三棱镜发射头 + 发光能量环
+        add(outlined(rbox(14, 5.4, 5.4, 1.6), toon(0xe9eef2), 1, 1, 1, 5, 0, 0));
+        cylX(dk, 1.3, 16, 20, 0.4, 0);
+        for (const x of [16, 21, 26]) { const r = add(new T.Mesh(new T.TorusGeometry(2.2, 0.35, 6, 16), basic(color))); r.rotation.y = Math.PI / 2; r.position.set(x, 0.4, 0); }
+        { const cr = add(new T.Mesh(new T.OctahedronGeometry(3.2), basic(0x9ffcff, { transparent: true, opacity: 0.85 }))); cr.position.set(31, 0.4, 0); cr.scale.set(1.4, 1, 1); }
+        add(outlined(rbox(8, 2.4, 2.4, 0.8), dk, 1, 1, 1, 6, 4.2, 0)); add(part(s.sph, basic(0x5ff0ff), 1, 1, 1, 10.2, 4.2, 0));
+        add(part(s.box, toon(0xff5a36), 10, 0.6, 5.6, 4, -2.9, 0));
+        add(outlined(rbox(4, 7, 3.4, 1.2), dk, 1, 1, 1, 1, -5, 0));
+        break;
+      }
+      case 'lancer': {    // 2.2 枪骑原型机：高周波长枪 + 护手盘 + 发光枪尖
+        add(outlined(rbox(7, 4, 4, 1.4), dk, 1, 1, 1, 1, 0, 0));
+        cylX(toon(0x2a2d3a), 0.9, 34, 18, 0, 0);
+        { const gd = add(new T.Mesh(new T.CylinderGeometry(4.6, 3, 2.4, 12), toon(0xe9eef2))); gd.rotation.z = -Math.PI / 2; gd.position.set(7, 0, 0); }
+        { const tip = add(new T.Mesh(new T.ConeGeometry(2, 11, 4), basic(color))); tip.rotation.z = -Math.PI / 2; tip.position.set(40, 0, 0); }
+        for (const x of [24, 30]) add(part(s.box, basic(color), 1, 2.6, 2.6, x, 0, 0));
+        add(part(s.box, toon(0xff5a36), 6, 0.6, 4.6, 3, -2.3, 0));
+        break;
+      }
       case 'warden': {    // 1.8 结界机兵：符咒法杖 + 发光宝珠 + 金色符环 + 垂下的符纸
         add(outlined(rbox(8, 5, 5, 1.6), dk, 1, 1, 1, 2, 0, 0));
         cylX(toon(0x3a2a1c), 1.1, 24, 16, 0, 0);
@@ -1874,6 +1893,8 @@
     academyW: { top: '#eef0fa', inner: '#8a6bff', pants: '#1d2140', shoes: '#1d2140', sleeve: 'long', coat: true, gakuran: '#d8b25a', haori: '#8a6bff' },
     // 1.9：排位赛季传说「烈士·不灭战旗」——深色长大衣 + 金扣 + 红色围巾
     merc:     { top: '#8a7a52', inner: '#3a3d48', pants: '#5a5240', shoes: '#2a221c', sleeve: 'long', armor: true, scarf: '#c89a3a' },   // 2.1 霍克：沙漠战术背心
+    labcoat:  { top: '#f2f5f7', inner: '#2b3a4a', pants: '#2b3a4a', shoes: '#5ff0d0', sleeve: 'long', coat: true },   // 2.2 姜黎：白大褂
+    testsuit: { top: '#16161e', inner: '#ff4f7a', pants: '#16161e', shoes: '#ff4f7a', sleeve: 'long', armor: true, neon: true },   // 2.2 沈零：试验部队驾驶服
     martyr:   { top: '#2a2420', inner: '#c8102e', pants: '#1d1a18', shoes: '#2a2420', sleeve: 'long', coat: true, gakuran: '#ffd35e', scarf: '#c8102e' },
   };
 
@@ -1969,6 +1990,11 @@
         add(part(SH.cylH, dk, 0.55, 7, 0.55, 3, 0, 0)).rotation.z = Math.PI / 2;
         add(part(SH.cylH, toon(0x3a3d48), 0.75, 1.8, 0.75, 0, 0, 0)).rotation.z = Math.PI / 2;
         add(part(SH.sph, gl(0x7af0ff), 0.85, 0.85, 0.85, 6.6, 0, 0));
+        break;
+      }
+      case 'zero': {   // 2.2 高周波匕首
+        add(part(SH.cylH, dk, 0.4, 2.2, 0.4, 0.6, 0, 0)).rotation.z = Math.PI / 2;
+        add(part(SH.box, toon(0xdfe6ee), 4.6, 0.9, 0.25, 4, 0, 0)); add(part(SH.box, gl(0xff4f7a), 4.4, 0.25, 0.3, 4.1, 0.45, 0));
         break;
       }
       case 'hammer': {
@@ -2088,6 +2114,18 @@
       { const bill = part(SH.box, toon(0x8a7448), 4.2, 0.4, 5.6, 3.2, 3.3, 0); bill.rotation.z = -0.12; deco.add(bill); }
       deco.add(part(SH.box, toon(P.accent), 0.3, 1.3, 1.6, 4.1, 4.4, 0));
       deco.add(part(SH.sph, toon(0x2a2d3a), 0.9, 1.3, 0.6, 0, 0.2, 4.4)); deco.add(part(SH.cylH, toon(0x2a2d3a), 0.12, 2.6, 0.12, 1.2, -0.6, 4.3)).rotation.z = 1.2;
+    }
+    // 2.2 姜黎：细框眼镜 + 别在头发上的笔
+    if (pid === 'doc') {
+      const lx = CH.headR * 0.86 + 1.1;
+      for (const z of [-2.1, 2.1]) { const r = new T.Mesh(new T.TorusGeometry(1.2, 0.18, 5, 14), toon(0x2a2d3a)); r.position.set(lx, 0.3, z); r.rotation.y = Math.PI / 2; headG.add(r); }
+      headG.add(part(SH.box, toon(0x2a2d3a), 0.2, 0.2, 1.6, lx, 0.4, 0));
+      { const pen = part(SH.cylH, toon(P.accent), 0.25, 4, 0.25, -2.6, 4.6, 2.6); pen.rotation.x = 1.1; deco.add(pen); }
+    }
+    // 2.2 沈零：单边红色目镜 + 耳侧编号「0」
+    if (pid === 'zero') {
+      headG.add(outlined(SH.sphH, basic(0xff4f7a, { transparent: true, opacity: 0.8 }), 0.5, 1.4, 1.7, CH.headR * 0.86 + 1.2, 0.3, 2.1, 0.8));
+      deco.add(part(SH.box, toon(0x2a2d3a), 1, 1.8, 0.6, 0, 0.4, -4.4)); deco.add(part(SH.box, basic(0xff4f7a), 0.5, 1, 0.65, 0.1, 0.5, -4.5));
     }
     // 1.8 赤镰：眼下的红色咒纹
     if (pid === 'aka') for (const [y, z] of [[-0.9, -1.9], [-1.5, -1.6]]) headG.add(part(SH.box, basic(0xff2d4b), 0.25, 0.22, 1.1, CH.headR * 0.93, y, z));
@@ -3808,7 +3846,8 @@
       if (kind === 'charge') {         // 炸药：一闪一闪的涂料弹
         const m = P['shell' + team].next(); m.position.set(x, z + 6, y); m.scale.setScalar(1.3 + 0.4 * Math.abs(Math.sin(now / 70))); continue;
       }
-      if (kind === 'fog') continue;    // 毒雾用粒子画（client 收到 fg 事件）
+      if (kind === 'fog' || kind === 'nano') continue;    // 毒雾 / 纳米雾用粒子画（client 收到 fg 事件）
+      if (kind === 'phase') { const g = P.sealz.next(); g.position.set(x, z + 1, y); g.rotation.y = -now / 300; g.scale.setScalar(1.33); continue; }   // 2.2 相位冻结：展开前的符阵
       if (kind === 'dome') { const g = P['dome' + team].next(); g.position.set(x, z, y); g.children[0].material.opacity = 0.13 + 0.05 * Math.sin(now / 220); g.children[1].rotation.y = now / 1600; continue; }
       if (kind === 'domain') {   // 1.9.1 简易领域
         const g = P['domain' + team].next(); g.position.set(x, z + 0.5, y);
@@ -3816,7 +3855,7 @@
         g.children[2].rotation.y = now / 2400; g.children[3].rotation.y = -now / 1500; g.children[4].rotation.y = now / 700; g.children[4].position.y = Math.sin(now / 300) * 4;
         continue;
       }
-      if (kind === 'sealz') { const g = P.sealz.next(); g.position.set(x, z + 1, y); g.rotation.y = now / 900; continue; }
+      if (kind === 'sealz') { const g = P.sealz.next(); g.position.set(x, z + 1, y); g.rotation.y = now / 900; g.scale.setScalar(1); continue; }
       if (kind === 'supply') { const g = P.crate.next(); g.position.set(x, z, y); g.rotation.y = 0.4; continue; }   // 2.1 霍克的补给箱
       if (kind === 'recon') { const g = P['drone' + team].next(); g.position.set(x, z + Math.sin(now / 300) * 4, y); g.userData.rotor.rotation.y = now / 25; continue; }   // 2.1 侦察无人机
       if (kind === 'decoy') { const g = P.decoy.next(); g.position.set(x, z + Math.sin(now / 160) * 1.5, y); g.rotation.y = now / 260; continue; }

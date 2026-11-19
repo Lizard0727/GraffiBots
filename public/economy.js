@@ -55,7 +55,7 @@
   E.questName = (q) => E.QUESTS[q[0]].name.replace('{n}', q[1]);
   E.SEASON_PILOTS = ['flag', 'hammer', 'echo'];      // 本赛季新角色：只能从街头宝箱开出
   E.SEASON_MECHS = ['dozer', 'flamer', 'carrier', 'wrecker', 'megaphone'];
-  E.QUEST_ONLY = ['han', 'riot'];   // 只能通过任务获得，不会从宝箱开出
+  E.QUEST_ONLY = ['han', 'riot', 'doc', 'prism', 'zero', 'lancer'];   // 只能通过任务获得，不会从宝箱开出（2.2：灰石叛逃者两章任务线）
   E.STRIKE_MECHS = ['blade', 'stinger', 'phantom'];   // 袭击！特攻队：只会从「特攻队补给箱」开出
   // 1.8：夜都决战联动角色——不会从宝箱、限时购买里出现（符零 / 结界机兵：活动任务；赤镰 / 灵刃机兵：宝石购买）
   E.COLLAB = { pilots: ['fu', 'aka'], mechs: ['warden', 'reaper'], quest: ['fu', 'warden'], shop: [{ k: 'pilot', id: 'aka', gems: 480 }, { k: 'mech', id: 'reaper', gems: 360 }], bundle: 720 };
@@ -106,7 +106,40 @@
   };
   E.TASKLINES.loot = { name: '搜刮行动', desc: '灰城外围发现了大量废弃物资！进入超大地图搜刮、和其他小队争夺，活着撤离才算数。', color: '#ffb000',
     steps: [['loot', 1, RW('gems', 60)], ['lootex', 1, RW('coins', 1000)], ['lootv', 8000, RW('gems', 120)], ['lootex', 5, RC('strike')], ['lootgold', 1, RW('gems', 150)], ['loothi', 1, RW('crystals', 1)], ['lootv', 60000, RC('airdrop')]] };
-  E.TASKLINE_ORDER = ['rookie', 'loot', 'strike'];
+  // ---------------- 2.2：章节任务线「灰石叛逃者」——接着韩冰的故事；普通对战和搜刮撤离都能推进 ----------------
+  //   每一步：[统计, 数量, 奖励, 说话的人, 台词]；必须按顺序领取；第二章要先领完第一章
+  E.TASKLINES.prism = { name: '棱镜档案', color: '#5ff0d0', chapter: 1, pilot: 'doc',
+    desc: '第一章 · 韩冰收到一段来自灰石研究园区的加密信号：有一位研究员想要叛逃。护送她和她偷出来的棱镜原型机离开禁区。',
+    steps: [
+      ['play', 3, RW('coins', 600), 'han', '研究园区里有人在给我们发加密信号……先打几场，别让灰石起疑。'],
+      ['loot', 1, RW('gems', 60), 'doc', '我是园区的研究员姜黎。服务器里有你们需要的东西——来禁区找我。'],
+      ['kills', 25, RW('coins', 900), 'han', '园区外围的巡逻机兵变多了。清出一条路来。'],
+      ['lootex', 1, { k: 'mech', id: 'prism' }, 'doc', '原型机我偷出来了！它叫「棱镜」——帮我把它带出禁区。'],
+      ['win', 5, RW('gems', 80), 'han', '灰石发现服务器被清空了，正在全城搜捕她。我们得赢得够快。'],
+      ['paint', 8000, RW('coins', 1200), 'doc', '相位技术本来是用来把涂料「冻住」的。现在，我们反过来用它——把灰墙涂回来。'],
+      ['lootv', 20000, RC('military'), 'doc', '棱镜阵列还缺几个零件。禁区里的研究所应该还有存货。'],
+      ['elim', 3, { k: 'pilot', id: 'doc' }, 'doc', '我加入你们。从今天起，我的研究只为这座城。'],
+    ] };
+  E.TASKLINES.zero = { name: '零号档案', color: '#ff4f7a', chapter: 2, pilot: 'zero', need: 'prism',
+    desc: '第二章 · 灰石集团派出试验部队追捕姜黎，带队的是代号「零号」的王牌驾驶员。她追得越近，就越看清这座城本来的颜色。',
+    steps: [
+      ['play', 3, RW('coins', 700), 'doc', '灰石派出了试验部队来抓我……带队的是零号。我见过她的训练数据——她从来没输过。'],
+      ['kills', 30, RW('gems', 60), 'zero', '编号零。交出姜黎，否则这座城会被刷成灰色。'],
+      ['lootex', 2, RW('coins', 1000), 'han', '零号在禁区里设了埋伏。活着撤出来，才算赢。'],
+      ['win', 6, { k: 'mech', id: 'lancer' }, 'han', '我们缴获了一台枪骑原型机——和零号开的是同一型号。'],
+      ['elim', 3, RW('gems', 80), 'zero', '……城墙上的那些画，是你们涂的？'],
+      ['lootv', 30000, RC('military'), 'doc', '她在禁区里找一样东西：试验部队的真实档案。我们帮她找到。'],
+      ['paint', 10000, RW('coins', 1500), 'zero', '我关掉了追踪器。告诉我——这座城本来是什么颜色？'],
+      ['kills', 60, { k: 'pilot', id: 'zero' }, 'zero', '编号零，任务变更：保护这座城。'],
+    ] };
+  E.TASKLINE_ORDER = ['rookie', 'prism', 'zero', 'loot', 'strike'];
+  // 章节能不能推进：第二章要先把第一章的奖励全部领完
+  E.chapterOpen = (o, id) => { const L = E.TASKLINES[id]; if (!L || !L.need) return true; const st = E.taskState(o, L.need); return st.c.every(Boolean); };
+  // 任务角色 / 机体从哪条任务线拿
+  E.questSource = (id) => {
+    for (const k of E.TASKLINE_ORDER) { const L = E.TASKLINES[k]; if (L.chapter && L.steps.some((q) => q[2] && q[2].id === id)) return { name: L.name, id: k, step: L.steps.findIndex((q) => q[2] && q[2].id === id) + 1, n: L.steps.length }; }
+    return { name: E.STORY.name, id: 'story', step: (E.STORY.rewards.find((r) => r[1].id === id) || [5])[0], n: E.STORY.steps.length };
+  };
   // ---------------- 排位赛：段位、分数、段位奖励 ----------------
   // 1.9：排位赛第一赛季「烈士」——10 个段位；每个赛季开始时分数减半
   //   铁段每段 100 分、金段每段 150 分、钻石 / 星耀每段 200 分、传说段每段 400 分
@@ -190,6 +223,7 @@
   E.rankBotPower = (tier) => ({ lv: Math.min(11, 3 + tier), bt: tier >= 6 ? 2 : tier >= 3 ? 1 : 0 });   // AI 强度跟着段位
   // ---------------- 信箱（系统邮件：版本补偿 / 活动礼包） ----------------
   E.MAILS = [
+    { id: 'v22', t: Date.UTC(2026, 10, 19, 6), from: '韩冰', title: '2.2 更新礼包 · 战斗定位', body: '2.2 版本上线啦：每个角色都有了战斗定位、克制关系和六边形能力面板，技能改成了充能制，超载也能多次使用了。另外——研究园区有人在给我们发信号，去「活动 → 任务」看看「棱镜档案」吧。这份礼包请收下！', items: [RW('gems', 200), RC('military'), RW('coins', 2000)] },
     { id: 'v15', t: Date.UTC(2026, 10, 14, 4), from: '灰城反抗军指挥部', title: '1.5 更新礼包', body: '1.5 版本上线啦：点驾驶员和机体就能进入全新的角色页面，画面更精致，所有角色和机体都重新调整了平衡。这份更新礼包请收下！', items: [RW('gems', 150), RC('hero'), RW('coins', 1500)] },
     { id: 'v212', t: Date.UTC(2026, 10, 17, 18), from: '涂鸦机兵开发组', title: '2.1.2 更新礼包 · 更流畅', body: '2.1.2 来啦：修好了狙击机兵的无限大招和电梯，画面每帧的绘制次数少了一大半、更流畅了，撤离模式的 AI 也变聪明了。小礼包请收下！', items: [RW('gems', 80), RC('supply'), RC('supply')] },
     { id: 'v211', t: Date.UTC(2026, 10, 17, 12), from: '沙鹰雇佣兵小队', title: '2.1.1 更新礼包 · 中途加入', body: '2.1.1 来啦：撤离行动可以中途加入了，物资多了 31 种、还有能用的消耗品；按 N 打开大地图；账号可以用转移码搬到别的浏览器和设备。小礼包请收下！', items: [RW('gems', 100), RC('supply')] },
@@ -747,6 +781,8 @@
         const L = E.TASKLINES[a.id], i = a.i | 0;
         if (!L || !L.steps[i]) return no('没有这个任务');
         const st = E.taskState(o, a.id);
+        if (L.chapter && !E.chapterOpen(o, a.id)) return no(`要先完成「${E.TASKLINES[L.need].name}」`);
+        if (L.chapter && i > 0 && !st.c[i - 1]) return no('章节任务要按顺序领取');
         if (st.p[i] < L.steps[i][1]) return no('任务还没完成');
         if (st.c[i]) return no('已经领过了');
         st.c[i] = true;
@@ -825,7 +861,7 @@
       ev.quests.forEach((q, i) => { st.p[i] = Math.min(q[1], st.p[i] + (gainS[q[0]] || 0)); });
     }
     E.STORY.steps.forEach((q, i) => { o.story.p[i] = Math.min(q[1], o.story.p[i] + (gainS[q[0]] || 0)); });
-    for (const id of Object.keys(E.TASKLINES)) { const L = E.TASKLINES[id], st = E.taskState(o, id); L.steps.forEach((q, i) => { if (q[0] !== 'lvl') st.p[i] = Math.min(q[1], st.p[i] + (gainS[q[0]] || 0)); }); }
+    for (const id of Object.keys(E.TASKLINES)) { const L = E.TASKLINES[id], st = E.taskState(o, id); if (L.chapter && !E.chapterOpen(o, id)) continue; L.steps.forEach((q, i) => { if (q[0] !== 'lvl' && (!L.chapter || i === 0 || st.p[i - 1] >= L.steps[i - 1][1])) st.p[i] = Math.min(q[1], st.p[i] + (gainS[q[0]] || 0)); }); }
     const d = E.dayIndex(now);
     if (o.day !== d) { o.day = d; o.dayWin = 0; }
     if (rw.won && !o.dayWin) { o.dayWin = 1; items.push({ k: 'gems', n: E.FIRST_WIN_GEMS, why: '每日首胜' }); }
