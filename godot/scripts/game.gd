@@ -21,8 +21,13 @@ var acc := 0.0
 var sel_pilot := "blaze"
 var sel_mech := "blaster"
 var sel_map := -1
+var sel_mode := "turf"
+var mode_view: ModeView
+var mode_lbl: Label
+var spectate_id := 0
 var cur_map := -1
-var team_col := [Color.WHITE, Color.WHITE, Color.WHITE]
+# 队伍颜色：1 / 2 来自原版配色，3~8 给逃亡圈的其他小队（封印争夺里 3 是中立咒灵）
+var team_col := [Color.WHITE, Color.WHITE, Color.WHITE, Color("#ff8a1f"), Color("#6dff8a"), Color("#b48cff"), Color("#ffe14d"), Color("#ff3b52"), Color("#4f7bff")]
 var font: FontFile
 var theme_ui: Theme
 var desktop := true
@@ -85,9 +90,11 @@ func _ready() -> void:
 	menu = build_menu(); layer.add_child(menu)
 	result_ui = Control.new(); result_ui.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.theme = theme_ui; result_ui.visible = false; layer.add_child(result_ui)
 	build_map(0)
+	mode_view = ModeView.new(); add_child(mode_view)
+	if OS.get_environment("GB_MODE") != "": sel_mode = OS.get_environment("GB_MODE")
 	if OS.get_environment("GB_AUTOPLAY") != "":
 		var gm := OS.get_environment("GB_MAP")
-		sel_map = int(gm) if gm != "" else 0
+		sel_map = int(gm) if gm != "" else (-1 if sel_mode != "turf" else 0)
 		start_match(OS.get_environment("GB_PILOT") if OS.get_environment("GB_PILOT") != "" else "blaze", OS.get_environment("GB_MECH") if OS.get_environment("GB_MECH") != "" else "blaster")
 
 func make_theme() -> Theme:
@@ -322,6 +329,16 @@ func build_menu() -> Control:
 	var sv := VBoxContainer.new(); sv.add_theme_constant_override("separation", 10); side.add_child(sv)
 	detail_lbl = Label.new(); detail_lbl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; detail_lbl.custom_minimum_size = Vector2(290, 0); detail_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail_lbl.add_theme_font_size_override("font_size", 15); detail_lbl.add_theme_color_override("font_color", Color("#e6e2fa")); sv.add_child(detail_lbl)
+	var mdl := Label.new(); mdl.text = "模式"; mdl.add_theme_color_override("font_color", Color("#c9c5e6")); sv.add_child(mdl)
+	var mo := OptionButton.new()
+	for i in data.modeOrder.size():
+		var mk: String = data.modeOrder[i]
+		mo.add_item(str(data.modes[mk].name), i)
+		if mk == sel_mode: mo.select(i)
+	mo.item_selected.connect(func(k): sel_mode = data.modeOrder[k]; sfx.play("click"); update_detail())
+	sv.add_child(mo)
+	mode_lbl = Label.new(); mode_lbl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; mode_lbl.custom_minimum_size = Vector2(290, 0)
+	mode_lbl.add_theme_font_size_override("font_size", 13); mode_lbl.add_theme_color_override("font_color", Color("#ffe14d")); sv.add_child(mode_lbl)
 	var ml := Label.new(); ml.text = "地图"; ml.add_theme_color_override("font_color", Color("#c9c5e6")); sv.add_child(ml)
 	var ob := OptionButton.new(); ob.add_item("随机地图", 0)
 	for i in data.maps.size(): ob.add_item(str(data.maps[i].name), i + 1)
@@ -343,7 +360,10 @@ func update_detail() -> void:
 	var t := "%s「%s」— %s\n技能 • %s：%s\n被动 • %s：%s\n弹出武器 • %s\n\n%s（%s）\n%s\n大招 • %s：%s" % [P.name, P.code, P.title, P.skillInfo.name, P.skillInfo.desc, P.passive.name, P.passive.desc, A.name,
 		w.name, role_name(sel_mech), w.desc, w.specialInfo.name, w.specialInfo.desc]
 	if w.trait != null: t += "\n特性 • %s：%s" % [w.trait.name, w.trait.desc]
+	var O: Dictionary = P.overload
+	t += "\n超载 • %s：%s" % [O.name, O.desc]
 	detail_lbl.text = t
+	if mode_lbl != null: mode_lbl.text = str(data.modes[sel_mode].desc)
 
 func show_result() -> void:
 	for c in result_ui.get_children(): c.queue_free()
@@ -355,11 +375,17 @@ func show_result() -> void:
 	var t := Label.new(); t.text = "胜利！" if win == me.team else ("平局" if win == 0 else "失败"); t.add_theme_font_size_override("font_size", 64)
 	t.add_theme_color_override("font_color", Color("#ffe14d") if win == me.team else Color("#c9c5e6")); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; box.add_child(t)
 	var pa: float = 100.0 * float(r.a) / max(1.0, float(r.tot)); var pb: float = 100.0 * float(r.b) / max(1.0, float(r.tot))
-	var s := Label.new(); s.text = "我方 %.1f%%   对方 %.1f%%" % [pa, pb]; s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; s.add_theme_font_size_override("font_size", 26); box.add_child(s)
+	var s := Label.new(); s.text = "我方 %.1f%%   对方 %.1f%%" % [pa, pb]
+	var md := sim.mode
+	if md in ["escape4", "escape8"]: s.text = "第 1 名！" if win == me.team else "我方出局了"
+	elif md == "raid": s.text = "讨伐成功！百目被打倒了" if win == 1 else "时间到了，百目还活着"
+	elif md == "elim": s.text = "局数  %d : %d" % [sim.obj.wins[1], sim.obj.wins[2]]
+	elif md == "zone": s.text = "剩余倒计时  我方 %d   对方 %d" % [int(sim.obj.count[1]), int(sim.obj.count[2])]
+	elif md != "turf": s.text = "比分  %d : %d" % [sim.obj.score[1], sim.obj.score[2]]; s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; s.add_theme_font_size_override("font_size", 26); box.add_child(s)
 	var grid := GridContainer.new(); grid.columns = 5; grid.add_theme_constant_override("h_separation", 22); box.add_child(grid)
 	for h in ["", "驾驶员 / 机体", "击毁", "倒下", "涂地"]:
 		var l := Label.new(); l.text = h; l.add_theme_color_override("font_color", Color("#9a96b8")); l.add_theme_font_size_override("font_size", 15); grid.add_child(l)
-	var ps := sim.players.duplicate(); ps.sort_custom(func(a, b): return a.team < b.team or (a.team == b.team and a.painted > b.painted))
+	var ps := sim.players.filter(func(q): return not q.npc); ps.sort_custom(func(a, b): return a.team < b.team or (a.team == b.team and a.painted > b.painted))
 	for p in ps:
 		var c: Color = team_col[p.team]
 		for v in [p.name, "%s / %s" % [data.pilots[p.pilot].name, data.mechs[p.weapon].short], str(p.kills), str(p.deaths), str(p.painted)]:
@@ -375,16 +401,22 @@ func show_result() -> void:
 # ---------------- 开局 ----------------
 func start_match(pilot: String, mech: String) -> void:
 	sel_pilot = pilot; sel_mech = mech
-	var midx: int = sel_map if sel_map >= 0 else randi() % data.maps.size()
+	var midx: int = sel_map
+	if midx < 0:   # 随机地图：逃亡圈默认「废墟逃亡区」，乐园模式默认「欢乐乐园」
+		midx = randi() % data.maps.size()
+		for i in data.maps.size():
+			if (sel_mode.begins_with("escape") and data.maps[i].name == "废墟逃亡区") or (sel_mode == "park" and data.maps[i].park): midx = i
 	if midx != cur_map: build_map(midx)
 	var dur := float(OS.get_environment("GB_DURATION")) if OS.get_environment("GB_DURATION") != "" else 180.0
-	sim = Sim.new(data, midx, 0, dur)
-	me = sim.add_player(1, "你", 1, pilot, mech, false)
+	sim = Sim.new(data, midx, 0, dur, sel_mode)
+	var lay := sim.team_layout()
+	me = sim.add_player(1, "你", lay[0], pilot, mech, false)
 	var pool_p: Array = data.pilotOrder.duplicate(); pool_p.erase(pilot); pool_p.shuffle()
 	var pool_m: Array = data.order.duplicate(); pool_m.shuffle()
 	var names := BOT_NAMES.duplicate(); names.shuffle()
-	for i in 7:
-		sim.add_player(i + 2, names[i], 1 if i < 3 else 2, pool_p[i % pool_p.size()], pool_m[i % pool_m.size()], true)
+	for i in range(1, lay.size()):
+		sim.add_player(i + 1, names[i - 1], lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true)
+	spectate_id = 0
 	for id in mech_nodes: mech_nodes[id].root.queue_free()
 	mech_nodes.clear()
 	for id in helper_nodes: helper_nodes[id].queue_free()
@@ -395,12 +427,18 @@ func start_match(pilot: String, mech: String) -> void:
 	paint_tex.update(paint_img); mini_tex.update(mini_img)
 	for f in fx_list: f.node.queue_free()
 	fx_list.clear()
+	mode_view.setup(sim, team_col)
 	menu.visible = false
 	state = "play"
 	acc = 0.0
 
 func make_mech_node(p: Sim.Mech) -> Dictionary:
-	var n := Models.build_mech(p.weapon, data.mechs[p.weapon], team_col[p.team], data.pilots[p.pilot])
+	var col: Color = team_col[p.team]
+	if p.boss: col = Color("#5a2a7a")
+	elif p.spirit: col = Color("#9a7cff")
+	var n := Models.build_mech(p.weapon, data.mechs[p.weapon], col, data.pilots[p.pilot])
+	if p.boss: n.scale = 2.6
+	elif p.spirit: n.scale = 0.85
 	add_child(n.root)
 	var ov := StandardMaterial3D.new(); ov.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; ov.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	ov.albedo_color = Color(1, 1, 1, 0); ov.grow = true; ov.grow_amount = 0.01
@@ -433,8 +471,8 @@ func _process(delta: float) -> void:
 			if sim.dirty.size() > 0:
 				for i in sim.dirty:
 					var t := sim.grid[i]
-					paint_img.set_pixel(i % sim.GW, i / sim.GW, Color(1 if t == 1 else 0, 1 if t == 2 else 0, 0, 1 if t > 0 else 0))
-					mini_img.set_pixel(i % sim.GW, i / sim.GW, team_col[t] if t == 1 or t == 2 else base_cols[i])
+					paint_img.set_pixel(i % sim.GW, i / sim.GW, Color(1 if t == me.team else 0, 1 if t > 0 and t != me.team else 0, 0, 1 if t > 0 else 0))
+					mini_img.set_pixel(i % sim.GW, i / sim.GW, team_col[t] if t > 0 else base_cols[i])
 				paint_tex.update(paint_img); mini_tex.update(mini_img)
 			if sim.over and state == "play":
 				state = "result"
@@ -545,6 +583,7 @@ func update_visuals(alpha: float, delta: float) -> void:
 		missile_mm.set_instance_transform(mc, Transform3D(Basis(Vector3.RIGHT, PI), Vector3(m.x * K, m.z * K + h, m.y * K))); mc += 1
 	missile_mm.visible_instance_count = mc
 	sync_helpers(delta)
+	mode_view.sync(delta, me.team)
 	update_camera(delta)
 	update_aim()
 
@@ -580,9 +619,17 @@ func update_camera(delta: float) -> void:
 	shake = max(0.0, shake - delta * 2.2)
 	fov_punch = max(0.0, fov_punch - delta * 2.5)
 	if me != null and state == "play":
-		var n: Dictionary = mech_nodes[me.id]
+		var follow: Sim.Mech = me
+		if not me.alive and (me.out or me.respawn_t > 100):   # 一条命的模式里出局：看还活着的队友（或者任何人）
+			var cur := player_by_id(spectate_id)
+			if cur == null or not cur.alive:
+				cur = null
+				for q in sim.players:
+					if q.alive and not q.npc and (cur == null or (q.team == me.team and cur.team != me.team)): cur = q
+			if cur != null: follow = cur; spectate_id = cur.id
+		var n: Dictionary = mech_nodes[follow.id]
 		var mp: Vector3 = n.root.position
-		var look := Vector3(cos(me.inp.a), 0, sin(me.inp.a)) * (2.5 if not touch_mode else 1.5)
+		var look := Vector3(cos(follow.inp.a), 0, sin(follow.inp.a)) * (2.5 if not touch_mode else 1.5)
 		var off := Vector3(0, 23, 17.5)
 		var target := mp + look + off
 		cam.position = cam.position.lerp(target, min(1.0, delta * 6.0))
@@ -675,6 +722,7 @@ func update_fx(delta: float) -> void:
 			"light": (node as OmniLight3D).light_energy = float(f.e) * (1.0 - k)
 			"debris": node.position += f.v * delta; f.v.y -= 22.0 * delta; node.rotation += Vector3(4, 3, 5) * delta
 			"text": pass
+			"tele": node.scale = Vector3(float(f.r) * (0.6 + 0.4 * k), 6, float(f.r) * (0.6 + 0.4 * k))
 		if f.life <= 0: node.queue_free()
 		else: keep.append(f)
 	fx_list = keep
@@ -836,6 +884,69 @@ func apply_events() -> void:
 			"dmg":
 				hud.dmg_text(player_by_id(e[1]), int(e[2]), e[3] == me.id)
 				if e[1] == me.id: shake = max(shake, 0.18)
+			_: mode_event(e)
+
+# 超载 + 各模式的事件：横幅、音效、特效
+func mode_event(e: Array) -> void:
+	var mine := func(team: int) -> bool: return team == me.team
+	match e[0]:
+		"ov":
+			var p := player_by_id(e[1])
+			if p == null: return
+			var O: Dictionary = data.pilots[p.pilot].overload
+			var c := Color(str(data.pilots[p.pilot].accent))
+			var pos := Vector3(e[2] * K, e[4] * K, e[3] * K)
+			ring(pos, 5.0, c, 0.6); ring(pos, 3.0, Color.WHITE, 0.4); burst(pos + Vector3(0, 1.5, 0), c, 30, 7.0, 0.22, 0.7, -3.0)
+			flash_light(pos + Vector3(0, 2, 0), c, 6.0, 14.0, 0.35)
+			sfx.play("super", vol_at(e[2], e[3]))
+			if p == me:
+				hud.banner("超载 • " + str(O.name), c, data.pilots[p.pilot]); fov_punch = 1.0; shake = max(shake, 0.5)
+		"goal":
+			var team: int = e[1]
+			hud.banner(("我方得分！" if mine.call(team) else "对方得分！"), team_col[team])
+			sfx.play("win" if mine.call(team) else "lose", -4.0); shake = max(shake, 0.4)
+		"grab": var p2 := player_by_id(e[1]); if p2 != null: hud.banner(("我方" if p2.team == me.team else "对方") + "抢到了宝物核心！", team_col[p2.team]); sfx.play("pickup")
+		"drop": hud.banner("宝物核心掉在地上了！", Color("#ffe14d"))
+		"trr": hud.banner("宝物核心回到中央", Color("#ffe14d"))
+		"dep":
+			var p3 := player_by_id(e[1])
+			if p3 != null:
+				hud.float_text(p3, "+%d" % int(e[2]), Color("#ffe14d")); sfx.play("pickup", 0.0 if p3 == me else -8.0)
+				ring(Vector3(p3.x * K, p3.z * K, p3.y * K), 3.0, team_col[p3.team], 0.5)
+		"bp": if e[1] == me.id: sfx.play("pickup", -4.0)
+		"zn":
+			var o: int = e[1]
+			hud.banner("据点变为中立" if o == 0 else ("我方占领了据点！" if mine.call(o) else "据点被对方占领！"), Color.WHITE if o == 0 else team_col[o]); sfx.play("lock")
+		"rd": hud.banner("第 %d 局：%s" % [int(e[4]), "我方获胜！" if mine.call(e[1]) else "对方获胜"], team_col[e[1]]); sfx.play("win" if mine.call(e[1]) else "lose", -4.0)
+		"rs": hud.banner("第 %d 局 开始！" % int(e[1]), Color("#ffe14d")); sfx.play("go")
+		"cz": hud.banner("毒圈开始缩小！", Color("#ff6b8a")); sfx.play("lock")
+		"cr": hud.banner("新的空投箱降落了", Color("#ffb000"))
+		"crt":
+			burst(Vector3(e[2] * K, e[4] * K + 1, e[3] * K), Color("#ffb000"), 16, 5.0, 0.2, 0.5)
+			if e[1] == me.id: hud.banner("空投箱 × %d：伤害和生命都提高了" % int(e[5]), Color("#ffb000")); sfx.play("pickup")
+		"tout":
+			var t: int = e[1]
+			hud.banner(("我方" if mine.call(t) else "一支小队") + "出局了（第 %d 名）" % int(e[2]), team_col[t]); sfx.play("ko", -4.0)
+		"boss":
+			var pos2 := Vector3(e[3] * K, e[5] * K, e[4] * K)
+			match str(e[2]):
+				"rage": hud.banner("百目狂暴了！", Color("#ff3b52")); ring(pos2, 9.0, Color("#ff3b52"), 0.8); shake = max(shake, 0.7); sfx.play("super")
+				"summon": hud.banner("百目召唤了小咒灵", Color("#b48cff"))
+				"dash": ring(pos2, 4.0, Color("#ff3b52"), 0.4); sfx.play("boom", -6.0)
+				"ring": burst(pos2 + Vector3(0, 3, 0), Color("#b48cff"), 20, 6.0, 0.3, 0.5)
+				"down":
+					hud.banner("百目被打倒了！", Color("#ffe14d")); fireball(pos2 + Vector3(0, 3, 0), 9.0, Color("#b48cff")); ring(pos2, 14.0, Color("#ffe14d"), 0.9)
+					shake = 1.0; hitstop(160); sfx.play("wreck")
+		"tg":
+			var mi := MeshInstance3D.new(); mi.mesh = Models.mesh("torus", 0.92, 1.0); mi.material_override = Models.glow(Color("#ff3b52"), 2.4, 0.85)
+			var r: float = float(e[4]) * K
+			mi.position = Vector3(e[1] * K, e[3] * K + 0.15, e[2] * K); mi.scale = Vector3(r, 6, r); mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_fx(mi, float(e[5]), "tele", {"r": r})
+		"summon": ring(Vector3(e[2] * K, e[4] * K, e[3] * K), 3.0, Color("#b48cff"), 0.6); burst(Vector3(e[2] * K, e[4] * K + 1, e[3] * K), Color("#b48cff"), 16, 4.0, 0.2, 0.6, -2.0)
+		"balloon":
+			var pb := Vector3(e[3] * K, e[5] * K, e[4] * K)
+			burst(pb, team_col[e[2]], 20, 6.0, 0.2, 0.5); ring(pb, 2.0, Color.WHITE, 0.3); sfx.play("pickup", vol_at(e[3], e[4]) - 4.0)
+		"dmn": burst(Vector3(e[3] * K, e[5] * K + 1.2, e[4] * K), Color("#b48cff"), 8, 4.0, 0.16, 0.3)
 
 func hitstop(ms: int) -> void:
 	Engine.time_scale = 0.12
@@ -889,6 +1000,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		match ev.physical_keycode:
 			KEY_Q: me.inp.gq += 1
 			KEY_E: me.inp.qq += 1
+			KEY_R: me.inp.oq += 1
 			KEY_ESCAPE: state = "menu"; menu.visible = true
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 		me.inp.qq += 1
@@ -898,7 +1010,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 
 func touch_buttons() -> Dictionary:
 	var s := get_viewport().get_visible_rect().size
-	return {"super": [Vector2(s.x - 230, s.y - 230), 52.0], "skill": [Vector2(s.x - 330, s.y - 150), 44.0], "wheel": [Vector2(s.x - 110, s.y - 330), 40.0], "jump": [Vector2(s.x - 210, s.y - 340), 36.0]}
+	return {"super": [Vector2(s.x - 230, s.y - 230), 52.0], "skill": [Vector2(s.x - 330, s.y - 150), 44.0], "wheel": [Vector2(s.x - 110, s.y - 330), 40.0], "jump": [Vector2(s.x - 210, s.y - 340), 36.0], "ov": [Vector2(s.x - 340, s.y - 280), 36.0]}
 
 func handle_touch(ev: InputEvent) -> void:
 	var s := get_viewport().get_visible_rect().size
@@ -912,6 +1024,7 @@ func handle_touch(ev: InputEvent) -> void:
 					t_btn[name] = idx
 					if name == "skill": me.inp.gq += 1
 					elif name == "super": me.inp.qq += 1
+					elif name == "ov": me.inp.oq += 1
 					elif name == "wheel": wheel_hold = true
 					return
 			if pos.x < s.x * 0.45 and t_move.id < 0: t_move = {"id": idx, "o": pos, "v": Vector2.ZERO}

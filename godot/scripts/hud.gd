@@ -78,7 +78,7 @@ func _draw() -> void:
 		if not p.alive: continue
 		if p.team != me.team and not sim.visible_to(me.team, p): continue
 		var n: Dictionary = game.mech_nodes[p.id]
-		var wp: Vector3 = n.root.position + Vector3(0, 2.2 if p.foot else 3.4, 0)
+		var wp: Vector3 = n.root.position + Vector3(0, 2.2 if p.foot else (3.4 * float(n.scale)), 0)
 		if cam.is_position_behind(wp): continue
 		var s := cam.unproject_position(wp)
 		var self_p: bool = p == me
@@ -101,6 +101,10 @@ func _draw() -> void:
 		for st in STATUS:
 			if float(p.get(st[0])) > 0 and tags.size() < 3: tags.append(st)
 		if p.foot: tags.push_front(["", "弹出", "#ffae2e"])
+		if p.ov_t > 0: tags.push_front(["", "超载", "#ff4fd8"])
+		if p.carry > 0: tags.push_front(["", ("封印石 %d" if sim.mode == "seal" else "电池 %d") % p.carry, "#ffe14d"])
+		if sim.obj.has("tr") and sim.obj.tr.carrier == p: tags.push_front(["", "宝物", "#ffe14d"])
+		if p.cubes > 0: tags.append(["", "箱 %d" % p.cubes, "#ffb000"])
 		var tx := s.x - (tags.size() - 1) * 26.0
 		for st in tags:
 			txt(st[1], Vector2(tx, s.y + (24 if self_p else 18)), 11, Color(st[2]), HORIZONTAL_ALIGNMENT_CENTER, 3); tx += 52
@@ -130,19 +134,35 @@ func _draw() -> void:
 	var t: int = int(ceil(max(0.0, sim.time_left)))
 	draw_rect(Rect2(vs.x / 2 - 70, 10, 140, 50), Color(0, 0, 0, 0.75))
 	txt("%d:%02d" % [t / 60, t % 60], Vector2(vs.x / 2, 34), 32, Color("#ff6b5a") if t <= 30 else Color.WHITE)
-	var tu: Array = game.turf
-	var tot := float(max(1, tu[2]))
-	var bw := 360.0; var bx := vs.x / 2 - bw / 2; var by := 68.0
-	draw_rect(Rect2(bx - 2, by - 2, bw + 4, 18), Color(0, 0, 0, 0.75))
-	draw_rect(Rect2(bx, by, bw * tu[0] / tot, 14), game.team_col[1])
-	draw_rect(Rect2(bx + bw - bw * tu[1] / tot, by, bw * tu[1] / tot, 14), game.team_col[2])
-	txt("%d%%" % int(100.0 * tu[0] / tot), Vector2(bx - 30, by + 7), 15, game.team_col[1])
-	txt("%d%%" % int(100.0 * tu[1] / tot), Vector2(bx + bw + 30, by + 7), 15, game.team_col[2])
+	if sim.mode == "turf":
+		var tu: Array = game.turf
+		var tot := float(max(1, tu[2]))
+		var bw := 360.0; var bx := vs.x / 2 - bw / 2; var by := 68.0
+		draw_rect(Rect2(bx - 2, by - 2, bw + 4, 18), Color(0, 0, 0, 0.75))
+		draw_rect(Rect2(bx, by, bw * tu[0] / tot, 14), game.team_col[1])
+		draw_rect(Rect2(bx + bw - bw * tu[1] / tot, by, bw * tu[1] / tot, 14), game.team_col[2])
+		txt("%d%%" % int(100.0 * tu[0] / tot), Vector2(bx - 30, by + 7), 15, game.team_col[1])
+		txt("%d%%" % int(100.0 * tu[1] / tot), Vector2(bx + bw + 30, by + 7), 15, game.team_col[2])
+	else:
+		draw_mode_panel(sim, me, vs)
 	# ---- 小地图 ----
 	var mw := 190.0; var mh := mw * sim.GH / sim.GW; var mx := vs.x - mw - 14; var my := 14.0
 	draw_rect(Rect2(mx - 5, my - 5, mw + 10, mh + 10), Color(0, 0, 0, 0.75))
 	draw_texture_rect(game.mini_tex, Rect2(mx, my, mw, mh), false)
 	var ms := mw / sim.W
+	var o: Dictionary = sim.obj
+	if o.has("circle"):
+		var c0: Dictionary = o.circle
+		draw_arc(Vector2(mx + c0.x * ms, my + c0.y * ms), c0.r * ms, 0, TAU, 48, Color("#ff6b8a"), 2)
+		for k in o.crates: draw_rect(Rect2(mx + k.x * ms - 2, my + k.y * ms - 2, 4, 4), Color("#ffb000"))
+	if sim.mode == "zone":
+		var Z: Dictionary = sim.MC.ZONE; var zc: Color = game.team_col[o.owner] if o.owner > 0 else Color.WHITE
+		draw_rect(Rect2(mx + Z.x0 * 16 * ms, my + Z.y0 * 16 * ms, (Z.x1 - Z.x0) * 16 * ms, (Z.y1 - Z.y0) * 16 * ms), zc, false, 2)
+	if o.has("tr"): draw_circle(Vector2(mx + o.tr.x * ms, my + o.tr.y * ms), 4, Color("#ffe14d"))
+	if o.has("ball"): draw_circle(Vector2(mx + o.ball.x * ms, my + o.ball.y * ms), 4, Color.WHITE)
+	if o.has("bats"):
+		for bt in o.bats: draw_circle(Vector2(mx + bt.x * ms, my + bt.y * ms), 2, Color("#ffe14d") if sim.mode == "battery" else Color("#b48cff"))
+	if o.has("fl"): draw_circle(Vector2(mx + o.fl.x * ms, my + o.fl.y * ms), 5, Color("#ff6ec4"))
 	for p in sim.players:
 		if not p.alive: continue
 		var pos := Vector2(mx + p.x * ms, my + p.y * ms)
@@ -175,9 +195,11 @@ func _draw() -> void:
 	elif sim.time < 0.8:
 		txt("开打！", vs / 2, 84, Color("#ffe14d"), HORIZONTAL_ALIGNMENT_CENTER, 8)
 	if not me.alive:
-		txt("%.1f 秒后复活" % max(0.0, me.respawn_t), Vector2(vs.x / 2, vs.y * 0.6), 30, Color.WHITE)
+		if me.respawn_t > 100: txt("你出局了 • 正在观战" + ("，等下一局" if sim.mode == "elim" else ""), Vector2(vs.x / 2, vs.y * 0.6), 26, Color.WHITE)
+		else: txt("%.1f 秒后复活" % max(0.0, me.respawn_t), Vector2(vs.x / 2, vs.y * 0.6), 30, Color.WHITE)
 	elif me.foot:
-		txt("机体被打爆！撑住 %.1f 秒，新机体就会空投下来" % max(0.0, me.rebuild_t), Vector2(vs.x / 2, vs.y * 0.68), 20, Color("#ffae2e"))
+		if me.rebuild_t > 100: txt("机体被打爆！这个模式只有一条命，驾驶员要活下去", Vector2(vs.x / 2, vs.y * 0.68), 20, Color("#ffae2e"))
+		else: txt("机体被打爆！撑住 %.1f 秒，新机体就会空投下来" % max(0.0, me.rebuild_t), Vector2(vs.x / 2, vs.y * 0.68), 20, Color("#ffae2e"))
 	if sim.time_left <= 10 and sim.time_left > 0:
 		txt("最后 %d 秒！" % int(ceil(sim.time_left)), Vector2(vs.x / 2, 120), 22, Color("#ff6b5a"))
 	# ---- 右下：攻击 / 大招 / 技能 ----
@@ -186,12 +208,15 @@ func _draw() -> void:
 	var spk := clampf(me.sp / float(w.spNeed), 0, 1)
 	var regen := me.skill_regen / float(sim.C.SKILL_REGEN)
 	var atk_name: String = str(P.sidearm.name) if me.foot else str(w.short)
+	var ovk: float = me.ov_t / float(sim.C.OV_TIME) if me.ov_t > 0 else me.ov / float(sim.C.OV_NEED)
+	var ov_ready: bool = me.ov_t <= 0 and me.ov >= float(sim.C.OV_NEED)
 	if game.touch_mode:
 		var B: Dictionary = game.touch_buttons()
 		ring(B.super[0], B.super[1], spk, Color("#ffdf2e"), "大招", "", spk >= 1 and not me.foot, me.foot)
 		ring(B.skill[0], B.skill[1], regen if me.skill_uses <= 0 else 1.0, Color(str(P.accent)), str(P.skillInfo.short), "%d/%d" % [me.skill_uses, me.skill_max], false, me.skill_uses <= 0)
 		ring(B.wheel[0], B.wheel[1], 1.0, Color("#7af0ff"), "滚轮", "", game.wheel_hold, me.foot)
 		ring(B.jump[0], B.jump[1], 1.0, Color("#c9c5e6"), "跳", "", false, false)
+		ring(B.ov[0], B.ov[1], ovk, Color("#ff4fd8"), "超载", "", ov_ready, me.ov_t <= 0 and not ov_ready)
 		for st in [game.t_move, game.t_aim]:
 			if st.id >= 0:
 				draw_circle(st.o, 70, Color(1, 1, 1, 0.12)); draw_arc(st.o, 70, 0, TAU, 40, Color(1, 1, 1, 0.35), 3)
@@ -205,6 +230,41 @@ func _draw() -> void:
 		ring(Vector2(bx2 - 186, by2 + 12), 26, regen if me.skill_uses <= 0 else 1.0, Color(str(P.accent)), str(P.skillInfo.short), "Q • %d/%d" % [me.skill_uses, me.skill_max], false, me.skill_uses <= 0)
 		if me.skill_uses < me.skill_max:
 			draw_arc(Vector2(bx2 - 186, by2 + 12), 33, -PI / 2, -PI / 2 + regen * TAU, 32, Color(1, 1, 1, 0.4), 3)
-		txt("空格 跳跃 • Shift 滚轮 • Esc 菜单", Vector2(bx2 - 90, by2 - 62), 12, Color("#a8a4c8"), HORIZONTAL_ALIGNMENT_CENTER, 3)
+		ring(Vector2(bx2 - 256, by2 + 16), 22, ovk, Color("#ff4fd8"), "超载", "R", ov_ready, me.ov_t <= 0 and not ov_ready)
+		txt("空格 跳跃 • Shift 滚轮 • R 超载 • Esc 菜单", Vector2(bx2 - 90, by2 - 62), 12, Color("#a8a4c8"), HORIZONTAL_ALIGNMENT_CENTER, 3)
 	if sim.reveal[me.team] > sim.time:
 		txt("全队视野：所有敌人都暴露了", Vector2(vs.x / 2, 100), 15, Color("#7ad0ff"))
+
+# 模式比分（顶部，代替涂地比例条）
+func draw_mode_panel(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
+	var o: Dictionary = sim.obj; var MC: Dictionary = sim.MC
+	var c1: Color = game.team_col[me.team]; var c2: Color = game.team_col[3 - me.team] if me.team <= 2 else Color.WHITE
+	var y := 76.0
+	var two := func(a: String, b: String, label: String) -> void:
+		draw_rect(Rect2(vs.x / 2 - 200, y - 14, 400, 28), Color(0, 0, 0, 0.7))
+		txt(a, Vector2(vs.x / 2 - 120, y), 22, c1); txt(b, Vector2(vs.x / 2 + 120, y), 22, c2); txt(label, Vector2(vs.x / 2, y), 14, Color("#c9c5e6"))
+	var s1: int = o.score[me.team] if me.team <= 2 else 0
+	var s2: int = o.score[3 - me.team] if me.team <= 2 else 0
+	match sim.mode:
+		"zone": two.call("%d" % int(ceil(o.count[me.team])), "%d" % int(ceil(o.count[3 - me.team])), "据点 %d%% / %d%%" % [int(o.share[me.team] * 100), int(o.share[3 - me.team] * 100)])
+		"escort": two.call(str(s1), str(s2), "宝物 先得 %d 分" % int(MC.ESCORT_TARGET))
+		"soccer": two.call(str(s1), str(s2), "足球 先进 %d 球" % int(MC.SOCCER_TARGET))
+		"battery": two.call(str(s1), str(s2), "电池 先存 %d 个" % int(MC.BATTERY_TARGET))
+		"seal": two.call(str(s1), str(s2), "封印石 先存 %d 个" % int(MC.SEAL.target))
+		"park": two.call(str(s1), str(s2), "花车 先到 %d 分" % int(MC.PARK.target))
+		"elim": two.call(str(o.wins[me.team]), str(o.wins[3 - me.team]), "第 %d 局 • 存活 %d / %d" % [int(o.round), sim.alive_of(me.team), sim.alive_of(3 - me.team)])
+		"escape4", "escape8":
+			var left := 0
+			for t in range(1, sim.teams + 1):
+				if sim.alive_of(t) > 0: left += 1
+			var c: Dictionary = o.circle
+			var st := "毒圈第 %d 阶段" % (int(c.stage) + 1) if c.phase != 2 else "毒圈已缩到最小"
+			draw_rect(Rect2(vs.x / 2 - 200, y - 14, 400, 28), Color(0, 0, 0, 0.7))
+			txt("剩余 %d 队 • %s • 箱子 %d" % [left, st, me.cubes], Vector2(vs.x / 2, y), 16, Color.WHITE)
+		"raid":
+			var b: Sim.Mech = sim.boss
+			if b == null: return
+			var k := clampf(b.hp / b.max_hp, 0, 1)
+			draw_rect(Rect2(vs.x / 2 - 252, y - 12, 504, 26), Color(0, 0, 0, 0.8))
+			draw_rect(Rect2(vs.x / 2 - 248, y - 8, 496 * k, 18), Color("#ff3b52") if k < float(MC.RAID.rage) else Color("#b48cff"))
+			txt("百目  %d / %d" % [int(b.hp), int(b.max_hp)], Vector2(vs.x / 2, y), 15, Color.WHITE)
