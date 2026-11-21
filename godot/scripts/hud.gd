@@ -141,11 +141,11 @@ func _draw() -> void:
 		if game.t_move.id < 0: txt("左边拖动：移动", Vector2(160, vs.y - 60), 15, Color(1, 1, 1, 0.5))
 	else:
 		var bx2 := vs.x - 70; var by2 := vs.y - 70
-		ring(Vector2(bx2, by2), 40, me.ammo / 3.0 if w.attack != "charge" or me.charge <= 0 else me.charge, Color("#ffae2e"), str(w.short), "左键 · %d/3" % int(me.ammo), false, false)
+		ring(Vector2(bx2, by2), 40, me.ammo / 3.0 if w.attack != "charge" or me.charge <= 0 else me.charge, Color("#ffae2e"), str(w.short), "左键 • %d/3" % int(me.ammo), false, false)
 		ring(Vector2(bx2 - 104, by2 + 6), 32, spk, Color("#ffdf2e"), "大招", "E / 右键", spk >= 1, false)
-		ring(Vector2(bx2 - 186, by2 + 12), 26, regen if me.skill_uses <= 0 else 1.0, Color(str(P.accent)), str(P.skillInfo.short), "Q · %d/%d" % [me.skill_uses, me.skill_max], false, me.skill_uses <= 0)
+		ring(Vector2(bx2 - 186, by2 + 12), 26, regen if me.skill_uses <= 0 else 1.0, Color(str(P.accent)), str(P.skillInfo.short), "Q • %d/%d" % [me.skill_uses, me.skill_max], false, me.skill_uses <= 0)
 		if me.skill_uses < me.skill_max:
 			draw_arc(Vector2(bx2 - 186, by2 + 12), 33, -PI / 2, -PI / 2 + regen * TAU, 32, Color(1, 1, 1, 0.4), 3)
-		txt("空格 跳跃 · Shift 滚轮", Vector2(bx2 - 90, by2 - 62), 12, Color("#a8a4c8"), HORIZONTAL_ALIGNMENT_CENTER, 3)
+		txt("空格 跳跃 • Shift 滚轮", Vector2(bx2 - 90, by2 - 62), 12, Color("#a8a4c8"), HORIZONTAL_ALIGNMENT_CENTER, 3)
 	if sim.reveal[me.team] > sim.time:
 		txt("全队视野：所有敌人都暴露了", Vector2(vs.x / 2, 100), 15, Color("#7ad0ff"))

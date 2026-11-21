@@ -213,7 +213,7 @@ func build_menu() -> Control:
 	box.position = Vector2(-330, -300); box.custom_minimum_size = Vector2(660, 600)
 	root.add_child(box)
 	var title := Label.new(); title.text = "涂鸦机兵 GRAFFIBOTS"; title.add_theme_font_size_override("font_size", 56); title.add_theme_color_override("font_color", Color("#ffe14d")); title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; box.add_child(title)
-	var sub := Label.new(); sub.text = "Godot 样品版 · 4 对 4 涂地大战 · %s" % data.map.name; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_color_override("font_color", Color("#c9c5e6")); box.add_child(sub)
+	var sub := Label.new(); sub.text = "Godot 样品版 • 4 对 4 涂地大战 • %s" % data.map.name; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_color_override("font_color", Color("#c9c5e6")); box.add_child(sub)
 	var mk_row := func(label: String, ids: Array, names: Callable, cur: String, on_pick: Callable) -> HBoxContainer:
 		var row := HBoxContainer.new(); row.alignment = BoxContainer.ALIGNMENT_CENTER; row.add_theme_constant_override("separation", 12)
 		var l := Label.new(); l.text = label; l.custom_minimum_size = Vector2(110, 0); row.add_child(l)
@@ -231,7 +231,7 @@ func build_menu() -> Control:
 	go.pressed.connect(func(): start_match(sel_pilot, sel_mech))
 	box.add_child(go)
 	var help := Label.new(); help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; help.add_theme_color_override("font_color", Color("#9a96b8")); help.add_theme_font_size_override("font_size", 18)
-	help.text = "电脑：WASD 移动 · 鼠标瞄准 · 左键攻击 · Q 技能 · E / 右键 大招 · Shift 滚轮 · 空格 跳\n手机：左摇杆移动 · 右摇杆瞄准并攻击 · 右下角按钮放技能 / 大招"
+	help.text = "电脑：WASD 移动 • 鼠标瞄准 • 左键攻击 • Q 技能 • E / 右键 大招 • Shift 滚轮 • 空格 跳\n手机：左摇杆移动 • 右摇杆瞄准并攻击 • 右下角按钮放技能 / 大招"
 	box.add_child(help)
 	return root
 
@@ -245,7 +245,7 @@ func show_result() -> void:
 	var t := Label.new(); t.text = "胜利！" if win == me.team else ("平局" if win == 0 else "失败"); t.add_theme_font_size_override("font_size", 72)
 	t.add_theme_color_override("font_color", Color("#ffe14d") if win == me.team else Color("#c9c5e6")); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; box.add_child(t)
 	var pa: float = 100.0 * float(r.a) / max(1.0, float(r.tot)); var pb: float = 100.0 * float(r.b) / max(1.0, float(r.tot))
-	var s := Label.new(); s.text = "我方 %.1f%%   对方 %.1f%%\n击倒 %d · 倒下 %d · 涂地 %d 格" % [pa, pb, me.kills, me.deaths, me.painted]; s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; box.add_child(s)
+	var s := Label.new(); s.text = "我方 %.1f%%   对方 %.1f%%\n击倒 %d • 倒下 %d • 涂地 %d 格" % [pa, pb, me.kills, me.deaths, me.painted]; s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; box.add_child(s)
 	var again := Button.new(); again.text = "再来一局"; again.custom_minimum_size = Vector2(260, 70); again.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech)); box.add_child(again)
 	var back := Button.new(); back.text = "返回菜单"; back.custom_minimum_size = Vector2(260, 60); back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -473,11 +473,11 @@ func apply_events() -> void:
 			"skill":
 				var p := player_by_id(e[1])
 				if p != null: ring_fx(Vector3(p.x * K, p.z * K, p.y * K), 3.0, Color(str(data.pilots[p.pilot].accent)), 0.6)
-				if e[1] == me.id: hud.banner("技能 · " + str(data.pilots[me.pilot].skillInfo.name), Color(str(data.pilots[me.pilot].accent)))
+				if e[1] == me.id: hud.banner("技能 • " + str(data.pilots[me.pilot].skillInfo.name), Color(str(data.pilots[me.pilot].accent)))
 			"super":
 				var p2 := player_by_id(e[1])
 				if p2 != null: ring_fx(Vector3(p2.x * K, p2.z * K, p2.y * K), 5.0, Color("#ffe14d"), 0.7)
-				if e[1] == me.id: hud.banner("大招 · " + str(data.mechs[me.weapon].specialInfo.name), Color("#ffe14d"))
+				if e[1] == me.id: hud.banner("大招 • " + str(data.mechs[me.weapon].specialInfo.name), Color("#ffe14d"))
 			"dmg": hud.dmg_text(player_by_id(e[1]), int(e[2]))
 
 func player_by_id(id: int) -> Sim.Mech:
