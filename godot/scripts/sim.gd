@@ -113,6 +113,10 @@ class Mech:
 	var pmul := 1.0
 	var tal := {}             # 带进这局的天赋（最多 3 个）
 	var obj := 0              # 抢目标的次数（得分 / 送电池……）
+	var balloons := 0
+	var float_t := 0.0
+	var seals := 0
+	var spirits := 0
 	var hit_n := 0
 	var d5_used := false
 	var ov := 0.0             # 超载充能（打出的伤害）
@@ -187,6 +191,7 @@ var spawns: Array = []
 var boss: Mech = null
 var minions: Array = []
 var spirits: Array = []
+var ranked := false
 var rng := RandomNumberGenerator.new()
 var next_id := 1
 
@@ -1097,6 +1102,7 @@ func kill(t: Mech, by: Mech) -> void:
 	t.charge = 0; t.burst_n = 0; t.roll_t = 0; t.sp_t = 0; t.sp_kind = ""; t.shield = 0
 	if t.spirit:
 		t.respawn_t = 1e9
+		if by != null and by != t and not by.npc: by.spirits += 1
 		if mode == "seal":
 			for i in int(MC.SEAL.drop): drop_near(t.x, t.y, t.z)
 		ev(["ko", t.id, by.id if by != null else 0, t.x, t.y, t.z, t.team])
@@ -1923,7 +1929,7 @@ func pop_balloon(b: Dictionary, team: int, owner: Mech) -> void:
 	if not obj.balloons.has(b): return
 	obj.balloons.erase(b)
 	if team < 1 or team > 2: return
-	if owner != null: owner.obj += 1
+	if owner != null: owner.obj += 1; owner.balloons += 1
 	obj.score[team] += int(MC.PARK.balloon)
 	paint(b.x, b.y, top_at(b.x, b.y), 34, team, owner)
 	ev(["balloon", b.id, team, b.x, b.y, b.z])
@@ -1983,6 +1989,8 @@ func mode_park(dt: float) -> void:
 		obj.acc -= float(PK.tick)
 		if fl.own:
 			obj.score[fl.own] += 1
+			for q in players:
+				if q.alive and q.team == fl.own and Vector2(q.x - fl.x, q.y - fl.y).length() < float(PK.r): q.float_t += float(PK.tick)
 			paint(fl.x, fl.y, top_at(fl.x, fl.y), 40, fl.own, null)
 			if obj.score[fl.own] >= int(PK.target): finish(fl.own); return
 	obj.bal_t -= dt
@@ -2170,6 +2178,7 @@ func mode_stones(dt: float) -> void:
 		if p.carry > 0 and Vector2(p.x, p.y).distance_to(base_pos(p.team)) < 120:
 			obj.score[p.team] += p.carry
 			ev(["dep", p.id, p.carry]); p.obj += p.carry
+			if seal: p.seals += p.carry
 			p.carry = 0
 			if obj.score[p.team] >= target: finish(p.team); return
 

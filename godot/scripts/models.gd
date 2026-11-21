@@ -63,13 +63,15 @@ static func part(parent: Node3D, m: Mesh, mat: Material, pos: Vector3, rot := Ve
 
 # ---------------- 机兵 ----------------
 # 返回 {root, body, legs: [l, r], gun, ball, foot, parts: [...可以闪白的网格]}
-static func build_mech(weapon: String, w: Dictionary, tc: Color, P: Dictionary) -> Dictionary:
+static func build_mech(weapon: String, w: Dictionary, tc: Color, P: Dictionary, paint = null) -> Dictionary:
 	var root := Node3D.new()
 	var rig := Node3D.new(); root.add_child(rig)
 	var hp := float(w.hp)
 	var s := 1.12 if hp >= 160 else (0.92 if hp <= 95 else 1.0)
 	rig.scale = Vector3.ONE * s
 	var dk := Color("#262838"); var mt := Color("#9aa3bd"); var wh := Color("#f4f0ea")
+	if paint != null:   # 机甲涂装皮肤：框架 / 亮色 / 关节
+		dk = Color(str(paint.frame)); wh = Color(str(paint.light)); mt = Color(str(paint.joint))
 	var acc := Color(str(P.accent))
 	var td := tc.darkened(0.35)
 	# 腿（髋关节在 y = 0.95，可以摆动）

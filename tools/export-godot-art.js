@@ -28,6 +28,13 @@ const pub = path.join(__dirname, '..', 'public'), out = path.join(__dirname, '..
     save(`portraits/${id}.png`, await render(await p.evaluate((id) => GP.portrait(id, { bg: false }), id), 600, 780));
     save(`faces/${id}.png`, await render(await p.evaluate((id) => GP.portrait(id, { face: true }), id), 160, 160));
   }
+  // 驾驶员皮肤：换配色的立绘和头像（文件名用皮肤 id）
+  const skins = await p.evaluate(() => GS.SKINS.filter((k) => k.kind === 'pilot').map((k) => k.id));
+  for (const sid of skins) {
+    const P = (face) => p.evaluate(([sid, face]) => { const K = GS.SKINS.find((k) => k.id === sid); const P = Object.assign({}, GS.pilot(K.pilot), K.over || {}); return GP.portrait(P, face ? { face: true } : { bg: false }); }, [sid, face]);
+    save(`portraits/${sid}.png`, await render(await P(false), 600, 780));
+    save(`faces/${sid}.png`, await render(await P(true), 160, 160));
+  }
   const icons = await p.evaluate(() => GI.names);
   for (const n of icons) save(`icons/${n}.png`, await render(await p.evaluate((n) => GI.svg(n), n), 96, 96));
   const chests = await p.evaluate(() => Object.keys(GE ? GE.CHESTS : {}));
@@ -36,5 +43,5 @@ const pub = path.join(__dirname, '..', 'public'), out = path.join(__dirname, '..
     save(`chests/${c}_open.png`, await render(await p.evaluate((c) => GI.chestArt(c, true), c), 240, 260));
   }
   await b.close();
-  console.log('godot/art：', pilots.length, '张立绘 +', icons.length, '个图标 +', chests.length, '种宝箱');
+  console.log('godot/art：', pilots.length, '张立绘 +', skins.length, '套皮肤 +', icons.length, '个图标 +', chests.length, '种宝箱');
 })();

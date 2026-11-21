@@ -1,11 +1,10 @@
+# 2026-11：官网暂时冻结，不再随推送自动更新；需要时在 Actions 页面手动运行
 # 发布涂鸦机兵官网（GitHub Pages）：打包单文件版、完整包和安卓 APK，生成官网，一起发布。
 # 第一次使用：仓库 Settings → Pages → Source 选「GitHub Actions」。之后每次推送到 main / master 都会自动更新官网。
 # 官网地址：https://<用户名>.github.io/<仓库名>/ ，要和 public/config.js 里的 GB_SITE_URL 一致（游戏靠它检查新版本）。
 name: 发布官网
 
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:

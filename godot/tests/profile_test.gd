@@ -55,6 +55,32 @@ func _init() -> void:
 	var P2 := Profile.new(data, path)
 	ok(P2.o.xp == P.o.xp and P2.o.pilots[pid].lv == 6 and P2.o.tal == P.o.tal and typeof(P2.o.coins) == TYPE_INT, "存档读回来一致")
 	ok(P.daily_quests(20000).size() == 3, "每日任务每天 3 个：%s" % str(P.daily_quests(Profile.day_index()).map(func(q): return P.quest_name(q))))
+	# ---- 阶段 5：通行证 / 邮件 / 任务线 / 皮肤 / 排位 ----
+	var g0: int = P.o.gems
+	var mr := P.claim_mail("godot_pc")
+	ok(mr.ok and P.o.gems >= g0 + 300, "电脑版上线礼包邮件：宝石 +300、金色空投")
+	ok(not P.claim_mail("godot_pc").ok, "邮件不能重复领")
+	var st := P.task_state("rookie")
+	ok(int(st.p[0]) >= 1 and P.claim_task("rookie", 0).ok, "新兵之路第 1 步（打 1 局）可以领奖")
+	ok(int(P.o.pass.xp) > 0, "对战给了通行证经验 %d" % int(P.o.pass.xp))
+	P.o.pass.xp = 600 * 3
+	var pr := P.claim_pass_all()
+	ok(pr.ok and P.o.pass.cf.size() == 3 and P.o.pass.cp.is_empty(), "通行证 3 级：领了 3 个免费奖励，高级没解锁不给")
+	P.o.gems = 5000
+	ok(P.buy_pass(false).ok and P.claim_pass_all().ok and P.o.pass.cp.size() == 3, "解锁高级通行证后补领高级奖励")
+	var sk := "frost_night"
+	ok(P.buy_skin(sk).ok and P.wear(sk).ok and P.art_id("frost") == sk and P.pilot_look("frost").accent == "#2ef0c8", "买皮肤、穿上：立绘和 3D 配色都换成皮肤")
+	P.o.pilots["frost"] = {"lv": 1, "bt": 0}; P.o.pilots["candy"] = {"lv": 1, "bt": 0}; P.o.pilots["titan"] = {"lv": 1, "bt": 0}
+	ok(P.can_ranked(), "3 位驾驶员 + 3 台机体可以打排位")
+	var rp0: int = P.o.rank.rp
+	var rr := P.apply_match({"xp": 100, "trophies": 8, "won": true, "draw": false, "mvp": false, "kills": 3, "paint": 300, "mode": "turf", "ranked": true})
+	ok(P.o.rank.rp == rp0 + 10 and not rr.rank.is_empty(), "排位赢一局 +10 分")
+	ok(D_has_events(P) >= 0, "活动：现在进行中的有 %d 个" % P.active_events().size())
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	print("\n" + ("全部通过" if fails == 0 else "%d 项失败" % fails))
 	quit(1 if fails else 0)
+
+func D_has_events(P) -> int:
+	for ev in P.active_events():
+		P.event_state(ev)
+	return P.active_events().size()

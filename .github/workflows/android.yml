@@ -1,11 +1,9 @@
+# 2026-11：专注电脑版，安卓 App 暂停自动打包；需要时在 Actions 页面手动运行
 # 在 GitHub 的服务器上用官方 Android SDK 打包「涂鸦机兵」安卓 App（APK）
 # 推送代码或在 Actions 页面点「Run workflow」即可；打包好的 APK 在本次运行页面底部的 Artifacts 里下载。
 name: 打包安卓 App
 
 on:
-  push:
-    branches: [main, master]
-    paths: ['public/**', 'android/**', '.github/workflows/android.yml']
   workflow_dispatch:
 
 jobs:

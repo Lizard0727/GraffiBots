@@ -176,18 +176,35 @@ func _draw() -> void:
 	for f in feeds:
 		if now() - f[2] > 5: continue
 		txt(f[0], Vector2(vs.x - 20, fy), 15, f[1], HORIZONTAL_ALIGNMENT_RIGHT, 3); fy += 22
-	# ---- 技能 / 大招横幅（大招带驾驶员头像条） ----
+	# ---- 技能横幅 / 大招特写（右侧斜条：驾驶员立绘滑进来 + 招式名） ----
 	for b in banners:
 		var age2: float = now() - b[2]
-		if age2 < 1.6:
-			var c2: Color = b[1]; c2.a = 1.0 - max(0.0, age2 - 1.0) / 0.6
-			var slide := ease(clampf(age2 / 0.18, 0, 1), 0.3)
-			if b[3] != null:
-				var y0 := vs.y * 0.25
-				var bc := Color(str(b[3].accent)); bc.a = 0.75 * c2.a
-				draw_colored_polygon(PackedVector2Array([Vector2(-40 + slide * 40, y0 - 34), Vector2(vs.x * slide, y0 - 34), Vector2(vs.x * slide - 30, y0 + 34), Vector2(-40 + slide * 40, y0 + 34)]), bc)
-				txt(str(b[3].name), Vector2(vs.x * 0.5, y0 - 52), 18, Color(1, 1, 1, c2.a))
-			txt(b[0], Vector2(vs.x / 2, vs.y * 0.25), 32, c2, HORIZONTAL_ALIGNMENT_CENTER, 6)
+		if b[3] == null:
+			if age2 < 1.6:
+				var c2: Color = b[1]; c2.a = 1.0 - max(0.0, age2 - 1.0) / 0.6
+				txt(b[0], Vector2(vs.x / 2, vs.y * 0.25), 30, c2, HORIZONTAL_ALIGNMENT_CENTER, 6)
+			continue
+		if age2 > 1.5: continue
+		var Pd: Dictionary = b[3]
+		var a := clampf(1.0 - max(0.0, age2 - 1.15) / 0.35, 0, 1)
+		var slide := 1.0 - pow(1.0 - clampf(age2 / 0.22, 0, 1), 3)   # 快速滑入
+		var drift := age2 * 18.0                                       # 停住后慢慢漂
+		var acc := Color(str(Pd.accent))
+		var y0 := vs.y * 0.3; var h := 150.0; var x0 := vs.x * 0.42
+		var off := (1.0 - slide) * vs.x * 0.6 - drift
+		var band := PackedVector2Array([Vector2(x0 + 60 + off, y0 - h / 2), Vector2(vs.x + 40, y0 - h / 2 - 30), Vector2(vs.x + 40, y0 + h / 2 - 30), Vector2(x0 + off, y0 + h / 2)])
+		draw_colored_polygon(band, Color(0.05, 0.03, 0.1, 0.82 * a))
+		var stripe := PackedVector2Array([Vector2(x0 + 52 + off, y0 - h / 2 - 8), Vector2(vs.x + 40, y0 - h / 2 - 38), Vector2(vs.x + 40, y0 - h / 2 - 26), Vector2(x0 + 50 + off, y0 - h / 2 + 4)])
+		draw_colored_polygon(stripe, Color(acc, a))
+		var stripe2 := PackedVector2Array([Vector2(x0 - 6 + off, y0 + h / 2 - 4), Vector2(vs.x + 40, y0 + h / 2 - 34), Vector2(vs.x + 40, y0 + h / 2 - 22), Vector2(x0 - 8 + off, y0 + h / 2 + 8)])
+		draw_colored_polygon(stripe2, Color(acc.lightened(0.3), a))
+		var tex: Texture2D = UIKit.tex("res://art/portraits/%s.png" % game.profile.art_id(Pd.id)) if game.profile != null else null
+		if tex != null:   # 立绘的脸到胸口这一段，裁进斜条里
+			var src := Rect2(60, 90, 480, 300)
+			var dst := Rect2(vs.x - 420 - off * 0.3 + drift * 0.5, y0 - h / 2 - 26, 400, 250)
+			draw_texture_rect_region(tex, dst, src, Color(1, 1, 1, a))
+		txt(str(Pd.name) + "「" + str(Pd.code) + "」", Vector2(x0 + 230 + off, y0 - 34), 20, Color(1, 1, 1, a), HORIZONTAL_ALIGNMENT_CENTER, 5)
+		txt(b[0], Vector2(x0 + 230 + off, y0 + 16), 40, Color(b[1].r, b[1].g, b[1].b, a), HORIZONTAL_ALIGNMENT_CENTER, 8)
 	# ---- 倒计时 / 弹出 / 复活 ----
 	if sim.countdown > 0:
 		var cd: float = sim.countdown - floorf(sim.countdown)

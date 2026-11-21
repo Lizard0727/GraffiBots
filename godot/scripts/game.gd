@@ -62,11 +62,15 @@ var fov_punch := 0.0
 var aim_line: MeshInstance3D
 var aim_ring: MeshInstance3D
 var profile: Profile
+var settings: Settings
+var music: Music
 var lobby: Lobby
 var showroom: Node3D
 var showroom_key := ""
 var showroom_cam := 0.0
 var autoplay := false
+var ranked_on := false
+var ranked_bans := {}
 var shot_t := 0.0
 
 # 触屏
@@ -86,7 +90,11 @@ func _ready() -> void:
 	font = load("res://fonts/huangyou.ttf")
 	theme_ui = make_theme()
 	sfx = Sfx.new(); add_child(sfx)
+	settings = Settings.new()
+	music = Music.new(); add_child(music)
 	setup_world()
+	settings.apply(self)
+	music.play("menu")
 	hud = preload("res://scripts/hud.gd").new()
 	hud.game = self
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -107,6 +115,7 @@ func _ready() -> void:
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
+		if OS.get_environment("GB_SHOT") == "": splash(layer)
 	if autoplay:
 		var gm := OS.get_environment("GB_MAP")
 		sel_map = int(gm) if gm != "" else (-1 if sel_mode != "turf" else 0)
@@ -338,6 +347,10 @@ func show_result() -> void:
 		var parts: Array = ["经验 +%d" % rw.xp, "奖杯 %+d" % rw.trophies]
 		for it in res.items: parts.append(lobby.item_text(it)[0])
 		if res.lv_ups > 0: parts.append("账号升到 %d 级！天赋点 +%d" % [profile.level(), res.lv_ups])
+		parts.append("通行证经验 +%d" % res.pass_xp + ("（升到 %d 级）" % res.pass_after if res.pass_after > res.pass_before else ""))
+		if not res.rank.is_empty():
+			var T: Dictionary = data.econ.rank.tiers[res.rank.t1]
+			parts.append("排位 %+d 分 → %s %d 分" % [res.rank.d, T.name, res.rank.rp1])
 		if rw.mvp: parts.append("MVP")
 		var rl := Label.new(); rl.text = "   ".join(parts); rl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		rl.add_theme_font_size_override("font_size", 17); rl.add_theme_color_override("font_color", Color("#ffe14d")); box.add_child(rl)
@@ -354,7 +367,7 @@ func show_result() -> void:
 			var l := Label.new(); l.text = v; l.add_theme_font_size_override("font_size", 15); l.add_theme_color_override("font_color", Color.WHITE if p == me else c); grid.add_child(l)
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); box.add_child(hb)
 	var again := Button.new(); again.text = "再来一局"; again.custom_minimum_size = Vector2(220, 60)
-	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech) if autoplay else start_from_lobby()); hb.add_child(again)
+	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech) if autoplay else (lobby.ranked_start() if sim.ranked else start_from_lobby())); hb.add_child(again)
 	var back := Button.new(); back.text = "返回菜单"; back.custom_minimum_size = Vector2(220, 60)
 	back.pressed.connect(func(): result_ui.visible = false; back_to_lobby()); hb.add_child(back)
 	result_ui.visible = true
@@ -371,13 +384,17 @@ func start_match(pilot: String, mech: String) -> void:
 	if midx != cur_map: build_map(midx)
 	var dur := float(OS.get_environment("GB_DURATION")) if OS.get_environment("GB_DURATION") != "" else 180.0
 	sim = Sim.new(data, midx, 0, dur, sel_mode)
+	sim.ranked = ranked_on
 	var lay := sim.team_layout()
 	var pw: Dictionary = {"lv": 7, "bt": 1} if autoplay else profile.power(pilot)
 	me = sim.add_player(1, "你", lay[0], pilot, mech, false, pw)
 	var blv: int = int(pw.lv)   # AI 强度跟着玩家等级（原版：人类玩家的平均等级）
 	var bot_pw := {"lv": blv, "bt": 2 if blv >= 9 else (1 if blv >= 5 else 0)}
+	if ranked_on: bot_pw = profile.rank_bot_power()
 	var pool_p: Array = data.pilotOrder.duplicate(); pool_p.erase(pilot); pool_p.shuffle()
 	var pool_m: Array = data.order.duplicate(); pool_m.shuffle()
+	if ranked_on:   # 被禁用的驾驶员 / 机体 AI 也不能用
+		pool_p.erase(ranked_bans.get("pilot", "")); pool_m.erase(ranked_bans.get("mech", ""))
 	var names := BOT_NAMES.duplicate(); names.shuffle()
 	for i in range(1, lay.size()):
 		sim.add_player(i + 1, names[i - 1], lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
@@ -393,6 +410,7 @@ func start_match(pilot: String, mech: String) -> void:
 	for f in fx_list: f.node.queue_free()
 	fx_list.clear()
 	mode_view.setup(sim, team_col)
+	music.play("battle")
 	showroom.visible = false
 	menu.visible = false
 	state = "play"
@@ -402,7 +420,8 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 	var col: Color = team_col[p.team]
 	if p.boss: col = Color("#5a2a7a")
 	elif p.spirit: col = Color("#9a7cff")
-	var n := Models.build_mech(p.weapon, data.mechs[p.weapon], col, data.pilots[p.pilot])
+	var mine: bool = p.id == 1 and not autoplay and not p.npc
+	var n := Models.build_mech(p.weapon, data.mechs[p.weapon], col, profile.pilot_look(p.pilot) if mine else data.pilots[p.pilot], profile.mech_paint() if mine else null)
 	if p.boss: n.scale = 2.6
 	elif p.spirit: n.scale = 0.85
 	add_child(n.root)
@@ -590,6 +609,7 @@ func sync_helpers(delta: float) -> void:
 			helper_nodes[id].queue_free(); helper_nodes.erase(id)
 
 func update_camera(delta: float) -> void:
+	if state == "play" and sim != null and sim.countdown <= 0 and sim.time_left <= 30 and sim.mode != "elim": music.play("final")
 	shake = max(0.0, shake - delta * 2.2)
 	fov_punch = max(0.0, fov_punch - delta * 2.5)
 	if me != null and state == "play":
@@ -726,7 +746,10 @@ func apply_events() -> void:
 				var a := float(p.inp.a)
 				var tip: Vector3 = n.root.position + Vector3(cos(a) * 1.9, 1.5, sin(a) * 1.9) + Vector3(-sin(a), 0, cos(a)) * 0.85
 				var c: Color = team_col[p.team]
-				burst(tip, c.lightened(0.4), 4, 3.0, 0.14, 0.15, 0.0)
+				var fxs = profile.skin(str(profile.o.wear.get("fx", ""))) if p == me and not autoplay else null
+				if fxs != null:
+					for fc in fxs.fx.cols: burst(tip, Color(str(fc)), 3, 4.0, 0.12, 0.25, 0.0)
+				else: burst(tip, c.lightened(0.4), 4, 3.0, 0.14, 0.15, 0.0)
 				flash_light(tip, c, 2.0, 6.0, 0.08)
 				var atk := "sidearm" if p.foot else str(data.mechs[p.weapon].attack)
 				sfx.play({"burst": "shoot_burst", "fan": "shoot_fan", "flick": "shoot_fan", "lob": "shoot_lob", "punch": "punch"}.get(atk, "shoot_burst"), vol_at(p.x, p.y) - (4.0 if p != me else 0.0))
@@ -952,10 +975,10 @@ func read_input() -> void:
 		inp.j = t_btn.has("jump")
 		return
 	var mx := 0.0; var my := 0.0
-	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT): mx -= 1
-	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT): mx += 1
-	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP): my -= 1
-	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN): my += 1
+	if settings.pressed("left") or Input.is_physical_key_pressed(KEY_LEFT): mx -= 1
+	if settings.pressed("right") or Input.is_physical_key_pressed(KEY_RIGHT): mx += 1
+	if settings.pressed("up") or Input.is_physical_key_pressed(KEY_UP): my -= 1
+	if settings.pressed("down") or Input.is_physical_key_pressed(KEY_DOWN): my += 1
 	inp.mx = mx; inp.my = my
 	var gp := ground_point(get_viewport().get_mouse_position(), (me.z + 24.0) * K)
 	var dx := gp.x / K - me.x; var dy := gp.z / K - me.y
@@ -965,17 +988,16 @@ func read_input() -> void:
 	var th := sim.top_at(gp.x / K, gp.z / K)
 	inp.pt = atan2(th + 16.0 - (me.z + 24.0), max(40.0, d)) if th > me.z + 20 else 0.0
 	inp.f = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not menu.visible
-	inp.w = Input.is_physical_key_pressed(KEY_SHIFT)
-	inp.j = Input.is_physical_key_pressed(KEY_SPACE)
+	inp.w = settings.pressed("wheel")
+	inp.j = settings.pressed("jump")
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if state != "play" or me == null: return
 	if ev is InputEventKey and ev.pressed and not ev.echo:
-		match ev.physical_keycode:
-			KEY_Q: me.inp.gq += 1
-			KEY_E: me.inp.qq += 1
-			KEY_R: me.inp.oq += 1
-			KEY_ESCAPE: back_to_lobby()
+		if settings.is_key(ev, "skill"): me.inp.gq += 1
+		elif settings.is_key(ev, "super"): me.inp.qq += 1
+		elif settings.is_key(ev, "overload"): me.inp.oq += 1
+		elif ev.physical_keycode == KEY_ESCAPE: back_to_lobby()
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 		me.inp.qq += 1
 	if ev is InputEventScreenTouch or ev is InputEventScreenDrag:
@@ -1016,6 +1038,16 @@ func handle_touch(ev: InputEvent) -> void:
 
 
 # ---------------- 大厅 ----------------
+func start_ranked(bans: Dictionary) -> void:
+	ranked_on = true; ranked_bans = bans
+	sel_mode = profile.ranked_mode(); sel_map = -1
+	start_match(profile.o.pilot, profile.o.weapon)
+	ranked_on = false
+
+func _input(ev: InputEvent) -> void:   # F11：全屏切换（任何时候都能用）
+	if ev is InputEventKey and ev.pressed and not ev.echo and ev.physical_keycode == KEY_F11:
+		settings.fullscreen = not settings.fullscreen; settings.apply(self); settings.save()
+
 func start_from_lobby() -> void:
 	var o: Dictionary = profile.o
 	if not profile.has_pilot(o.pilot): lobby.toast("先在「驾驶员」里选一位驾驶员"); return
@@ -1024,6 +1056,7 @@ func start_from_lobby() -> void:
 
 func back_to_lobby() -> void:
 	state = "menu"; menu.visible = true; result_ui.visible = false
+	music.play("menu")
 	if hitstop_until > 0: Engine.time_scale = 1.0; hitstop_until = 0
 	lobby.refresh()
 
@@ -1032,16 +1065,48 @@ func show_showroom(pid: String, mech: String, vis: bool, cam_x := 0.0) -> void:
 	showroom_cam = cam_x
 	showroom.visible = vis and pid != ""
 	if pid == "" or not data.pilots.has(pid): return
-	var key := pid + "|" + mech
+	var key := pid + "|" + mech + "|" + profile.pilot_skin(pid) + "|" + str(profile.o.wear.get("mech", ""))
 	if key != showroom_key:
 		showroom_key = key
 		for c in showroom.get_children(): c.queue_free()
 		var tc: Color = team_col[1]
 		var turn := Node3D.new(); turn.name = "turn"; showroom.add_child(turn)
-		var n := Models.build_mech(mech, data.mechs[mech], tc, data.pilots[pid])
+		var n := Models.build_mech(mech, data.mechs[mech], tc, profile.pilot_look(pid), profile.mech_paint())
 		n.root.scale = Vector3.ONE * 1.6; turn.add_child(n.root)
 		var disc := MeshInstance3D.new(); disc.mesh = Models.mesh("cyl", 3.6, 0.3); disc.material_override = Models.toon(Color("#2a2550"), 0.1, 0.6); disc.position.y = -0.15; showroom.add_child(disc)
 		var rim := MeshInstance3D.new(); rim.mesh = Models.mesh("torus", 3.5, 3.75); rim.material_override = Models.glow(Color(str(data.pilots[pid].accent)), 2.4); showroom.add_child(rim)
 		var l := OmniLight3D.new(); l.position = Vector3(2, 5, 4); l.light_energy = 2.2; l.omni_range = 14; showroom.add_child(l)
 	var m: Dictionary = data.maps[cur_map]
 	showroom.position = Vector3(float(m.gw) / 2.0, -0.45, float(m.gh) + 14.0)
+
+
+# ---------------- 开场：XA 游戏工作室 → 加载画面（等背景音乐合成好） ----------------
+func splash(layer: CanvasLayer) -> void:
+	var sp := Control.new(); sp.set_anchors_preset(Control.PRESET_FULL_RECT); sp.mouse_filter = Control.MOUSE_FILTER_STOP; layer.add_child(sp)
+	var bg := ColorRect.new(); bg.color = Color("#0b0816"); bg.set_anchors_preset(Control.PRESET_FULL_RECT); sp.add_child(bg)
+	var vs := get_viewport().get_visible_rect().size
+	var dots := UIKit.Splash.new(); dots.cols = [Color("#ff3ea5"), Color("#1fd6ee"), Color("#ffe14d")]; dots.seed_v = 7; dots.size = vs; dots.modulate.a = 0; sp.add_child(dots)
+	var studio := VBoxContainer.new(); studio.alignment = BoxContainer.ALIGNMENT_CENTER; studio.size = vs; studio.modulate.a = 0; sp.add_child(studio)
+	var xa := UIKit.label("XA", 120, Color("#ffe14d"), 14, Color("#ff3ea5")); xa.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; studio.add_child(xa)
+	var n1 := UIKit.label("XA 游戏工作室", 34, Color.WHITE, 6); n1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; studio.add_child(n1)
+	var n2 := UIKit.label("XA GAME STUDIO", 18, Color("#9a96b8")); n2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; studio.add_child(n2)
+	var load := VBoxContainer.new(); load.alignment = BoxContainer.ALIGNMENT_CENTER; load.size = vs; load.modulate.a = 0; sp.add_child(load)
+	var t1 := UIKit.label("涂鸦机兵", 84, Color("#ffe14d"), 16, Color("#ff3ea5")); t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; load.add_child(t1)
+	var t2 := UIKit.label("GRAFFI•BOTS  •  电脑版", 22, Color("#5ff0ff"), 6); t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; load.add_child(t2)
+	var barc := CenterContainer.new(); load.add_child(barc)
+	var bar := UIKit.bar(0.0, 420, 14, Color("#ffe14d")); barc.add_child(bar)
+	var tip := UIKit.label("正在调颜料……", 16, Color("#a8a4c8")); tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; load.add_child(tip)
+	var tw := create_tween()
+	tw.tween_property(studio, "modulate:a", 1.0, 0.5); tw.parallel().tween_property(dots, "modulate:a", 0.5, 0.8)
+	tw.tween_interval(0.9)
+	tw.tween_property(studio, "modulate:a", 0.0, 0.35)
+	tw.tween_property(load, "modulate:a", 1.0, 0.3)
+	var tips := ["正在调颜料……", "正在给机兵上油……", "正在合成背景音乐……", "灰城的墙已经刷好了，等你去涂"]
+	tw.tween_method(func(k):
+		bar.k = k; bar.queue_redraw()
+		tip.text = tips[mini(3, int(k * 4))], 0.0, 0.85, 1.2)
+	tw.tween_callback(func():
+		var wait := create_tween()
+		wait.tween_method(func(k): bar.k = 0.85 + 0.15 * k; bar.queue_redraw(), 0.0, 1.0, 0.4)
+		wait.tween_property(sp, "modulate:a", 0.0, 0.4)
+		wait.tween_callback(sp.queue_free))
