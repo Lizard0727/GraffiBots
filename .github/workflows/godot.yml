@@ -57,6 +57,7 @@ jobs:
         run: |
           ~/godot/godot --headless --path godot --import || true
           ~/godot/godot --headless --path godot --script res://tests/sim_test.gd
+          ~/godot/godot --headless --path godot --script res://tests/profile_test.gd
 
       - name: 导出
         run: |
@@ -75,7 +76,7 @@ jobs:
           cp build/godot/android/GraffiBots-Godot.apk build/GraffiBots-Godot.apk
           gh release delete godot-proto --yes --cleanup-tag || true
           gh release create godot-proto build/GraffiBots-Godot-Windows.zip build/GraffiBots-Godot-Web.zip build/GraffiBots-Godot.apk \
-            --title "Godot 版（最新）" --notes "涂鸦机兵 Godot 版（移植第三阶段）：全部 22 台机体、21 位驾驶员和超载技能、14 张地图、11 种模式。Windows（解压后双击 exe）、网页版、安卓 APK。" --prerelease --target ${{ github.sha }}
+            --title "Godot 版（最新）" --notes "涂鸦机兵 Godot 版（移植第三阶段）：全部 22 台机体、21 位驾驶员和超载技能、14 张地图、11 种模式，本地存档 + 大厅 + 养成（宝箱、升级、突破、天赋、任务）。Windows（解压后双击 exe）、网页版、安卓 APK。" --prerelease --target ${{ github.sha }}
 
       - name: 更新官网（/godot/ 网页版）
         env:

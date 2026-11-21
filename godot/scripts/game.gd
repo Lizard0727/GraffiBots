@@ -61,7 +61,11 @@ var hitstop_until := 0
 var fov_punch := 0.0
 var aim_line: MeshInstance3D
 var aim_ring: MeshInstance3D
-var detail_lbl: Label
+var profile: Profile
+var lobby: Lobby
+var showroom: Node3D
+var showroom_key := ""
+var autoplay := false
 var shot_t := 0.0
 
 # 触屏
@@ -87,12 +91,21 @@ func _ready() -> void:
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var layer := CanvasLayer.new(); add_child(layer); layer.add_child(hud)
-	menu = build_menu(); layer.add_child(menu)
+	profile = Profile.new(data)
+	lobby = Lobby.new(self); menu = lobby; layer.add_child(menu)
 	result_ui = Control.new(); result_ui.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.theme = theme_ui; result_ui.visible = false; layer.add_child(result_ui)
 	build_map(0)
 	mode_view = ModeView.new(); add_child(mode_view)
+	showroom = Node3D.new(); add_child(showroom)
 	if OS.get_environment("GB_MODE") != "": sel_mode = OS.get_environment("GB_MODE")
-	if OS.get_environment("GB_AUTOPLAY") != "":
+	autoplay = OS.get_environment("GB_AUTOPLAY") != ""
+	if not autoplay:
+		if OS.get_environment("GB_TAB") != "" and int(profile.o.tut) == 0:   # 截图用：直接给个开好宝箱的账号
+			profile.tutorial(); profile.open_chest("starter"); profile.o.gems = 600
+		lobby.refresh()
+		if OS.get_environment("GB_TAB") != "": lobby.show_tab(OS.get_environment("GB_TAB"))
+		if int(profile.o.tut) == 0: lobby.welcome()
+	if autoplay:
 		var gm := OS.get_environment("GB_MAP")
 		sel_map = int(gm) if gm != "" else (-1 if sel_mode != "turf" else 0)
 		start_match(OS.get_environment("GB_PILOT") if OS.get_environment("GB_PILOT") != "" else "blaze", OS.get_environment("GB_MECH") if OS.get_environment("GB_MECH") != "" else "blaster")
@@ -299,72 +312,6 @@ func role_name(id: String) -> String:
 	if c == null: return ""
 	return "%s • %s" % [data.roles[c[0]].name, data.tags.get(c[1], "")]
 
-func build_menu() -> Control:
-	var root := Control.new(); root.set_anchors_preset(Control.PRESET_FULL_RECT); root.theme = theme_ui
-	var bg := ColorRect.new(); bg.color = Color(0.03, 0.02, 0.08, 0.55); bg.set_anchors_preset(Control.PRESET_FULL_RECT); root.add_child(bg)
-	var outer := VBoxContainer.new(); outer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	outer.offset_left = 24; outer.offset_right = -24; outer.offset_top = 14; outer.offset_bottom = -14; outer.add_theme_constant_override("separation", 10)
-	root.add_child(outer)
-	var title := Label.new(); title.text = "涂鸦机兵 GRAFFIBOTS"; title.add_theme_font_size_override("font_size", 44); title.add_theme_color_override("font_color", Color("#ffe14d"))
-	title.add_theme_color_override("font_outline_color", Color("#ff3ea5")); title.add_theme_constant_override("outline_size", 8)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; outer.add_child(title)
-	var row := HBoxContainer.new(); row.size_flags_vertical = Control.SIZE_EXPAND_FILL; row.add_theme_constant_override("separation", 12); outer.add_child(row)
-	var mk_grid := func(caption: String, ids: Array, label: Callable, cur: String, pick: Callable) -> PanelContainer:
-		var pc := PanelContainer.new(); pc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var v := VBoxContainer.new(); pc.add_child(v)
-		var l := Label.new(); l.text = caption; l.add_theme_color_override("font_color", Color("#c9c5e6")); v.add_child(l)
-		var sc := ScrollContainer.new(); sc.size_flags_vertical = Control.SIZE_EXPAND_FILL; sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; v.add_child(sc)
-		var g := GridContainer.new(); g.columns = 3; g.size_flags_horizontal = Control.SIZE_EXPAND_FILL; g.add_theme_constant_override("h_separation", 8); g.add_theme_constant_override("v_separation", 8); sc.add_child(g)
-		var group := ButtonGroup.new()
-		for id in ids:
-			var b := Button.new(); b.toggle_mode = true; b.button_group = group; b.text = label.call(id); b.custom_minimum_size = Vector2(116, 64); b.clip_text = true
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL; b.add_theme_font_size_override("font_size", 16)
-			b.button_pressed = id == cur
-			b.pressed.connect(func(): pick.call(id); sfx.play("click"); update_detail())
-			g.add_child(b)
-		return pc
-	row.add_child(mk_grid.call("驾驶员（%d）" % data.pilotOrder.size(), data.pilotOrder, func(id): var P = data.pilots[id]; return "%s「%s」\n%s" % [P.name, P.code, role_name(id)], sel_pilot, func(id): sel_pilot = id))
-	row.add_child(mk_grid.call("机体（%d）" % data.order.size(), data.order, func(id): return "%s\n%s" % [data.mechs[id].name, role_name(id)], sel_mech, func(id): sel_mech = id))
-	var side := PanelContainer.new(); side.custom_minimum_size = Vector2(320, 0); side.size_flags_stretch_ratio = 0.0; row.add_child(side)
-	var sv := VBoxContainer.new(); sv.add_theme_constant_override("separation", 10); side.add_child(sv)
-	detail_lbl = Label.new(); detail_lbl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; detail_lbl.custom_minimum_size = Vector2(290, 0); detail_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	detail_lbl.add_theme_font_size_override("font_size", 15); detail_lbl.add_theme_color_override("font_color", Color("#e6e2fa")); sv.add_child(detail_lbl)
-	var mdl := Label.new(); mdl.text = "模式"; mdl.add_theme_color_override("font_color", Color("#c9c5e6")); sv.add_child(mdl)
-	var mo := OptionButton.new()
-	for i in data.modeOrder.size():
-		var mk: String = data.modeOrder[i]
-		mo.add_item(str(data.modes[mk].name), i)
-		if mk == sel_mode: mo.select(i)
-	mo.item_selected.connect(func(k): sel_mode = data.modeOrder[k]; sfx.play("click"); update_detail())
-	sv.add_child(mo)
-	mode_lbl = Label.new(); mode_lbl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; mode_lbl.custom_minimum_size = Vector2(290, 0)
-	mode_lbl.add_theme_font_size_override("font_size", 13); mode_lbl.add_theme_color_override("font_color", Color("#ffe14d")); sv.add_child(mode_lbl)
-	var ml := Label.new(); ml.text = "地图"; ml.add_theme_color_override("font_color", Color("#c9c5e6")); sv.add_child(ml)
-	var ob := OptionButton.new(); ob.add_item("随机地图", 0)
-	for i in data.maps.size(): ob.add_item(str(data.maps[i].name), i + 1)
-	ob.item_selected.connect(func(k): sel_map = k - 1; sfx.play("click"); if sel_map >= 0: build_map(sel_map))
-	sv.add_child(ob)
-	var go := Button.new(); go.text = "开始对战"; go.custom_minimum_size = Vector2(0, 70); go.add_theme_font_size_override("font_size", 30)
-	go.pressed.connect(func(): sfx.play("go"); start_match(sel_pilot, sel_mech))
-	sv.add_child(go)
-	var help := Label.new(); help.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; help.custom_minimum_size = Vector2(290, 0); help.add_theme_font_size_override("font_size", 13); help.add_theme_color_override("font_color", Color("#9a96b8"))
-	help.text = "电脑：WASD 移动 • 鼠标瞄准 • 左键攻击 • Q 技能 • E / 右键 大招 • Shift 滚轮 • 空格 跳\n手机：左摇杆移动 • 右摇杆瞄准并攻击 • 右下角按钮"
-	sv.add_child(help)
-	update_detail.call_deferred()
-	return root
-
-func update_detail() -> void:
-	if detail_lbl == null: return
-	var P: Dictionary = data.pilots[sel_pilot]; var w: Dictionary = data.mechs[sel_mech]
-	var A: Dictionary = P.sidearm
-	var t := "%s「%s」— %s\n技能 • %s：%s\n被动 • %s：%s\n弹出武器 • %s\n\n%s（%s）\n%s\n大招 • %s：%s" % [P.name, P.code, P.title, P.skillInfo.name, P.skillInfo.desc, P.passive.name, P.passive.desc, A.name,
-		w.name, role_name(sel_mech), w.desc, w.specialInfo.name, w.specialInfo.desc]
-	if w.trait != null: t += "\n特性 • %s：%s" % [w.trait.name, w.trait.desc]
-	var O: Dictionary = P.overload
-	t += "\n超载 • %s：%s" % [O.name, O.desc]
-	detail_lbl.text = t
-	if mode_lbl != null: mode_lbl.text = str(data.modes[sel_mode].desc)
-
 func show_result() -> void:
 	for c in result_ui.get_children(): c.queue_free()
 	var bg := ColorRect.new(); bg.color = Color(0.03, 0.02, 0.08, 0.7); bg.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.add_child(bg)
@@ -381,7 +328,20 @@ func show_result() -> void:
 	elif md == "raid": s.text = "讨伐成功！百目被打倒了" if win == 1 else "时间到了，百目还活着"
 	elif md == "elim": s.text = "局数  %d : %d" % [sim.obj.wins[1], sim.obj.wins[2]]
 	elif md == "zone": s.text = "剩余倒计时  我方 %d   对方 %d" % [int(sim.obj.count[1]), int(sim.obj.count[2])]
-	elif md != "turf": s.text = "比分  %d : %d" % [sim.obj.score[1], sim.obj.score[2]]; s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; s.add_theme_font_size_override("font_size", 26); box.add_child(s)
+	elif md != "turf": s.text = "比分  %d : %d" % [sim.obj.score[1], sim.obj.score[2]]
+	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; s.add_theme_font_size_override("font_size", 26); box.add_child(s)
+	if not autoplay:   # 对战奖励：经验、奖杯、金币、首胜宝石、任务
+		var rw := profile.match_reward(sim, me)
+		var res := profile.apply_match(rw)
+		var parts: Array = ["经验 +%d" % rw.xp, "奖杯 %+d" % rw.trophies]
+		for it in res.items: parts.append(lobby.item_text(it)[0])
+		if res.lv_ups > 0: parts.append("账号升到 %d 级！天赋点 +%d" % [profile.level(), res.lv_ups])
+		if rw.mvp: parts.append("MVP")
+		var rl := Label.new(); rl.text = "   ".join(parts); rl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rl.add_theme_font_size_override("font_size", 17); rl.add_theme_color_override("font_color", Color("#ffe14d")); box.add_child(rl)
+		if not res.quests.is_empty():
+			var ql := Label.new(); ql.text = "完成任务：" + "、".join(res.quests); ql.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			ql.add_theme_font_size_override("font_size", 15); ql.add_theme_color_override("font_color", Color("#6dff8a")); box.add_child(ql)
 	var grid := GridContainer.new(); grid.columns = 5; grid.add_theme_constant_override("h_separation", 22); box.add_child(grid)
 	for h in ["", "驾驶员 / 机体", "击毁", "倒下", "涂地"]:
 		var l := Label.new(); l.text = h; l.add_theme_color_override("font_color", Color("#9a96b8")); l.add_theme_font_size_override("font_size", 15); grid.add_child(l)
@@ -392,9 +352,9 @@ func show_result() -> void:
 			var l := Label.new(); l.text = v; l.add_theme_font_size_override("font_size", 15); l.add_theme_color_override("font_color", Color.WHITE if p == me else c); grid.add_child(l)
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); box.add_child(hb)
 	var again := Button.new(); again.text = "再来一局"; again.custom_minimum_size = Vector2(220, 60)
-	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech)); hb.add_child(again)
+	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech) if autoplay else start_from_lobby()); hb.add_child(again)
 	var back := Button.new(); back.text = "返回菜单"; back.custom_minimum_size = Vector2(220, 60)
-	back.pressed.connect(func(): result_ui.visible = false; menu.visible = true; state = "menu"); hb.add_child(back)
+	back.pressed.connect(func(): result_ui.visible = false; back_to_lobby()); hb.add_child(back)
 	result_ui.visible = true
 	sfx.play("win" if win == me.team else "lose")
 
@@ -410,12 +370,15 @@ func start_match(pilot: String, mech: String) -> void:
 	var dur := float(OS.get_environment("GB_DURATION")) if OS.get_environment("GB_DURATION") != "" else 180.0
 	sim = Sim.new(data, midx, 0, dur, sel_mode)
 	var lay := sim.team_layout()
-	me = sim.add_player(1, "你", lay[0], pilot, mech, false)
+	var pw: Dictionary = {"lv": 7, "bt": 1} if autoplay else profile.power(pilot)
+	me = sim.add_player(1, "你", lay[0], pilot, mech, false, pw)
+	var blv: int = int(pw.lv)   # AI 强度跟着玩家等级（原版：人类玩家的平均等级）
+	var bot_pw := {"lv": blv, "bt": 2 if blv >= 9 else (1 if blv >= 5 else 0)}
 	var pool_p: Array = data.pilotOrder.duplicate(); pool_p.erase(pilot); pool_p.shuffle()
 	var pool_m: Array = data.order.duplicate(); pool_m.shuffle()
 	var names := BOT_NAMES.duplicate(); names.shuffle()
 	for i in range(1, lay.size()):
-		sim.add_player(i + 1, names[i - 1], lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true)
+		sim.add_player(i + 1, names[i - 1], lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
 	spectate_id = 0
 	for id in mech_nodes: mech_nodes[id].root.queue_free()
 	mech_nodes.clear()
@@ -428,6 +391,7 @@ func start_match(pilot: String, mech: String) -> void:
 	for f in fx_list: f.node.queue_free()
 	fx_list.clear()
 	mode_view.setup(sim, team_col)
+	showroom.visible = false
 	menu.visible = false
 	state = "play"
 	acc = 0.0
@@ -491,8 +455,16 @@ func _process(delta: float) -> void:
 	else:
 		var t := Time.get_ticks_msec() / 1000.0
 		var c := Vector3(float(data.maps[cur_map].gw) / 2.0, 0, float(data.maps[cur_map].gh) / 2.0)
-		cam.position = c + Vector3(sin(t * 0.12) * 55, 48, cos(t * 0.12) * 55)
-		cam.look_at(c)
+		if showroom.visible:
+			var turn := showroom.get_node_or_null("turn")
+			if turn != null: turn.rotation.y = t * 0.35
+			var sp: Vector3 = showroom.position
+			cam.fov = 40
+			cam.position = sp + Vector3(3.4, 4.6, 14.0)
+			cam.look_at(sp + Vector3(3.4, 2.0, 0))
+		else:
+			cam.position = c + Vector3(sin(t * 0.12) * 55, 48, cos(t * 0.12) * 55)
+			cam.look_at(c)
 		if sim != null: update_visuals(1.0, real_dt)
 	update_fx(real_dt)
 	hud.queue_redraw()
@@ -1001,7 +973,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			KEY_Q: me.inp.gq += 1
 			KEY_E: me.inp.qq += 1
 			KEY_R: me.inp.oq += 1
-			KEY_ESCAPE: state = "menu"; menu.visible = true
+			KEY_ESCAPE: back_to_lobby()
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 		me.inp.qq += 1
 	if ev is InputEventScreenTouch or ev is InputEventScreenDrag:
@@ -1039,3 +1011,35 @@ func handle_touch(ev: InputEvent) -> void:
 	else:
 		if t_move.id == idx: t_move.v = ((pos - t_move.o) / 70.0).limit_length(1.0)
 		if t_aim.id == idx: t_aim.v = ((pos - t_aim.o) / 70.0).limit_length(1.0)
+
+
+# ---------------- 大厅 ----------------
+func start_from_lobby() -> void:
+	var o: Dictionary = profile.o
+	if not profile.has_pilot(o.pilot): lobby.toast("先在「驾驶员」里选一位驾驶员"); return
+	sel_mode = o.mode; sel_map = int(o.map)
+	start_match(o.pilot, o.weapon)
+
+func back_to_lobby() -> void:
+	state = "menu"; menu.visible = true; result_ui.visible = false
+	if hitstop_until > 0: Engine.time_scale = 1.0; hitstop_until = 0
+	lobby.refresh()
+
+# 大厅的 3D 展台：机体 + 站在旁边的驾驶员，放在场地外面的地上，背后是城市夜景
+func show_showroom(pid: String, mech: String, vis: bool) -> void:
+	showroom.visible = vis and pid != ""
+	if pid == "" or not data.pilots.has(pid): return
+	var key := pid + "|" + mech
+	if key != showroom_key:
+		showroom_key = key
+		for c in showroom.get_children(): c.queue_free()
+		var tc: Color = team_col[1]
+		var turn := Node3D.new(); turn.name = "turn"; showroom.add_child(turn)
+		var n := Models.build_mech(mech, data.mechs[mech], tc, data.pilots[pid])
+		n.root.scale = Vector3.ONE * 1.6; turn.add_child(n.root)
+		var pl := Models.build_pilot(data.pilots[pid], tc); pl.position = Vector3(3.0, 0, 2.2); pl.scale = Vector3.ONE * 1.9; pl.rotation.y = PI / 2 + 0.5; showroom.add_child(pl)
+		var disc := MeshInstance3D.new(); disc.mesh = Models.mesh("cyl", 3.6, 0.3); disc.material_override = Models.toon(Color("#2a2550"), 0.1, 0.6); disc.position.y = -0.15; showroom.add_child(disc)
+		var rim := MeshInstance3D.new(); rim.mesh = Models.mesh("torus", 3.5, 3.75); rim.material_override = Models.glow(Color(str(data.pilots[pid].accent)), 2.4); showroom.add_child(rim)
+		var l := OmniLight3D.new(); l.position = Vector3(2, 5, 4); l.light_energy = 2.2; l.omni_range = 14; showroom.add_child(l)
+	var m: Dictionary = data.maps[cur_map]
+	showroom.position = Vector3(float(m.gw) / 2.0, -0.45, float(m.gh) + 14.0)

@@ -2,9 +2,11 @@
 // 运行：node tools/export-godot-data.js
 // 阶段 2：全部 22 台机体、21 位驾驶员、全部技能 / 大招 / 随身武器 / 超载、定位克制表、14 张普通地图
 // 阶段 3：模式（除了搜刮撤离）和各模式的参数
+// 阶段 4：经济 / 养成（货币、宝箱、升级、突破、天赋、每日任务、对战奖励）
 'use strict';
 const fs = require('fs'), path = require('path');
 const S = require('../public/shared.js');
+const E = require('../public/economy.js');
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 const bits = (arr) => Array.from(arr, (v) => (v ? '1' : '0')).join('');
 const maps = [];
@@ -31,6 +33,18 @@ const out = {
   modes: Object.fromEntries(S.MODE_ORDER.filter((k) => k !== 'loot').map((k) => [k, pick(S.MODES[k], ['name', 'short', 'desc', 'oneLife', 'teams', 'size', 'coop'])])),
   modeCfg: { ESCAPE: S.ESCAPE, ELIM: S.ELIM, ZONE: S.ZONE, SOCCER_GOAL: S.SOCCER_GOAL, ESCORT_TARGET: S.ESCORT_TARGET, SOCCER_TARGET: S.SOCCER_TARGET, BATTERY_TARGET: S.BATTERY_TARGET,
     RAID: S.RAID, SEAL: S.SEAL, PARK: S.PARK },
+  econ: {
+    cur: E.CUR, start: E.START, starterPilots: E.STARTER_PILOTS, starterMechs: E.STARTER_MECHS,
+    chests: E.CHESTS, chestOrder: E.CHEST_ORDER, exchange: E.EXCHANGE,
+    maxLv: E.MAX_LV, lvBonus: E.LV_BONUS, upCoins: E.UP_COINS, upParts: E.UP_PARTS, breaks: E.BREAKS, levelUp: E.LEVELUP, firstWinGems: E.FIRST_WIN_GEMS,
+    pools: { starter: E.STARTER_PILOTS, standard: S.PILOTS.map((p) => p.id).filter((id) => !E.SEASON_PILOTS.includes(id) && !E.noDrop(id)), all: S.PILOTS.map((p) => p.id).filter((id) => !E.noDrop(id)),
+      mech: S.WEAPON_ORDER.filter((id) => !E.noDrop(id) && !E.STRIKE_MECHS.includes(id)), strike: E.STRIKE_MECHS },
+    locked: Object.fromEntries([...S.PILOTS.map((p) => p.id), ...S.WEAPON_ORDER].filter((id) => E.noDrop(id) || E.STRIKE_MECHS.includes(id)).map((id) => [id,
+      E.STRIKE_MECHS.includes(id) ? '特攻队补给箱' : E.PASS_ONLY.pilots.includes(id) || E.PASS_ONLY.mechs.includes(id) ? '赛季通行证' : E.COLLAB.pilots.includes(id) || E.COLLAB.mechs.includes(id) ? '联动活动' : '任务「' + E.questSource(id).name + '」'])),
+    talents: S.TALENTS, branches: S.TALENT_BRANCHES, talentSlots: S.TALENT_SLOTS,
+    quests: E.QUESTS, dailyPool: E.DAILY_POOL, weekly: E.WEEKLY,
+    trophy: { win: S.TROPHY_WIN, draw: S.TROPHY_DRAW, loss: S.TROPHY_LOSS },
+  },
   maps, colors: S.COLOR_SETS.map((c) => c.c),
 };
 const json = JSON.stringify(out).replace(/·/g, '•');   // Godot 版的字体没有「·」

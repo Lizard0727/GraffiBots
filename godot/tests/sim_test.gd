@@ -29,7 +29,7 @@ func _init() -> void:
 		var lay := sim.team_layout()
 		for i in lay.size():
 			var k := k0 + i
-			sim.add_player(i + 1, "AI%d" % (i + 1), lay[i], pilots[k % pilots.size()], mechs[k % mechs.size()], true)
+			sim.add_player(i + 1, "AI%d" % (i + 1), lay[i], pilots[k % pilots.size()], mechs[k % mechs.size()], true, {"lv": 7, "bt": 1, "tal": [["a1", "d1", "p1"], ["a5", "d5", "s5"], ["p4", "s4", "a6"], ["s2", "d2", "p3"]][k % 4]})
 		k0 += lay.size()
 		var t0 := Time.get_ticks_msec()
 		var ticks := 0

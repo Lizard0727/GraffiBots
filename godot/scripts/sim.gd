@@ -108,6 +108,13 @@ class Mech:
 	var ls_n := 0
 	var ls_t := 0.0
 	var flash := 0.0          # 受击闪白（给画面）
+	var lv := 1               # 驾驶员等级（每级生命和伤害 +4%）
+	var bt := 0               # 突破：I 解锁超载，II 超载更强
+	var pmul := 1.0
+	var tal := {}             # 带进这局的天赋（最多 3 个）
+	var obj := 0              # 抢目标的次数（得分 / 送电池……）
+	var hit_n := 0
+	var d5_used := false
 	var ov := 0.0             # 超载充能（打出的伤害）
 	var ov_t := 0.0           # 超载剩余时间
 	var ov_pulse := 0.0
@@ -246,16 +253,19 @@ func pdata(p: Mech) -> Dictionary:
 func side(p: Mech) -> Dictionary:
 	return D.pilots[p.pilot].sidearm
 
-func add_player(id: int, name: String, team: int, pilot: String, weapon: String, bot: bool) -> Mech:
+func add_player(id: int, name: String, team: int, pilot: String, weapon: String, bot: bool, power: Dictionary = {}) -> Mech:
 	var p := Mech.new()
 	p.id = id; p.name = name; p.team = team; p.pilot = pilot; p.weapon = weapon; p.bot = bot
+	p.lv = clampi(int(power.get("lv", 1)), 1, 11); p.bt = clampi(int(power.get("bt", 0)), 0, 2)
+	p.pmul = 1.0 + (p.lv - 1) * 0.04
+	for t in power.get("tal", []).slice(0, 3): p.tal[t] = true
 	var n := 0
 	for q in players:
 		if q.team == team:
 			n += 1
 	p.slot = n
-	p.max_hp = float(D.mechs[weapon].hp) * (1.18 if pilot == "titan" else 1.0)
-	p.skill_max = int(C.SKILL_CHARGES); p.skill_uses = p.skill_max
+	p.max_hp = round(float(D.mechs[weapon].hp) * (1.18 if pilot == "titan" else 1.0) * p.pmul * (1.08 if p.tal.has("d1") else 1.0))
+	p.skill_max = int(C.SKILL_CHARGES) + (1 if p.tal.has("s2") else 0); p.skill_uses = p.skill_max
 	p.ai_strafe = 1.0 if rng.randf() < 0.5 else -1.0
 	players.append(p)
 	respawn(p)
@@ -272,7 +282,7 @@ func respawn(p: Mech) -> void:
 	p.vx = 0; p.vy = 0; p.vz = 0; p.kx = 0; p.ky = 0; p.on_ground = true
 	p.foot = false; p.hp = p.max_hp; p.ammo = float(C.AMMO); p.alive = true; p.inv_t = 2.5; p.charge = 0; p.burst_n = 0
 	p.inp.a = 0.0 if p.team == 1 else PI
-	p.carry = 0
+	p.carry = 0; p.d5_used = false
 	ev(["spawn", p.id])
 
 func max_hp_of(p: Mech) -> float:
@@ -342,7 +352,7 @@ func update_player(p: Mech, dt: float) -> void:
 		if p.shield_t <= 0: p.shield = 0
 	p.skill_cd = max(0.0, p.skill_cd - dt)
 	if p.skill_uses < p.skill_max and p.lock_t <= 0:   # 技能充能：每 15 秒回复 1 次
-		var rk := 1.25 if p.pilot == "doc" else (1.1 if near_pilot(p, "doc", 220) else 1.0)
+		var rk := (1.25 if p.pilot == "doc" else (1.1 if near_pilot(p, "doc", 220) else 1.0)) * (1.2 if p.tal.has("s1") else 1.0)
 		p.skill_regen += dt * rk
 		if p.skill_regen >= float(C.SKILL_REGEN):
 			p.skill_regen -= float(C.SKILL_REGEN); p.skill_uses += 1
@@ -391,6 +401,8 @@ func update_player(p: Mech, dt: float) -> void:
 	if obj.has("tr") and obj.tr.carrier == p: sm *= 0.72
 	if p.carry > 0: sm *= 1.0 - 0.04 * p.carry
 	if p.boss: sm *= 0.8
+	if own and p.tal.has("p2"): sm *= 1.06
+	if own and bool(p.inp.w) and not p.foot and p.tal.has("p6"): sm *= 1.1
 	p.sm = sm
 	p.wheel = bool(p.inp.w) and not p.foot and not (p.sp_t > 0 and p.sp_kind == "beam")
 	var mul := 1.0
@@ -402,13 +414,14 @@ func update_player(p: Mech, dt: float) -> void:
 	var mh := max_hp_of(p)
 	if enemy_paint and not p.npc and p.inv_t <= 0 and not (p.sp_t > 0 and p.sp_kind == "charge") and p.hp > mh * 0.3:
 		p.hp = max(mh * 0.3, p.hp - mh * 0.1 * dt)
+	if own and p.tal.has("p4"): p.hp = min(mh, p.hp + 3 * dt)
 	if not enemy_paint and not p.boss and time - p.last_hurt > 3.0 and time - p.last_atk > 2.0:
 		var k := (0.32 if (p.wheel and own) else 0.16) * (2.0 if p.pilot == "chef" else 1.0)
 		p.hp = min(mh, p.hp + mh * k * dt)
 	# 装填
 	if p.burst_n <= 0 and p.roll_t <= 0 and p.charge <= 0:
 		var rt := float(side(p).reload) if p.foot else float(w.reload)
-		var rk := (2.0 if p.rush_t > 0 else 1.0) * (1.6 if (p.wheel and own) else 1.0)
+		var rk := (2.0 if p.rush_t > 0 else 1.0) * (1.6 if (p.wheel and own) else 1.0) * (1.12 if p.tal.has("a2") else 1.0)
 		if near_pilot(p, "echo", 200): rk *= 1.2
 		elif p.pilot == "echo": rk *= 1.1
 		if p.jam_t > 0: rk *= 0.7
@@ -431,7 +444,7 @@ func update_player(p: Mech, dt: float) -> void:
 		if p.skill_uses > 0 and p.skill_cd <= 0 and p.silence_t <= 0 and p.seal_t <= 0: use_skill(p)
 	if p.inp.oq != p.last_oq:
 		p.last_oq = p.inp.oq
-		if p.ov_t <= 0 and p.ov >= float(C.OV_NEED) and p.silence_t <= 0 and not p.npc: activate_overload(p)
+		if p.bt >= 1 and p.ov_t <= 0 and p.ov >= float(C.OV_NEED) and p.silence_t <= 0 and not p.npc: activate_overload(p)
 	if p.sp_t > 0: update_special(p, dt)
 	if p.quake_t > 0:
 		p.quake_t -= dt
@@ -573,6 +586,7 @@ func knock(p: Mech, dx: float, dy: float, power: float, up: float = 0.0) -> void
 func paint(x: float, y: float, z: float, r: float, team: int, owner: Mech) -> int:
 	r = max(12.0, r)
 	if team > 2 and mode == "seal": return 0
+	if owner != null and owner.tal.has("p1"): r *= 1.12
 	var n := 0
 	var r2 := r * r
 	var x0 := maxi(0, int(floor((x - r) / CELL))); var x1 := mini(GW - 1, int(floor((x + r) / CELL)))
@@ -590,7 +604,7 @@ func paint(x: float, y: float, z: float, r: float, team: int, owner: Mech) -> in
 	if owner != null and n > 0:
 		owner.painted += n
 		if owner.sp_t <= 0 and owner.no_sp_until <= time and not owner.foot:
-			owner.sp = min(float(wdata(owner).spNeed), owner.sp + n * 0.6 * (1.6 if owner.pilot == "yuzu" else 1.0))
+			owner.sp = min(float(wdata(owner).spNeed), owner.sp + n * 0.6 * (1.6 if owner.pilot == "yuzu" else 1.0) * (1.25 if owner.tal.has("p3") else 1.0))
 	return n
 
 # ---------------- 武器 ----------------
@@ -979,6 +993,13 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 			if bOV.has("kb"): kmul *= float(bOV.kb)
 			if bOV.has("frostHit") and by.team != t.team: t.slow_t = max(t.slow_t, 1.0)
 	if by != null and by != t and by.team != t.team:
+		if by.tal.has("a1"): dmg *= 1.06
+		if by.tal.has("a4") and t.hp < max_hp_of(t) * 0.3: dmg *= 1.15
+		if by.tal.has("a5"):
+			by.hit_n += 1
+			if by.hit_n % 5 == 0: dmg *= 1.6
+		if by.tal.has("a6") and (t.slow_t > 0 or t.silence_t > 0 or t.reveal_t > 0): dmg *= 1.2
+		if by.tal.has("p5") and by.on_ground and cell_at(by.x, by.y) == by.team: dmg *= 1.08
 		if by.rally_t > 0: dmg *= 1.2
 		if by.pilot == "han" and t.hp > max_hp_of(t) * 0.7: dmg *= 1.1
 		if t.mark_t > 0 and t.mark_team == by.team: dmg *= 1.12
@@ -991,10 +1012,12 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 	if not t.foot and D.mechs[t.weapon].has("front") and by != null and by != t:
 		var da2 := wrapf(atan2(by.y - t.y, by.x - t.x) - float(t.inp.a), -PI, PI)
 		if absf(da2) < 1.05: dmg *= float(D.mechs[t.weapon].front); ev(["guard", t.id])
+	if t.tal.has("d6") and dmg > 30: dmg *= 0.8
 	if tOV != null and tOV.has("def"): dmg *= float(tOV.def)
 	if tOV != null and tOV.has("reflect") and by != null and by != t and by.team != t.team and by.alive and not _reflecting:
 		_reflecting = true; hurt(by, dmg * float(tOV.reflect), t); _reflecting = false
 	if not t.foot and D.mechs[t.weapon].has("armor"): dmg *= float(D.mechs[t.weapon].armor)
+	if t.tal.has("d4") and t.hp < max_hp_of(t) * 0.3: dmg *= 0.85
 	if t.poss_t > 0: dmg *= 0.85
 	if t.aura_t > 0: dmg *= t.aura_def
 	for h in helpers:
@@ -1016,16 +1039,19 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 		if dmg <= 0:
 			ev(["shield", t.id]); return
 	if obj.has("tr") and obj.tr.carrier == t: dmg *= 0.75
+	if by != null and by != t: dmg *= by.pmul
 	if by != null and by != t and by.cubes > 0: dmg *= 1.0 + by.cubes * float(MC.ESCAPE.crateDmg)
 	if tOV != null and tOV.has("undying"): dmg = min(dmg, max(0.0, t.hp - 1))
+	if t.tal.has("d5") and not t.foot and not t.d5_used and dmg >= t.hp:   # 不屈装甲
+		dmg = max(0.0, t.hp - 1); t.d5_used = true; t.inv_t = 1.5; ev(["guard", t.id])
 	t.hp -= dmg; t.last_hurt = time; t.flash = 1.0
 	if by != null and by != t and by.team != t.team:
 		var bo = ov_of(by)
 		var heal := (dmg * 0.35 if by.poss_t > 0 else 0.0) + (float(bo.hitHeal) if bo != null and bo.has("hitHeal") else 0.0)
 		if heal > 0: by.hp = min(max_hp_of(by), by.hp + heal)
 		if not by.foot and by.sp_t <= 0 and by.no_sp_until <= time:
-			by.sp = min(float(wdata(by).spNeed), by.sp + dmg * (1.3 if by.pilot == "candy" else 1.0) * (float(bo.spGain) if bo != null and bo.has("spGain") else 1.0))
-		if by.ov_t <= 0 and not by.npc: by.ov = min(float(C.OV_NEED), by.ov + dmg)
+			by.sp = min(float(wdata(by).spNeed), by.sp + dmg * (1.3 if by.pilot == "candy" else 1.0) * (float(bo.spGain) if bo != null and bo.has("spGain") else 1.0) * (1.15 if by.tal.has("a3") else 1.0))
+		if by.ov_t <= 0 and not by.npc and by.bt >= 1: by.ov = min(float(C.OV_NEED), by.ov + dmg * (1.2 if by.tal.has("s3") else 1.0))
 	ev(["dmg", t.id, int(round(dmg)), by.id if by != null else 0])
 	if t.hp <= 0:
 		if t.boss: boss_down(t, by)
@@ -1039,6 +1065,7 @@ func on_takedown(by: Mech, t: Mech) -> void:
 	by.kills += 1
 	var bo = ov_of(by)
 	if bo != null and bo.has("killCharge"): by.skill_uses = mini(by.skill_max, by.skill_uses + 1)
+	if by.tal.has("s4") and by.alive: by.hp = min(max_hp_of(by), by.hp + 15)
 	if by.pilot == "blaze": by.hp = min(max_hp_of(by), by.hp + max_hp_of(by) * 0.4)   # 凌焰：越战越勇
 	if by.pilot == "kaka" and t != null:   # 卡卡：惊喜礼盒
 		add_helper({"kind": "bento", "gift": true, "heal": 0.0, "x": t.x, "y": t.y, "z": top_at(t.x, t.y), "team": by.team, "owner": by, "t": 12.0, "armed": 0.4})
@@ -1047,16 +1074,17 @@ func on_takedown(by: Mech, t: Mech) -> void:
 func wreck(t: Mech, by: Mech) -> void:
 	if by != null and by != t: on_takedown(by, t)
 	paint(t.x, t.y, top_at(t.x, t.y), 55, by.team if by != null else (0 if teams > 2 else 3 - t.team), by)
-	t.foot = true; t.hp = float(C.PILOT_HP); t.rebuild_t = 1e9 if one_life else float(C.REBUILD) - (2.0 if t.pilot == "aurora" else 0.0)
+	t.foot = true; t.hp = float(C.PILOT_HP); t.rebuild_t = 1e9 if one_life else float(C.REBUILD) - (2.0 if t.pilot == "aurora" else 0.0) - (1.0 if t.tal.has("d3") else 0.0)
 	t.charge = 0; t.burst_n = 0; t.roll_t = 0; t.sp_t = 0; t.sp_kind = ""; t.shield = 0; t.shield_t = 0; t.quake_t = 0
-	if t.pilot == "hammer": t.shield = 60; t.shield_t = 6
+	var sh := (60.0 if t.pilot == "hammer" else 0.0) + (25.0 if t.tal.has("d2") else 0.0)
+	if sh > 0: t.shield = sh; t.shield_t = 6
 	t.inv_t = 0.7; t.ammo = float(C.AMMO); t.wheel = false
 	ev(["wreck", t.id, by.id if by != null else 0, t.x, t.y, t.z, t.team])
 	if t.pilot == "vet": explode(t.x, t.y, t.z, 100, 58, 24, t.team, t)
 	knock(t, rng.randf() - 0.5, rng.randf() - 0.5, 150, 300)
 
 func redeploy(p: Mech) -> void:
-	p.foot = false; p.hp = p.max_hp; p.ammo = float(C.AMMO); p.inv_t = 1.0; p.rebuild_t = 0
+	p.foot = false; p.hp = p.max_hp; p.ammo = float(C.AMMO); p.inv_t = 1.0; p.rebuild_t = 0; p.d5_used = false
 	ev(["mdrop", p.id, p.x, p.y, p.z])
 	for t in players:
 		if not t.alive or t.team == p.team or dist2d(t, p) > 75: continue
@@ -1179,6 +1207,9 @@ func use_skill(p: Mech) -> void:
 func activate_special(p: Mech) -> void:
 	var w := wdata(p)
 	p.sp = 0; p.sp_kind = str(w.special); p.no_sp_until = time + 3
+	if p.tal.has("s5"):   # 战术掩护
+		for a2 in players:
+			if a2 != p and a2.alive and a2.team == p.team and dist2d(a2, p) < 200: a2.shield = max(a2.shield, 30.0); a2.shield_t = 4
 	var a := float(p.inp.a)
 	ev(["super", p.id, p.sp_kind, p.x, p.y, p.z])
 	match p.sp_kind:
@@ -1623,7 +1654,7 @@ func ai_think(p: Mech, dt: float) -> void:
 				inp.gq += 1
 		if not p.foot and p.sp >= float(w.spNeed) and td < float(SUPER_REACH.get(str(w.special), 300)):
 			inp.qq += 1
-		if not p.npc and p.ov >= float(C.OV_NEED) and p.ov_t <= 0 and td < 320 and rng.randf() < 0.05:
+		if not p.npc and p.bt >= 1 and p.ov >= float(C.OV_NEED) and p.ov_t <= 0 and td < 320 and rng.randf() < 0.05:
 			inp.oq += 1
 		return
 	# 没有敌人：去涂地
@@ -1690,7 +1721,7 @@ func ov_of(p: Mech):
 
 func activate_overload(p: Mech) -> void:
 	var O: Dictionary = pdata(p).overload
-	p.ov = 0; p.ov_t = float(C.OV_TIME); p.ov_pulse = 0
+	p.ov = 0; p.ov_t = float(C.OV_TIME) + (2.0 if p.bt >= 2 else 0.0) + (2.0 if p.tal.has("s6") else 0.0); p.ov_pulse = 0
 	ev(["ov", p.id, p.x, p.y, p.z])
 	if O.has("skillReset"): p.skill_cd = 0; p.skill_uses = mini(p.skill_max, p.skill_uses + 1)
 	if O.has("stealth"): p.smoke_t = max(p.smoke_t, p.ov_t)
@@ -1712,20 +1743,21 @@ func activate_overload(p: Mech) -> void:
 		add_helper({"kind": "domain", "x": p.x, "y": p.y, "z": p.z, "r": float(O.domain.r), "team": p.team, "owner": p, "t": p.ov_t + 0.2, "cd": 99.0, "hits": {}})
 
 func overload_tick(p: Mech, O: Dictionary, dt: float) -> void:
+	var k := 1.25 if p.bt >= 2 else 1.0
 	if O.has("aura"):
 		for a in players:
 			if not a.alive or dist2d(a, p) > float(O.aura.r) or absf(a.z - p.z) > 120: continue
-			if a.team == p.team: a.hp = min(max_hp_of(a), a.hp + float(O.aura.heal) * dt); a.aura_t = 0.3; a.aura_def = float(O.aura.def)
+			if a.team == p.team: a.hp = min(max_hp_of(a), a.hp + float(O.aura.heal) * k * dt); a.aura_t = 0.3; a.aura_def = float(O.aura.def)
 			elif not a.boss: a.dslow_t = max(a.dslow_t, 0.3)
 	if O.has("regen"):
 		for a in players:
 			if a.alive and a.team == p.team and (a == p or (not O.has("burstHeal") and dist2d(a, p) < 200)):
-				a.hp = min(max_hp_of(a), a.hp + float(O.regen) * dt)
+				a.hp = min(max_hp_of(a), a.hp + float(O.regen) * k * dt)
 	if O.has("pulse"):
 		p.ov_pulse -= dt
 		if p.ov_pulse <= 0:
 			p.ov_pulse = 1.0
-			explode(p.x, p.y, p.z + 10, 180, float(O.pulse), float(O.pulse) * 0.7, p.team, p, true)
+			explode(p.x, p.y, p.z + 10, 180, float(O.pulse) * k, float(O.pulse) * 0.7 * k, p.team, p, true)
 
 func domain_blocks(team: int, x: float, y: float, z: float) -> bool:
 	for h in helpers:
@@ -1744,7 +1776,7 @@ func update_domain(h: Dictionary) -> bool:
 		if h.hits.get(e.id, 0.0) > time: continue
 		h.hits[e.id] = time + float(Dm.cd)
 		e.slow_t = max(e.slow_t, 0.8); e.seal_t = max(e.seal_t, 0.8)
-		hurt(e, float(Dm.counter), ow, dx if absf(dx) > 0.01 else 1.0, dy, 1.6)
+		hurt(e, float(Dm.counter) * (1.25 if ow.bt >= 2 else 1.0), ow, dx if absf(dx) > 0.01 else 1.0, dy, 1.6)
 		ev(["dmn", h.id, e.id, h.x, h.y, h.z])
 	return true
 
@@ -1891,6 +1923,7 @@ func pop_balloon(b: Dictionary, team: int, owner: Mech) -> void:
 	if not obj.balloons.has(b): return
 	obj.balloons.erase(b)
 	if team < 1 or team > 2: return
+	if owner != null: owner.obj += 1
 	obj.score[team] += int(MC.PARK.balloon)
 	paint(b.x, b.y, top_at(b.x, b.y), 34, team, owner)
 	ev(["balloon", b.id, team, b.x, b.y, b.z])
@@ -2060,7 +2093,7 @@ func mode_escort(dt: float) -> void:
 		var g := goal_for(c.team)
 		if Vector2(c.x, c.y).distance_to(g) < 52 and c.z < 20:
 			obj.score[c.team] += 1
-			ev(["goal", c.team, c.id])
+			ev(["goal", c.team, c.id]); c.obj += 1
 			paint(g.x, g.y, 0, 110, c.team, c)
 			tr.carrier = null; tr.reset_t = 3.0
 			if obj.score[c.team] >= int(MC.ESCORT_TARGET): finish(c.team)
@@ -2136,7 +2169,7 @@ func mode_stones(dt: float) -> void:
 					if p.carry >= cap: break
 		if p.carry > 0 and Vector2(p.x, p.y).distance_to(base_pos(p.team)) < 120:
 			obj.score[p.team] += p.carry
-			ev(["dep", p.id, p.carry])
+			ev(["dep", p.id, p.carry]); p.obj += p.carry
 			p.carry = 0
 			if obj.score[p.team] >= target: finish(p.team); return
 
