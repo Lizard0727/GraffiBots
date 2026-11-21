@@ -227,7 +227,7 @@ func build_home() -> void:
 	var pulse := fb.create_tween().set_loops()   # 绑在按钮上：按钮被换掉时动画跟着停
 	pulse.tween_method(func(a): fb.glow.a = a; fb.queue_redraw(), 0.35, 1.0, 0.8)
 	pulse.tween_method(func(a): fb.glow.a = a; fb.queue_redraw(), 1.0, 0.35, 0.8)
-	at(L("WASD 移动 • 鼠标瞄准 • 左键攻击 • Q 技能 • E 大招 • R 超载", 12, Color("#9a96b8")), Vector2(rx, 534))
+	var lanb := UIKit.flat_button("局域网联机" + ("（%d 人）" % game.net.room.players.size() if game.net.role != "" else ""), 17); at(lanb, Vector2(rx, 534), Vector2(300, 44)); click(lanb, func(): open_sub("lan"))
 	game.show_showroom(pid, P.o.weapon, true, -2.2)
 
 func quests_done() -> int:
@@ -246,7 +246,7 @@ func build_sub() -> void:
 		var sp := UIKit.Splash.new(); sp.cols = [Color("#ff3ea5"), Color("#1fd6ee"), Color("#ffe14d"), Color("#9cff2e")]; sp.seed_v = sub.hash(); sp.modulate.a = 0.6; at(sp, Vector2.ZERO, vs)
 	var back := UIKit.flat_button("< 返回大厅", 17); at(back, Vector2(16, 96), Vector2(150, 44)); click(back, func(): sub = ""; refresh())
 	var titles := {"pilots": "驾驶员", "mechs": "机体", "chests": "宝箱商店", "talents": "天赋树", "quests": "任务", "pass": "通行证 • " + str(D.econ.pass.season),
-		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离"}
+		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "局域网联机"}
 	at(L(str(titles[sub]), 34, Color("#ffe14d"), 8), Vector2(182, 94))
 	match sub:
 		"pilots": page_pilots()
@@ -260,6 +260,7 @@ func build_sub() -> void:
 		"shop": page_shop()
 		"ranked": page_ranked()
 		"loot": page_loot()
+		"lan": page_lan()
 	game.show_showroom(P.o.pilot, view_mech if see_3d else P.o.weapon, see_3d, -3.6)
 
 func grid(ids: Array, w: float, cols: int, make: Callable) -> void:
@@ -780,17 +781,17 @@ func page_pass() -> void:
 	var days: int = max(0, (int(PS.ends) - Profile.now_s()) / 86400)
 	hv.add_child(L("下一级还要 %d 经验 • 赛季还剩 %d 天 • 对战、每日 / 每周任务都给通行证经验" % [per - xp % per, days], 13, Color("#ffe6d0")))
 	var sp := Control.new(); sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sp.mouse_filter = Control.MOUSE_FILTER_IGNORE; hh.add_child(sp)
-	var bv := vbox(6); hh.add_child(bv)
+	var bv := hbox(8); bv.alignment = BoxContainer.ALIGNMENT_CENTER; hh.add_child(bv)
 	if not P.o.pass.prem:
-		var b1 := UIKit.gold_button("", 10); clear(b1); b1.custom_minimum_size = Vector2(230, 38); bv.add_child(b1)
+		var b1 := UIKit.gold_button("", 10); clear(b1); b1.custom_minimum_size = Vector2(196, 46); bv.add_child(b1)
 		var b1h := hbox(6); b1h.alignment = BoxContainer.ALIGNMENT_CENTER; b1.add_child(b1h); b1h.add_child(L("高级通行证", 16, Color("#3a1f05"))); b1h.add_child(UIKit.icon("gems", 22)); b1h.add_child(L(str(int(PS.price)), 16, Color("#3a1f05")))
 		click(b1, func(): act(P.buy_pass(false), "解锁了高级通行证！"))
 	if not P.o.pass.dlx:
 		var cost := int(PS.deluxe) - (int(PS.price) if P.o.pass.prem else 0)
-		var b2 := UIKit.pink_button("", 10); clear(b2); b2.custom_minimum_size = Vector2(230, 38); bv.add_child(b2)
-		var b2h := hbox(6); b2h.alignment = BoxContainer.ALIGNMENT_CENTER; b2.add_child(b2h); b2h.add_child(L("豪华版（+%d 级）" % int(PS.boost), 15, Color.WHITE, 3)); b2h.add_child(UIKit.icon("gems", 22)); b2h.add_child(L(str(cost), 15, Color.WHITE, 3))
+		var b2 := UIKit.pink_button("", 10); clear(b2); b2.custom_minimum_size = Vector2(196, 46); bv.add_child(b2)
+		var b2h := hbox(6); b2h.alignment = BoxContainer.ALIGNMENT_CENTER; b2.add_child(b2h); b2h.add_child(L("豪华版 +%d级" % int(PS.boost), 15, Color.WHITE, 3)); b2h.add_child(UIKit.icon("gems", 22)); b2h.add_child(L(str(cost), 15, Color.WHITE, 3))
 		click(b2, func(): act(P.buy_pass(true), "豪华版通行证！直接升 %d 级" % int(PS.boost)))
-	var ca := UIKit.gold_button("全部领取", 18); ca.custom_minimum_size = Vector2(230, 38); bv.add_child(ca); click(ca, func(): show_items(P.claim_pass_all(), "通行证奖励"))
+	var ca := UIKit.gold_button("全部领取", 18); ca.custom_minimum_size = Vector2(196, 46); bv.add_child(ca); click(ca, func(): show_items(P.claim_pass_all(), "通行证奖励"))
 	# 横向滚动的 50 级奖励
 	var sc := ScrollContainer.new(); sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; at(sc, Vector2(24, 262), Vector2(vs.x - 48, vs.y - 280))
 	var row := hbox(8); sc.add_child(row)
@@ -1157,3 +1158,65 @@ func page_loot() -> void:
 			h3.add_child(claim_btn("兑换 " + exs, func(): show_items(P.ex_loot(k), "兑换"), true))
 		h3.add_child(claim_btn("卖 %d" % (int(it.v) / 10), func(): act(P.sell_loot(k), "卖出了"), true))
 		lst.add_child(c3)
+
+
+# ---------------- 局域网联机 ----------------
+var lan_ip := "192.168."
+var lan_name := ""
+
+func page_lan() -> void:
+	var N: Net = game.net
+	var w := 520.0
+	var card := UIKit.dark_card(); at(card, Vector2(24, 152), Vector2(w, vs.y - 168))
+	var v := vbox(10); card.add_child(v)
+	v.add_child(UIKit.wrap(L("同一个 Wi-Fi / 局域网里的电脑可以一起玩：一个人开房，其他人输入房主的 IP 加入。不够的位置由 AI 补上。端口 %d（第一次开房时 Windows 防火墙可能会询问，选「允许」）。搜刮撤离暂时只能单机玩。" % Net.PORT, 14, Color("#e6e2fa")), w - 40))
+	if lan_name == "": lan_name = str(P.o.name) if str(P.o.name) != "" else "驾驶员%d" % (randi() % 900 + 100)
+	var nh := hbox(10); v.add_child(nh); nh.add_child(L("名字", 17, Color.WHITE))
+	var ne := LineEdit.new(); ne.text = lan_name; ne.max_length = 12; ne.custom_minimum_size = Vector2(240, 40); ne.text_changed.connect(func(t): lan_name = t); nh.add_child(ne)
+	var info := func() -> Dictionary: return {"name": lan_name.strip_edges() if lan_name.strip_edges() != "" else "驾驶员", "pilot": P.o.pilot, "weapon": P.o.weapon, "power": P.power(P.o.pilot)}
+	if N.role == "":
+		var hb := UIKit.gold_button("开房（我当房主）", 22); hb.custom_minimum_size = Vector2(0, 60); v.add_child(hb)
+		click(hb, func():
+			var err := N.host(info.call())
+			if err != "": toast(err)
+			refresh())
+		var jh := hbox(10); v.add_child(jh); jh.add_child(L("房主 IP", 17, Color.WHITE))
+		var ie := LineEdit.new(); ie.text = lan_ip; ie.custom_minimum_size = Vector2(220, 40); ie.text_changed.connect(func(t): lan_ip = t); jh.add_child(ie)
+		var jb := UIKit.pink_button("加入", 20); jb.custom_minimum_size = Vector2(110, 44); jh.add_child(jb)
+		click(jb, func():
+			var err := N.join(lan_ip, info.call())
+			if err != "": toast(err)
+			refresh())
+		return
+	if N.role == "host":
+		var ips := Net.lan_ips()
+		v.add_child(L("你是房主 • 让朋友输入：" + (", ".join(ips) if not ips.is_empty() else "（没找到局域网 IP）"), 17, Color("#6dff8a")))
+		var mh := hbox(10); v.add_child(mh); mh.add_child(L("模式", 16, Color.WHITE))
+		var mo := OptionButton.new(); mo.custom_minimum_size = Vector2(200, 40)
+		for i in D.modeOrder.size():
+			mo.add_item(str(D.modes[D.modeOrder[i]].name), i)
+			if D.modeOrder[i] == N.room.mode: mo.select(i)
+		mo.item_selected.connect(func(k): N.room.mode = D.modeOrder[k]; N.sync_room()); mh.add_child(mo)
+		var ob := OptionButton.new(); ob.custom_minimum_size = Vector2(160, 40); ob.add_item("随机地图", 0)
+		for i in D.maps.size(): ob.add_item(str(D.maps[i].name), i + 1)
+		ob.select(int(N.room.map) + 1); ob.item_selected.connect(func(k): N.room.map = k - 1; N.sync_room()); mh.add_child(ob)
+		var go := UIKit.gold_button("开始对战", 26); go.custom_minimum_size = Vector2(0, 64); v.add_child(go)
+		click(go, func():
+			game.sel_mode = N.room.mode; game.sel_map = int(N.room.map); game.loot_risk = "normal"
+			game.start_match(P.o.pilot, P.o.weapon))
+	else:
+		v.add_child(L("已加入房间，等房主开始…… 模式：%s" % D.modes.get(N.room.mode, {"name": N.room.mode}).name, 17, Color("#ffe14d")))
+	var lb := UIKit.flat_button("离开房间", 16); lb.custom_minimum_size = Vector2(140, 44); v.add_child(lb)
+	click(lb, func(): N.leave(); refresh())
+	# 房间里的人
+	var rx := 24 + w + 16
+	at(L("房间里的玩家（%d / %d）" % [N.room.players.size(), Net.MAX_PEERS + 1], 20, Color("#ffe14d"), 4), Vector2(rx, 152))
+	var lst := vbox(8); at(lst, Vector2(rx, 190))
+	for rp in N.room.players:
+		var c := UIKit.dark_card(); c.custom_minimum_size = Vector2(vs.x - rx - 24, 0)
+		var h := hbox(10); c.add_child(h)
+		if D.pilots.has(str(rp.pilot)): h.add_child(face(str(rp.pilot), 44, false))
+		var cv := vbox(0); h.add_child(cv)
+		cv.add_child(L(str(rp.name) + ("（房主）" if int(rp.peer) == 1 else ""), 18, Color.WHITE))
+		cv.add_child(L("%s • %s • Lv.%d" % [D.pilots.get(str(rp.pilot), {"name": "?"}).name, D.mechs.get(str(rp.weapon), {"name": "?"}).name, int(rp.get("power", {}).get("lv", 1))], 13, Color("#a8a4c8")))
+		lst.add_child(c)

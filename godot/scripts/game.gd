@@ -71,6 +71,14 @@ var showroom_key := ""
 var showroom_cam := 0.0
 var autoplay := false
 var ranked_on := false
+var net: Net
+var peer_ids := {}
+var match_seed := 0
+var net_snap = null
+var net_snap_t := 0.0
+var net_send_t := 0.0
+var base_img_saved: Image
+var net_client_match := false
 var loot_risk := "normal"
 var bag_open := false
 var loot_ui: Control
@@ -95,6 +103,12 @@ func _ready() -> void:
 	font = load("res://fonts/huangyou.ttf")
 	theme_ui = make_theme()
 	sfx = Sfx.new(); add_child(sfx)
+	net = Net.new(); net.name = "Net"; add_child(net)
+	net.match_started.connect(_on_net_start)
+	net.snapshot.connect(func(sn): net_snap = sn)
+	net.match_ended.connect(_on_net_end)
+	net.status.connect(func(t): if lobby != null: lobby.toast(t))
+	net.room_changed.connect(func(): if lobby != null and lobby.sub == "lan" and state == "menu": lobby.refresh())
 	settings = Settings.new()
 	music = Music.new(); add_child(music)
 	setup_world()
@@ -121,6 +135,7 @@ func _ready() -> void:
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
 		if OS.get_environment("GB_SHOT") == "": splash(layer)
+	if OS.get_environment("GB_LAN") != "": lan_test_setup(); return
 	if autoplay:
 		var gm := OS.get_environment("GB_MAP")
 		sel_map = int(gm) if gm != "" else (-1 if sel_mode != "turf" else 0)
@@ -252,6 +267,7 @@ func build_map(idx: int) -> void:
 		var c := base_color(gw, i, pal); base_cols[i] = c
 		bytes[i * 4] = c.r8; bytes[i * 4 + 1] = c.g8; bytes[i * 4 + 2] = c.b8; bytes[i * 4 + 3] = 255
 	var base_img := Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, bytes)
+	base_img_saved = base_img
 	mini_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, bytes)
 	var zero := PackedByteArray(); zero.resize(gw * gh * 4)
 	paint_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, zero)
@@ -455,7 +471,8 @@ func start_match(pilot: String, mech: String) -> void:
 			if (sel_mode.begins_with("escape") and data.maps[i].name == "废墟逃亡区") or (sel_mode == "park" and data.maps[i].park): midx = i
 	if midx != cur_map: build_map(midx)
 	var dur := float(OS.get_environment("GB_DURATION")) if OS.get_environment("GB_DURATION") != "" else 180.0
-	sim = Sim.new(data, max(0, midx) if not is_loot else 0, 0, dur, sel_mode, {"risk": loot_risk})
+	match_seed = randi() % 1000000 + 1
+	sim = Sim.new(data, max(0, midx) if not is_loot else 0, match_seed, dur, sel_mode, {"risk": loot_risk})
 	sim.ranked = ranked_on
 	var lay := sim.team_layout()
 	var pw: Dictionary = {"lv": 7, "bt": 1} if autoplay else profile.power(pilot)
@@ -468,7 +485,14 @@ func start_match(pilot: String, mech: String) -> void:
 	if ranked_on:   # 被禁用的驾驶员 / 机体 AI 也不能用
 		pool_p.erase(ranked_bans.get("pilot", "")); pool_m.erase(ranked_bans.get("mech", ""))
 	var names := BOT_NAMES.duplicate(); names.shuffle()
+	var remote: Array = net.room.players.filter(func(q): return int(q.peer) != 1) if net.role == "host" else []
+	peer_ids = {}
 	for i in range(1, lay.size()):
+		if i - 1 < remote.size():   # 局域网的真人玩家
+			var rp: Dictionary = remote[i - 1]
+			var q := sim.add_player(i + 1, str(rp.name), lay[i], str(rp.pilot), str(rp.weapon), false, rp.get("power", {}))
+			peer_ids[int(rp.peer)] = q.id
+			continue
 		sim.add_player(i + 1, names[(i - 1) % names.size()] + ("" if i <= names.size() else str(i)), lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
 	spectate_id = 0
 	if is_loot:   # 带进场的装备、安全箱大小；守卫和 Boss 小队
@@ -485,14 +509,22 @@ func start_match(pilot: String, mech: String) -> void:
 		for q in sim.players:
 			if not mech_nodes.has(q.id): pass
 		bag_open = false
+	begin_view()
+	if net.role == "host":
+		var roster: Array = []
+		for q in sim.players:
+			if not q.npc: roster.append([q.id, q.name, q.team, q.pilot, q.weapon, {"lv": q.lv, "bt": q.bt, "tal": q.tal.keys()}, q.bot])
+		net.broadcast_start({"mode": sel_mode, "map": midx, "seed": match_seed, "dur": dur, "roster": roster, "peers": peer_ids})
+
+# 对局画面初始化（单机 / 房主 / 客户端共用）
+func begin_view() -> void:
 	for id in mech_nodes: mech_nodes[id].root.queue_free()
 	mech_nodes.clear()
 	for id in helper_nodes: helper_nodes[id].queue_free()
 	helper_nodes.clear()
-	if is_loot: pass
 	for p in sim.players: mech_nodes[p.id] = make_mech_node(p)
-	for i in base_cols.size():
-		paint_img.set_pixel(i % sim.GW, i / sim.GW, Color(0, 0, 0, 0)); mini_img.set_pixel(i % sim.GW, i / sim.GW, base_cols[i])
+	paint_img.fill(Color(0, 0, 0, 0))
+	mini_img.copy_from(base_img_saved)
 	paint_tex.update(paint_img); mini_tex.update(mini_img)
 	for f in fx_list: f.node.queue_free()
 	fx_list.clear()
@@ -521,10 +553,43 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 
 # ---------------- 主循环 ----------------
 func _process(delta: float) -> void:
+	if OS.get_environment("GB_LAN") != "": lan_test_tick(delta)
 	var real_dt := delta
 	if hitstop_until > 0 and Time.get_ticks_msec() >= hitstop_until: Engine.time_scale = 1.0; hitstop_until = 0
+	if net_client_match and net.role != "client":   # 房主断开 / 自己退出
+		net_client_match = false
+		if state != "menu": back_to_lobby(); lobby.toast("联机已断开")
+	if state == "play" and sim != null and net.role == "client":
+		read_input()
+		net_send_t -= delta
+		if net_send_t <= 0: net_send_t = 1.0 / 30.0; net.send_input(me.inp.duplicate())
+		if net_snap != null:
+			for p in sim.players:
+				var n: Dictionary = mech_nodes[p.id]
+				n.prev = n.root.position; n.a_prev = n.a_cur
+			Net.apply_snapshot(sim, net_snap); net_snap = null; net_snap_t = 0.0
+			for p in sim.players:
+				var n: Dictionary = mech_nodes[p.id]
+				n.cur = Vector3(p.x * K, p.z * K, p.y * K); n.a_cur = float(p.inp.a)
+				if not p.alive: n.prev = n.cur
+			apply_events()
+			if sim.dirty.size() > 0:
+				for i in sim.dirty:
+					var t := sim.grid[i]
+					paint_img.set_pixel(i % sim.GW, i / sim.GW, Color(1 if t == me.team else 0, 1 if t > 0 and t != me.team else 0, 0, 1 if t > 0 else 0))
+					mini_img.set_pixel(i % sim.GW, i / sim.GW, team_col[t] if t > 0 else base_cols[i])
+				paint_tex.update(paint_img); mini_tex.update(mini_img)
+		net_snap_t += delta
+		update_visuals(clampf(net_snap_t / (2.0 / 30.0), 0, 1), real_dt)
+		update_fx(real_dt); update_loot_ui(real_dt); hud.queue_redraw()
+		return
 	if state == "play" and sim != null:
 		read_input()
+		if net.role == "host":   # 其他真人的操作
+			for peer in net.inputs:
+				var q := player_by_id(int(peer_ids.get(peer, -1)))
+				if q != null:
+					for k in net.inputs[peer]: q.inp[k] = net.inputs[peer][k]
 		acc += min(delta, 0.1)
 		while acc >= TICK:
 			acc -= TICK
@@ -539,6 +604,7 @@ func _process(delta: float) -> void:
 				var n: Dictionary = mech_nodes[p.id]
 				n.cur = Vector3(p.x * K, p.z * K, p.y * K); n.a_cur = float(p.inp.a)
 				if not p.alive: n.prev = n.cur
+			if net.role == "host": net.host_collect(sim); net.host_broadcast(sim)
 			apply_events()
 			if sim.dirty.size() > 0:
 				for i in sim.dirty:
@@ -548,6 +614,10 @@ func _process(delta: float) -> void:
 				paint_tex.update(paint_img); mini_tex.update(mini_img)
 			if sim.over and state == "play":
 				state = "result"
+				if net.role == "host":
+					var fin: Array = []
+					for q in sim.players: fin.append([q.id, q.kills, q.deaths, q.painted, q.obj, q.balloons, q.float_t, q.seals, q.spirits, q.cubes, q.extracted])
+					net.broadcast_end(sim.result, fin)
 				show_result()
 		update_visuals(acc / TICK, real_dt)
 		turf_t -= delta
@@ -1149,6 +1219,7 @@ func start_from_lobby() -> void:
 	start_match(o.pilot, o.weapon)
 
 func back_to_lobby() -> void:
+	if net.role == "client" and state == "play": net.leave()
 	state = "menu"; menu.visible = true; result_ui.visible = false
 	music.play("menu")
 	if hitstop_until > 0: Engine.time_scale = 1.0; hitstop_until = 0
@@ -1291,3 +1362,54 @@ class BagGrid extends Control:
 				else: game.sim.loot_drop(game.me, i, is_safe)
 				game.sfx.play("click"); game.loot_ui_t = 0
 				accept_event(); return
+
+
+# ---------------- 局域网：客户端开局 / 结束 ----------------
+func _on_net_start(info: Dictionary) -> void:
+	if net.role != "client": return
+	sel_mode = str(info.mode); loot_risk = "normal"; ranked_on = false
+	var midx := int(info.map)
+	if midx != cur_map: build_map(midx)
+	sim = Sim.new(data, midx, int(info.seed), float(info.dur), sel_mode)
+	var my_id := int(info.peers.get(net.my_peer(), info.peers.get(str(net.my_peer()), 1)))
+	for r in info.roster: sim.add_player(int(r[0]), str(r[1]), int(r[2]), str(r[3]), str(r[4]), bool(r[6]), r[5])
+	me = player_by_id(my_id)
+	if me == null: me = sim.players[0]
+	spectate_id = 0; net_snap = null
+	result_ui.visible = false
+	net_client_match = true
+	begin_view()
+
+func _on_net_end(d: Dictionary) -> void:
+	if net.role != "client" or sim == null: return
+	for row in d.players:
+		var q := player_by_id(int(row[0]))
+		if q == null: continue
+		q.kills = row[1]; q.deaths = row[2]; q.painted = row[3]; q.obj = row[4]; q.balloons = row[5]; q.float_t = row[6]; q.seals = row[7]; q.spirits = row[8]; q.cubes = row[9]; q.extracted = row[10]
+	sim.result = d.result; sim.winner = int(d.result.winner); sim.over = true
+	state = "result"
+	show_result()
+
+
+# ---------------- 联机自测（两个无画面进程：GB_LAN=host / GB_LAN=127.0.0.1） ----------------
+var lan_t := 0.0
+var lan_snaps := 0
+func lan_test_setup() -> void:
+	var who := OS.get_environment("GB_LAN")
+	if int(profile.o.tut) == 0: profile.tutorial(); profile.open_chest("starter")
+	var info := {"name": "测试" + who, "pilot": profile.o.pilot, "weapon": profile.o.weapon, "power": profile.power(profile.o.pilot)}
+	print("联机测试：", who, " ", net.host(info) if who == "host" else net.join(who, info))
+	net.snapshot.connect(func(_s): lan_snaps += 1)
+	set_process(true)
+
+func lan_test_tick(delta: float) -> void:
+	lan_t += delta
+	var who := OS.get_environment("GB_LAN")
+	if who == "host" and state == "menu" and net.room.players.size() >= 2 and lan_t > 2.0:
+		print("房主：房间里 %d 人，开打" % net.room.players.size())
+		sel_mode = "turf"; sel_map = 0; start_match(profile.o.pilot, profile.o.weapon)
+	if int(lan_t * 2) != int((lan_t - delta) * 2) and int(lan_t) % 3 == 0:
+		print("%s t=%.0f state=%s players=%d snaps=%d me=%s time=%.1f" % [who, lan_t, state, sim.players.size() if sim != null else 0, lan_snaps, str(me.id) if me != null else "-", sim.time if sim != null else 0.0])
+	if lan_t > float(OS.get_environment("GB_QUIT_AT") if OS.get_environment("GB_QUIT_AT") != "" else "20"):
+		if me != null and sim != null: print("%s 结束：me=%d (%d,%d) alive=%s painted=%d" % [who, me.id, me.x, me.y, me.alive, me.painted])
+		get_tree().quit()
