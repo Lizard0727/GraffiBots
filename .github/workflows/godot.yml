@@ -1,5 +1,5 @@
 # Godot 样品版：无画面测试 + 导出 Windows（单个 exe）、网页版、安卓 APK，放到 Releases 的「godot-proto」，并更新官网 /godot/
-name: Godot 样品版
+name: Godot 版
 
 on:
   push:
@@ -75,7 +75,7 @@ jobs:
           cp build/godot/android/GraffiBots-Godot.apk build/GraffiBots-Godot.apk
           gh release delete godot-proto --yes --cleanup-tag || true
           gh release create godot-proto build/GraffiBots-Godot-Windows.zip build/GraffiBots-Godot-Web.zip build/GraffiBots-Godot.apk \
-            --title "Godot 样品版（最新）" --notes "涂鸦机兵 Godot 样品版：1 张地图、2 台机体、2 位驾驶员、涂地 + AI。Windows（解压后双击 exe）、网页版、安卓 APK。" --prerelease --target ${{ github.sha }}
+            --title "Godot 版（最新）" --notes "涂鸦机兵 Godot 版（移植第二阶段）：全部 22 台机体、21 位驾驶员、14 张地图，画面和手感大升级。Windows（解压后双击 exe）、网页版、安卓 APK。" --prerelease --target ${{ github.sha }}
 
       - name: 更新官网（/godot/ 网页版）
         env:

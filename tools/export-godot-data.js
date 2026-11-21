@@ -1,22 +1,33 @@
-// 把现在游戏的数据（public/shared.js）导出成 Godot 样品版用的 JSON：godot/data/game.json
+// 把现在游戏的数据（public/shared.js）导出成 Godot 版用的 JSON：godot/data/game.json
 // 运行：node tools/export-godot-data.js
-// 样品版只用 1 张地图、2 台机体（喷罐 / 狙击）、2 位驾驶员（凌焰 / 白夜）；以后全面移植时把列表放开即可
+// 阶段 2：全部 22 台机体、21 位驾驶员、全部技能 / 大招 / 随身武器 / 超载、定位克制表、14 张普通地图
 'use strict';
 const fs = require('fs'), path = require('path');
 const S = require('../public/shared.js');
-const MECHS = ['blaster', 'charger'], PILOTS = ['blaze', 'frost'], MAP = 0;
-const M = S.buildMap(MAP);
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+const bits = (arr) => Array.from(arr, (v) => (v ? '1' : '0')).join('');
+const maps = [];
+for (let i = 0; i < S.MAP_N; i++) {
+  const M = S.buildMap(i);
+  S.useMap(M);
+  const pads = {};
+  M.pad.forEach((v, k) => { if (v) pads[k] = v; });
+  maps.push({ name: S.MAPS[i].name, desc: S.MAPS[i].desc, sky: S.MAPS[i].sky || 0, gw: M.gw, gh: M.gh,
+    top: Array.from(M.top, (v) => Math.round(v)), solid: bits(M.solid), bush: bits(M.bush), pads,
+    spawns: [1, 2].map((t) => [0, 1, 2, 3].map((s) => S.spawnPoint(t, s))) });
+}
 const out = {
-  version: 'proto-0.1', from: S.VERSION,
-  consts: pick(S, ['TICK', 'R', 'CELL', 'AMMO', 'GRAV', 'JUMP_V', 'STEP', 'PH', 'MUZZLE', 'RESPAWN', 'PILOT_HP', 'BUSH_DETECT', 'SKILL_CHARGES', 'SKILL_REGEN', 'SKILL_CD', 'PROJ_G']),
-  speed: S.SPEED, phys: S.PHYS, pad: S.PAD,
-  map: { name: S.MAPS[MAP].name, gw: M.gw, gh: M.gh, w: M.gw * 16, h: M.gh * 16,
-    top: Array.from(M.top, (v) => Math.round(v)), solid: Array.from(M.solid), lv: Array.from(M.lv), bush: Array.from(M.bush), pad: Array.from(M.pad) },
-  mechs: Object.fromEntries(MECHS.map((id) => [id, Object.assign({}, S.WEAPONS[id], { trait: S.TRAITS[id], special: S.WEAPONS[id].special, specialInfo: S.SPECIALS[S.WEAPONS[id].special], range2: S.weaponRange(id) })])),
-  pilots: Object.fromEntries(PILOTS.map((id) => { const P = S.pilot(id); return [id, { id, name: P.name, code: P.code, title: P.title, accent: P.accent, hair: P.hair, skin: P.skin, eye: P.eye, weapon: P.weapon, skill: P.skill, skillInfo: S.SKILLS[P.skill], passive: P.passive, line: P.line }]; })),
-  spawns: [1, 2].map((t) => [0, 1, 2, 3].map((s) => S.spawnPoint(t, s))),
-  colors: S.COLOR_SETS[0],
+  version: 'proto-0.2', from: S.VERSION,
+  consts: pick(S, ['TICK', 'R', 'CELL', 'AMMO', 'GRAV', 'JUMP_V', 'JUMP_W', 'STEP', 'PH', 'MUZZLE', 'RESPAWN', 'PILOT_HP', 'PILOT_R', 'PILOT_SPEED', 'REBUILD', 'KO_RESPAWN',
+    'BUSH_DETECT', 'SKILL_CHARGES', 'SKILL_REGEN', 'SKILL_CD', 'PROJ_G', 'OV_NEED', 'OV_TIME', 'ROLE_EDGE']),
+  speed: S.SPEED, phys: S.PHYS, pad: S.PAD, missile: S.MISSILE, pistol: S.PISTOL,
+  order: S.WEAPON_ORDER, pilotOrder: S.PILOTS.map((P) => P.id),
+  mechs: Object.fromEntries(S.WEAPON_ORDER.map((id) => [id, Object.assign({}, S.WEAPONS[id], { trait: S.TRAITS[id] || null, specialInfo: S.SPECIALS[S.WEAPONS[id].special], range2: S.weaponRange(id) })])),
+  pilots: Object.fromEntries(S.PILOTS.map((P) => [P.id, { id: P.id, name: P.name, code: P.code, title: P.title, accent: P.accent, hair: P.hair, hair2: P.hair2, skin: P.skin, eye: P.eye,
+    style: P.style, outfit: P.outfit, weapon: P.weapon, skill: P.skill, skillInfo: S.SKILLS[P.skill], passive: P.passive, line: P.line, sidearm: S.sidearm(P.id), overload: S.OVERLOADS[P.id] }])),
+  classes: S.CLASS, roles: Object.fromEntries(Object.entries(S.ROLES).map(([k, R]) => [k, pick(R, ['kind', 'name', 'color', 'desc'])])), ring: S.ROLE_RING, tags: S.TAGS,
+  maps, colors: S.COLOR_SETS.map((c) => c.c),
 };
-fs.writeFileSync(path.join(__dirname, '..', 'godot', 'data', 'game.json'), JSON.stringify(out));
-console.log('godot/data/game.json', (JSON.stringify(out).length / 1024).toFixed(0) + ' KB', MECHS.join('/'), PILOTS.join('/'), out.map.name);
+const json = JSON.stringify(out);
+fs.writeFileSync(path.join(__dirname, '..', 'godot', 'data', 'game.json'), json);
+console.log('godot/data/game.json', (json.length / 1024).toFixed(0) + ' KB', S.WEAPON_ORDER.length + ' 机体', S.PILOTS.length + ' 驾驶员', maps.length + ' 地图');
