@@ -65,6 +65,7 @@ var profile: Profile
 var lobby: Lobby
 var showroom: Node3D
 var showroom_key := ""
+var showroom_cam := 0.0
 var autoplay := false
 var shot_t := 0.0
 
@@ -103,7 +104,8 @@ func _ready() -> void:
 		if OS.get_environment("GB_TAB") != "" and int(profile.o.tut) == 0:   # 截图用：直接给个开好宝箱的账号
 			profile.tutorial(); profile.open_chest("starter"); profile.o.gems = 600
 		lobby.refresh()
-		if OS.get_environment("GB_TAB") != "": lobby.show_tab(OS.get_environment("GB_TAB"))
+		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
+		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
 	if autoplay:
 		var gm := OS.get_environment("GB_MAP")
@@ -460,8 +462,8 @@ func _process(delta: float) -> void:
 			if turn != null: turn.rotation.y = t * 0.35
 			var sp: Vector3 = showroom.position
 			cam.fov = 40
-			cam.position = sp + Vector3(3.4, 4.6, 14.0)
-			cam.look_at(sp + Vector3(3.4, 2.0, 0))
+			cam.position = sp + Vector3(showroom_cam, 4.6, 14.0)
+			cam.look_at(sp + Vector3(showroom_cam, 2.0, 0))
 		else:
 			cam.position = c + Vector3(sin(t * 0.12) * 55, 48, cos(t * 0.12) * 55)
 			cam.look_at(c)
@@ -1026,7 +1028,8 @@ func back_to_lobby() -> void:
 	lobby.refresh()
 
 # 大厅的 3D 展台：机体 + 站在旁边的驾驶员，放在场地外面的地上，背后是城市夜景
-func show_showroom(pid: String, mech: String, vis: bool) -> void:
+func show_showroom(pid: String, mech: String, vis: bool, cam_x := 0.0) -> void:
+	showroom_cam = cam_x
 	showroom.visible = vis and pid != ""
 	if pid == "" or not data.pilots.has(pid): return
 	var key := pid + "|" + mech
@@ -1037,7 +1040,6 @@ func show_showroom(pid: String, mech: String, vis: bool) -> void:
 		var turn := Node3D.new(); turn.name = "turn"; showroom.add_child(turn)
 		var n := Models.build_mech(mech, data.mechs[mech], tc, data.pilots[pid])
 		n.root.scale = Vector3.ONE * 1.6; turn.add_child(n.root)
-		var pl := Models.build_pilot(data.pilots[pid], tc); pl.position = Vector3(3.0, 0, 2.2); pl.scale = Vector3.ONE * 1.9; pl.rotation.y = PI / 2 + 0.5; showroom.add_child(pl)
 		var disc := MeshInstance3D.new(); disc.mesh = Models.mesh("cyl", 3.6, 0.3); disc.material_override = Models.toon(Color("#2a2550"), 0.1, 0.6); disc.position.y = -0.15; showroom.add_child(disc)
 		var rim := MeshInstance3D.new(); rim.mesh = Models.mesh("torus", 3.5, 3.75); rim.material_override = Models.glow(Color(str(data.pilots[pid].accent)), 2.4); showroom.add_child(rim)
 		var l := OmniLight3D.new(); l.position = Vector3(2, 5, 4); l.light_energy = 2.2; l.omni_range = 14; showroom.add_child(l)

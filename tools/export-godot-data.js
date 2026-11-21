@@ -45,6 +45,8 @@ const out = {
     quests: E.QUESTS, dailyPool: E.DAILY_POOL, weekly: E.WEEKLY,
     trophy: { win: S.TROPHY_WIN, draw: S.TROPHY_DRAW, loss: S.TROPHY_LOSS },
   },
+  hex: { axes: S.HEX_AXES, grades: S.GRADES,
+    mech: Object.fromEntries(S.WEAPON_ORDER.map((id) => [id, S.hex('mech', id).vals])), pilot: Object.fromEntries(S.PILOTS.map((P) => [P.id, S.hex('pilot', P.id).vals])) },
   maps, colors: S.COLOR_SETS.map((c) => c.c),
 };
 const json = JSON.stringify(out).replace(/·/g, '•');   // Godot 版的字体没有「·」
