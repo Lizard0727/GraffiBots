@@ -12,8 +12,8 @@ const QUALITY := {   # 画质档位：阴影、环境光遮蔽、辉光、抗锯
 }
 const QUALITY_ORDER := ["low", "mid", "high", "ultra"]
 const FPS_OPTIONS := [0, 60, 120, 144, 240]
-const ACTIONS := [["up", "前进"], ["down", "后退"], ["left", "向左"], ["right", "向右"], ["jump", "跳跃"], ["wheel", "滚轮形态"], ["skill", "技能"], ["super", "大招"], ["overload", "超载"]]
-const DEFAULT_KEYS := {"up": KEY_W, "down": KEY_S, "left": KEY_A, "right": KEY_D, "jump": KEY_SPACE, "wheel": KEY_SHIFT, "skill": KEY_Q, "super": KEY_E, "overload": KEY_R}
+const ACTIONS := [["up", "前进"], ["down", "后退"], ["left", "向左"], ["right", "向右"], ["jump", "跳跃"], ["wheel", "滚轮形态"], ["skill", "技能"], ["super", "大招"], ["overload", "超载"], ["interact", "搜索 / 互动"], ["bag", "背包"]]
+const DEFAULT_KEYS := {"up": KEY_W, "down": KEY_S, "left": KEY_A, "right": KEY_D, "jump": KEY_SPACE, "wheel": KEY_SHIFT, "skill": KEY_Q, "super": KEY_E, "overload": KEY_R, "interact": KEY_F, "bag": KEY_TAB}
 
 var fullscreen := false
 var vsync := true

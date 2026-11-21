@@ -28,7 +28,7 @@ func new_profile() -> Dictionary:
 		"pass": {"xp": 0, "prem": false, "dlx": false, "cf": [], "cp": [], "bc": 0}, "mailGot": [], "mailDel": [],
 		"story": {"p": [0, 0, 0, 0, 0], "c": []}, "tl": {}, "ev": {}, "evLogin": {}, "rank": {"rp": 0, "best": 0, "road": [], "n": 0, "s": int(E.rank.season.id)},
 		"skins": [], "wear": {"pilot": {}, "mech": "", "fx": "", "frame": "", "avatar": ""}, "ranked": false,
-		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0}}
+		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0}, "gear": {}, "gearOn": [], "safeLv": 1, "risk": "normal"}
 	for k in E.start: p[k] = int(E.start[k])
 	for k in E.startExtra: p[k] = int(E.startExtra[k])
 	return p
@@ -49,6 +49,9 @@ func load_or_new() -> void:
 	o.pass.xp = int(o.pass.xp); o.pass.bc = int(o.pass.bc)
 	o.rank.rp = int(o.rank.rp); o.rank.best = int(o.rank.best); o.rank.n = int(o.rank.n)
 	for k in o.stash: o.stash[k] = int(o.stash[k])
+	for k in o.gear: o.gear[k] = int(o.gear[k])
+	o.safeLv = int(o.safeLv)
+	for k in o.lootRec: o.lootRec[k] = int(o.lootRec[k])
 	o.pass.cf = o.pass.cf.map(func(x): return int(x)); o.pass.cp = o.pass.cp.map(func(x): return int(x)); o.rank.road = o.rank.road.map(func(x): return int(x))
 	o.story.c = o.story.c.map(func(x): return int(x))
 
@@ -264,6 +267,13 @@ func match_reward(sim: Sim, me) -> Dictionary:
 	var mvp = mvp_of(sim, sim.winner) if sim.winner > 0 else null
 	var lm = mvp_of(sim, me.team) if not won and not draw and sim.teams == 2 else null
 	var is_mvp: bool = mvp == me or lm == me
+	if sim.loot:   # 搜刮撤离：撤离成功才把背包 + 安全箱带出来；阵亡只保住安全箱
+		var ex: bool = me.extracted
+		var kept: Array = sim.obj.banked.get(me.id, []) if ex else sim.inv_keys(me.safe)
+		var v := sim.loot_value(kept)
+		var gold := kept.filter(func(k): return int(D.loot.items[k].r) >= 5).size()
+		return {"xp": 60 + me.kills * 12 + ((80 + mini(120, v / 100)) if ex else 0), "trophies": 6 if ex else -2, "won": ex, "draw": false, "mvp": false, "kills": me.kills, "paint": me.painted, "mode": "loot",
+			"lootex": ex, "lootv": v if ex else 0, "lootgold": gold if ex else 0, "kept": kept, "paid": int(sim.obj.paid.get(me.id, 0)), "risk": sim.risk}
 	if sim.teams > 2:   # 逃亡圈按名次
 		var place: Array = [sim.winner]
 		var el: Array = sim.obj.elim.duplicate(); el.reverse()
@@ -609,6 +619,20 @@ func apply_match(rw: Dictionary) -> Dictionary:
 			var q: Array = L.steps[i]
 			if q[0] != "lvl" and (not L.has("chapter") or i == 0 or int(st2.p[i - 1]) >= int(L.steps[i - 1][1])):
 				st2.p[i] = mini(int(q[1]), int(st2.p[i]) + int(g.get(q[0], 0)))
+	var loot_info := {}
+	if mode == "loot":
+		var R2: Dictionary = o.lootRec; R2.runs = int(R2.runs) + 1
+		for k in rw.get("kept", []): o.stash[k] = mini(9999, int(o.stash.get(k, 0)) + 1)
+		var lost: Array = []
+		if rw.lootex:
+			R2.ex = int(R2.ex) + 1; R2.total = int(R2.total) + int(rw.lootv); R2.best = max(int(R2.best), int(rw.lootv))
+			if int(rw.get("paid", 0)) > 0: o.coins = max(0, int(o.coins) - int(rw.paid))
+		elif rw.get("risk", "normal") == "high":
+			for gk in o.gearOn.duplicate():
+				if int(o.gear.get(gk, 0)) > 0:
+					o.gear[gk] = int(o.gear[gk]) - 1; lost.append(gk)
+					if o.gear[gk] <= 0: o.gear.erase(gk); o.gearOn.erase(gk)
+		loot_info = {"ex": rw.lootex, "v": int(rw.lootv), "kept": rw.get("kept", []), "lost": lost}
 	var d := day_index()
 	if int(o.day) != d: o.day = d; o.dayWin = 0
 	if rw.won and int(o.dayWin) == 0: o.dayWin = 1; items.append({"k": "gems", "n": int(E.firstWinGems), "why": "每日首胜"})
@@ -641,7 +665,7 @@ func apply_match(rw: Dictionary) -> Dictionary:
 	for it in items:
 		if it.k == "passxp": pxp_total += int(it.n)
 	return {"items": merge(items.filter(func(it): return it.k != "passxp")), "pass_xp": pxp_total, "pass_before": pass_before, "pass_after": pass_level(),
-		"lv_before": lv_before, "lv_ups": ups, "tr_before": tr_before, "quests": done, "streak": o.streak, "rank": rank_info}
+		"lv_before": lv_before, "lv_ups": ups, "tr_before": tr_before, "quests": done, "streak": o.streak, "rank": rank_info, "loot": loot_info}
 
 # 小红点：有没有能领的东西
 func claimables() -> Dictionary:
@@ -664,3 +688,52 @@ func claimables() -> Dictionary:
 			if not st2.c[i] and int(st2.p[i]) >= int(ev.quests[i][1]): n_ev += 1
 		if ev.has("login") and int(o.evLogin.get(ev.id, {"n": 0}).n) < ev.login.size() and int(o.evLogin.get(ev.id, {"d": -1}).d) != day_index(): n_ev += 1
 	return {"pass": n_pass, "tasks": n_task, "events": n_ev, "mail": unread_mail()}
+
+# ---------------- 仓库 / 军需处 ----------------
+func stash_value() -> int:
+	var v := 0
+	for k in o.stash: v += int(D.loot.items[k].v) * int(o.stash[k]) if D.loot.items.has(k) else 0
+	return v
+func sell_loot(k: String, n: int = 1) -> Dictionary:
+	if int(o.stash.get(k, 0)) < n: return no("仓库里没有这么多")
+	var gain: int = int(D.loot.items[k].v) / 10 * n
+	o.stash[k] = int(o.stash[k]) - n
+	if o.stash[k] <= 0: o.stash.erase(k)
+	o.coins += gain
+	return ok([{"k": "coins", "n": gain}])
+func sell_all() -> Dictionary:   # 一键卖出：只卖普通 / 优良 / 稀有
+	var gain := 0
+	for k in o.stash.keys():
+		if int(D.loot.items[k].r) <= 3: gain += int(D.loot.items[k].v) / 10 * int(o.stash[k]); o.stash.erase(k)
+	if gain <= 0: return no("没有可以一键卖出的物资（史诗以上要手动卖）")
+	o.coins += gain
+	return ok([{"k": "coins", "n": gain}])
+func ex_loot(k: String) -> Dictionary:   # 传说 / 至宝物资换宝石 / 能量结晶
+	var it: Dictionary = D.loot.items.get(k, {})
+	if not it.has("ex"): return no("这件物资不能兑换")
+	if int(o.stash.get(k, 0)) < 1: return no("仓库里没有")
+	o.stash[k] = int(o.stash[k]) - 1
+	if o.stash[k] <= 0: o.stash.erase(k)
+	var items: Array = []
+	for c in it.ex: items.append({"k": c, "n": int(it.ex[c])})
+	grant(items)
+	return ok(items)
+func buy_gear(id: String) -> Dictionary:
+	var G: Dictionary = D.loot.gear.get(id, {})
+	if G.is_empty(): return no("没有这件装备")
+	if int(o.coins) < int(G.price): return no("金币不够（需要 %d）" % int(G.price))
+	o.coins -= int(G.price); o.gear[id] = int(o.gear.get(id, 0)) + 1
+	return ok()
+func toggle_gear(id: String) -> Dictionary:
+	if o.gearOn.has(id): o.gearOn.erase(id); return ok()
+	if int(o.gear.get(id, 0)) <= 0: return no("还没有这件装备")
+	if id in ["pack", "bigpack"]: o.gearOn = o.gearOn.filter(func(g): return not g in ["pack", "bigpack"])
+	o.gearOn.append(id)
+	return ok()
+func safe_up() -> Dictionary:
+	var lv := int(o.safeLv)
+	if lv >= 3: return no("安全箱已经是最大的了")
+	var cost := int(D.loot.safeCost[lv + 1])
+	if int(o.coins) < cost: return no("金币不够（需要 %d）" % cost)
+	o.coins -= cost; o.safeLv = lv + 1
+	return ok()

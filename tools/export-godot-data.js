@@ -36,6 +36,21 @@ const econ5 = {
   offer: E.OFFER, newOffer: Object.assign({}, E.NEW_OFFER, { until: sec(E.NEW_OFFER.until) }), seasonPilots: E.SEASON_PILOTS, seasonMechs: E.SEASON_MECHS, collab: E.COLLAB,
   skins: S.SKINS, startExtra: { tickets: 0, shards: 0, talismans: 0 },
 };
+
+// 阶段 5：搜刮撤离的超大地图（760×500）和物资配置
+const packBits = (arr) => { const b = new Uint8Array(Math.ceil(arr.length / 8)); arr.forEach((v, i) => { if (v) b[i >> 3] |= 1 << (i & 7); }); return Buffer.from(b).toString('base64'); };   // 8 格一个字节
+const lootMap = (() => {
+  const gi = S.GIANT_MAP(), M = S.buildMap(gi); S.useMap(M);
+  const pads = {}, lifts = {};
+  M.pad.forEach((v, k) => { if (v) pads[k] = v; });
+  if (M.lift) M.lift.forEach((v, k) => { if (v) lifts[k] = v; });
+  const r = { name: S.MAPS[gi].name, desc: S.MAPS[gi].desc, sky: S.MAPS[gi].sky || 0, gw: M.gw, gh: M.gh, goalX: 24, park: false, giant: true,
+    topB64: Buffer.from(Uint8Array.from(M.top, (v) => Math.max(0, Math.min(255, Math.round(v))))).toString('base64'), solidBits: packBits(M.solid), bushBits: packBits(M.bush), pads, lifts, loot: M.loot,
+    spawns: [1, 2].map((t) => [0, 1, 2, 3].map((s) => S.spawnPoint(t, s))) };
+  S.useMap(S.buildMap(0));
+  return r;
+})();
+const lootCfg = Object.assign({}, S.LOOT, { search: [0, 1, 2, 3, 4, 5, 6].map((r) => S.LOOT.search(r)), keys: S.LOOT_KEYS, levelH: S.LEVEL_H, lift: S.LIFT });
 const out = {
   version: 'proto-0.3', from: S.VERSION,
   consts: pick(S, ['TICK', 'R', 'CELL', 'AMMO', 'GRAV', 'JUMP_V', 'JUMP_W', 'STEP', 'PH', 'MUZZLE', 'RESPAWN', 'PILOT_HP', 'PILOT_R', 'PILOT_SPEED', 'REBUILD', 'KO_RESPAWN',
@@ -46,8 +61,8 @@ const out = {
   pilots: Object.fromEntries(S.PILOTS.map((P) => [P.id, { id: P.id, name: P.name, code: P.code, title: P.title, accent: P.accent, hair: P.hair, hair2: P.hair2, skin: P.skin, eye: P.eye,
     style: P.style, outfit: P.outfit, weapon: P.weapon, skill: P.skill, skillInfo: S.SKILLS[P.skill], passive: P.passive, line: P.line, sidearm: S.sidearm(P.id), overload: S.OVERLOADS[P.id] }])),
   classes: S.CLASS, roles: Object.fromEntries(Object.entries(S.ROLES).map(([k, R]) => [k, pick(R, ['kind', 'name', 'color', 'desc'])])), ring: S.ROLE_RING, tags: S.TAGS,
-  modeOrder: S.MODE_ORDER.filter((k) => k !== 'loot'),
-  modes: Object.fromEntries(S.MODE_ORDER.filter((k) => k !== 'loot').map((k) => [k, pick(S.MODES[k], ['name', 'short', 'desc', 'oneLife', 'teams', 'size', 'coop'])])),
+  modeOrder: S.MODE_ORDER.slice(),
+  modes: Object.fromEntries([...S.MODE_ORDER, 'loot'].map((k) => [k, pick(S.MODES[k], ['name', 'short', 'desc', 'oneLife', 'teams', 'size', 'coop'])])),
   modeCfg: { ESCAPE: S.ESCAPE, ELIM: S.ELIM, ZONE: S.ZONE, SOCCER_GOAL: S.SOCCER_GOAL, ESCORT_TARGET: S.ESCORT_TARGET, SOCCER_TARGET: S.SOCCER_TARGET, BATTERY_TARGET: S.BATTERY_TARGET,
     RAID: S.RAID, SEAL: S.SEAL, PARK: S.PARK },
   econ: {
@@ -65,6 +80,7 @@ const out = {
   },
   hex: { axes: S.HEX_AXES, grades: S.GRADES,
     mech: Object.fromEntries(S.WEAPON_ORDER.map((id) => [id, S.hex('mech', id).vals])), pilot: Object.fromEntries(S.PILOTS.map((P) => [P.id, S.hex('pilot', P.id).vals])) },
+  lootMap, loot: lootCfg,
   maps, colors: S.COLOR_SETS.map((c) => c.c),
 };
 const json = JSON.stringify(out).replace(/·/g, '•').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]\uFE0F?/gu, '');   // Godot 版的字体没有「·」

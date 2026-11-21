@@ -145,11 +145,23 @@ func _draw() -> void:
 		txt("%d%%" % int(100.0 * tu[1] / tot), Vector2(bx + bw + 30, by + 7), 15, game.team_col[2])
 	else:
 		draw_mode_panel(sim, me, vs)
-	# ---- 小地图 ----
+	# ---- 小地图（超大地图只显示自己周围 150×100 格） ----
 	var mw := 190.0; var mh := mw * sim.GH / sim.GW; var mx := vs.x - mw - 14; var my := 14.0
-	draw_rect(Rect2(mx - 5, my - 5, mw + 10, mh + 10), Color(0, 0, 0, 0.75))
-	draw_texture_rect(game.mini_tex, Rect2(mx, my, mw, mh), false)
-	var ms := mw / sim.W
+	var org := Vector2.ZERO; var ms := mw / sim.W
+	if sim.loot:
+		mw = 230.0; mh = 154.0; mx = vs.x - mw - 14
+		var rw := 150.0; var rh := 100.0
+		var cx := clampf(me.x / 16.0 - rw / 2, 0, sim.GW - rw); var cy := clampf(me.y / 16.0 - rh / 2, 0, sim.GH - rh)
+		org = Vector2(cx * 16.0, cy * 16.0); ms = mw / (rw * 16.0)
+		draw_rect(Rect2(mx - 5, my - 5, mw + 10, mh + 10), Color(0, 0, 0, 0.75))
+		draw_texture_rect_region(game.mini_tex, Rect2(mx, my, mw, mh), Rect2(cx, cy, rw, rh))
+		for e in sim.obj.ex:
+			var ep := Vector2(mx + (e.x - org.x) * ms, my + (e.y - org.y) * ms)
+			if ep.x > mx and ep.y > my and ep.x < mx + mw and ep.y < my + mh: draw_circle(ep, 6, Color("#6dff8a") if sim.ex_open(e) else Color("#7a7690"))
+		mx -= org.x * ms; my -= org.y * ms
+	else:
+		draw_rect(Rect2(mx - 5, my - 5, mw + 10, mh + 10), Color(0, 0, 0, 0.75))
+		draw_texture_rect(game.mini_tex, Rect2(mx, my, mw, mh), false)
 	var o: Dictionary = sim.obj
 	if o.has("circle"):
 		var c0: Dictionary = o.circle
@@ -166,6 +178,7 @@ func _draw() -> void:
 	for p in sim.players:
 		if not p.alive: continue
 		var pos := Vector2(mx + p.x * ms, my + p.y * ms)
+		if sim.loot and not Rect2(vs.x - 244, 14, 230, 154).has_point(pos): continue
 		if p.team == me.team:
 			draw_circle(pos, 5 if p == me else 4, Color.WHITE if p == me else game.team_col[p.team])
 			if p == me: draw_line(pos, pos + Vector2(cos(me.inp.a), sin(me.inp.a)) * 10, Color.WHITE, 2)
@@ -263,6 +276,7 @@ func draw_mode_panel(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
 	var s1: int = o.score[me.team] if me.team <= 2 else 0
 	var s2: int = o.score[3 - me.team] if me.team <= 2 else 0
 	match sim.mode:
+		"loot": draw_loot_panel(sim, me, vs)
 		"zone": two.call("%d" % int(ceil(o.count[me.team])), "%d" % int(ceil(o.count[3 - me.team])), "据点 %d%% / %d%%" % [int(o.share[me.team] * 100), int(o.share[3 - me.team] * 100)])
 		"escort": two.call(str(s1), str(s2), "宝物 先得 %d 分" % int(MC.ESCORT_TARGET))
 		"soccer": two.call(str(s1), str(s2), "足球 先进 %d 球" % int(MC.SOCCER_TARGET))
@@ -285,3 +299,29 @@ func draw_mode_panel(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
 			draw_rect(Rect2(vs.x / 2 - 252, y - 12, 504, 26), Color(0, 0, 0, 0.8))
 			draw_rect(Rect2(vs.x / 2 - 248, y - 8, 496 * k, 18), Color("#ff3b52") if k < float(MC.RAID.rage) else Color("#b48cff"))
 			txt("百目  %d / %d" % [int(b.hp), int(b.max_hp)], Vector2(vs.x / 2, y), 15, Color.WHITE)
+
+func draw_loot_panel(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
+	var bag := sim.loot_value(sim.inv_keys(me.inv)); var safe := sim.loot_value(sim.inv_keys(me.safe))
+	draw_rect(Rect2(vs.x / 2 - 230, 62, 460, 30), Color(0, 0, 0, 0.7))
+	txt("背包 %d • 安全箱 %d • 格子 %d / %d" % [bag, safe, sim.inv_cells(me.inv), int(me.inv.w) * int(me.inv.h)], Vector2(vs.x / 2, 77), 16, Color("#ffe14d"))
+	# 最近的撤离点：开放 / 还要多久开放，方向箭头
+	var best = null; var bd := 1e9
+	for e in sim.obj.ex:
+		var d := Vector2(e.x - me.x, e.y - me.y).length()
+		var w := d if sim.ex_open(e) else d + 4000
+		if w < bd: bd = w; best = e
+	if best != null:
+		var d2 := Vector2(best.x - me.x, best.y - me.y)
+		var name: String = str(game.data.loot.ext[best.type].name)
+		var st := "开放中" if sim.ex_open(best) else ("%d 秒后开放" % int(best.open - sim.time) if best.open < 1e8 else "需要拉闸")
+		txt("%s %d 米 • %s" % [name, int(d2.length() / 16.0), st], Vector2(vs.x / 2, 106), 15, Color("#6dff8a") if sim.ex_open(best) else Color("#c9c5e6"))
+		var ac := Vector2(vs.x / 2, vs.y / 2) + d2.normalized() * 130
+		var a := d2.angle()
+		draw_colored_polygon(PackedVector2Array([ac + Vector2(cos(a), sin(a)) * 14, ac + Vector2(cos(a + 2.5), sin(a + 2.5)) * 10, ac + Vector2(cos(a - 2.5), sin(a - 2.5)) * 10]), Color("#6dff8a") if sim.ex_open(best) else Color(1, 1, 1, 0.4))
+	if me.ex_t > 0:
+		txt("撤离中…… %.1f 秒" % max(0.0, float(game.data.loot.extTime) - me.ex_t), Vector2(vs.x / 2, vs.y * 0.62), 26, Color("#6dff8a"), HORIZONTAL_ALIGNMENT_CENTER, 6)
+		draw_rect(Rect2(vs.x / 2 - 150, vs.y * 0.62 + 20, 300 * me.ex_t / float(game.data.loot.extTime), 10), Color("#6dff8a"))
+	var nc = game.near_cont()
+	if nc != null and me.open_c == 0:
+		var CT: Dictionary = game.data.loot.conts.get(nc.type, {})
+		txt("%s 搜索「%s」 • %s 背包" % [Settings.key_name(game.settings.keys.interact), CT.get("name", "遗骸" if nc.type == "body" else "物资"), Settings.key_name(game.settings.keys.bag)], Vector2(vs.x / 2, vs.y * 0.7), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 5)

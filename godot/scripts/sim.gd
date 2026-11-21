@@ -108,6 +108,21 @@ class Mech:
 	var ls_n := 0
 	var ls_t := 0.0
 	var flash := 0.0          # 受击闪白（给画面）
+	var lift = null           # 坐电梯中
+	var inv := {"w": 5, "h": 3, "items": []}    # 搜刮撤离：网格背包
+	var safe := {"w": 2, "h": 2, "items": []}   # 安全箱（阵亡也保留）
+	var open_c := 0
+	var srch := 0.0
+	var ex_t := 0.0
+	var extracted := false
+	var loot_boss := false
+	var pick_t := 0.0
+	var ai_cont := 0
+	var ai_local := PackedInt32Array()   # 目标很近时的局部细导航场（64×64 小格窗口）
+	var ai_local_org := Vector2i.ZERO
+	var ai_skip := {}                    # 走不到 / 卡住的目标：一段时间内不再选
+	var ai_done := {}
+	var kit := 0
 	var lv := 1               # 驾驶员等级（每级生命和伤害 +4%）
 	var bt := 0               # 突破：I 解锁超载，II 超载更强
 	var pmul := 1.0
@@ -192,21 +207,35 @@ var boss: Mech = null
 var minions: Array = []
 var spirits: Array = []
 var ranked := false
+var lift := PackedInt32Array()
+var loot := false
+var risk := "normal"
+var tick_n := 0
 var rng := RandomNumberGenerator.new()
 var next_id := 1
 
-func _init(data: Dictionary, map_idx: int = 0, seed_v: int = 0, duration: float = 180.0, mode_v: String = "turf") -> void:
+func _init(data: Dictionary, map_idx: int = 0, seed_v: int = 0, duration: float = 180.0, mode_v: String = "turf", opts: Dictionary = {}) -> void:
+	risk = str(opts.get("risk", "normal"))
 	D = data
 	C = D.consts
-	M = D.maps[clampi(map_idx, 0, D.maps.size() - 1)]
+	M = D.lootMap if mode_v == "loot" else D.maps[clampi(map_idx, 0, D.maps.size() - 1)]
 	GW = int(M.gw); GH = int(M.gh); W = GW * CELL; H = GH * CELL
-	top = PackedInt32Array(M.top)
-	solid.resize(GW * GH); bush.resize(GW * GH); pad.resize(GW * GH); grid.resize(GW * GH)
-	var sb: String = M.solid; var bb: String = M.bush
-	for i in GW * GH:
-		solid[i] = 1 if sb.unicode_at(i) == 49 else 0
-		bush[i] = 1 if bb.unicode_at(i) == 49 else 0
+	solid.resize(GW * GH); bush.resize(GW * GH); pad.resize(GW * GH); grid.resize(GW * GH); lift.resize(GW * GH)
+	if M.has("topB64"):   # 超大地图：高度 / 墙 / 草丛都压缩过
+		top = PackedInt32Array(Array(Marshalls.base64_to_raw(M.topB64)))
+		var sbits := Marshalls.base64_to_raw(M.solidBits); var bbits := Marshalls.base64_to_raw(M.bushBits)
+		for i in GW * GH:
+			solid[i] = (sbits[i >> 3] >> (i & 7)) & 1
+			bush[i] = (bbits[i >> 3] >> (i & 7)) & 1
+	else:
+		top = PackedInt32Array(M.top)
+		var sb: String = M.solid; var bb: String = M.bush
+		for i in GW * GH:
+			solid[i] = 1 if sb.unicode_at(i) == 49 else 0
+			bush[i] = 1 if bb.unicode_at(i) == 49 else 0
 	for k in M.pads: pad[int(k)] = int(M.pads[k])
+	for k in M.get("lifts", {}): lift[int(k)] = int(M.lifts[k])
+	if GW * GH > 50000: build_nav()
 	time_left = duration
 	if seed_v != 0: rng.seed = seed_v
 	else: rng.randomize()
@@ -277,9 +306,11 @@ func add_player(id: int, name: String, team: int, pilot: String, weapon: String,
 	return p
 
 func respawn(p: Mech) -> void:
-	if spawns.size() > p.team and spawns[p.team] != null:
+	if p.guard is Dictionary:
+		p.x = float(p.guard.x); p.y = float(p.guard.y)
+	elif spawns.size() > p.team and spawns[p.team] != null:
 		var sv: Vector2 = spawns[p.team]
-		p.x = sv.x + (34.0 if p.slot % 2 == 1 else 0.0); p.y = sv.y + (20.0 if p.slot % 2 == 1 else 0.0)
+		p.x = sv.x + [0.0, 34.0, -30.0][p.slot % 3]; p.y = sv.y + [0.0, 20.0, 26.0][p.slot % 3]
 	else:
 		var s: Dictionary = M.spawns[(p.team - 1) % 2][p.slot % 4]
 		p.x = float(s.x); p.y = float(s.y)
@@ -308,9 +339,15 @@ func step(dt: float) -> void:
 		return
 	time += dt
 	time_left -= dt
+	field_budget = 1   # 超大地图每帧最多新算 1 个导航场
+	tick_n += 1
 	for p in players:
 		if p.boss: boss_think(p, dt)
-		elif p.bot: ai_think(p, dt)
+		elif p.bot:
+			# 超大地图人多：AI 隔帧思考（守卫更少），输入会保持到下次思考
+			var every := 1
+			if loot: every = 4 if p.guard != null else 2
+			if (tick_n + p.slot) % every == 0: ai_think(p, dt * every)
 		update_player(p, dt)
 	update_helpers(dt)
 	update_projs(dt)
@@ -337,6 +374,10 @@ func finish(win: int = -1) -> void:
 			for t in range(1, teams + 1):
 				if alive_of(t) > bn: bn = alive_of(t); win = t
 		elif mode == "raid": win = 2
+		elif loot:
+			var bv := 0; win = 0
+			for t in range(1, teams + 1):
+				if int(obj.score[t]) > bv: bv = int(obj.score[t]); win = t
 		elif mode == "turf": win = by_turf
 		elif mode == "zone": win = 1 if obj.count[1] < obj.count[2] else (2 if obj.count[2] < obj.count[1] else by_turf)
 		else: win = 1 if obj.score[1] > obj.score[2] else (2 if obj.score[2] > obj.score[1] else by_turf)
@@ -522,6 +563,17 @@ func collide(p: Mech, r: float) -> void:
 	p.x = clampf(p.x, r, W - r); p.y = clampf(p.y, r, H - r)
 
 func step_move(p: Mech, dt: float, mul: float) -> void:
+	if p.lift != null:   # 电梯：先沿电梯井升到楼顶高度，再平移到楼顶上
+		var Lf: Dictionary = p.lift; var LS: Dictionary = D.loot.lift
+		p.vx = 0; p.vy = 0; p.kx = 0; p.ky = 0; p.vz = 0; p.on_ground = false; p.coy = 0; p.pad_t = 0.6
+		if Lf.ph == 0:
+			p.z = min(float(Lf.top), p.z + float(LS.up) * dt)
+			if p.z >= float(Lf.top): Lf.ph = 1
+		else:
+			var dx: float = Lf.tx - p.x; var dy: float = Lf.ty - p.y; var dl := sqrt(dx * dx + dy * dy); var st := float(LS.across) * dt
+			if dl <= st: p.x = Lf.tx; p.y = Lf.ty; p.lift = null; p.z = max(p.z, top_at(p.x, p.y)); p.on_ground = true
+			else: p.x += dx / dl * st; p.y += dy / dl * st
+		return
 	var P: Dictionary = D.phys
 	p.land_v = 0
 	var mx := float(p.inp.mx); var my := float(p.inp.my)
@@ -564,6 +616,16 @@ func step_move(p: Mech, dt: float, mul: float) -> void:
 			p.vz = float(D.pad.v); p.on_ground = false; p.coy = 0; p.jumped = false; p.pad_t = 0.6
 			p.kx += cos(a) * float(D.pad.push); p.ky += sin(a) * float(D.pad.push)
 			ev(["pad", p.id])
+		var lc := lift[cy * GW + cx] if in_bounds(cx, cy) else 0
+		if lc > 0 and p.on_ground:
+			var la := (lc - 1) / 250.0 * TAU; var roof := float(D.loot.levelH[5])
+			var ux := cos(la); var uy := sin(la)
+			var ccx := (cx + 0.5) * CELL; var ccy := (cy + 0.5) * CELL
+			var d := float(CELL)
+			while d < CELL * 12 and top_at(ccx + ux * d, ccy + uy * d) < roof - 1: d += CELL / 2.0
+			if d < CELL * 12:
+				p.lift = {"tx": ccx + ux * (d + CELL * 1.4), "ty": ccy + uy * (d + CELL * 1.4), "top": roof + 8, "ph": 0}
+				ev(["pad", p.id])
 	var gh := top_at(p.x, p.y)
 	if p.on_ground:
 		if gh < p.z - 0.5: p.on_ground = false; p.vz = 0
@@ -1108,6 +1170,7 @@ func kill(t: Mech, by: Mech) -> void:
 		ev(["ko", t.id, by.id if by != null else 0, t.x, t.y, t.z, t.team])
 		return
 	drop_items(t)
+	if loot: loot_drop_body(t)
 	paint(t.x, t.y, top_at(t.x, t.y), 40, by.team if by != null else (0 if teams > 2 else 3 - t.team), by)
 	if by != null and by != t: on_takedown(by, t)
 	t.sp = floor(t.sp * 0.5)
@@ -1550,6 +1613,11 @@ func pick_roam(p: Mech, near: Vector2 = Vector2(-1, -1)) -> void:
 		p.ai_field = build_field(best)
 
 func field_dir(p: Mech) -> Vector2:
+	if nav_w > 0:
+		if p.ai_local.size() > 0:
+			var d := local_dir(p)
+			if d != Vector2.INF: return d
+		return coarse_dir(p)
 	if p.ai_field.size() == 0: return Vector2.ZERO
 	var cx := int(p.x / CELL); var cy := int(p.y / CELL)
 	var here := p.ai_field[cy * GW + cx] if in_bounds(cx, cy) else -1
@@ -1579,8 +1647,10 @@ func ai_think(p: Mech, dt: float) -> void:
 	var engage: float = minf(760.0, rng_w + 200.0)
 	if mode in ["escape4", "escape8"] and time - p.last_hurt > 4.0: engage = minf(engage, rng_w * 0.75 + 40.0)
 	for e in players:
-		if not e.alive or e.team == p.team or not visible_to(p.team, e): continue
+		if not e.alive or e.team == p.team: continue
 		var d := dist2d(e, p)
+		if d > engage or d > td or not visible_to(p.team, e): continue
+		if p.guard is Dictionary and guard_anchor(p).distance_to(Vector2(e.x, e.y)) > 460 and time - p.last_hurt > 3: continue
 		if d < td and d < engage and d < blind_r: td = d; tgt = e
 	var inp := p.inp
 	inp.j = false
@@ -1597,7 +1667,7 @@ func ai_think(p: Mech, dt: float) -> void:
 		var g = mode_goal(p)
 		if g != null: set_goal(p, g)
 		elif p.ai_urgent: p.ai_urgent = false
-	var has_goal: bool = mode != "turf" and p.ai_goal_cell >= 0
+	var has_goal: bool = mode != "turf" and (p.ai_goal_cell >= 0 or nav_w > 0)
 	if tgt != null and (melee or los(p.x, p.y, p.z + float(C.MUZZLE), tgt.x, tgt.y)):
 		var to := Vector2(tgt.x - p.x, tgt.y - p.y)
 		var lead := to.length() / 650.0
@@ -1667,7 +1737,8 @@ func ai_think(p: Mech, dt: float) -> void:
 	if has_goal:
 		if Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() < 30: p.ai_mode_t = min(p.ai_mode_t, 0.1)
 	elif p.ai_goal_cell < 0 or Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() < 40 or p.ai_t <= -3.0:
-		pick_roam(p); p.ai_t = 0
+		if nav_w == 0: pick_roam(p)
+		p.ai_t = 0
 	var d := field_dir(p)
 	if p.ai_t <= 0:
 		p.ai_t = 0.5
@@ -1676,8 +1747,9 @@ func ai_think(p: Mech, dt: float) -> void:
 		p.ai_last = Vector2(p.x, p.y)
 		if p.ai_stuck >= 3:
 			p.ai_stuck = 0; inp.j = true
+			if loot: skip_goal(p)
 			if has_goal: p.ai_mode_t = 0
-			else: pick_roam(p)
+			elif nav_w == 0: pick_roam(p)
 	inp.mx = d.x; inp.my = d.y
 	if mode == "soccer" and not melee:   # 足球：球在自己和对方球门之间就朝球开火
 		var b: Dictionary = obj.ball
@@ -1810,6 +1882,7 @@ func init_mode() -> void:
 		"battery": obj.bats = []; obj.bat_t = 2.0
 		"seal": obj.bats = []; obj.bat_t = 2.0; obj.sp_t = 1.5; setup_seal()
 		"raid": time_left = float(MC.RAID.time); setup_raid()
+		"loot": init_loot()
 		"park":
 			obj.fl = park_pos(0.0); obj.fl.k = 0.0; obj.fl.own = 0
 			obj.balloons = []; obj.bal_t = 1.5; obj.acc = 0.0
@@ -1974,6 +2047,7 @@ func update_mode(dt: float) -> void:
 		"escort": mode_escort(dt)
 		"soccer": mode_soccer(dt)
 		"battery", "seal": mode_stones(dt)
+		"loot": update_loot(dt)
 
 func mode_park(dt: float) -> void:
 	var PK: Dictionary = MC.PARK
@@ -2267,6 +2341,7 @@ func mode_goal(p: Mech):
 			return Vector2(best.x, best.y) if best != null else null
 		if p.guard != null: return p.guard + Vector2(rng.randf_range(-90, 90), rng.randf_range(-90, 90))
 		return null
+	if loot: return loot_goal(p)
 	match mode:
 		"park":
 			var best = null; var bd := 420.0
@@ -2334,6 +2409,22 @@ func mode_goal(p: Mech):
 	return null
 
 func set_goal(p: Mech, g: Vector2) -> void:
+	if nav_w > 0:   # 超大地图：粗导航格，同一个目标格的导航场大家共用
+		p.ai_goal = g
+		if p.guard != null: p.ai_field = PackedInt32Array(); return   # 守卫就在岗位附近：直接走过去
+		if Vector2(p.x, p.y).distance_to(g) < 900 and field_budget > -2:
+			field_budget -= 1
+			local_field(p, g)
+			var bx := int(p.x / CELL) - p.ai_local_org.x; var by := int(p.y / CELL) - p.ai_local_org.y
+			var reach: bool = p.ai_local.size() > 0 and bx >= 0 and by >= 0 and bx < LW and by < LW and p.ai_local[by * LW + bx] >= 0
+			if not reach and loot: skip_goal(p)
+			return
+		p.ai_local = PackedInt32Array()
+		var ci := clampi(int(g.y / CELL) / NC, 0, nav_h - 1) * nav_w + clampi(int(g.x / CELL) / NC, 0, nav_w - 1)
+		if ci != p.ai_goal_cell and (field_cache.has(ci) or field_budget > 0):
+			if not field_cache.has(ci): field_budget -= 1
+			p.ai_goal_cell = ci; p.ai_field = coarse_field(ci)
+		return
 	var cx := clampi(int(g.x / CELL), 0, GW - 1); var cy := clampi(int(g.y / CELL), 0, GH - 1)
 	var i := cy * GW + cx
 	if not walkable(i):   # 目标格子走不到：找附近能走的格子
@@ -2352,9 +2443,383 @@ func set_goal(p: Mech, g: Vector2) -> void:
 # 这个模式下 8 个（讨伐是 4 个）玩家位置各属于哪一队；第一个位置是真人玩家
 func team_layout() -> Array:
 	if mode == "raid": return [1, 1, 1, 1]
+	if mode == "loot": return [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6]
 	if teams > 2:
 		var size := 8 / teams
 		var out: Array = []
 		for i in 8: out.append(1 + i / size)
 		return out
 	return [1, 1, 1, 1, 2, 2, 2, 2]
+
+# ================================================================
+# 搜刮撤离（移植 core.js 的 makeCont / updateLoot / extract / 守卫 / Boss 小队）
+# ================================================================
+const NC := 8                       # 超大地图的粗导航格：8×8 小格合成 1 格
+var nav_w := 0
+var nav_h := 0
+var nav_ok := PackedByteArray()
+var field_cache := {}
+var field_budget := 0
+
+func build_nav() -> void:
+	nav_w = (GW + NC - 1) / NC; nav_h = (GH + NC - 1) / NC
+	nav_ok.resize(nav_w * nav_h)
+	for ny in nav_h:
+		for nx in nav_w:
+			var n := 0
+			for dy in NC:
+				for dx in NC:
+					var cx := nx * NC + dx; var cy := ny * NC + dy
+					if in_bounds(cx, cy) and solid[cy * GW + cx] == 0 and top[cy * GW + cx] <= 90: n += 1
+			nav_ok[ny * nav_w + nx] = 1 if n >= 20 else 0
+
+func coarse_field(goal: int) -> PackedInt32Array:
+	if field_cache.has(goal): return field_cache[goal]
+	var f := PackedInt32Array(); f.resize(nav_w * nav_h); f.fill(-1)
+	if goal < 0 or goal >= f.size(): return f
+	var q := PackedInt32Array([goal]); f[goal] = 0
+	var head := 0
+	while head < q.size():
+		var c := q[head]; head += 1
+		var cx := c % nav_w; var cy := c / nav_w
+		for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = cx + dd.x; var ny: int = cy + dd.y
+			if nx < 0 or ny < 0 or nx >= nav_w or ny >= nav_h: continue
+			var ni := ny * nav_w + nx
+			if f[ni] >= 0 or nav_ok[ni] == 0: continue
+			f[ni] = f[c] + 1; q.append(ni)
+	if field_cache.size() > 80: field_cache.clear()
+	field_cache[goal] = f
+	return f
+
+func coarse_dir(p: Mech) -> Vector2:
+	var cx := int(p.x / CELL) / NC; var cy := int(p.y / CELL) / NC
+	var f := p.ai_field
+	if f.size() != nav_w * nav_h or cx < 0 or cy < 0 or cx >= nav_w or cy >= nav_h: return Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).normalized()
+	var here := f[cy * nav_w + cx]
+	if here <= 0: return Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).normalized()
+	var best := Vector2i(-99, -99); var bv := here
+	for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var nx: int = cx + dd.x; var ny: int = cy + dd.y
+		if nx < 0 or ny < 0 or nx >= nav_w or ny >= nav_h: continue
+		var v := f[ny * nav_w + nx]
+		if v >= 0 and v < bv:
+			if dd.x != 0 and dd.y != 0 and (f[cy * nav_w + nx] < 0 or f[ny * nav_w + cx] < 0): continue
+			bv = v; best = Vector2i(nx, ny)
+	if best.x < -50: return Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).normalized()
+	var tgt := Vector2((best.x + 0.5) * NC * CELL, (best.y + 0.5) * NC * CELL)
+	return (tgt - Vector2(p.x, p.y)).normalized()
+
+# ---------------- 物资 / 背包 ----------------
+func item_def(k: String) -> Dictionary: return D.loot.items[k]
+func loot_value(keys: Array) -> int:
+	var v := 0
+	for k in keys: v += int(D.loot.items[k].v) if D.loot.items.has(k) else 0
+	return v
+func inv_keys(inv: Dictionary) -> Array: return inv.items.map(func(it): return it.k)
+func inv_cells(inv: Dictionary) -> int:
+	var n := 0
+	for it in inv.items: n += int(it.w) * int(it.h)
+	return n
+
+func roll_loot(tier: int, high: bool, kinds = null) -> String:
+	var w: Array = D.loot.tiers.get(str(clampi(tier, 1, 6)), D.loot.tiers["1"])
+	var tot := 0.0
+	for x in w: tot += float(x)
+	var x := rng.randf() * tot; var r := 1
+	for i in range(1, w.size()):
+		x -= float(w[i])
+		if x < 0: r = i; break
+	if high and r < 6 and rng.randf() < 0.3: r += 1
+	var pool: Array = D.loot.keys.filter(func(k): return int(D.loot.items[k].r) == r)
+	if kinds != null:
+		var near: Array = kinds.filter(func(k): return D.loot.items.has(k) and absi(int(D.loot.items[k].r) - r) <= 1)
+		if not near.is_empty(): pool = near
+	return pool[rng.randi() % pool.size()]
+
+# 在网格背包里找放得下的位置（可以旋转）
+func inv_place(inv: Dictionary, k: String) -> bool:
+	var it := item_def(k)
+	var occ := {}
+	for e in inv.items:
+		for yy in int(e.h):
+			for xx in int(e.w): occ[Vector2i(int(e.x) + xx, int(e.y) + yy)] = true
+	for rot in [false, true]:
+		var w: int = int(it.h) if rot else int(it.w); var h: int = int(it.w) if rot else int(it.h)
+		for y in range(0, int(inv.h) - h + 1):
+			for x in range(0, int(inv.w) - w + 1):
+				var free := true
+				for yy in h:
+					for xx in w:
+						if occ.has(Vector2i(x + xx, y + yy)): free = false; break
+					if not free: break
+				if free:
+					inv.items.append({"k": k, "x": x, "y": y, "w": w, "h": h}); return true
+	return false
+
+func make_cont(type: String, x: float, y: float, tier: int, hi: bool, keys = null) -> Dictionary:
+	var CT: Dictionary = D.loot.conts.get(type, {"n": [1, 2]})
+	var items: Array = []
+	if keys != null: items = keys
+	else:
+		var n := rng.randi_range(int(CT.n[0]), int(CT.n[1])) + (1 if hi else 0)
+		for i in n: items.append(roll_loot(tier + int(CT.get("bump", 0)), hi, CT.get("kinds")))
+	var c := {"id": next_id, "type": type, "x": x, "y": y, "z": top_at(x, y), "tier": tier, "items": items, "rev": 0}
+	next_id += 1
+	obj.conts.append(c); obj.cont_map[c.id] = c
+	return c
+
+func can_reach(p: Mech, c: Dictionary) -> bool:
+	return Vector2(p.x - c.x, p.y - c.y).length() < float(D.loot.openR) and absf(p.z - c.z) < 60
+
+func search_need(c: Dictionary, p: Mech) -> float:
+	var k: String = c.items[mini(int(c.rev), c.items.size() - 1)]
+	var r := int(D.loot.items[k].r) if D.loot.items.has(k) else 1
+	return float(D.loot.search[r]) * (0.7 if c.type == "body" else 1.0) * (0.85 if p.pilot == "raven" else (0.8 if p.pilot == "hawk" else 1.0))
+
+func ex_open(e: Dictionary) -> bool: return time >= float(e.open) and time < float(e.close)
+
+func init_loot() -> void:
+	loot = true; teams = 6; one_life = true
+	var L: Dictionary = M.loot; var hi := risk == "high"
+	obj.conts = []; obj.cont_map = {}; obj.banked = {}; obj.paid = {}; obj.score = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+	for c in L.get("conts", []): make_cont(str(c[2]), (c[0] + 0.5) * CELL, (c[1] + 0.5) * CELL, int(c[3]), hi)
+	for sp in L.get("spots", []):
+		var ks: Array = []
+		for i in int(sp[3]) * (2 if hi else 1): ks.append(roll_loot(int(sp[2]), hi))
+		make_cont("duffel", (sp[0] + 0.5) * CELL, (sp[1] + 0.5) * CELL, int(sp[2]), hi, ks)
+	var opens: Array = D.loot.opens.duplicate(); opens.shuffle()
+	var ni := 0; var E2: Dictionary = D.loot.ext
+	obj.ex = []
+	for e in L.extract:
+		var type: String = e[2] if E2.has(e[2]) else "normal"
+		var ex := {"x": e[0] * CELL, "y": e[1] * CELL, "type": type, "open": 0.0, "close": 1e9, "told": false}
+		if type == "normal": ex.open = float(opens[ni % opens.size()]); ni += 1
+		if type == "timed": ex.open = float(E2.timed.from); ex.close = float(E2.timed.to)
+		if type == "lever": ex.open = 1e9; ex.close = 0.0
+		obj.ex.append(ex)
+	obj.lever = {"x": (L.lever[0] + 0.5) * CELL, "y": (L.lever[1] + 0.5) * CELL, "on": false} if L.has("lever") and L.lever != null else null
+	time_left = float(D.loot.duration)
+	spawns = [null]
+	for t in range(1, 7): spawns.append(Vector2(L.spawns[(t - 1) % L.spawns.size()][0] * CELL, L.spawns[(t - 1) % L.spawns.size()][1] * CELL))
+
+# 中立守卫（守中间的高级物资）+ 灰石指挥官 Boss 小队（在城区之间巡逻）
+func setup_loot_guards(bot_lv: int) -> void:
+	var L: Dictionary = M.loot; var gt := int(D.loot.guardTeam)
+	var gw := ["bucket", "riot", "blaster", "fist", "roller", "flamer"]
+	var k := 0
+	for g in L.get("guards", []):
+		var hv: bool = str(g[2]) == "hv"
+		var pl: String = D.pilotOrder[rng.randi() % D.pilotOrder.size()]
+		var m := add_player(-500 - k, "灰石重装卫兵" if hv else "守卫机兵", gt, pl, gw[k % gw.size()], true, {"lv": clampi(bot_lv + (2 if hv else 1), 1, 11), "bt": 1})
+		m.npc = true; m.guard = {"x": g[0] * CELL, "y": g[1] * CELL, "hv": hv}
+		if hv: m.max_hp = round(m.max_hp * 1.4)
+		respawn(m)
+		k += 1
+	var route: Array = L.get("bossRoute", []).map(func(q): return Vector2(q[0] * CELL, q[1] * CELL))
+	if route.is_empty(): return
+	var b := add_player(-990, "灰石指挥官 • 铁卫", gt, "han", "wrecker", true, {"lv": clampi(bot_lv + 3, 1, 11), "bt": 2})
+	b.npc = true; b.loot_boss = true; b.guard = {"x": route[0].x, "y": route[0].y, "route": route, "ri": 0}; b.max_hp = round(b.max_hp * 3.2)
+	respawn(b)
+	var ew := ["riot", "charger", "gatling"]
+	for i in 3:
+		var e := add_player(-991 - i, "铁卫护卫", gt, D.pilotOrder[rng.randi() % D.pilotOrder.size()], ew[i], true, {"lv": clampi(bot_lv + 2, 1, 11), "bt": 2})
+		e.npc = true; e.guard = {"x": route[0].x + (i - 1) * 40, "y": route[0].y + 40, "follow": b}; e.max_hp = round(e.max_hp * 1.5)
+		respawn(e)
+
+func guard_anchor(p: Mech) -> Vector2:
+	var G: Dictionary = p.guard
+	if G.has("follow") and G.follow.alive: return Vector2(G.follow.x, G.follow.y)
+	if G.has("route"):
+		var tgt: Vector2 = G.route[int(G.ri) % G.route.size()]
+		if Vector2(p.x, p.y).distance_to(tgt) < 120: G.ri = int(G.ri) + 1
+		return G.route[int(G.ri) % G.route.size()]
+	return Vector2(G.x, G.y)
+
+func update_loot(dt: float) -> void:
+	var LT: Dictionary = D.loot
+	for p in players:
+		if not p.alive or p.out or p.guard != null: continue
+		if p.kit > 0 and p.hp < max_hp_of(p) * 0.3 and not p.foot: p.kit = 0; p.hp = min(max_hp_of(p), p.hp + 60); ev(["heal", p.id, 60])
+		# AI：走到目标容器旁边就打开
+		if p.bot and p.open_c == 0 and p.ai_cont != 0 and obj.cont_map.has(p.ai_cont):
+			var gc: Dictionary = obj.cont_map[p.ai_cont]
+			if can_reach(p, gc):
+				if gc.items.is_empty(): p.ai_done[gc.id] = true; p.ai_cont = 0; p.ai_mode_t = 0
+				else: p.open_c = gc.id; p.srch = 0
+		if p.open_c != 0:
+			var c = obj.cont_map.get(p.open_c)
+			if c == null or not can_reach(p, c): p.open_c = 0
+			elif int(c.rev) < c.items.size():
+				p.srch += dt
+				if p.srch >= search_need(c, p): c.rev = int(c.rev) + 1; p.srch = 0; ev(["srch", p.id, c.id])
+			elif p.bot:
+				p.pick_t -= dt
+				if p.pick_t <= 0:
+					p.pick_t = 0.35
+					if not bot_take(p, c): p.open_c = 0; p.ai_done[c.id] = true; p.ai_cont = 0; p.ai_mode_t = 0
+		# 撤离：站在开放的撤离点里读条，挨打会倒退
+		var in_ex = null
+		for e in obj.ex:
+			if not ex_open(e) or Vector2(p.x - e.x, p.y - e.y).length() >= float(LT.extR): continue
+			if e.type == "weight" and inv_cells(p.inv) > int(LT.ext.weight.max): continue
+			in_ex = e; break
+		if in_ex != null:
+			var hurt_recent: bool = time - p.last_hurt < 1.0
+			p.ex_t = max(0.0, p.ex_t - dt * 1.5) if hurt_recent else p.ex_t + dt
+			if p.ex_t >= float(LT.extTime): extract(p, in_ex)
+		else: p.ex_t = max(0.0, p.ex_t - dt * 2)
+		# 拉闸：电闸附近站 3 秒，拉闸撤离点开放 150 秒
+		if obj.lever != null and not obj.lever.on and Vector2(p.x - obj.lever.x, p.y - obj.lever.y).length() < 50:
+			obj.lever.on = true
+			for e in obj.ex:
+				if e.type == "lever": e.open = time; e.close = time + float(LT.ext.lever.open)
+			ev(["lever", p.id])
+	for e in obj.ex:
+		if not e.told and ex_open(e): e.told = true; ev(["exo", e.x, e.y])
+	var humans_left := 0; var any_human := false; var squads_left := 0
+	for p in players:
+		if p.guard != null: continue
+		if not p.bot: any_human = true; if not p.out: humans_left += 1
+		if not p.out: squads_left += 1
+	if (any_human and humans_left == 0) or squads_left == 0: finish(-1)
+
+func bot_take(p: Mech, c: Dictionary) -> bool:   # AI 拿最值钱的、放得下的
+	var best := -1; var bv := -1
+	for i in int(c.rev):
+		if i >= c.items.size(): break
+		var v := int(D.loot.items[c.items[i]].v)
+		if v > bv and _fits(p.inv, c.items[i]): bv = v; best = i
+	if best < 0: return false
+	var k: String = c.items[best]
+	if inv_place(p.inv, k): c.items.remove_at(best); c.rev = int(c.rev) - 1; return true
+	return false
+
+func _fits(inv: Dictionary, k: String) -> bool:
+	var tmp := {"w": inv.w, "h": inv.h, "items": inv.items.duplicate()}
+	return inv_place(tmp, k)
+
+# 真人操作：拿 / 放进安全箱 / 丢掉
+func loot_take(p: Mech, cid: int, i: int, to_safe := false) -> bool:
+	var c = obj.cont_map.get(cid)
+	if c == null or not can_reach(p, c) or i >= int(c.rev) or i >= c.items.size(): return false
+	if inv_place(p.safe if to_safe else p.inv, c.items[i]):
+		c.items.remove_at(i); c.rev = int(c.rev) - 1; return true
+	return false
+
+func loot_drop(p: Mech, idx: int, from_safe := false) -> void:
+	var inv: Dictionary = p.safe if from_safe else p.inv
+	if idx < 0 or idx >= inv.items.size(): return
+	var k: String = inv.items[idx].k
+	inv.items.remove_at(idx)
+	var c := make_cont("pile", p.x + rng.randf_range(-20, 20), p.y + rng.randf_range(-20, 20), 1, false, [k]); c.rev = 1
+
+func loot_move(p: Mech, idx: int, to_safe: bool) -> bool:   # 背包 ↔ 安全箱
+	var a: Dictionary = p.inv if to_safe else p.safe; var b: Dictionary = p.safe if to_safe else p.inv
+	if idx < 0 or idx >= a.items.size(): return false
+	var k: String = a.items[idx].k
+	if inv_place(b, k): a.items.remove_at(idx); return true
+	return false
+
+func extract(p: Mech, e: Dictionary) -> void:
+	p.extracted = true; p.out = true; p.alive = false; p.ex_t = 0; p.respawn_t = 1e9; p.open_c = 0
+	var keys: Array = inv_keys(p.inv) + inv_keys(p.safe)
+	var v := loot_value(keys)
+	obj.banked[p.id] = keys
+	if e.type == "paid": obj.paid[p.id] = int(D.loot.ext.paid.cost)
+	obj.score[p.team] = int(obj.score[p.team]) + v
+	p.obj += 1
+	ev(["exd", p.id, v])
+
+func loot_drop_body(t: Mech) -> void:
+	var drop: Array = inv_keys(t.inv); t.inv.items = []
+	if t.guard != null:
+		var hi := risk == "high"
+		drop.append(roll_loot(5 if t.guard.get("hv", false) else 4, hi)); drop.append(roll_loot(3, hi))
+		if rng.randf() < (0.5 if t.guard.get("hv", false) else 0.25): drop.append(roll_loot(5, hi))
+		if t.loot_boss: drop += [roll_loot(6, true), roll_loot(6, true), roll_loot(5, true)]
+	if not drop.is_empty(): make_cont("body", t.x, t.y, 0, false, drop)
+
+func skip_goal(p: Mech) -> void:   # 这个目标走不到：换一个
+	if p.ai_cont != 0: p.ai_done[p.ai_cont] = true; p.ai_cont = 0
+	else: p.ai_skip[Vector2i(int(p.ai_goal.x), int(p.ai_goal.y))] = time + 40.0
+	p.ai_mode_t = 0
+
+func loot_goal(p: Mech):
+	if p.guard != null: return guard_anchor(p) + Vector2(rng.randf_range(-60, 60), rng.randf_range(-60, 60))
+	var v := loot_value(inv_keys(p.inv) + inv_keys(p.safe))
+	var want := 3000 + 9000 * (time_left / float(D.loot.duration))
+	var low: bool = p.hp < max_hp_of(p) * 0.35 and v > 1500
+	if v >= want or time_left < 130 or low or inv_cells(p.inv) >= int(p.inv.w) * int(p.inv.h) - 1:
+		var best = null; var bd := 1e9
+		for e in obj.ex:
+			if not ex_open(e) or e.type == "lever": continue
+			if e.type == "weight" and inv_cells(p.inv) > int(D.loot.ext.weight.max): continue
+			if p.ai_skip.get(Vector2i(int(e.x), int(e.y)), 0.0) > time: continue
+			var d := Vector2(e.x - p.x, e.y - p.y).length()
+			if d < bd: bd = d; best = Vector2(e.x, e.y)
+		if best != null: p.ai_urgent = bd < 900; p.ai_cont = 0; return best
+	# 找最近、没搜过、有东西的容器（AI 不坐电梯上楼顶）
+	var bc = null; var bs := -1e9
+	for c in obj.conts:
+		if c.items.is_empty() or p.ai_done.has(c.id) or c.z > 120: continue
+		var d2 := Vector2(c.x - p.x, c.y - p.y).length()
+		if d2 > 1400: continue
+		var s := float(c.tier) * 220.0 - d2 + rng.randf() * 200.0
+		if s > bs: bs = s; bc = c
+	if bc != null: p.ai_cont = bc.id; return Vector2(bc.x, bc.y)
+	return Vector2(rng.randf_range(200, W - 200), rng.randf_range(200, H - 200))
+
+const LW := 64
+func loot_walk(i: int) -> bool: return solid[i] == 0 and top[i] <= 90
+
+func local_field(p: Mech, g: Vector2) -> void:
+	var gx := int(g.x / CELL); var gy := int(g.y / CELL)
+	var px := int(p.x / CELL); var py := int(p.y / CELL)
+	var ox := clampi((gx + px) / 2 - LW / 2, 0, max(0, GW - LW)); var oy := clampi((gy + py) / 2 - LW / 2, 0, max(0, GH - LW))
+	var f := PackedInt32Array(); f.resize(LW * LW); f.fill(-1)
+	p.ai_local_org = Vector2i(ox, oy)
+	var lx := gx - ox; var ly := gy - oy
+	if lx < 0 or ly < 0 or lx >= LW or ly >= LW: p.ai_local = PackedInt32Array(); return
+	# 目标格本身可能是箱子 / 墙：从旁边能站的格子开始
+	var start := -1
+	for r in 3:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var x := lx + dx; var y := ly + dy
+				if start < 0 and x >= 0 and y >= 0 and x < LW and y < LW and loot_walk((oy + y) * GW + ox + x): start = y * LW + x
+	if start < 0: p.ai_local = PackedInt32Array(); return
+	var q := PackedInt32Array([start]); f[start] = 0; var head := 0
+	while head < q.size():
+		var c := q[head]; head += 1
+		var cx := c % LW; var cy := c / LW
+		var ht: int = top[(oy + cy) * GW + ox + cx]
+		for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = cx + dd.x; var ny: int = cy + dd.y
+			if nx < 0 or ny < 0 or nx >= LW or ny >= LW: continue
+			var ni := ny * LW + nx
+			if f[ni] >= 0: continue
+			var gi := (oy + ny) * GW + ox + nx
+			if not loot_walk(gi) or absi(top[gi] - ht) > 24: continue
+			f[ni] = f[c] + 1; q.append(ni)
+	p.ai_local = f
+
+func local_dir(p: Mech) -> Vector2:
+	var cx := int(p.x / CELL) - p.ai_local_org.x; var cy := int(p.y / CELL) - p.ai_local_org.y
+	if cx < 0 or cy < 0 or cx >= LW or cy >= LW: return Vector2.INF
+	var f := p.ai_local
+	var here := f[cy * LW + cx]
+	if here < 0: return Vector2.INF
+	if here == 0: return Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).normalized()
+	var best := Vector2.ZERO; var bv := here
+	for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var nx: int = cx + dd.x; var ny: int = cy + dd.y
+		if nx < 0 or ny < 0 or nx >= LW or ny >= LW: continue
+		var v := f[ny * LW + nx]
+		if v >= 0 and v < bv:
+			if dd.x != 0 and dd.y != 0 and (f[cy * LW + nx] < 0 or f[ny * LW + cx] < 0): continue
+			bv = v; best = Vector2(dd.x, dd.y)
+	if best == Vector2.ZERO: return Vector2.INF
+	# 朝下一格的中心走（不只是方向），转角不容易卡住
+	var tgt := Vector2((p.ai_local_org.x + cx + best.x + 0.5) * CELL, (p.ai_local_org.y + cy + best.y + 0.5) * CELL)
+	return (tgt - Vector2(p.x, p.y)).normalized()

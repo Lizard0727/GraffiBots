@@ -45,6 +45,7 @@ jobs:
           ~/godot/godot --headless --path godot --import || true
           ~/godot/godot --headless --path godot --script res://tests/sim_test.gd
           ~/godot/godot --headless --path godot --script res://tests/profile_test.gd
+          ~/godot/godot --headless --path godot --script res://tests/loot_test.gd
 
       - name: 导出
         run: |

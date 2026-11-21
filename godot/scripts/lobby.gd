@@ -1099,11 +1099,61 @@ func page_tasklines() -> void:
 				var can: bool = done and (not Ld.has("chapter") or i == 0 or st.c[i - 1])
 				row.add_child(claim_btn("领取", func(): show_items(P.claim_task(id, i), str(Ld.name)), can))
 
-func stash_value() -> int:
-	var v := 0
-	for k in P.o.stash:
-		if D.has("loot") and D.loot.items.has(k): v += int(D.loot.items[k].v) * int(P.o.stash[k])
-	return v
+func stash_value() -> int: return P.stash_value()
 
 func page_loot() -> void:
-	at(L("搜刮撤离正在移植中……", 20, Color("#a8a4c8")), Vector2(24, 160))
+	var LT: Dictionary = D.loot
+	var lw := 470.0
+	var left := UIKit.card(Color("#ffcf4d").darkened(0.45), Color("#16122e"), Color("#ffcf4d"), 20); at(left, Vector2(24, 152), Vector2(lw, vs.y - 168))
+	var v := vbox(10); left.add_child(v)
+	v.add_child(L("灰城禁区 • 760×500 超大地图", 20, Color("#ffe14d"), 5))
+	v.add_child(UIKit.wrap(L("6 支 3 人小队搜刮物资、互相争夺；在开放的撤离点里读条 %d 秒成功撤离，背包和安全箱里的东西进仓库。只有一条命，阵亡只保住安全箱。%s 搜索容器，%s 打开背包。" % [int(LT.extTime), Settings.key_name(game.settings.keys.interact), Settings.key_name(game.settings.keys.bag)], 13, Color("#e6e2fa")), lw - 40))
+	var rh := hbox(8); v.add_child(rh)
+	for rk in ["normal", "high"]:
+		var on: bool = str(P.o.risk) == rk
+		var c := UIKit.card(Color("#ff6ad5") if on else Color("#2e2760"), Color("#a63cff") if on else Color("#17132f"), Color("#ffc4ef") if on else Color("#4b4396"), 14, true)
+		c.custom_minimum_size = Vector2(205, 70)
+		var cv := vbox(0); c.add_child(cv); cv.add_child(L(str(LT.risks[rk].name), 18, Color.WHITE, 3)); cv.add_child(UIKit.wrap(L(str(LT.risks[rk].desc), 11, Color("#e6e2fa")), 185))
+		click(c, func(): P.o.risk = rk; P.save(); refresh()); rh.add_child(c)
+	if str(P.o.risk) == "high":
+		v.add_child(L("带进场的装备（阵亡会丢）", 16, Color("#ffe14d")))
+		var gg := GridContainer.new(); gg.columns = 2; gg.add_theme_constant_override("h_separation", 8); gg.add_theme_constant_override("v_separation", 6); v.add_child(gg)
+		for gk in LT.gear:
+			var G2: Dictionary = LT.gear[gk]; var n := int(P.o.gear.get(gk, 0)); var on2: bool = P.o.gearOn.has(gk)
+			var c2 := UIKit.dark_card(true); c2.selected = on2; c2.custom_minimum_size = Vector2(205, 0)
+			var cv2 := vbox(0); c2.add_child(cv2); cv2.add_child(L("%s x%d%s" % [G2.name, n, "（带上）" if on2 else ""], 15, Color.WHITE)); cv2.add_child(UIKit.wrap(L(str(G2.desc), 11, Color("#a8a4c8")), 185))
+			var bh := hbox(6); cv2.add_child(bh); bh.add_child(UIKit.icon("coins", 18)); bh.add_child(L("%d 买一件 • 右边点卡片带上 / 取下" % int(G2.price), 11, Color("#ffd23f")))
+			click(c2, func(): act(P.toggle_gear(gk) if n > 0 else P.buy_gear(gk), ("切换了 " if n > 0 else "买了 ") + str(G2.name)))
+			gg.add_child(c2)
+	var lvs := int(P.o.safeLv); var sd: Array = LT.safe[lvs]
+	var sh := hbox(10); v.add_child(sh)
+	sh.add_child(L("安全箱 %dx%d" % [int(sd[0]), int(sd[1])], 16, Color("#7af0ff")))
+	if lvs < 3: sh.add_child(claim_btn("升级（%d 金币）" % int(LT.safeCost[lvs + 1]), func(): act(P.safe_up(), "安全箱升级了"), true))
+	var R2: Dictionary = P.o.lootRec
+	v.add_child(L("战绩：%d 次行动 • 撤离 %d 次 • 最高 %d • 累计 %d" % [int(R2.runs), int(R2.ex), int(R2.best), int(R2.total)], 13, Color("#c9c5e6")))
+	var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL; sp.mouse_filter = Control.MOUSE_FILTER_IGNORE; v.add_child(sp)
+	var go := UIKit.gold_button("进入禁区", 30); go.custom_minimum_size = Vector2(0, 70); v.add_child(go)
+	click(go, func(): game.sfx.play("go"); game.start_loot(str(P.o.risk)))
+	# 仓库
+	var rx := 24 + lw + 16; var rw := vs.x - rx - 24
+	var top := hbox(10); at(top, Vector2(rx, 152))
+	top.add_child(L("仓库 • 总价值 %d" % P.stash_value(), 20, Color("#ffe14d"), 4))
+	top.add_child(claim_btn("一键卖出（稀有及以下）", func(): show_items(P.sell_all(), "卖出物资"), not P.o.stash.is_empty()))
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; at(sc, Vector2(rx, 200), Vector2(rw, vs.y - 216))
+	var lst := vbox(6); sc.add_child(lst)
+	if P.o.stash.is_empty(): lst.add_child(L("仓库是空的。去禁区里搜点好东西带出来吧！", 15, Color("#a8a4c8")))
+	var keys: Array = P.o.stash.keys()
+	keys.sort_custom(func(x, y): return int(LT.items[x].v) > int(LT.items[y].v))
+	for k in keys:
+		var it: Dictionary = LT.items[k]; var rc := Color(str(LT.rare[int(it.r)].c))
+		var c3 := UIKit.card(rc.darkened(0.6), Color("#120f26"), rc.darkened(0.2), 12); c3.custom_minimum_size = Vector2(rw - 20, 0)
+		var h3 := hbox(10); c3.add_child(h3)
+		var nl := L("%s x%d" % [it.name, int(P.o.stash[k])], 16, rc, 3); nl.custom_minimum_size.x = 220; h3.add_child(nl)
+		h3.add_child(L("%s • %dx%d • 价值 %d" % [LT.rare[int(it.r)].name, int(it.w), int(it.h), int(it.v)], 13, Color("#c9c5e6")))
+		var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; spc.mouse_filter = Control.MOUSE_FILTER_IGNORE; h3.add_child(spc)
+		if it.has("ex"):
+			var exs := ""
+			for ck in it.ex: exs += "%s %d " % [P.cur_name(ck), int(it.ex[ck])]
+			h3.add_child(claim_btn("兑换 " + exs, func(): show_items(P.ex_loot(k), "兑换"), true))
+		h3.add_child(claim_btn("卖 %d" % (int(it.v) / 10), func(): act(P.sell_loot(k), "卖出了"), true))
+		lst.add_child(c3)

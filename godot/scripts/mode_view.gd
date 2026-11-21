@@ -16,6 +16,27 @@ func setup(s: Sim, team_cols: Array) -> void:
 	nodes.clear(); pools.clear()
 	var MC: Dictionary = sim.MC
 	match sim.mode:
+		"loot":
+			var exs: Array = []
+			for e in sim.obj.ex:
+				var n := Node3D.new(); add_child(n); n.position = Vector3(e.x * K, sim.top_at(e.x, e.y) * K + 0.05, e.y * K)
+				var r := float(sim.D.loot.extR) * K
+				var ring := MeshInstance3D.new(); ring.mesh = Models.mesh("torus", 0.94, 1.0); ring.scale = Vector3(r, 10, r); n.add_child(ring)
+				var pil := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 1.0; cm.bottom_radius = 1.0; cm.height = 1.0; cm.cap_top = false; cm.cap_bottom = false; pil.mesh = cm
+				pil.scale = Vector3(r, 16, r); pil.position.y = 8; pil.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; n.add_child(pil)
+				exs.append([n, ring, pil, e])
+			nodes.ex = exs
+			if sim.obj.lever != null:
+				var lv := Node3D.new(); add_child(lv); lv.position = Vector3(sim.obj.lever.x * K, sim.top_at(sim.obj.lever.x, sim.obj.lever.y) * K, sim.obj.lever.y * K)
+				Models.part(lv, Models.mesh("box", 0.8, 1.6, 0.5), Models.toon(Color("#ffb000"), 0.4), Vector3(0, 0.8, 0))
+				Models.part(lv, Models.mesh("cyl", 0.08, 1.0), Models.glow(Color("#ff3b52"), 2.0), Vector3(0.3, 1.9, 0), Vector3(0, 0, 30))
+				nodes.lever = lv
+			var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
+			var bx := BoxMesh.new(); bx.size = Vector3(1.3, 1.0, 1.3)
+			var bm := StandardMaterial3D.new(); bm.vertex_color_use_as_albedo = true; bm.roughness = 0.7; bx.material = bm
+			mm.mesh = bx; mm.instance_count = 2000; mm.visible_instance_count = 0
+			var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; add_child(mmi); nodes.conts = mm
+			nodes.cont_t = 0.0
 		"zone":
 			var Z: Dictionary = MC.ZONE
 			var w := float(Z.x1 - Z.x0); var h := float(Z.y1 - Z.y0)
@@ -126,6 +147,26 @@ func sync(delta: float, me_team: int) -> void:
 	t += delta
 	var o: Dictionary = sim.obj
 	match sim.mode:
+		"loot":
+			for x in nodes.ex:
+				var open: bool = sim.ex_open(x[3])
+				var c := Color("#6dff8a") if open else Color("#8a86a8")
+				x[1].material_override = Models.glow(c, 2.2 if open else 1.0, 0.9)
+				x[2].material_override = Models.glow(c, 1.4, (0.16 + 0.05 * sin(t * 3)) if open else 0.05)
+			nodes.cont_t -= delta
+			if nodes.cont_t <= 0:
+				nodes.cont_t = 0.5
+				var mm: MultiMesh = nodes.conts; var i := 0
+				var cols := {"crate": Color("#6a8a4a"), "locker": Color("#7a8aa8"), "safe": Color("#3a3d48"), "pc": Color("#4fb8ff"), "med": Color("#f4f0ea"), "fridge": Color("#c9e6f0"),
+					"server": Color("#2a3a5a"), "tools": Color("#ff8a1f"), "weapon": Color("#4a4d56"), "duffel": Color("#8a5a3a"), "vault": Color("#ffc531"), "body": Color("#ff3b52"), "pile": Color("#b78cff")}
+				for c in o.conts:
+					if c.items.is_empty() or i >= mm.instance_count: continue
+					var sz := 1.4 if c.type in ["vault", "safe", "server"] else (0.7 if c.type in ["pile", "body"] else 1.0)
+					mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(sz, sz, sz)), Vector3(c.x * K, c.z * K + 0.5 * sz, c.y * K)))
+					var col: Color = cols.get(c.type, Color.GRAY)
+					if int(c.rev) >= c.items.size(): col = col.lightened(0.35)   # 搜过了：亮一点
+					mm.set_instance_color(i, col); i += 1
+				mm.visible_instance_count = i
 		"zone":
 			var own: int = o.owner
 			var c: Color = cols[own] if own > 0 else Color.WHITE

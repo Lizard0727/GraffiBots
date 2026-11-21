@@ -4,6 +4,7 @@ extends Node3D
 
 const K := 1.0 / 16.0          # 原版 1 格 = 16 像素 → Godot 1 个单位
 const TICK := 1.0 / 30.0
+const LOOT_MAP := 99         # 搜刮撤离的超大地图（不在普通地图列表里）
 const BOT_NAMES := ["Pixel", "Juno", "Tofu", "Ash", "Mochi", "Rex", "Kiwi", "Nova", "Bolt", "Yuki"]
 # 每张地图的氛围：天空顶 / 地平线 / 霓虹 A / 霓虹 B / 地面
 const PALETTES := [
@@ -70,6 +71,10 @@ var showroom_key := ""
 var showroom_cam := 0.0
 var autoplay := false
 var ranked_on := false
+var loot_risk := "normal"
+var bag_open := false
+var loot_ui: Control
+var loot_ui_t := 0.0
 var ranked_bans := {}
 var shot_t := 0.0
 
@@ -195,65 +200,121 @@ func palette(i: int) -> Array:
 	return p.map(func(c): return Color(c))
 
 # ---------------- 地图 ----------------
-func base_color(m: Dictionary, i: int, pal: Array) -> Color:
-	var gw := int(m.gw)
+# 地图数据统一解成数组（普通地图是字符串，超大地图是压缩过的 base64）
+var map_top := PackedInt32Array()
+var map_solid := PackedByteArray()
+var map_bush := PackedByteArray()
+
+func map_def(idx: int) -> Dictionary:
+	return data.lootMap if idx == LOOT_MAP else data.maps[idx]
+
+func decode_map(m: Dictionary) -> void:
+	var n := int(m.gw) * int(m.gh)
+	map_solid.resize(n); map_bush.resize(n)
+	if m.has("topB64"):
+		map_top = PackedInt32Array(Array(Marshalls.base64_to_raw(m.topB64)))
+		var sb := Marshalls.base64_to_raw(m.solidBits); var bb := Marshalls.base64_to_raw(m.bushBits)
+		for i in n:
+			map_solid[i] = (sb[i >> 3] >> (i & 7)) & 1; map_bush[i] = (bb[i >> 3] >> (i & 7)) & 1
+	else:
+		map_top = PackedInt32Array(m.top)
+		var ss: String = m.solid; var bs: String = m.bush
+		for i in n:
+			map_solid[i] = 1 if ss.unicode_at(i) == 49 else 0; map_bush[i] = 1 if bs.unicode_at(i) == 49 else 0
+
+func base_color(gw: int, i: int, pal: Array) -> Color:
 	var cx := i % gw; var cy := i / gw
-	var t := float(m.top[i])
-	if m.solid.unicode_at(i) == 49: return Color(pal[4]).lightened(0.22)
-	if m.bush.unicode_at(i) == 49: return Color("#1f4a32")
+	var t := float(map_top[i])
+	if map_solid[i] == 1: return Color(pal[4]).lightened(0.22)
+	if map_bush[i] == 1: return Color("#1f4a32")
 	var c: Color = pal[4]
-	if t >= 1: c = c.lightened(0.1 if t < 60 else 0.2)
+	if t >= 1: c = c.lightened(0.1 if t < 60 else (0.2 if t < 160 else 0.28))
 	if (cx / 4 + cy / 4) % 2 == 0: c = c.lightened(0.03)
 	return c
 
 func build_map(idx: int) -> void:
+	var t_build := Time.get_ticks_msec()
 	cur_map = idx
 	if map_root != null: map_root.queue_free()
 	map_root = Node3D.new(); add_child(map_root)
-	var m: Dictionary = data.maps[idx]
-	var pal := palette(idx)
+	var m: Dictionary = map_def(idx)
+	decode_map(m)
+	var pal := palette(idx if idx != LOOT_MAP else 7)
 	var sm: ProceduralSkyMaterial = env.sky.sky_material
 	sm.sky_top_color = pal[0]; sm.sky_horizon_color = Color(pal[1]).darkened(0.35); sm.ground_horizon_color = Color(pal[0]).lightened(0.05); sm.ground_bottom_color = Color(pal[0]).darkened(0.5)
 	sm.sky_curve = 0.25
 	env.fog_light_color = Color(pal[1]).darkened(0.55)
 	var gw := int(m.gw); var gh := int(m.gh)
-	paint_img = Image.create(gw, gh, false, Image.FORMAT_RGBA8)
-	mini_img = Image.create(gw, gh, false, Image.FORMAT_RGBA8)
-	var base_img := Image.create(gw, gh, false, Image.FORMAT_RGBA8)
+	# 底色 / 小地图：直接写字节，比一格一格 set_pixel 快很多（超大地图有 38 万格）
 	base_cols.resize(gw * gh)
+	var bytes := PackedByteArray(); bytes.resize(gw * gh * 4)
 	for i in gw * gh:
-		base_cols[i] = base_color(m, i, pal)
-		base_img.set_pixel(i % gw, i / gw, base_cols[i]); mini_img.set_pixel(i % gw, i / gw, base_cols[i]); paint_img.set_pixel(i % gw, i / gw, Color(0, 0, 0, 0))
+		var c := base_color(gw, i, pal); base_cols[i] = c
+		bytes[i * 4] = c.r8; bytes[i * 4 + 1] = c.g8; bytes[i * 4 + 2] = c.b8; bytes[i * 4 + 3] = 255
+	var base_img := Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, bytes)
+	mini_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, bytes)
+	var zero := PackedByteArray(); zero.resize(gw * gh * 4)
+	paint_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, zero)
 	paint_tex = ImageTexture.create_from_image(paint_img); base_tex = ImageTexture.create_from_image(base_img); mini_tex = ImageTexture.create_from_image(mini_img)
-	# 地形网格：顶面用涂料着色器，侧面按高度上色
+	# 地形网格：同一行连续同高的格子合成一块（顶面）；侧面也按行 / 列合并
 	var st_top := SurfaceTool.new(); st_top.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var st_side := SurfaceTool.new(); st_side.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var topf := func(cx: int, cy: int) -> float:
+	var T := map_top
+	var hgt := func(cx: int, cy: int) -> float:
 		if cx < 0 or cy < 0 or cx >= gw or cy >= gh: return -0.5
-		return float(m.top[cy * gw + cx]) * K
-	var neon: Array = []   # 高台边缘的霓虹灯条：[位置, 朝向, 颜色]
+		return float(T[cy * gw + cx]) * K
+	var neon: Array = []
+	var quad := func(st: SurfaceTool, v: Array, n: Vector3, cols: Array) -> void:
+		for k in [0, 1, 2, 0, 2, 3]:
+			st.set_normal(n)
+			if cols.size() > 0: st.set_color(cols[k])
+			st.set_uv(Vector2(v[k].x / gw, v[k].z / gh)); st.add_vertex(v[k])
+	var side_col := func(h: float) -> Color:
+		return Color(pal[4]).darkened(0.35) if h < 2 else (Color(pal[4]).lightened(0.05) if h < 6 else Color(pal[4]).lightened(0.12))
 	for cy in gh:
+		var x0 := 0
+		while x0 < gw:
+			var h0: float = T[cy * gw + x0]
+			var x1 := x0 + 1
+			while x1 < gw and T[cy * gw + x1] == h0: x1 += 1
+			var hh: float = h0 * K
+			quad.call(st_top, [Vector3(x0, hh, cy), Vector3(x1, hh, cy), Vector3(x1, hh, cy + 1), Vector3(x0, hh, cy + 1)], Vector3.UP, [])
+			x0 = x1
+	# 侧面：沿 y 方向的边（上 / 下）按行合并，沿 x 方向的边（左 / 右）按列合并
+	for dir in [Vector2i(0, 1), Vector2i(0, -1)]:
+		for cy in gh:
+			var cx := 0
+			while cx < gw:
+				var h: float = hgt.call(cx, cy); var nh: float = hgt.call(cx, cy + dir.y)
+				if nh >= h - 0.01: cx += 1; continue
+				var e := cx + 1
+				while e < gw and is_equal_approx(hgt.call(e, cy), h) and is_equal_approx(hgt.call(e, cy + dir.y), nh): e += 1
+				var zz: float = cy + (1 if dir.y == 1 else 0)
+				var sc: Color = side_col.call(h); var lo := sc.darkened(0.45)
+				var v := [Vector3(cx, nh, zz), Vector3(e, nh, zz), Vector3(e, h, zz), Vector3(cx, h, zz)] if dir.y == -1 else [Vector3(e, nh, zz), Vector3(cx, nh, zz), Vector3(cx, h, zz), Vector3(e, h, zz)]
+				quad.call(st_side, v, Vector3(0, 0, dir.y), [lo, lo, sc, sc])
+				if h - nh >= 1.8 and nh > -0.4 and neon.size() < 6000:
+					var seg := cx
+					while seg < e:
+						neon.append([Vector3(seg + 0.5, h, zz + dir.y * 0.02), dir, pal[2] if (seg / 6 + cy / 6) % 2 == 0 else pal[3]]); seg += 1
+				cx = e
+	for dir in [Vector2i(1, 0), Vector2i(-1, 0)]:
 		for cx in gw:
-			var h: float = topf.call(cx, cy)
-			var u0 := float(cx) / gw; var u1 := float(cx + 1) / gw; var v0 := float(cy) / gh; var v1 := float(cy + 1) / gh
-			st_top.set_normal(Vector3.UP)
-			for q in [[cx, cy, u0, v0], [cx + 1, cy, u1, v0], [cx + 1, cy + 1, u1, v1], [cx, cy, u0, v0], [cx + 1, cy + 1, u1, v1], [cx, cy + 1, u0, v1]]:
-				st_top.set_uv(Vector2(q[2], q[3])); st_top.add_vertex(Vector3(q[0], h, q[1]))
-			var side_c: Color = Color(pal[4]).darkened(0.35) if h < 2 else (Color(pal[4]).lightened(0.05) if h < 6 else Color(pal[4]).lightened(0.12))
-			for nb in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				var nh: float = topf.call(cx + nb.x, cy + nb.y)
-				if nh >= h - 0.01: continue
-				var a: Vector3; var b: Vector3
-				if nb.x == 1: a = Vector3(cx + 1, 0, cy); b = Vector3(cx + 1, 0, cy + 1)
-				elif nb.x == -1: a = Vector3(cx, 0, cy + 1); b = Vector3(cx, 0, cy)
-				elif nb.y == 1: a = Vector3(cx + 1, 0, cy + 1); b = Vector3(cx, 0, cy + 1)
-				else: a = Vector3(cx, 0, cy); b = Vector3(cx + 1, 0, cy)
-				var n := Vector3(nb.x, 0, nb.y)
-				var lo := side_c.darkened(0.45)
-				for vv in [[a, nh, lo], [b, nh, lo], [b, h, side_c], [a, nh, lo], [b, h, side_c], [a, h, side_c]]:
-					st_side.set_normal(n); st_side.set_color(vv[2]); st_side.add_vertex(Vector3(vv[0].x, vv[1], vv[0].z))
-				if h - nh >= 1.8 and nh > -0.4:
-					neon.append([(a + b) * 0.5 + Vector3(0, h, 0) + n * 0.02, nb, pal[2] if (cx / 6 + cy / 6) % 2 == 0 else pal[3]])
+			var cy := 0
+			while cy < gh:
+				var h: float = hgt.call(cx, cy); var nh: float = hgt.call(cx + dir.x, cy)
+				if nh >= h - 0.01: cy += 1; continue
+				var e := cy + 1
+				while e < gh and is_equal_approx(hgt.call(cx, e), h) and is_equal_approx(hgt.call(cx + dir.x, e), nh): e += 1
+				var xx: float = cx + (1 if dir.x == 1 else 0)
+				var sc: Color = side_col.call(h); var lo := sc.darkened(0.45)
+				var v := [Vector3(xx, nh, e), Vector3(xx, nh, cy), Vector3(xx, h, cy), Vector3(xx, h, e)] if dir.x == -1 else [Vector3(xx, nh, cy), Vector3(xx, nh, e), Vector3(xx, h, e), Vector3(xx, h, cy)]
+				quad.call(st_side, v, Vector3(dir.x, 0, 0), [lo, lo, sc, sc])
+				if h - nh >= 1.8 and nh > -0.4 and neon.size() < 6000:
+					var seg := cy
+					while seg < e:
+						neon.append([Vector3(xx + dir.x * 0.02, h, seg + 0.5), dir, pal[2] if (cx / 6 + seg / 6) % 2 == 0 else pal[3]]); seg += 1
+				cy = e
 	var mesh := ArrayMesh.new()
 	st_top.commit(mesh); st_side.commit(mesh)
 	turf_mat = ShaderMaterial.new(); turf_mat.shader = load("res://shaders/turf.gdshader")
@@ -262,7 +323,6 @@ func build_map(idx: int) -> void:
 	var side_mat := StandardMaterial3D.new(); side_mat.vertex_color_use_as_albedo = true; side_mat.cull_mode = BaseMaterial3D.CULL_DISABLED; side_mat.roughness = 0.9
 	mesh.surface_set_material(0, turf_mat); mesh.surface_set_material(1, side_mat)
 	var mi := MeshInstance3D.new(); mi.mesh = mesh; map_root.add_child(mi)
-	# 霓虹灯条
 	if neon.size() > 0:
 		var nm := MultiMesh.new(); nm.transform_format = MultiMesh.TRANSFORM_3D; nm.use_colors = true
 		var bx := BoxMesh.new(); bx.size = Vector3(1.0, 0.1, 0.1)
@@ -273,10 +333,10 @@ func build_map(idx: int) -> void:
 			var rot := Basis(Vector3.UP, PI / 2) if e[1].x != 0 else Basis()
 			nm.set_instance_transform(k, Transform3D(rot, e[0])); nm.set_instance_color(k, e[2])
 		var nmi := MultiMeshInstance3D.new(); nmi.multimesh = nm; nmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; map_root.add_child(nmi)
-	# 草丛（卡通着色的圆球）
 	var bush_cells: Array = []
+	var step_b := 2 if gw * gh < 50000 else 3
 	for i in gw * gh:
-		if m.bush.unicode_at(i) == 49 and (i % gw + i / gw) % 2 == 0: bush_cells.append(i)
+		if map_bush[i] == 1 and (i % gw + i / gw) % step_b == 0: bush_cells.append(i)
 	if bush_cells.size() > 0:
 		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D
 		var sph := SphereMesh.new(); sph.radius = 0.8; sph.height = 1.3; sph.radial_segments = 10; sph.rings = 6; sph.material = Models.toon(Color("#3fbf5f"), 0.05, 0.3)
@@ -284,18 +344,24 @@ func build_map(idx: int) -> void:
 		var rn := RandomNumberGenerator.new(); rn.seed = 7 + idx
 		for k in bush_cells.size():
 			var i: int = bush_cells[k]; var s := rn.randf_range(0.9, 1.35)
-			mm.set_instance_transform(k, Transform3D(Basis(Vector3.UP, rn.randf() * TAU).scaled(Vector3(s, s * 0.85, s)), Vector3(i % gw + 0.5, 0.5, i / gw + 0.5)))
+			mm.set_instance_transform(k, Transform3D(Basis(Vector3.UP, rn.randf() * TAU).scaled(Vector3(s, s * 0.85, s)), Vector3(i % gw + 0.5, float(T[i]) * K + 0.5, i / gw + 0.5)))
 		var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; map_root.add_child(mmi)
+	if OS.get_environment("GB_SHOT") != "": print("地图 %s 建好了：%d ms" % [m.name, Time.get_ticks_msec() - t_build])
+	# 电梯（超大地图）
+	for k in m.get("lifts", {}):
+		var i := int(k)
+		var lm := MeshInstance3D.new(); var lb := BoxMesh.new(); lb.size = Vector3(0.95, 0.15, 0.95); lb.material = Models.glow(Color("#7af0ff"), 1.8); lm.mesh = lb
+		lm.position = Vector3(i % gw + 0.5, float(T[i]) * K + 0.08, i / gw + 0.5); map_root.add_child(lm)
 	# 弹跳板
 	for k in m.pads:
 		var i := int(k)
 		var pmi := MeshInstance3D.new(); var cyl := CylinderMesh.new(); cyl.top_radius = 0.48; cyl.bottom_radius = 0.5; cyl.height = 0.12; cyl.material = Models.glow(Color("#ffd23f"), 1.8); pmi.mesh = cyl
-		pmi.position = Vector3(i % gw + 0.5, float(m.top[i]) * K + 0.06, i / gw + 0.5); map_root.add_child(pmi)
+		pmi.position = Vector3(i % gw + 0.5, float(map_top[i]) * K + 0.06, i / gw + 0.5); map_root.add_child(pmi)
 	# 场地外：围栏 + 远处的城市剪影
 	var fence_mat := Models.glow(pal[2], 2.0)
 	for e in [[Vector3(gw / 2.0, 0.6, -0.4), Vector3(gw + 1, 0.15, 0.15)], [Vector3(gw / 2.0, 0.6, gh + 0.4), Vector3(gw + 1, 0.15, 0.15)], [Vector3(-0.4, 0.6, gh / 2.0), Vector3(0.15, 0.15, gh + 1)], [Vector3(gw + 0.4, 0.6, gh / 2.0), Vector3(0.15, 0.15, gh + 1)]]:
 		var b := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = e[1]; bm.material = fence_mat; b.mesh = bm; b.position = e[0]; map_root.add_child(b)
-	var floor_mi := MeshInstance3D.new(); var pm2 := PlaneMesh.new(); pm2.size = Vector2(600, 600)
+	var floor_mi := MeshInstance3D.new(); var pm2 := PlaneMesh.new(); pm2.size = Vector2(max(600, gw * 3), max(600, gh * 3))
 	var fm := StandardMaterial3D.new(); fm.albedo_color = Color(pal[0]).darkened(0.3); fm.roughness = 0.6; fm.metallic_specular = 0.6; pm2.material = fm
 	floor_mi.mesh = pm2; floor_mi.position = Vector3(gw / 2.0, -0.6, gh / 2.0); map_root.add_child(floor_mi)
 	var win_img := Image.create(8, 16, false, Image.FORMAT_RGBA8)
@@ -306,7 +372,7 @@ func build_map(idx: int) -> void:
 	var bmat := StandardMaterial3D.new(); bmat.albedo_color = Color(pal[0]).lightened(0.05); bmat.emission_enabled = true; bmat.emission_texture = win_tex; bmat.emission_energy_multiplier = 1.4
 	bmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST; bmat.uv1_scale = Vector3(3, 2, 1)
 	for k in 46:
-		var a := k / 46.0 * TAU + rn2.randf() * 0.1; var rr := rn2.randf_range(95, 140)
+		var a := k / 46.0 * TAU + rn2.randf() * 0.1; var rr: float = rn2.randf_range(95, 140) * max(1.0, gw / 120.0)
 		var bh := rn2.randf_range(14, 48); var bw := rn2.randf_range(8, 18)
 		var b := MeshInstance3D.new(); var bm2 := BoxMesh.new(); bm2.size = Vector3(bw, bh, bw); bm2.material = bmat; b.mesh = bm2
 		b.position = Vector3(gw / 2.0 + cos(a) * rr, bh / 2.0 - 1, gh / 2.0 + sin(a) * rr * 0.8); b.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -337,6 +403,11 @@ func show_result() -> void:
 	var md := sim.mode
 	if md in ["escape4", "escape8"]: s.text = "第 1 名！" if win == me.team else "我方出局了"
 	elif md == "raid": s.text = "讨伐成功！百目被打倒了" if win == 1 else "时间到了，百目还活着"
+	elif md == "loot":
+		t.text = "撤离成功！" if me.extracted else "撤离失败"
+		t.add_theme_color_override("font_color", Color("#ffe14d") if me.extracted else Color("#c9c5e6"))
+		var kv := sim.loot_value(sim.obj.banked.get(me.id, []) if me.extracted else sim.inv_keys(me.safe))
+		s.text = ("带出物资价值 %d" % kv) if me.extracted else ("只保住了安全箱里的物资（价值 %d）" % kv)
 	elif md == "elim": s.text = "局数  %d : %d" % [sim.obj.wins[1], sim.obj.wins[2]]
 	elif md == "zone": s.text = "剩余倒计时  我方 %d   对方 %d" % [int(sim.obj.count[1]), int(sim.obj.count[2])]
 	elif md != "turf": s.text = "比分  %d : %d" % [sim.obj.score[1], sim.obj.score[2]]
@@ -367,7 +438,7 @@ func show_result() -> void:
 			var l := Label.new(); l.text = v; l.add_theme_font_size_override("font_size", 15); l.add_theme_color_override("font_color", Color.WHITE if p == me else c); grid.add_child(l)
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); box.add_child(hb)
 	var again := Button.new(); again.text = "再来一局"; again.custom_minimum_size = Vector2(220, 60)
-	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech) if autoplay else (lobby.ranked_start() if sim.ranked else start_from_lobby())); hb.add_child(again)
+	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech) if autoplay else (lobby.ranked_start() if sim.ranked else (start_loot(loot_risk) if sim.loot else start_from_lobby()))); hb.add_child(again)
 	var back := Button.new(); back.text = "返回菜单"; back.custom_minimum_size = Vector2(220, 60)
 	back.pressed.connect(func(): result_ui.visible = false; back_to_lobby()); hb.add_child(back)
 	result_ui.visible = true
@@ -376,14 +447,15 @@ func show_result() -> void:
 # ---------------- 开局 ----------------
 func start_match(pilot: String, mech: String) -> void:
 	sel_pilot = pilot; sel_mech = mech
-	var midx: int = sel_map
+	var is_loot := sel_mode == "loot"
+	var midx: int = LOOT_MAP if is_loot else sel_map
 	if midx < 0:   # 随机地图：逃亡圈默认「废墟逃亡区」，乐园模式默认「欢乐乐园」
 		midx = randi() % data.maps.size()
 		for i in data.maps.size():
 			if (sel_mode.begins_with("escape") and data.maps[i].name == "废墟逃亡区") or (sel_mode == "park" and data.maps[i].park): midx = i
 	if midx != cur_map: build_map(midx)
 	var dur := float(OS.get_environment("GB_DURATION")) if OS.get_environment("GB_DURATION") != "" else 180.0
-	sim = Sim.new(data, midx, 0, dur, sel_mode)
+	sim = Sim.new(data, max(0, midx) if not is_loot else 0, 0, dur, sel_mode, {"risk": loot_risk})
 	sim.ranked = ranked_on
 	var lay := sim.team_layout()
 	var pw: Dictionary = {"lv": 7, "bt": 1} if autoplay else profile.power(pilot)
@@ -397,12 +469,27 @@ func start_match(pilot: String, mech: String) -> void:
 		pool_p.erase(ranked_bans.get("pilot", "")); pool_m.erase(ranked_bans.get("mech", ""))
 	var names := BOT_NAMES.duplicate(); names.shuffle()
 	for i in range(1, lay.size()):
-		sim.add_player(i + 1, names[i - 1], lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
+		sim.add_player(i + 1, names[(i - 1) % names.size()] + ("" if i <= names.size() else str(i)), lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
 	spectate_id = 0
+	if is_loot:   # 带进场的装备、安全箱大小；守卫和 Boss 小队
+		var sd: Array = data.loot.safe[clampi(int(profile.o.safeLv), 1, 3)] if not autoplay else [2, 2]
+		me.safe = {"w": int(sd[0]), "h": int(sd[1]), "items": []}
+		if loot_risk == "high" and not autoplay:
+			for gk in profile.o.gearOn:
+				if gk == "armor": me.max_hp = round(me.max_hp * 1.25); me.hp = me.max_hp
+				elif gk in ["pack", "bigpack"]: var bd: Array = data.loot.bags[gk]; me.inv = {"w": int(bd[0]), "h": int(bd[1]), "items": []}
+				elif gk == "kit": me.kit = 1
+		for q in sim.players:
+			if q.bot and loot_risk == "high" and randf() < 0.6: var bd2: Array = data.loot.bags.pack; q.inv = {"w": int(bd2[0]), "h": int(bd2[1]), "items": []}
+		sim.setup_loot_guards(blv)
+		for q in sim.players:
+			if not mech_nodes.has(q.id): pass
+		bag_open = false
 	for id in mech_nodes: mech_nodes[id].root.queue_free()
 	mech_nodes.clear()
 	for id in helper_nodes: helper_nodes[id].queue_free()
 	helper_nodes.clear()
+	if is_loot: pass
 	for p in sim.players: mech_nodes[p.id] = make_mech_node(p)
 	for i in base_cols.size():
 		paint_img.set_pixel(i % sim.GW, i / sim.GW, Color(0, 0, 0, 0)); mini_img.set_pixel(i % sim.GW, i / sim.GW, base_cols[i])
@@ -475,7 +562,7 @@ func _process(delta: float) -> void:
 			turf = [a, b, tot]
 	else:
 		var t := Time.get_ticks_msec() / 1000.0
-		var c := Vector3(float(data.maps[cur_map].gw) / 2.0, 0, float(data.maps[cur_map].gh) / 2.0)
+		var c := Vector3(float(map_def(cur_map).gw) / 2.0, 0, float(map_def(cur_map).gh) / 2.0)
 		if showroom.visible:
 			var turn := showroom.get_node_or_null("turn")
 			if turn != null: turn.rotation.y = t * 0.35
@@ -488,6 +575,7 @@ func _process(delta: float) -> void:
 			cam.look_at(c)
 		if sim != null: update_visuals(1.0, real_dt)
 	update_fx(real_dt)
+	update_loot_ui(real_dt)
 	hud.queue_redraw()
 	if OS.get_environment("GB_SHOT") != "" and (OS.get_environment("GB_SHOT_MENU") != "" or (sim != null and state != "menu")):
 		shot_t += real_dt
@@ -551,7 +639,7 @@ func update_visuals(alpha: float, delta: float) -> void:
 	# 子弹
 	var counts := [0, 0, 0]
 	for pr in sim.projs:
-		var t: int = pr.team
+		var t: int = 1 if pr.team == me.team else 2
 		var mm: MultiMesh = proj_mm[t]
 		if counts[t] >= mm.instance_count: continue
 		var v := Vector3(pr.vx, pr.vz, pr.vy).normalized()
@@ -562,7 +650,7 @@ func update_visuals(alpha: float, delta: float) -> void:
 	for t in [1, 2]: proj_mm[t].visible_instance_count = counts[t]
 	var sc := [0, 0, 0]
 	for s in sim.shells:
-		var t2: int = s.team
+		var t2: int = 1 if s.team == me.team else 2
 		var mm2: MultiMesh = shell_mm[t2]
 		if sc[t2] >= mm2.instance_count: continue
 		var sp := sim.shell_pos(s)
@@ -994,7 +1082,9 @@ func read_input() -> void:
 func _unhandled_input(ev: InputEvent) -> void:
 	if state != "play" or me == null: return
 	if ev is InputEventKey and ev.pressed and not ev.echo:
-		if settings.is_key(ev, "skill"): me.inp.gq += 1
+		if sim.loot and settings.is_key(ev, "interact"): loot_interact()
+		elif sim.loot and settings.is_key(ev, "bag"): bag_open = not bag_open; loot_ui_t = 0
+		elif settings.is_key(ev, "skill"): me.inp.gq += 1
 		elif settings.is_key(ev, "super"): me.inp.qq += 1
 		elif settings.is_key(ev, "overload"): me.inp.oq += 1
 		elif ev.physical_keycode == KEY_ESCAPE: back_to_lobby()
@@ -1038,6 +1128,10 @@ func handle_touch(ev: InputEvent) -> void:
 
 
 # ---------------- 大厅 ----------------
+func start_loot(risk: String) -> void:
+	loot_risk = risk; sel_mode = "loot"
+	start_match(profile.o.pilot, profile.o.weapon)
+
 func start_ranked(bans: Dictionary) -> void:
 	ranked_on = true; ranked_bans = bans
 	sel_mode = profile.ranked_mode(); sel_map = -1
@@ -1076,7 +1170,7 @@ func show_showroom(pid: String, mech: String, vis: bool, cam_x := 0.0) -> void:
 		var disc := MeshInstance3D.new(); disc.mesh = Models.mesh("cyl", 3.6, 0.3); disc.material_override = Models.toon(Color("#2a2550"), 0.1, 0.6); disc.position.y = -0.15; showroom.add_child(disc)
 		var rim := MeshInstance3D.new(); rim.mesh = Models.mesh("torus", 3.5, 3.75); rim.material_override = Models.glow(Color(str(data.pilots[pid].accent)), 2.4); showroom.add_child(rim)
 		var l := OmniLight3D.new(); l.position = Vector3(2, 5, 4); l.light_energy = 2.2; l.omni_range = 14; showroom.add_child(l)
-	var m: Dictionary = data.maps[cur_map]
+	var m: Dictionary = map_def(cur_map)
 	showroom.position = Vector3(float(m.gw) / 2.0, -0.45, float(m.gh) + 14.0)
 
 
@@ -1110,3 +1204,90 @@ func splash(layer: CanvasLayer) -> void:
 		wait.tween_method(func(k): bar.k = 0.85 + 0.15 * k; bar.queue_redraw(), 0.0, 1.0, 0.4)
 		wait.tween_property(sp, "modulate:a", 0.0, 0.4)
 		wait.tween_callback(sp.queue_free))
+
+
+# ---------------- 搜刮撤离：互动、容器面板、背包 ----------------
+func near_cont():
+	if sim == null or not sim.loot or not me.alive: return null
+	var best = null; var bd := float(data.loot.openR)
+	for c in sim.obj.conts:
+		if c.items.is_empty() or absf(me.z - c.z) > 60: continue
+		var d := Vector2(c.x - me.x, c.y - me.y).length()
+		if d < bd: bd = d; best = c
+	return best
+
+func loot_interact() -> void:
+	if me.open_c != 0: me.open_c = 0; loot_ui_t = 0; return
+	var c = near_cont()
+	if c != null: me.open_c = c.id; me.srch = 0; sfx.play("click"); loot_ui_t = 0
+
+func rare_col(k: String) -> Color:
+	var r := int(data.loot.items[k].r)
+	return Color(str(data.loot.rare[r].c)) if r < data.loot.rare.size() and data.loot.rare[r] != null else Color.WHITE
+
+func update_loot_ui(delta: float) -> void:
+	if loot_ui == null:
+		loot_ui = Control.new(); loot_ui.set_anchors_preset(Control.PRESET_FULL_RECT); loot_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE; loot_ui.theme = theme_ui
+		hud.get_parent().add_child(loot_ui)
+	loot_ui.visible = state == "play" and sim != null and sim.loot
+	if not loot_ui.visible: return
+	loot_ui_t -= delta
+	if loot_ui_t > 0: return
+	loot_ui_t = 0.2
+	for c in loot_ui.get_children(): c.queue_free()
+	var vs := get_viewport().get_visible_rect().size
+	if me.open_c != 0 and sim.obj.cont_map.has(me.open_c):
+		var c: Dictionary = sim.obj.cont_map[me.open_c]
+		var pc := UIKit.dark_card(); pc.position = Vector2(vs.x - 380, 140); pc.custom_minimum_size = Vector2(360, 0); loot_ui.add_child(pc)
+		var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 6); pc.add_child(v)
+		var CT: Dictionary = data.loot.conts.get(c.type, {"name": c.type})
+		v.add_child(UIKit.label("%s（F 关闭）" % CT.get("name", "遗骸" if c.type == "body" else "物资"), 18, Color("#ffe14d"), 4))
+		for i in c.items.size():
+			var k: String = c.items[i]; var it: Dictionary = data.loot.items[k]
+			var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 6); v.add_child(row)
+			if i < int(c.rev):
+				var nl := UIKit.label("%s  %dx%d  %d" % [it.name, int(it.w), int(it.h), int(it.v)], 15, rare_col(k), 3); nl.custom_minimum_size.x = 210; row.add_child(nl)
+				var tb := UIKit.flat_button("拿", 14); tb.custom_minimum_size = Vector2(48, 30); row.add_child(tb)
+				tb.pressed.connect(func(): if sim.loot_take(me, c.id, i): sfx.play("pickup"); loot_ui_t = 0)
+				var sb := UIKit.flat_button("安全箱", 13); sb.custom_minimum_size = Vector2(70, 30); row.add_child(sb)
+				sb.pressed.connect(func(): if sim.loot_take(me, c.id, i, true): sfx.play("pickup"); loot_ui_t = 0)
+			elif i == int(c.rev):
+				row.add_child(UIKit.label("搜索中……", 15, Color("#c9c5e6"))); row.add_child(UIKit.bar(me.srch / max(0.01, sim.search_need(c, me)), 140, 10, Color("#ffe14d")))
+			else: row.add_child(UIKit.label("？？？", 15, Color("#6a668a")))
+		if c.items.is_empty(): v.add_child(UIKit.label("空了", 15, Color("#a8a4c8")))
+	if bag_open:
+		var bp := UIKit.dark_card(); bp.position = Vector2(20, 150); loot_ui.add_child(bp)
+		var bv := VBoxContainer.new(); bv.add_theme_constant_override("separation", 8); bp.add_child(bv)
+		bv.add_child(UIKit.label("背包  价值 %d（Tab 关闭 • 左键丢掉 • 右键放进 / 拿出安全箱）" % sim.loot_value(sim.inv_keys(me.inv)), 15, Color("#ffe14d"), 3))
+		bv.add_child(bag_grid(me.inv, false))
+		bv.add_child(UIKit.label("安全箱（阵亡也能带出来）  价值 %d" % sim.loot_value(sim.inv_keys(me.safe)), 15, Color("#7af0ff"), 3))
+		bv.add_child(bag_grid(me.safe, true))
+
+func bag_grid(inv: Dictionary, is_safe: bool) -> Control:
+	var g := BagGrid.new(); g.inv = inv; g.game = self; g.is_safe = is_safe
+	g.custom_minimum_size = Vector2(int(inv.w) * 52 + 2, int(inv.h) * 52 + 2)
+	return g
+
+class BagGrid extends Control:
+	var inv: Dictionary
+	var game
+	var is_safe := false
+	func _draw() -> void:
+		for y in int(inv.h):
+			for x in int(inv.w): draw_rect(Rect2(x * 52 + 1, y * 52 + 1, 50, 50), Color(1, 1, 1, 0.06))
+		for it in inv.items:
+			var r := Rect2(int(it.x) * 52 + 3, int(it.y) * 52 + 3, int(it.w) * 52 - 4, int(it.h) * 52 - 4)
+			var c: Color = game.rare_col(it.k)
+			draw_rect(r, Color(c, 0.35)); draw_rect(r, c, false, 2.0)
+			draw_string(game.font, r.position + Vector2(4, 18), str(game.data.loot.items[it.k].name), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 6, 13, Color.WHITE)
+			draw_string(game.font, r.position + Vector2(4, r.size.y - 6), str(int(game.data.loot.items[it.k].v)), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 6, 12, c)
+	func _gui_input(ev: InputEvent) -> void:
+		if not (ev is InputEventMouseButton) or not ev.pressed: return
+		var cx := int(ev.position.x / 52); var cy := int(ev.position.y / 52)
+		for i in inv.items.size():
+			var it: Dictionary = inv.items[i]
+			if cx >= int(it.x) and cx < int(it.x) + int(it.w) and cy >= int(it.y) and cy < int(it.y) + int(it.h):
+				if ev.button_index == MOUSE_BUTTON_RIGHT: game.sim.loot_move(game.me, i, not is_safe)
+				else: game.sim.loot_drop(game.me, i, is_safe)
+				game.sfx.play("click"); game.loot_ui_t = 0
+				accept_event(); return
