@@ -63,6 +63,7 @@ var fov_punch := 0.0
 var aim_line: MeshInstance3D
 var aim_ring: MeshInstance3D
 var profile: Profile
+var accounts: Accounts
 var settings: Settings
 var music: Music
 var lobby: Lobby
@@ -119,7 +120,8 @@ func _ready() -> void:
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var layer := CanvasLayer.new(); add_child(layer); layer.add_child(hud)
-	profile = Profile.new(data)
+	accounts = Accounts.new()
+	profile = load_profile()
 	lobby = Lobby.new(self); menu = lobby; layer.add_child(menu)
 	result_ui = Control.new(); result_ui.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.theme = theme_ui; result_ui.visible = false; layer.add_child(result_ui)
 	build_map(0)
@@ -134,12 +136,28 @@ func _ready() -> void:
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
+		var pop := OS.get_environment("GB_POPUP")   # 截图用
+		if pop == "account": lobby.account_popup()
+		elif pop != "": lobby.account_form(pop)
 		if OS.get_environment("GB_SHOT") == "": splash(layer)
 	if OS.get_environment("GB_LAN") != "": lan_test_setup(); return
 	if autoplay:
 		var gm := OS.get_environment("GB_MAP")
 		sel_map = int(gm) if gm != "" else (-1 if sel_mode != "turf" else 0)
 		start_match(OS.get_environment("GB_PILOT") if OS.get_environment("GB_PILOT") != "" else "blaze", OS.get_environment("GB_MECH") if OS.get_environment("GB_MECH") != "" else "blaster")
+
+
+# 账号：游客用 user://profile.json；登录 / 导入的账号各有自己的存档（见 account.gd）
+func load_profile() -> Profile:
+	var p := Profile.new(data, accounts.profile_path(accounts.current()))
+	if accounts.current() != "" and str(p.o.name) != accounts.current_name(): p.o.name = accounts.current_name(); p.save()
+	return p
+
+func switch_account() -> void:
+	profile = load_profile()
+	lobby.P = profile; lobby.sub = ""; lobby.view_mech = profile.o.weapon; lobby.view_pilot = ""
+	lobby.close_popup(); lobby.refresh()
+	if int(profile.o.tut) == 0: lobby.welcome()
 
 func make_theme() -> Theme:
 	var t := Theme.new()

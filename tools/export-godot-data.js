@@ -28,7 +28,7 @@ const GODOT_MAILS = [
     keep: true, items: [{ k: 'gems', n: 300 }, { k: 'chest', id: 'airdrop', n: 1 }, { k: 'coins', n: 2000 }, { k: 'parts', n: 300 }] },
 ];
 const econ5 = {
-  pass: Object.assign({}, E.PASS, { season: E.SEASON.name, ends: sec(E.SEASON.end) }), passOnly: E.PASS_ONLY,
+  pass: Object.assign({}, E.PASS, { season: E.SEASON.name, sid: E.SEASON.id, ends: sec(E.SEASON.end) }), passOnly: E.PASS_ONLY,
   mails: [...GODOT_MAILS, ...E.MAILS].map((m) => Object.assign({}, m, { t: sec(m.t) })), mailDays: E.MAIL_DAYS, mailUnclaimed: E.MAIL_UNCLAIMED,
   story: E.STORY, tasklines: E.TASKLINES, tasklineOrder: E.TASKLINE_ORDER,
   events: E.EVENTS.map((ev) => Object.assign({}, ev, { start: sec(ev.start), end: sec(ev.end) })), eventStat: E.EVENT_STAT,

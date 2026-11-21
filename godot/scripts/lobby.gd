@@ -115,14 +115,14 @@ func build_top() -> void:
 	var lv := P.level()
 	var xp0 := Profile.xp_for_level(lv); var xp1 := Profile.xp_for_level(lv + 1)
 	var pc := UIKit.dark_card(true); at(pc, Vector2(16, 12), Vector2(236, 72))
-	click(pc, func(): open_sub("quests"))
+	click(pc, func(): account_popup())
 	var h := hbox(10); pc.add_child(h)
 	var pid: String = P.o.pilot
 	var fr := UIKit.card(Color(str(D.pilots[pid].accent)) if pid != "" else Color.GRAY, Color("#1a1430"), Color.WHITE, 12); fr.pad = Vector4(2, 2, 2, 2); fr.shadow = 0
 	fr.add_child(face(pid, 46) if pid != "" else UIKit.icon("pilot", 46)); h.add_child(fr)
 	var v := vbox(3); h.add_child(v)
 	var nh := hbox(6); v.add_child(nh)
-	nh.add_child(L(str(P.o.name) if str(P.o.name) != "" else "涂鸦驾驶员", 17, Color.WHITE)); nh.add_child(UIKit.chip("Lv.%d" % lv, Color("#7af0ff"), 13))
+	nh.add_child(L(str(P.o.name) if str(P.o.name) != "" else "游客", 17, Color.WHITE)); nh.add_child(UIKit.chip("Lv.%d" % lv, Color("#7af0ff"), 13))
 	v.add_child(UIKit.bar(float(P.o.xp - xp0) / max(1, xp1 - xp0), 150, 9, Color("#7af0ff")))
 	v.add_child(L("%d / %d XP" % [P.o.xp - xp0, xp1 - xp0], 12, Color("#9a96b8")))
 	var tc := UIKit.dark_card(); at(tc, Vector2(262, 12), Vector2(176, 72))
@@ -641,7 +641,7 @@ func settings_popup() -> void:
 	v.alignment = BoxContainer.ALIGNMENT_BEGIN
 	v.add_child(centered(L("设置", 30, Color("#ffe14d"), 8)))
 	var th := hbox(8); th.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(th)
-	for t in [["display", "画面"], ["audio", "声音"], ["keys", "按键"], ["save", "存档"]]:
+	for t in [["display", "画面"], ["audio", "声音"], ["keys", "按键"], ["save", "账号 / 存档"]]:
 		var on: bool = t[0] == set_tab
 		var c := UIKit.card(Color("#ff6ad5") if on else Color("#2e2760"), Color("#a63cff") if on else Color("#17132f"), Color("#ffc4ef") if on else Color("#4b4396"), 14, true)
 		c.pad = Vector4(18, 6, 18, 6); c.add_child(L(t[1], 17, Color.WHITE, 3)); th.add_child(c)
@@ -682,7 +682,11 @@ func settings_popup() -> void:
 			var rk := UIKit.flat_button("恢复默认按键", 15); rk.custom_minimum_size = Vector2(160, 40); body.add_child(rk)
 			click(rk, func(): S2.keys = Settings.DEFAULT_KEYS.duplicate(); S2.save(); settings_popup())
 		"save":
-			body.add_child(UIKit.wrap(L("存档保存在本机（user://profile.json）。重置会清空所有进度，重新开新手宝箱。", 15, Color("#e6e2fa")), 640))
+			var A: Accounts = game.accounts
+			body.add_child(L("当前：" + ("账号「%s」" % A.current_name() if A.current() != "" else "游客"), 20, Color("#ffe14d"), 4))
+			body.add_child(UIKit.wrap(L("账号和网页版、安卓版通用：在网页版「账号 → 导出转移码」，复制到这里导入，就能用原来的密码登录、接着玩；在这里导出的转移码也能导回网页版。有游戏服务器的话也可以直接登录在线账号。", 15, Color("#e6e2fa")), 640))
+			var ab := UIKit.gold_button("账号管理", 18); ab.custom_minimum_size = Vector2(180, 50); body.add_child(ab); click(ab, func(): account_popup())
+			body.add_child(UIKit.wrap(L("重置会清空当前账号（或游客）的所有进度，重新开新手宝箱。", 14, Color("#a8a4c8")), 640))
 			var rs2 := UIKit.pink_button("重置存档", 18); rs2.custom_minimum_size = Vector2(180, 50); body.add_child(rs2); click(rs2, func(): confirm_reset())
 	var ok := UIKit.gold_button("好的", 22); ok.custom_minimum_size = Vector2(180, 54); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok); click(ok, func(): rebinding = ""; close_popup())
 
@@ -1220,3 +1224,112 @@ func page_lan() -> void:
 		cv.add_child(L(str(rp.name) + ("（房主）" if int(rp.peer) == 1 else ""), 18, Color.WHITE))
 		cv.add_child(L("%s • %s • Lv.%d" % [D.pilots.get(str(rp.pilot), {"name": "?"}).name, D.mechs.get(str(rp.weapon), {"name": "?"}).name, int(rp.get("power", {}).get("lv", 1))], 13, Color("#a8a4c8")))
 		lst.add_child(c)
+
+# ================= 账号（和网页版通用，见 account.gd）=================
+var acc_name := ""
+var acc_pass := ""
+var acc_code := ""
+var acc_server := ""
+var acc_busy := false
+
+func _acc_btn(text: String, kind: String, f: Callable, w := 200.0) -> GCard:
+	var b: GCard = UIKit.gold_button(text, 17) if kind == "gold" else (UIKit.pink_button(text, 17) if kind == "pink" else UIKit.flat_button(text, 16))
+	b.custom_minimum_size = Vector2(w, 46); click(b, f); return b
+
+func _acc_field(parent: Control, label: String, val: String, secret: bool, setter: Callable) -> LineEdit:
+	var h := hbox(12); h.alignment = BoxContainer.ALIGNMENT_CENTER; parent.add_child(h)
+	var l := L(label, 18, Color.WHITE); l.custom_minimum_size.x = 110; h.add_child(l)
+	var e := LineEdit.new(); e.text = val; e.secret = secret; e.custom_minimum_size = Vector2(340, 42); e.text_changed.connect(setter); h.add_child(e)
+	return e
+
+func account_popup() -> void:
+	var A: Accounts = game.accounts
+	var v := make_popup(Vector2(760, 470))
+	v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L("账号", 32, Color("#ffe14d"), 8)))
+	var cur := A.current()
+	var who := "游客（进度只存在这台电脑的游客存档里）"
+	if cur != "": who = "账号「%s」" % A.current_name() + ("（在线账号的电脑存档）" if A.is_online(cur) else "（本机账号，和网页版通用）")
+	v.add_child(centered(L("当前：" + who, 18, Color("#7af0ff"), 3)))
+	v.add_child(centered(UIKit.wrap(L("账号格式和网页版完全一样：网页版导出的转移码可以直接导进来，用原来的密码登录；电脑版导出的转移码也能导回网页版继续玩。", 14, Color("#c8c4e8")), 680)))
+	var g := GridContainer.new(); g.columns = 3; g.add_theme_constant_override("h_separation", 14); g.add_theme_constant_override("v_separation", 12); g.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(g)
+	g.add_child(_acc_btn("登录", "gold", func(): account_form("login")))
+	g.add_child(_acc_btn("注册新账号", "gold", func(): account_form("register")))
+	g.add_child(_acc_btn("导入转移码", "pink", func(): account_form("import")))
+	g.add_child(_acc_btn("导出转移码", "pink", func(): account_form("export")) if cur != "" else _acc_btn("导出转移码", "flat", func(): toast("先登录或注册账号")))
+	g.add_child(_acc_btn("在线账号（服务器）", "flat", func(): account_form("online")))
+	g.add_child(_acc_btn("退出登录" if cur != "" else "已经是游客", "flat", func():
+		if A.current() == "": return
+		A.logout(); game.switch_account(); toast("已退出，现在是游客")))
+	var accs := A.list()
+	if accs.size() > 0:
+		v.add_child(centered(L("这台电脑上的账号（点一下切换，需要密码）", 15, Color("#a8a4c8"))))
+		var hl := HFlowContainer.new(); hl.alignment = FlowContainer.ALIGNMENT_CENTER; hl.add_theme_constant_override("h_separation", 8); hl.add_theme_constant_override("v_separation", 8); v.add_child(hl)
+		for a in accs:
+			var c := UIKit.card(Color("#ff6ad5") if a.key == cur else Color("#2e2760"), Color("#a63cff") if a.key == cur else Color("#17132f"), Color("#ffc4ef") if a.key == cur else Color("#4b4396"), 12, true)
+			c.pad = Vector4(14, 6, 14, 6); c.add_child(L(str(a.name) + (" (在线)" if a.online else ""), 15, Color.WHITE, 3)); hl.add_child(c)
+			click(c, func(): acc_name = str(a.name); acc_pass = ""; account_form("login"))
+	var ok := UIKit.flat_button("关闭", 18); ok.custom_minimum_size = Vector2(160, 46); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok); click(ok, func(): close_popup())
+
+func account_form(kind: String) -> void:
+	var A: Accounts = game.accounts
+	var titles := {"login": "登录本机账号", "register": "注册新账号", "import": "导入转移码", "export": "导出转移码", "online": "在线账号"}
+	var v := make_popup(Vector2(760, 520))
+	v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L(titles[kind], 30, Color("#ffe14d"), 8)))
+	var msg := L("", 16, Color("#ff9a8a")); msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bh := hbox(14); bh.alignment = BoxContainer.ALIGNMENT_CENTER
+	var back := _acc_btn("返回", "flat", func(): account_popup(), 140)
+	match kind:
+		"login", "register":
+			if kind == "register": v.add_child(centered(UIKit.wrap(L("新账号会带上你现在的进度（%s）。" % ("游客进度" if A.current() == "" else "账号「%s」的进度" % A.current_name()), 15, Color("#c8c4e8")), 640)))
+			else: v.add_child(centered(UIKit.wrap(L("从网页版导入的账号用网页版的密码登录。", 15, Color("#c8c4e8")), 640)))
+			_acc_field(v, "账号名", acc_name, false, func(t): acc_name = t)
+			_acc_field(v, "密码", acc_pass, true, func(t): acc_pass = t)
+			bh.add_child(back)
+			bh.add_child(_acc_btn("登录" if kind == "login" else "注册", "gold", func():
+				var r: Dictionary = A.login(acc_name, acc_pass) if kind == "login" else A.register(acc_name, acc_pass, P.o)
+				if not r.ok: msg.text = str(r.err); return
+				acc_pass = ""; game.switch_account(); toast("欢迎回来，%s！" % A.current_name() if kind == "login" else "注册成功：%s" % A.current_name()), 160))
+		"import":
+			v.add_child(centered(UIKit.wrap(L("在网页版或安卓版打开「账号 → 导出转移码」，复制整段 GBACC1 开头的码，粘贴到下面。导入后用原来的密码登录。", 15, Color("#c8c4e8")), 680)))
+			var te := TextEdit.new(); te.text = acc_code; te.custom_minimum_size = Vector2(680, 160); te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY; te.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			te.text_changed.connect(func(): acc_code = te.text); v.add_child(te)
+			bh.add_child(back)
+			bh.add_child(_acc_btn("粘贴", "flat", func(): te.text = DisplayServer.clipboard_get(); acc_code = te.text, 120))
+			var do_import := func(overwrite: bool) -> void:
+				var r: Dictionary = A.import_code(acc_code, overwrite, D)
+				if r.get("exists", false):
+					msg.text = "这台电脑上已经有账号「%s」了，再点「覆盖导入」会用转移码里的进度替换它" % r.name; return
+				if not r.ok: msg.text = str(r.err); return
+				acc_code = ""; acc_name = str(r.name); acc_pass = ""
+				toast("导入成功：%s%s，输入密码登录" % [r.name, "（进度版本太老，从新手开始）" if r.get("fresh", false) else ""])
+				account_form("login")
+			bh.add_child(_acc_btn("导入", "gold", func(): do_import.call(false), 140))
+			bh.add_child(_acc_btn("覆盖导入", "pink", func(): do_import.call(true), 140))
+		"export":
+			P.save()
+			var code := A.export_code(A.current(), P.o, D)
+			v.add_child(centered(UIKit.wrap(L("把这段码复制到网页版或安卓版的「账号 → 导入转移码」，用这个账号的密码登录就能接着玩。转移码里有你的进度，不要发给别人。", 15, Color("#c8c4e8")), 680)))
+			var te := TextEdit.new(); te.text = code; te.editable = false; te.custom_minimum_size = Vector2(680, 180); te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY; te.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(te)
+			bh.add_child(back)
+			bh.add_child(_acc_btn("复制", "gold", func(): DisplayServer.clipboard_set(code); toast("已复制转移码"), 160))
+		"online":
+			if acc_server == "": acc_server = str(A.data.get("server", ""))
+			v.add_child(centered(UIKit.wrap(L("连接朋友或自己用 node server.js 开的游戏服务器（例如 192.168.1.5:3000），登录在线账号后把服务器上的进度下载到这台电脑。在线账号的奖励由服务器结算，电脑版单机打的局不会传回服务器。", 14, Color("#c8c4e8")), 680)))
+			_acc_field(v, "服务器", acc_server, false, func(t): acc_server = t)
+			_acc_field(v, "账号名", acc_name, false, func(t): acc_name = t)
+			_acc_field(v, "密码", acc_pass, true, func(t): acc_pass = t)
+			bh.add_child(back)
+			var go := func(reg: bool) -> void:
+				if acc_busy: return
+				acc_busy = true; msg.add_theme_color_override("font_color", Color("#7af0ff")); msg.text = "正在连接……"
+				var r: Dictionary = await A.online_pull(get_tree(), acc_server, acc_name, acc_pass, reg, D)
+				acc_busy = false
+				if not is_instance_valid(msg): return
+				if not r.ok: msg.add_theme_color_override("font_color", Color("#ff9a8a")); msg.text = str(r.err); return
+				acc_pass = ""; game.switch_account(); toast("已登录在线账号：%s" % A.current_name())
+			bh.add_child(_acc_btn("登录", "gold", func(): go.call(false), 140))
+			bh.add_child(_acc_btn("注册", "pink", func(): go.call(true), 140))
+	v.add_child(msg)
+	v.add_child(bh)

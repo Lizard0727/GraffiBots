@@ -23,6 +23,10 @@
   - 限时活动（任务、登录奖励、活动商店）、联动兑换
   - 皮肤商店（驾驶员皮肤会换立绘，机体涂装和特效会在展台和对战里生效）
   - 排位段位、夺冠之路和赛季重置
+- **账号（和网页版 / 安卓版通用）**：点左上角的个人卡，或者「设置 → 账号 / 存档」
+  - 本机账号的格式和网页版一样：网页版「导出转移码」得到的 `GBACC1.` 码可以直接导入，用原来的密码登录；电脑版导出的码也能导回网页版
+  - 注册新账号时会带上现在的进度；没登录就用游客存档（`user://profile.json`）
+  - 在线账号：填 `node server.js` 开的服务器地址，登录后把服务器上的进度下载到这台电脑。电脑版单机打的局不会传回服务器
 - **局域网联机**：大厅里点「局域网联机」，一人开房，其他人输入房主的 IP 加入，最多 8 人
   - 房主跑权威模拟，其他玩家只发操作，房主每 2 帧广播一次快照
   - 端口是 UDP 24680，第一次开房时要允许防火墙放行
@@ -56,6 +60,7 @@ GitHub Releases 里的 `godot-proto` 有 `GraffiBots-Godot-Windows.zip`。解压
   | `scripts/lobby.gd` | 大厅和所有子页面 |
   | `scripts/profile.gd` | 存档和经济 |
   | `scripts/net.gd` | 局域网联机 |
+| `scripts/account.gd` | 账号 |
   | `scripts/settings.gd` | 设置 |
   | `scripts/music.gd` | 背景音乐 |
   | `scripts/hud.gd` | HUD |
@@ -67,6 +72,7 @@ GitHub Releases 里的 `godot-proto` 有 `GraffiBots-Godot-Windows.zip`。解压
   - `godot --headless --path godot --script res://tests/sim_test.gd`：跑所有模式、技能、大招、超载
   - `res://tests/profile_test.gd`：存档、通行证、邮件、皮肤、排位、活动
   - `res://tests/loot_test.gd`：搜刮撤离的整局模拟和性能
+  - `res://tests/account_test.gd`：和网页版一样的密码哈希、转移码导入导出；设置 `GB_SERVER=地址` 时还会测在线账号
 - **自动构建**：`.github/workflows/godot.yml`，只出 Windows 版
 
 ## 操作

@@ -46,6 +46,10 @@ jobs:
           ~/godot/godot --headless --path godot --script res://tests/sim_test.gd
           ~/godot/godot --headless --path godot --script res://tests/profile_test.gd
           ~/godot/godot --headless --path godot --script res://tests/loot_test.gd
+          # 账号：和网页版的转移码互通、在线账号（临时开一个 node server.js）
+          GB_ACCOUNTS=/tmp/acc.json PORT=3917 node server.js &
+          sleep 1
+          GB_SERVER=127.0.0.1:3917 ~/godot/godot --headless --path godot --script res://tests/account_test.gd
 
       - name: 导出
         run: |
