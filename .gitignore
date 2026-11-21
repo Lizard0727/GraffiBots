@@ -11,3 +11,6 @@ site/game/
 
 # e2e 截图（测试脚本有时写到仓库根目录）
 /*.png
+
+# Godot 样品版的数据要提交
+!godot/data/

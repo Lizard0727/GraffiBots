@@ -34,7 +34,7 @@ jobs:
         run: |
           node tools/build-single.js
           mkdir -p _zip/GraffiBots
-          git ls-files -z | xargs -0 -I{} cp --parents {} _zip/GraffiBots/
+          git ls-files -z -- . ':!godot' | xargs -0 -I{} cp --parents {} _zip/GraffiBots/
           cp dist/涂鸦机兵-单文件版.html _zip/GraffiBots/
           (cd _zip && zip -qr ../dist/GraffiBots.zip GraffiBots)
           # 2.0：Windows 版——启动器 bat + 单文件版（用 Edge / Chrome 应用窗口打开，更流畅）
@@ -65,6 +65,14 @@ jobs:
 
       - name: 生成官网
         run: node tools/build-site.js --out _site --downloads
+
+      # Godot 样品版的网页版（Releases 里的 godot-proto，没有就跳过）
+      - name: 放入 Godot 样品网页版
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download godot-proto -p 'GraffiBots-Godot-Web.zip' -D _godot && mkdir -p _site/godot && unzip -q _godot/GraffiBots-Godot-Web.zip -d _site/godot && ls _site/godot
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

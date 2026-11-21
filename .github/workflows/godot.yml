@@ -1,0 +1,83 @@
+# Godot 样品版：无画面测试 + 导出 Windows（单个 exe）、网页版、安卓 APK，放到 Releases 的「godot-proto」，并更新官网 /godot/
+name: Godot 样品版
+
+on:
+  push:
+    branches: [main, master]
+    paths: ['godot/**', 'tools/export-godot-data.js', '.github/workflows/godot.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  GODOT_VER: 4.3-stable
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 缓存 Godot 和导出模板
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VER }}
+
+      - name: 下载 Godot ${{ env.GODOT_VER }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot ~/.local/share/godot/export_templates/${GODOT_VER/-/.}
+          cd ~/godot
+          curl -sSL -o g.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VER}/Godot_v${GODOT_VER}_linux.x86_64.zip"
+          unzip -q g.zip && mv Godot_v${GODOT_VER}_linux.x86_64 godot && rm g.zip
+          curl -sSL -o t.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VER}/Godot_v${GODOT_VER}_export_templates.tpz"
+          unzip -q t.tpz && mv templates/* ~/.local/share/godot/export_templates/${GODOT_VER/-/.}/ && rm -rf t.tpz templates
+
+      - name: 编辑器设置（安卓 SDK / Java）和调试签名
+        run: |
+          mkdir -p ~/.config/godot
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_HOME" "$JAVA_HOME" > ~/.config/godot/editor_settings-4.3.tres
+          keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
+
+      - name: 导入资源 + 无画面测试
+        run: |
+          ~/godot/godot --headless --path godot --import || true
+          ~/godot/godot --headless --path godot --script res://tests/sim_test.gd
+
+      - name: 导出
+        run: |
+          mkdir -p build/godot/windows build/godot/web build/godot/android
+          ~/godot/godot --headless --path godot --export-release "Windows Desktop" ../build/godot/windows/GraffiBots.exe
+          ~/godot/godot --headless --path godot --export-release "Web" ../build/godot/web/index.html
+          ~/godot/godot --headless --path godot --export-debug "Android" ../build/godot/android/GraffiBots-Godot.apk
+          ls -la build/godot/*
+
+      - name: 打包并更新 Release（godot-proto）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd build/godot/windows && zip -q ../../GraffiBots-Godot-Windows.zip GraffiBots.exe)
+          (cd build/godot/web && zip -qr ../../GraffiBots-Godot-Web.zip .)
+          cp build/godot/android/GraffiBots-Godot.apk build/GraffiBots-Godot.apk
+          gh release delete godot-proto --yes --cleanup-tag || true
+          gh release create godot-proto build/GraffiBots-Godot-Windows.zip build/GraffiBots-Godot-Web.zip build/GraffiBots-Godot.apk \
+            --title "Godot 样品版（最新）" --notes "涂鸦机兵 Godot 样品版：1 张地图、2 台机体、2 位驾驶员、涂地 + AI。Windows（解压后双击 exe）、网页版、安卓 APK。" --prerelease --target ${{ github.sha }}
+
+      - name: 更新官网（/godot/ 网页版）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run site.yml --ref ${{ github.ref_name }} || true
