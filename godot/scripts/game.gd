@@ -48,6 +48,8 @@ var base_cols := PackedColorArray()
 var turf_mat: ShaderMaterial
 var mech_nodes := {}
 var helper_nodes := {}
+var fps_lbl: Label
+var fps_t := 0.0
 var dawn_nodes := {}      # 3.1「黎明之后」联动的画面节点（dawn_fx.gd）
 var night_rect: ColorRect
 var cine: Control
@@ -132,6 +134,10 @@ func _ready() -> void:
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var layer := CanvasLayer.new(); add_child(layer); layer.add_child(hud)
+	# 3.2：帧率（大厅和对局都显示，设置里可以关）
+	fps_lbl = Label.new(); fps_lbl.add_theme_font_size_override("font_size", 15); fps_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+	fps_lbl.add_theme_constant_override("outline_size", 4); fps_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE; fps_lbl.z_index = 100
+	var fl_layer := CanvasLayer.new(); fl_layer.layer = 50; add_child(fl_layer); fl_layer.add_child(fps_lbl)
 	accounts = Accounts.new()
 	Bots.init(data)
 	I18n.lang = settings.lang if OS.get_environment("GB_LANG") == "" else OS.get_environment("GB_LANG")
@@ -752,6 +758,16 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 
 # ---------------- 主循环 ----------------
 func _process(delta: float) -> void:
+	if fps_lbl != null:
+		fps_lbl.visible = settings.show_fps
+		fps_t -= delta
+		if fps_t <= 0 and fps_lbl.visible:
+			fps_t = 0.25
+			var f := Engine.get_frames_per_second()
+			fps_lbl.text = "FPS %d" % f
+			fps_lbl.add_theme_color_override("font_color", Color("#6dff8a") if f >= 55 else (Color("#ffd23f") if f >= 30 else Color("#ff5a6a")))
+			var vsz := get_viewport().get_visible_rect().size
+			fps_lbl.position = Vector2(10, 8) if state == "play" else Vector2(10, vsz.y - 26)
 	if OS.get_environment("GB_DAWN") != "" and sim != null and state == "play" and me != null: dawn_test_tick()
 	if OS.get_environment("GB_KILLTEST") != "" and sim != null and state == "play" and sim.time > 2.0 and not _kt:   # 截图用：假装连杀两个
 		_kt = true

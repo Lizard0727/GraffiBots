@@ -226,6 +226,10 @@ class Mech:
 	var blocked := 0.0
 	var ai_tap := false
 	var night_t := 0.0
+	var ai_mem := {}          # 3.2：AI 记得敌人最后出现的位置 id → [x, y, vx, vy, 时间]
+	var ai_jump_t := 0.0
+	var ai_freeze_t := 0.0
+	var ai_guess_t := 0.0
 	var cine_t := 0.0         # 绝响终章
 	var cine_with := 0
 	var cine_lead := false
@@ -1672,8 +1676,10 @@ func update_helpers(dt: float) -> void:
 # ---------------- 视野 ----------------
 func visible_to(team: int, e: Mech) -> bool:
 	if not e.hidden or reveal[team] > time or e.reveal_t > 0: return true
+	# 3.2：草丛靠近 90 就会暴露；真正的隐身（光学迷彩 / 墨雾）只有几乎贴脸才会被发现
+	var r := 40.0 if (e.cloak_t > 0 or e.smoke_t > 0) else float(C.BUSH_DETECT)
 	for a in players:
-		if a.alive and a.team == team and dist2d(a, e) < float(C.BUSH_DETECT): return true
+		if a.alive and a.team == team and dist2d(a, e) < r: return true
 	return false
 
 func los(x0: float, y0: float, z0: float, x1: float, y1: float) -> bool:
@@ -1760,6 +1766,10 @@ func ai_think(p: Mech, dt: float) -> void:
 			return
 		p.afk_next -= dt
 		if p.afk_next <= 0: p.afk_t = rng.randf_range(4.0, 10.0); p.afk_next = rng.randf_range(15.0, 30.0)
+	if p.ai_freeze_t > 0:   # 菜鸟偶尔发呆
+		p.ai_freeze_t -= dt; p.inp.mx = 0; p.inp.my = 0; p.inp.f = false
+		return
+	if countdown <= 0 and float(p.pz.get("freeze", 0.0)) > 0 and rng.randf() < float(p.pz.freeze): p.ai_freeze_t = rng.randf_range(0.8, 2.0)
 	var w := wdata(p)
 	var melee: bool = str(w.attack) in ["punch", "guard"] and not p.foot
 	var rng_w := float(side(p).range) if p.foot else float(w.range2)
@@ -1770,19 +1780,24 @@ func ai_think(p: Mech, dt: float) -> void:
 	# 交战距离：射程 + 200；逃亡圈里大家更在意捡箱子、躲毒圈，被打了才还手
 	var engage: float = minf(760.0, rng_w + 160.0)   # 和网页版一样：射程 + 160 内才会盯上
 	if mode in ["escape4", "escape8"] and time - p.last_hurt > 4.0: engage = minf(engage, rng_w * 0.75 + 40.0)
+	var focus: bool = p.pz.get("focus", false)
+	var best_sc := 1e9
 	for e in players:
 		if not e.alive or e.team == p.team: continue
 		var d := dist2d(e, p)
-		if d > engage or d > td or not visible_to(p.team, e): continue
+		if d > engage or d > blind_r: continue
+		if not visible_to(p.team, e): continue   # 隐身 / 草丛里看不见的人不能直接锁定（见 ai_guess）
+		p.ai_mem[e.id] = [e.x, e.y, e.vx, e.vy, time]
 		if p.guard is Dictionary and guard_anchor(p).distance_to(Vector2(e.x, e.y)) > 460 and time - p.last_hurt > 3: continue
-		if d < td and d < engage and d < blind_r: td = d; tgt = e
+		var sc: float = d * (0.55 + 0.45 * e.hp / maxf(1.0, max_hp_of(e))) if focus else d   # 高手 / 大神优先打残血
+		if sc < best_sc: best_sc = sc; td = d; tgt = e
 	var inp := p.inp
 	inp.j = false
 	var hp_k := p.hp / max_hp_of(p)
 	if tgt != null and tgt.id == p.ai_tgt: p.ai_seen += dt
 	else: p.ai_seen = 0.0; p.ai_tgt = tgt.id if tgt != null else 0
 	# 反应时间：刚看到敌人要愣一下才开火（逃亡圈里更谨慎，被打了马上还手）
-	if p.pz.is_empty() and D.has("bots"): p.pz = D.bots.personas.decent   # 没指定性格的 AI 按网页版默认的「不错」
+	if p.pz.is_empty() and D.has("bots"): p.pz = D.bots.personas.normal   # 没指定性格的 AI 按「正常玩家」
 	var react := 0.3
 	if not p.pz.is_empty(): react = (float(p.pz.react[0]) + float(p.pz.react[1])) * 0.5 + 0.05
 	if mode in ["escape4", "escape8"]: react = 0.15 if time - p.last_hurt < 2.0 else 1.1
@@ -1805,10 +1820,14 @@ func ai_think(p: Mech, dt: float) -> void:
 	var has_goal: bool = mode != "turf" and (p.ai_goal_cell >= 0 or nav_w > 0)
 	# 交战距离（网页版 botThink）：远程 = 射程 ×1.05，近战 / 爱追人的性格至少 300；超出就先按目标走，不硬追
 	var fight_r: float = maxf(rng_w * 1.05, 300.0) if (melee or p.pz.get("chase", false)) else rng_w * 1.05
+	if mode == "soccer" and not p.foot and not melee and soccer_shot(p, rng_w):   # 3.2 足球：球能打就先打球
+		if has_goal: var fd := field_dir(p); inp.mx = fd.x; inp.my = fd.y
+		return
 	if tgt != null and td < fight_r and (melee or los(p.x, p.y, p.z + float(C.MUZZLE), tgt.x, tgt.y)):
 		var to := Vector2(tgt.x - p.x, tgt.y - p.y)
-		var lead := to.length() / 650.0
-		var lk := 0.6 * float(p.pz.get("lead", 0.6)) / 0.6
+		var pspd := float(w.get("speed", 650)) if not p.foot else float(side(p).get("speed", 650))
+		var lead := to.length() / (pspd if p.pz.get("trueLead", false) else 650.0)
+		var lk := float(p.pz.get("lead", 0.6))
 		inp.a = atan2(tgt.y + tgt.vy * lead * lk - p.y, tgt.x + tgt.vx * lead * lk - p.x) + rng.randf_range(-aim_j, aim_j)
 		inp.pt = atan2(tgt.z + 16 - (p.z + float(C.MUZZLE)), max(1.0, td))
 		inp.ad = td
@@ -1822,11 +1841,23 @@ func ai_think(p: Mech, dt: float) -> void:
 			var perp := Vector2(-dir.y, dir.x) * p.ai_strafe
 			if str(side(p).kind) == "melee" and (hp_k > 0.45 or td < 90): mv = dir + perp * 0.3
 			else: mv = -dir * 0.7 + perp * 0.6
-		if p.ai_urgent and has_goal: mv = field_dir(p) + mv * 0.25   # 目标要紧：边打边走
+		# 3.2：模式目标的拉力（据点 / 花车 / 宝物 / 电池 / 足球 / 毒圈）：边打边去做该做的事
+		var pull := obj_pull(p, has_goal)
+		if p.ai_urgent and has_goal: pull = maxf(pull, 0.8)
+		if pull > 0: mv = field_dir(p) * (1.0 + pull) * pull + mv * (1.0 - pull)
+		mv = stay_in_obj(p, mv)
+		# 闪避：对面正在朝我开火时横移（高手更会躲）
+		if tgt.firing and rng.randf() < float(p.pz.get("dodge", 0.2)) * dt * 6.0: p.ai_strafe = -p.ai_strafe
+		var stf: Array = p.pz.get("strafe", [0.6, 1.4])
 		if p.ai_t <= 0:
-			p.ai_t = rng.randf_range(0.6, 1.4)
-			if rng.randf() < 0.35: p.ai_strafe = -p.ai_strafe
-			if melee and td < 260 and rng.randf() < 0.3: inp.j = true
+			p.ai_t = rng.randf_range(float(stf[0]), float(stf[1]))
+			if rng.randf() < 0.45: p.ai_strafe = -p.ai_strafe
+		mv += Vector2(-dir.y, dir.x) * p.ai_strafe * (float(p.pz.get("strafeK", 0.8)) - 0.8) * 0.5
+		p.ai_jump_t -= dt
+		if p.ai_jump_t <= 0:
+			var jr: Array = p.pz.get("jump", [1.5, 4.0])
+			p.ai_jump_t = rng.randf_range(float(jr[0]), float(jr[1]))
+			if td < 320: inp.j = true
 		inp.mx = mv.x; inp.my = mv.y; inp.w = melee and td > 200 and cell_at(p.x, p.y) == p.team
 		if str(w.attack) == "charge" and not p.foot:
 			var need := 0.92 if td > 260 else 0.5
@@ -1836,14 +1867,17 @@ func ai_think(p: Mech, dt: float) -> void:
 		else:
 			inp.f = td < rng_w + (30.0 if melee else 10.0)
 		Dawn.ai_fire(self, p, tgt, td)
+		if mode == "soccer" and not melee and soccer_shot(p, rng_w): return
 		if p.ai_seen < react: inp.f = false
 		if inp.f and not p.pz.is_empty() and rng.randf() > clampf(float(p.pz.fire) / 0.5, 0.35, 1.0): inp.f = false
 		var rt := float(p.pz.get("retreat", 0.0))
-		if rt > 0 and hp_k < rt and not melee and not p.ai_urgent: inp.mx = -dir.x + mv.x * 0.4; inp.my = -dir.y + mv.y * 0.4
+		if rt > 0 and hp_k < rt and not melee and not p.ai_urgent and (p.pz.get("smart", false) or tgt.hp > p.hp): inp.mx = -dir.x + mv.x * 0.4; inp.my = -dir.y + mv.y * 0.4
+		if p.pz.get("smart", false) and not p.foot and hp_k < 0.25 and tgt.hp > p.hp and p.carry == 0 and cell_at(p.x, p.y) == p.team:
+			inp.w = true; inp.f = false; inp.mx = -dir.x; inp.my = -dir.y
 		# 技能
 		p.ai_skill -= dt
 		if p.skill_uses > 0 and p.skill_cd <= 0 and p.ai_skill <= 0:
-			p.ai_skill = 0.4
+			p.ai_skill = clampf(0.025 / maxf(0.005, float(p.pz.get("skill", 0.04))), 0.25, 2.5)   # 积极度越高，判断越频繁
 			var sk := str(pdata(p).skill)
 			var fight := td < 300
 			var use := false
@@ -1878,9 +1912,11 @@ func ai_think(p: Mech, dt: float) -> void:
 				inp.gq += 1
 		if not p.foot and p.sp >= float(w.spNeed) and td < float(SUPER_REACH.get(str(w.special), 300)):
 			inp.qq += 1
-		if not p.npc and p.bt >= 1 and p.ov >= float(C.OV_NEED) and p.ov_t <= 0 and td < 320 and rng.randf() < 0.05:
+		if not p.npc and p.bt >= 1 and p.ov >= float(C.OV_NEED) and p.ov_t <= 0 and td < 320 and rng.randf() < float(p.pz.get("ov", 0.1)) * dt * 4.0:
 			inp.oq += 1
 		return
+	# 看不见敌人：高手会揣测躲起来的人在哪（不是 100% 准）
+	if ai_guess(p, w, rng_w, melee, dt): return
 	# 没有敌人：去涂地
 	if has_goal:
 		if Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() < 30: p.ai_mode_t = min(p.ai_mode_t, 0.1)
@@ -1925,6 +1961,88 @@ func ai_think(p: Mech, dt: float) -> void:
 # ================================================================
 # 阶段 3：超载技能 + 各种模式（移植 core.js 的 activateOverload / initMode / updateMode / bossThink）
 # ================================================================
+# ---------------- 3.2 AI：模式目标 / 隐身揣测 ----------------
+func in_zone(x: float, y: float) -> bool:
+	var Z: Dictionary = MC.ZONE
+	return x > float(Z.x0) * CELL and x < float(Z.x1) * CELL and y > float(Z.y0) * CELL and y < float(Z.y1) * CELL
+
+# 这个模式里「去做目标」有多重要（0~1）；乘上性格的 obj（菜鸟也懂规则，只是执行差一点）
+func obj_pull(p: Mech, has_goal: bool) -> float:
+	if not has_goal or p.foot: return 0.0
+	var k := float(p.pz.get("obj", 0.9))
+	var v := 0.0
+	match mode:
+		"zone": v = 0.0 if in_zone(p.x, p.y) else 0.85
+		"park": v = 0.0 if Vector2(p.x - obj.fl.x, p.y - obj.fl.y).length() < float(MC.PARK.r) * 0.8 else 0.8
+		"escort":
+			var tr: Dictionary = obj.tr
+			v = 0.95 if tr.carrier == p else (0.75 if tr.carrier == null or (tr.carrier is Mech and tr.carrier.team != p.team) else 0.45)
+		"battery", "seal": v = 0.9 if p.carry >= 3 else (0.6 if p.carry > 0 else 0.35)
+		"soccer": v = 0.75
+		"escape4", "escape8": v = 0.9 if p.ai_urgent else 0.15
+		"raid": v = 0.4
+	return v * k
+
+# 已经在据点 / 花车圈里：横移不要走出去
+func stay_in_obj(p: Mech, mv: Vector2) -> Vector2:
+	if p.foot or mv.length() < 0.01: return mv
+	var nx := p.x + mv.normalized().x * 48; var ny := p.y + mv.normalized().y * 48
+	if mode == "zone" and in_zone(p.x, p.y) and not in_zone(nx, ny):
+		var Z: Dictionary = MC.ZONE
+		var c := Vector2((float(Z.x0) + float(Z.x1)) * 0.5 * CELL, (float(Z.y0) + float(Z.y1)) * 0.5 * CELL)
+		return (c - Vector2(p.x, p.y)).normalized() * 0.7 + mv * 0.3
+	if mode == "park":
+		var fc := Vector2(obj.fl.x, obj.fl.y); var r := float(MC.PARK.r)
+		if Vector2(p.x, p.y).distance_to(fc) < r and Vector2(nx, ny).distance_to(fc) > r * 0.9:
+			return (fc - Vector2(p.x, p.y)).normalized() * 0.7 + mv * 0.3
+	return mv
+
+# 足球：球在射程里、而且打过去是往对方球门推，就打球
+func soccer_shot(p: Mech, rng_w: float) -> bool:
+	var b: Dictionary = obj.ball
+	var to_ball := Vector2(b.x - p.x, b.y - p.y)
+	var to_goal := Vector2((W if p.team == 1 else 0.0) - b.x, H / 2 - b.y).normalized()
+	if to_ball.length() < rng_w * 1.1 and to_ball.normalized().dot(to_goal) > 0.15 and p.ammo >= 1:
+		p.inp.a = to_ball.angle(); p.inp.ad = to_ball.length(); p.inp.pt = -0.02; p.inp.f = true; p.inp.w = false
+		return true
+	return false
+
+# 敌人躲进草丛 / 隐身：按最后看见的位置揣测。正常玩家只会过去看一眼；有点实力以上会朝可能的位置试探性开火；越久越不准
+func ai_guess(p: Mech, w: Dictionary, rng_w: float, melee: bool, dt: float) -> bool:
+	var mem_t := float(p.pz.get("mem", 0.0))
+	if mem_t <= 0 or p.foot or mode in ["loot"]: return false
+	var best = null; var bd := 1e9
+	for id in p.ai_mem.keys():
+		var m: Array = p.ai_mem[id]
+		var age: float = time - float(m[4])
+		if age > mem_t: p.ai_mem.erase(id); continue
+		var e := player_by(int(id))
+		if e == null or not e.alive or visible_to(p.team, e): continue
+		var d := Vector2(float(m[0]) - p.x, float(m[1]) - p.y).length()
+		if d < bd and d < rng_w + 260: bd = d; best = [m, age, e]
+	if best == null: return false
+	var m: Array = best[0]; var age: float = best[1]; var e: Mech = best[2]
+	# 揣测的位置：最后位置 + 一点点速度外推 + 越久越大的误差（不会知道真实位置）
+	var guess := Vector2(float(m[0]) + float(m[2]) * minf(age, 0.8) * 0.5, float(m[1]) + float(m[3]) * minf(age, 0.8) * 0.5)
+	p.ai_guess_t -= dt
+	if p.ai_guess_t <= 0:
+		p.ai_guess_t = 0.5
+		var err := 55.0 + 140.0 * age
+		p.ai_mem[e.id] = [m[0], m[1], m[2], m[3], m[4], guess.x + rng.randf_range(-err, err), guess.y + rng.randf_range(-err, err)]
+		m = p.ai_mem[e.id]
+	var aim := Vector2(float(m[5]), float(m[6])) if m.size() > 6 else guess
+	var to := aim - Vector2(p.x, p.y)
+	var inp := p.inp
+	if to.length() > 110:
+		var dir := to.normalized()
+		inp.mx = dir.x; inp.my = dir.y
+	else: inp.mx = 0; inp.my = 0
+	inp.a = to.angle(); inp.ad = to.length(); inp.pt = -0.03; inp.w = false
+	if float(p.pz.get("guess", 0.0)) <= 0 and to.length() < 140: inp.mx = 0; inp.my = 0   # 正常玩家：走过去看一眼，不会乱开火
+	var fk := float(p.pz.get("guess", 0.0)) * maxf(0.0, 1.0 - age / mem_t)   # 越久越不敢确定
+	inp.f = fk > 0 and to.length() < rng_w + (30.0 if melee else 0.0) and rng.randf() < fk and p.ammo >= 2.0
+	return true
+
 func base_pos(team: int) -> Vector2:
 	return Vector2(6 * CELL if team == 1 else W - 6 * CELL, H / 2)
 
@@ -2496,7 +2614,7 @@ func mode_goal(p: Mech):
 			for b in obj.balloons:
 				var d := Vector2(b.x - p.x, b.y - p.y).length()
 				if d < bd: bd = d; best = b
-			if best != null and (p.slot % 2 == 1 or rng.randf() < 0.3): return Vector2(best.x, best.y)
+			if best != null and bd < 240 and (p.slot % 3 == 2 or rng.randf() < 0.15): return Vector2(best.x, best.y)   # 3.2：大部分人跟着花车得分，顺路才打气球
 			var ah := park_pos(obj.fl.k + 0.03)
 			return Vector2(clampf(ah.x + rng.randf_range(-50, 50), 40, W - 40), clampf(ah.y + rng.randf_range(-50, 50), 40, H - 40))
 		"escape4", "escape8":
@@ -2512,7 +2630,7 @@ func mode_goal(p: Mech):
 			var a := rng.randf() * TAU; var rr: float = rng.randf() * safe.r * 0.6
 			return Vector2(clampf(safe.x + cos(a) * rr, 40, W - 40), clampf(safe.y + sin(a) * rr, 40, H - 40))
 		"zone":
-			if rng.randf() < 0.75:
+			if true:   # 3.2：所有人都要去据点（以前只有 75% 的时候会去）
 				var Z: Dictionary = MC.ZONE
 				return Vector2(rng.randf_range(float(Z.x0) + 1, float(Z.x1) - 1) * CELL, rng.randf_range(float(Z.y0) + 1, float(Z.y1) - 1) * CELL)
 		"escort":
@@ -2920,7 +3038,7 @@ func add_late_squad(t: int) -> Array:
 		var pil: String = D.pilotOrder[rng.randi() % D.pilotOrder.size()]
 		var wpn: String = str(D.pilots[pil].weapon) if rng.randf() < 0.5 else str(D.order[rng.randi() % D.order.size()])
 		var q := add_player(next + 1 + i, names[i], t, pil, wpn, true, pw)
-		q.persona = "decent"; q.late = true
+		q.persona = "normal"; q.late = true
 		if risk == "high" and rng.randf() < 0.6: var bd2: Array = D.loot.bags.pack; q.inv = {"w": int(bd2[0]), "h": int(bd2[1]), "items": []}
 		rows.append([q.id, q.name, q.team, q.pilot, q.weapon, q.lv, q.bt])
 	var squads := 0; var seen := {}

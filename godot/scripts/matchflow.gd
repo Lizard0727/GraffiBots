@@ -162,11 +162,11 @@ func build_roster() -> void:
 		var Pz := Bots.persona(pid)
 		var lv: int = clampi(bot_lv + int(Pz.lv), 1, 11)
 		var pilot: String = pool_p[(i - 1) % pool_p.size()]
-		var quick: bool = pid in ["top", "god", "expert"]
+		var quick: bool = pid in ["skilled", "god", "expert"]
 		players.append({"name": nicks[i - 1], "team": int(lay[i]), "me": false, "persona": pid, "pilot": pilot if kind != "ranked" else "", "face": pilot, "mech": pool_m[(i - 1) % pool_m.size()] if kind != "ranked" else "",
 			"looks": Bots.looks(pilot, pid, tier if tier >= 0 else 2), "lv": clampi(acc_lv + randi_range(-6, 8) + int(Pz.lv) * 3, 1, 60), "plv": lv, "bt": 2 if lv >= 9 else (1 if lv >= 5 else 0),
 			"tier": clampi(tier + randi_range(-1, 1), 0, D.econ.rank.tiers.size() - 1) if tier >= 0 else 0,
-			"ready": false, "ready_at": randf_range(0.5, 3.0) if quick else randf_range(0.8, 9.0), "never": pid == "afk" and randf() < 0.45})
+			"ready": false, "ready_at": randf_range(0.5, 3.0) if quick else randf_range(0.8, 9.0), "never": pid == "noob" and randf() < 0.12})
 	for i in players.size(): players[i].idx = i
 	# 小概率有人一直不点准备（多半是对手）
 	for i in players.size(): players[i].idx = i
@@ -279,7 +279,7 @@ func enter_draft() -> void:
 	A.shuffle()   # 我第几个选是随机的
 	for p in A + B:
 		var r := randf(); var afk := 0.05 if ti >= 5 else 0.1
-		p.beh = "afk" if (r < afk or p.persona == "afk") and not p.me else ("hesitate" if r < afk + 0.2 else ("normal" if r < afk + 0.5 else "quick"))
+		p.beh = "afk" if r < afk and not p.me else ("hesitate" if r < afk + 0.2 else ("normal" if r < afk + 0.5 else "quick"))
 		if not p.me: p.pilot = ""; p.mech = ""
 		p.pick = null; p.hover = null; p.sys = false
 	players[0].pilot = ""; players[0].mech = ""

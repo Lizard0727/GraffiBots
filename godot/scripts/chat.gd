@@ -59,7 +59,7 @@ func say(p, trigger: String, o := {}) -> bool:
 	q.append({"at": at, "p": p, "text": text, "ch": ch, "depth": int(o.get("depth", 0)), "style": style})
 	ps.said = int(ps.said) + 1; ps.chat_at = t; gap_until = t + randf_range(1.2, 3.0)
 	# 活着打长句的普通玩家会停下来打字
-	if p.alive and text.length() >= 6 and not p.persona in ["top", "god", "expert"] and randf() < 0.4: p.typing_t = at - t
+	if p.alive and text.length() >= 6 and not p.persona in ["skilled", "god", "expert"] and randf() < 0.4: p.typing_t = at - t
 	return true
 
 func tick(dt: float) -> void:

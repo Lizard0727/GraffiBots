@@ -12,7 +12,7 @@ static func init(data: Dictionary) -> void:
 	skins = data.econ.get("skins", [])
 
 static func persona(id: String) -> Dictionary:
-	return B.personas.get(id, B.personas.decent)
+	return B.personas.get(id, B.personas.normal)
 
 static func persona_name(id: String) -> String: return str(persona(id).name)
 
@@ -34,7 +34,7 @@ static func roll(tier: int, lv: int) -> String:
 	for i in w.size():
 		r -= float(w[i])
 		if r < 0: return str(B.order[i])
-	return "decent"
+	return "normal"
 
 # 给一局里所有 AI 分配性格；两队实力差太多就重抽（最多 5 次）
 static func assign(slot_teams: Array, tier: int, humans: Dictionary, lv: int) -> Array:

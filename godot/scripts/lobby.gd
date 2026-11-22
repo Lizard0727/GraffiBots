@@ -668,6 +668,7 @@ func settings_popup() -> void:
 		"display":
 			var fs := CheckButton.new(); fs.button_pressed = S2.fullscreen; fs.toggled.connect(func(x): S2.fullscreen = x; applyf.call()); row.call("全屏（F11）", fs)
 			var vsy := CheckButton.new(); vsy.button_pressed = S2.vsync; vsy.toggled.connect(func(x): S2.vsync = x; applyf.call()); row.call("垂直同步", vsy)
+			var fpsb := CheckButton.new(); fpsb.button_pressed = S2.show_fps; fpsb.toggled.connect(func(x): S2.show_fps = x; applyf.call()); row.call("显示帧率", fpsb)
 			var fp := OptionButton.new()
 			for f in Settings.FPS_OPTIONS: fp.add_item(I18n.t("不限") if f == 0 else "%d FPS" % f)
 			fp.select(max(0, Settings.FPS_OPTIONS.find(S2.max_fps))); fp.item_selected.connect(func(k): S2.max_fps = Settings.FPS_OPTIONS[k]; applyf.call()); row.call("帧率上限", fp)

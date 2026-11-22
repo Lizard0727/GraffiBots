@@ -94,7 +94,23 @@ const out = {
     mech: Object.fromEntries(S.WEAPON_ORDER.map((id) => [id, S.hex('mech', id).vals])), pilot: Object.fromEntries(S.PILOTS.map((P) => [P.id, S.hex('pilot', P.id).vals])) },
   lootMap, loot: lootCfg,
   // 电脑版 3.0：AI 性格 / 昵称 / 聊天、结算评级、强度参考、稀有度、头部装饰、克制表、排位禁用建议
-  bots: ((B) => ({ personas: B.PERSONAS, order: B.ORDER, mix: B.MIX, nicksZh: B.NICKS_ZH, nicksEn: B.NICKS_EN, lines: B.LINES, reply: B.REPLY }))(require('../public/bots.js')),
+  // 3.2：电脑版 AI 改成 5 档（菜鸟 / 正常玩家 / 有点实力 / 高手 / 大神），每档的反应、准度、提前量、走位、技能、集火、撤退、隐身判断都不同
+  bots: ((B) => {
+    const P = B.PERSONAS;
+    const personas = {
+      noob:    Object.assign({}, P.noob, { name: '菜鸟', en: 'Rookie', obj: 0.75, guess: 0, mem: 0, dodge: 0 }),
+      normal:  Object.assign({}, P.decent, { name: '正常玩家', en: 'Casual', react: [0.22, 0.42], aim: 0.22, lead: 0.45, fire: 0.45, retreat: 0.25, skill: 0.035, ov: 0.08, strafe: [0.5, 1.3], strafeK: 0.7,
+        pow: 0.8, obj: 0.85, guess: 0, mem: 0.6, dodge: 0.1, styles: { nice: 4, chill: 4, noob: 1, toxic: 1 } }),
+      skilled: Object.assign({}, P.decent, { name: '有点实力', en: 'Skilled', react: [0.14, 0.28], aim: 0.14, lead: 0.75, fire: 0.6, retreat: 0.32, skill: 0.05, ov: 0.18, strafe: [0.35, 0.9], strafeK: 0.85,
+        jump: [1, 2.8], pow: 1.25, obj: 0.92, guess: 0.08, mem: 1.2, dodge: 0.3, styles: { nice: 3, lead: 2, chill: 2, toxic: 1 } }),
+      expert:  Object.assign({}, P.expert, { name: '高手', en: 'Expert', react: [0.08, 0.18], aim: 0.09, fire: 0.75, strafe: [0.25, 0.7], strafeK: 0.95, obj: 0.97, guess: 0.22, mem: 2.5, dodge: 0.55, pow: 1.8 }),
+      god:     Object.assign({}, P.god, { name: '大神', en: 'Godlike', obj: 1, guess: 0.32, mem: 3.0, dodge: 0.8 }),
+    };
+    // 权重：菜鸟 正常 有点实力 高手 大神（普通赛按等级插值，排位赛按段位）
+    const mix = { low: [34, 42, 16, 6, 2], high: [16, 34, 28, 16, 6],
+      rank: [[38, 42, 14, 5, 1], [32, 42, 18, 6, 2], [26, 40, 22, 9, 3], [20, 36, 26, 14, 4], [14, 32, 30, 18, 6], [10, 26, 32, 24, 8], [6, 20, 32, 30, 12], [4, 14, 30, 36, 16], [2, 10, 26, 40, 22], [1, 6, 22, 42, 29]] };
+    return { personas, order: ['noob', 'normal', 'skilled', 'expert', 'god'], mix, nicksZh: B.NICKS_ZH, nicksEn: B.NICKS_EN, lines: B.LINES, reply: B.REPLY };
+  })(require('../public/bots.js')),
   badges: S.BADGES, meta: S.META, rare: S.RARE, heads: S.HEADS,
   counters: Object.fromEntries([...S.WEAPON_ORDER, ...S.PILOTS.map((P) => P.id)].map((id) => [id, S.countersOf(id)])),
   banCounters: E.COUNTERS, banWhy: E.BAN_WHY,

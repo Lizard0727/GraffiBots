@@ -17,6 +17,7 @@ const DEFAULT_KEYS := {"up": KEY_W, "down": KEY_S, "left": KEY_A, "right": KEY_D
 
 var fullscreen := false
 var vsync := true
+var show_fps := true     # 3.2：左上角显示帧率
 var max_fps := 0
 var render_scale := 1.0
 var quality := "high"
@@ -30,6 +31,7 @@ func _init() -> void:
 	if c.load(PATH) != OK: return
 	fullscreen = c.get_value("display", "fullscreen", fullscreen)
 	vsync = c.get_value("display", "vsync", vsync)
+	show_fps = c.get_value("display", "show_fps", show_fps)
 	max_fps = c.get_value("display", "max_fps", max_fps)
 	render_scale = c.get_value("display", "render_scale", render_scale)
 	quality = c.get_value("display", "quality", quality)
@@ -41,7 +43,7 @@ func _init() -> void:
 
 func save() -> void:
 	var c := ConfigFile.new()
-	c.set_value("display", "fullscreen", fullscreen); c.set_value("display", "vsync", vsync); c.set_value("display", "max_fps", max_fps)
+	c.set_value("display", "fullscreen", fullscreen); c.set_value("display", "vsync", vsync); c.set_value("display", "show_fps", show_fps); c.set_value("display", "max_fps", max_fps)
 	c.set_value("display", "render_scale", render_scale); c.set_value("display", "quality", quality); c.set_value("display", "lang", lang)
 	c.set_value("audio", "sfx", sfx_db); c.set_value("audio", "music", music_db)
 	for a in keys: c.set_value("keys", a, keys[a])
