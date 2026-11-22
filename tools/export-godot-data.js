@@ -81,6 +81,11 @@ const out = {
   hex: { axes: S.HEX_AXES, grades: S.GRADES,
     mech: Object.fromEntries(S.WEAPON_ORDER.map((id) => [id, S.hex('mech', id).vals])), pilot: Object.fromEntries(S.PILOTS.map((P) => [P.id, S.hex('pilot', P.id).vals])) },
   lootMap, loot: lootCfg,
+  // 电脑版 3.0：AI 性格 / 昵称 / 聊天、结算评级、强度参考、稀有度、头部装饰、克制表、排位禁用建议
+  bots: ((B) => ({ personas: B.PERSONAS, order: B.ORDER, mix: B.MIX, nicksZh: B.NICKS_ZH, nicksEn: B.NICKS_EN, lines: B.LINES, reply: B.REPLY }))(require('../public/bots.js')),
+  badges: S.BADGES, meta: S.META, rare: S.RARE, heads: S.HEADS,
+  counters: Object.fromEntries([...S.WEAPON_ORDER, ...S.PILOTS.map((P) => P.id)].map((id) => [id, S.countersOf(id)])),
+  banCounters: E.COUNTERS, banWhy: E.BAN_WHY,
   maps, colors: S.COLOR_SETS.map((c) => c.c),
 };
 const json = JSON.stringify(out).replace(/·/g, '•').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]\uFE0F?/gu, '');   // Godot 版的字体没有「·」

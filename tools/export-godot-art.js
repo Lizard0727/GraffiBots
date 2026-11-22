@@ -37,6 +37,13 @@ const pub = path.join(__dirname, '..', 'public'), out = path.join(__dirname, '..
   }
   const icons = await p.evaluate(() => GI.names);
   for (const n of icons) save(`icons/${n}.png`, await render(await p.evaluate((n) => GI.svg(n), n), 96, 96));
+  // 头像（avatarSvg 原样取自 client.js）
+  fs.mkdirSync(path.join(out, 'avatars'), { recursive: true });
+  const cj = fs.readFileSync(path.join(pub, 'client.js'), 'utf8');
+  const avSrc = cj.slice(cj.indexOf('function avatarSvg(a)'), cj.indexOf('function wearing(K)'));
+  await p.evaluate((src) => { window.avatarSvg = new Function(src + '; return avatarSvg;')(); }, avSrc);
+  const avs = await p.evaluate(() => GS.SKINS.filter((k) => k.kind === 'avatar').map((k) => k.avatar));
+  for (const a of avs) save(`avatars/${a}.png`, await render((await p.evaluate((a) => window.avatarSvg(a), a)).replace(/stroke-width="3" stroke-linejoin="round"( fill="none")? stroke-width=/g, 'stroke-linejoin="round"$1 stroke-width=').replace(/stroke-width="3" stroke-linejoin="round" (\w+="[^"]*" )?stroke-width=/g, 'stroke-linejoin="round" $1stroke-width=').replace("<svg ", "<svg xmlns=\"http://www.w3.org/2000/svg\" "), 160, 160));
   const chests = await p.evaluate(() => Object.keys(GE ? GE.CHESTS : {}));
   for (const c of chests) {
     save(`chests/${c}.png`, await render(await p.evaluate((c) => GI.chestArt(c), c), 240, 260));

@@ -141,3 +141,68 @@ class Splash extends Control:
 			if r.randf() < 0.45:   # 往下流的涂料
 				var x := p.x + r.randf_range(-rad * 0.5, rad * 0.5)
 				draw_line(Vector2(x, p.y), Vector2(x, p.y + rad * r.randf_range(1.2, 3.0)), Color(c, 0.18), r.randf_range(3, 8))
+
+# ---------------- 头像 + 头像框（和网页版 style.css 的 frame-* 一样的配色和动画）----------------
+const FRAMES := {
+	"tape": {"cols": ["#f4e7a8", "#e6d28a"], "stripe": true, "spin": 0.0},
+	"neon": {"cols": ["#141018"], "glow": "#2ef0c8", "pulse": true, "spin": 0.0},
+	"rebel": {"cols": ["#ff5a36", "#141018"], "stripe": true, "spin": 0.6},
+	"gold": {"cols": ["#b88a1a", "#fff3c4", "#ffc531", "#b88a1a"], "spin": 0.5},
+	"master": {"cols": ["#b06bff", "#ff6ec4", "#7ab8ff"], "glow": "#b06bff", "spin": 2.1},
+	"flame": {"cols": ["#ff3b52", "#ff8a1f", "#ffe600", "#ff8a1f"], "glow": "#ff8a1f", "spin": 2.6},
+	"yato": {"cols": ["#8a6bff", "#d8b25a", "#ff2d4b"], "glow": "#8a6bff", "spin": 1.8},
+	"final": {"cols": ["#ffe14d", "#ff3b52", "#b06bff", "#7ab8ff"], "glow": "#ffe14d", "spin": 2.9},
+	"merc": {"cols": ["#e0a030", "#3a3d48", "#ff4d3d", "#e8d8a8"], "glow": "#e0a030", "spin": 2.1},
+}
+
+static var _circle_mat: ShaderMaterial
+static func circle_mat() -> ShaderMaterial:
+	if _circle_mat == null:
+		var sh := Shader.new()
+		sh.code = "shader_type canvas_item;\nuniform vec4 bg : source_color = vec4(0.1,0.08,0.2,1.0);\nvoid fragment(){ float d = distance(UV, vec2(0.5)); vec4 t = texture(TEXTURE, UV); vec4 c = mix(bg, vec4(t.rgb, 1.0), t.a); c.a = 1.0 - smoothstep(0.48, 0.5, d); COLOR = c; }"
+		_circle_mat = ShaderMaterial.new(); _circle_mat.shader = sh
+	return _circle_mat
+
+# tex_path：头像图片（驾驶员头像或头像皮肤）；frame：头像框（"" = 普通白边，或 FRAMES 的名字）；ring：没有头像框时的描边颜色
+static func avatar(tex_path: String, frame := "", size := 64.0, ring := Color("#f2eefc")) -> Avatar:
+	var a := Avatar.new(); a.frame = frame; a.ring = ring; a.custom_minimum_size = Vector2(size, size); a.size = Vector2(size, size)
+	var t := TextureRect.new(); t.texture = tex(tex_path); t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	t.material = circle_mat(); t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pad := size * (0.12 if frame != "" else 0.06)
+	t.position = Vector2(pad, pad); t.size = Vector2(size - pad * 2, size - pad * 2); t.custom_minimum_size = t.size
+	a.add_child(t); a.inner = t
+	return a
+
+class Avatar extends Control:
+	var frame := ""
+	var ring := Color.WHITE
+	var inner: TextureRect
+	var t := 0.0
+	func _ready() -> void: mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _process(delta: float) -> void:
+		if frame != "" and is_visible_in_tree(): t += delta; queue_redraw()
+	func _draw() -> void:
+		var c := size / 2; var r := minf(size.x, size.y) / 2
+		draw_circle(c + Vector2(0, r * 0.06), r, Color(0, 0, 0, 0.35))
+		if frame == "" or not UIKit.FRAMES.has(frame):
+			draw_circle(c, r, Color("#141018")); draw_circle(c, r * 0.95, ring)
+			return
+		var F: Dictionary = UIKit.FRAMES[frame]
+		if F.has("glow"):
+			var g := Color(str(F.glow)); var k := 0.5 + 0.5 * sin(t * 4.0) if F.get("pulse", false) else 1.0
+			for i in 4: draw_circle(c, r * (1.0 + 0.04 * (4 - i)), Color(g.r, g.g, g.b, 0.12 * k))
+		draw_circle(c, r, Color("#141018"))
+		var cols: Array = F.cols; var n := 48
+		var rot := t * float(F.spin)
+		for i in n:
+			var a0 := TAU * i / n + rot; var a1 := TAU * (i + 1) / n + rot
+			var col: Color
+			if F.get("stripe", false): col = Color(str(cols[(i / 3) % cols.size()]))
+			else:
+				var f := float(i) / n * cols.size(); var j := int(f) % cols.size()
+				col = Color(str(cols[j])).lerp(Color(str(cols[(j + 1) % cols.size()])), f - floor(f))
+			var pts := PackedVector2Array([c + Vector2(cos(a0), sin(a0)) * r * 0.97, c + Vector2(cos(a1), sin(a1)) * r * 0.97, c + Vector2(cos(a1), sin(a1)) * r * 0.8, c + Vector2(cos(a0), sin(a0)) * r * 0.8])
+			draw_colored_polygon(pts, col)
+		if F.has("glow") and F.get("pulse", false): draw_arc(c, r * 0.88, 0, TAU, 48, Color(str(F.glow)), r * 0.1)
+		draw_arc(c, r * 0.97, 0, TAU, 48, Color("#141018"), 2.0)
+		draw_arc(c, r * 0.8, 0, TAU, 48, Color("#141018"), 2.0)

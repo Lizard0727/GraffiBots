@@ -85,6 +85,9 @@ var bag_open := false
 var loot_ui: Control
 var loot_ui_t := 0.0
 var ranked_bans := {}
+var prep := {}            # 匹配阶段定好的阵容（matchflow.gd）：players[i] 对应 team_layout 的第 i 个位置
+var matchflow: MatchFlow
+var thumbs: Thumbs
 var shot_t := 0.0
 
 # 触屏
@@ -121,8 +124,11 @@ func _ready() -> void:
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var layer := CanvasLayer.new(); add_child(layer); layer.add_child(hud)
 	accounts = Accounts.new()
+	Bots.init(data)
 	profile = load_profile()
 	lobby = Lobby.new(self); menu = lobby; layer.add_child(menu)
+	matchflow = MatchFlow.new(self); layer.add_child(matchflow)
+	thumbs = Thumbs.new(self); add_child(thumbs)
 	result_ui = Control.new(); result_ui.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.theme = theme_ui; result_ui.visible = false; layer.add_child(result_ui)
 	build_map(0)
 	mode_view = ModeView.new(); add_child(mode_view)
@@ -132,11 +138,17 @@ func _ready() -> void:
 	if not autoplay:
 		if OS.get_environment("GB_TAB") != "" and int(profile.o.tut) == 0:   # 截图用：直接给个开好宝箱的账号
 			profile.tutorial(); profile.open_chest("starter"); profile.o.gems = 600
+		if OS.get_environment("GB_RICH") != "":   # 截图用：全部驾驶员和机体
+			for id in data.pilotOrder: profile.o.pilots[id] = {"lv": 7, "bt": 1}
+			for id in data.order:
+				if not profile.o.mechs.has(id): profile.o.mechs.append(id)
+			profile.o.rank.rp = 700
 		lobby.refresh()
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
 		var pop := OS.get_environment("GB_POPUP")   # 截图用
+		if OS.get_environment("GB_FLOW") != "": queue_match(OS.get_environment("GB_FLOW"))
 		if pop == "account": lobby.account_popup()
 		elif pop != "": lobby.account_form(pop)
 		if OS.get_environment("GB_SHOT") == "": splash(layer)
@@ -472,7 +484,10 @@ func show_result() -> void:
 			var l := Label.new(); l.text = v; l.add_theme_font_size_override("font_size", 15); l.add_theme_color_override("font_color", Color.WHITE if p == me else c); grid.add_child(l)
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); box.add_child(hb)
 	var again := Button.new(); again.text = "再来一局"; again.custom_minimum_size = Vector2(220, 60)
-	again.pressed.connect(func(): result_ui.visible = false; start_match(sel_pilot, sel_mech) if autoplay else (lobby.ranked_start() if sim.ranked else (start_loot(loot_risk) if sim.loot else start_from_lobby()))); hb.add_child(again)
+	again.pressed.connect(func():
+		result_ui.visible = false
+		if autoplay: start_match(sel_pilot, sel_mech)
+		else: back_to_lobby(); queue_match("ranked" if sim.ranked else ("loot" if sim.loot else "normal"))); hb.add_child(again)
 	var back := Button.new(); back.text = "返回菜单"; back.custom_minimum_size = Vector2(220, 60)
 	back.pressed.connect(func(): result_ui.visible = false; back_to_lobby()); hb.add_child(back)
 	result_ui.visible = true
@@ -494,14 +509,17 @@ func start_match(pilot: String, mech: String) -> void:
 	sim.ranked = ranked_on
 	var lay := sim.team_layout()
 	var pw: Dictionary = {"lv": 7, "bt": 1} if autoplay else profile.power(pilot)
-	me = sim.add_player(1, "你", lay[0], pilot, mech, false, pw)
+	me = sim.add_player(1, "你" if autoplay or str(profile.o.name) == "" else str(profile.o.name), lay[0], pilot, mech, false, pw)
+	if not autoplay: me.looks = profile.my_looks()
 	var blv: int = int(pw.lv)   # AI 强度跟着玩家等级（原版：人类玩家的平均等级）
 	var bot_pw := {"lv": blv, "bt": 2 if blv >= 9 else (1 if blv >= 5 else 0)}
 	if ranked_on: bot_pw = profile.rank_bot_power()
 	var pool_p: Array = data.pilotOrder.duplicate(); pool_p.erase(pilot); pool_p.shuffle()
 	var pool_m: Array = data.order.duplicate(); pool_m.shuffle()
 	if ranked_on:   # 被禁用的驾驶员 / 机体 AI 也不能用
-		pool_p.erase(ranked_bans.get("pilot", "")); pool_m.erase(ranked_bans.get("mech", ""))
+		for b in ranked_bans.get("pilots", []): pool_p.erase(b)
+		for b in ranked_bans.get("mechs", []): pool_m.erase(b)
+	var pers: Array = Bots.assign(lay.slice(1), profile.rank_tier(int(profile.o.rank.rp)) if ranked_on else -1, {1: 1}, blv) if not autoplay else []
 	var names := BOT_NAMES.duplicate(); names.shuffle()
 	var remote: Array = net.room.players.filter(func(q): return int(q.peer) != 1) if net.role == "host" else []
 	peer_ids = {}
@@ -511,7 +529,15 @@ func start_match(pilot: String, mech: String) -> void:
 			var q := sim.add_player(i + 1, str(rp.name), lay[i], str(rp.pilot), str(rp.weapon), false, rp.get("power", {}))
 			peer_ids[int(rp.peer)] = q.id
 			continue
-		sim.add_player(i + 1, names[(i - 1) % names.size()] + ("" if i <= names.size() else str(i)), lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
+		var pp: Array = prep.get("players", [])
+		if i < pp.size():   # 匹配 / 选人阶段已经定好的对手和队友
+			var e: Dictionary = pp[i]
+			var bp := {"lv": clampi(int(e.lv), 1, 11), "bt": clampi(int(e.bt), 0, 2)}
+			var q2 := sim.add_player(i + 1, str(e.name), lay[i], str(e.pilot), str(e.mech), true, bp)
+			q2.persona = str(e.persona); q2.pz = Bots.persona(q2.persona); q2.looks = e.get("looks", {})
+			continue
+		var qb := sim.add_player(i + 1, names[(i - 1) % names.size()] + ("" if i <= names.size() else str(i)), lay[i], pool_p[(i - 1) % pool_p.size()], pool_m[(i - 1) % pool_m.size()], true, bot_pw)
+		if i - 1 < pers.size(): qb.persona = str(pers[i - 1]); qb.pz = Bots.persona(qb.persona)
 	spectate_id = 0
 	if is_loot:   # 带进场的装备、安全箱大小；守卫和 Boss 小队
 		var sd: Array = data.loot.safe[clampi(int(profile.o.safeLv), 1, 3)] if not autoplay else [2, 2]
@@ -558,7 +584,8 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 	if p.boss: col = Color("#5a2a7a")
 	elif p.spirit: col = Color("#9a7cff")
 	var mine: bool = p.id == 1 and not autoplay and not p.npc
-	var n := Models.build_mech(p.weapon, data.mechs[p.weapon], col, profile.pilot_look(p.pilot) if mine else data.pilots[p.pilot], profile.mech_paint() if mine else null)
+	var look: Dictionary = profile.pilot_look(p.pilot) if mine else profile.look_with(p.pilot, str(p.looks.get("pskin", "")))
+	var n := Models.build_mech(p.weapon, data.mechs[p.weapon], col, look, profile.mech_paint() if mine else profile.paint_of(str(p.looks.get("paint", ""))))
 	if p.boss: n.scale = 2.6
 	elif p.spirit: n.scale = 0.85
 	add_child(n.root)
@@ -1229,6 +1256,23 @@ func start_ranked(bans: Dictionary) -> void:
 func _input(ev: InputEvent) -> void:   # F11：全屏切换（任何时候都能用）
 	if ev is InputEventKey and ev.pressed and not ev.echo and ev.physical_keycode == KEY_F11:
 		settings.fullscreen = not settings.fullscreen; settings.apply(self); settings.save()
+
+# 大厅的「对战 / 排位 / 进入禁区」：先走匹配流程（matchflow.gd），定好阵容再开局
+func queue_match(kind: String) -> void:
+	var o: Dictionary = profile.o
+	if not profile.has_pilot(str(o.pilot)): lobby.toast("先在「驾驶员」里选一位驾驶员"); return
+	if kind == "ranked" and not profile.can_ranked(): lobby.toast("至少需要 3 位驾驶员和 3 台机体才能打排位"); return
+	if kind == "loot": loot_risk = str(o.risk)
+	matchflow.begin(kind)
+
+func launch_prepared(kind: String, mode: String, map_idx: int, pilot: String, mech: String, roster: Dictionary, bans: Dictionary) -> void:
+	sel_mode = mode; sel_map = map_idx
+	ranked_on = kind == "ranked"; ranked_bans = bans if ranked_on else {}
+	prep = roster
+	start_match(pilot, mech)
+	prep = {}
+	ranked_on = false
+	if sim != null: sim.countdown = 5.0   # 多留两秒给观察阶段
 
 func start_from_lobby() -> void:
 	var o: Dictionary = profile.o

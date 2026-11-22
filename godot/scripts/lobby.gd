@@ -223,7 +223,7 @@ func build_home() -> void:
 	var fv := vbox(0); fv.alignment = BoxContainer.ALIGNMENT_CENTER; fb.add_child(fv)
 	fv.add_child(centered(L("对 战 !", 52, Color("#3a1f05"))))
 	fv.add_child(centered(L("和 AI 驾驶员立即开打", 15, Color("#6a4510"))))
-	click(fb, func(): game.sfx.play("go"); game.start_from_lobby())
+	click(fb, func(): game.sfx.play("go"); game.queue_match("normal"))
 	var pulse := fb.create_tween().set_loops()   # 绑在按钮上：按钮被换掉时动画跟着停
 	pulse.tween_method(func(a): fb.glow.a = a; fb.queue_redraw(), 0.35, 1.0, 0.8)
 	pulse.tween_method(func(a): fb.glow.a = a; fb.queue_redraw(), 1.0, 0.35, 0.8)
@@ -998,7 +998,7 @@ func page_ranked() -> void:
 	var mv := vbox(0); mh.add_child(mv); mv.add_child(L("当前排位模式：" + str(D.modes[md].name), 18, Color.WHITE)); mv.add_child(L("%d 分钟后换模式（每 %d 小时轮换）" % [left / 60, int(D.econ.rankHours)], 13, Color("#a8a4c8")))
 	var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL; sp.mouse_filter = Control.MOUSE_FILTER_IGNORE; v.add_child(sp)
 	if P.can_ranked():
-		var go := UIKit.gold_button("开始排位", 30); go.custom_minimum_size = Vector2(0, 74); v.add_child(go); click(go, func(): ranked_start())
+		var go := UIKit.gold_button("开始排位", 30); go.custom_minimum_size = Vector2(0, 74); v.add_child(go); click(go, func(): game.queue_match("ranked"))
 	else:
 		v.add_child(UIKit.wrap(L("需要至少 %d 位驾驶员和 %d 台机体才能参加排位赛（现在 %d / %d）" % [int(R.need.pilots), int(R.need.mechs), P.o.pilots.size(), P.o.mechs.size()], 16, Color("#ff9a6b")), 440))
 	# 夺冠之路
@@ -1138,7 +1138,7 @@ func page_loot() -> void:
 	v.add_child(L("战绩：%d 次行动 • 撤离 %d 次 • 最高 %d • 累计 %d" % [int(R2.runs), int(R2.ex), int(R2.best), int(R2.total)], 13, Color("#c9c5e6")))
 	var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL; sp.mouse_filter = Control.MOUSE_FILTER_IGNORE; v.add_child(sp)
 	var go := UIKit.gold_button("进入禁区", 30); go.custom_minimum_size = Vector2(0, 70); v.add_child(go)
-	click(go, func(): game.sfx.play("go"); game.start_loot(str(P.o.risk)))
+	click(go, func(): game.sfx.play("go"); game.queue_match("loot"))
 	# 仓库
 	var rx := 24 + lw + 16; var rw := vs.x - rx - 24
 	var top := hbox(10); at(top, Vector2(rx, 152))

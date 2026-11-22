@@ -28,7 +28,8 @@ func new_profile() -> Dictionary:
 		"pass": {"xp": 0, "prem": false, "dlx": false, "cf": [], "cp": [], "bc": 0}, "mailGot": [], "mailDel": [],
 		"story": {"p": [0, 0, 0, 0, 0], "c": []}, "tl": {}, "ev": {}, "evLogin": {}, "rank": {"rp": 0, "best": 0, "road": [], "n": 0, "s": int(E.rank.season.id)},
 		"skins": [], "wear": {"pilot": {}, "mech": "", "fx": "", "frame": "", "avatar": ""}, "ranked": false,
-		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0}, "gear": {}, "gearOn": [], "safeLv": 1, "risk": "normal"}
+		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0}, "gear": {}, "gearOn": [], "safeLv": 1, "risk": "normal",
+		"face": "", "show": [], "showBg": "", "title": "", "sign": "", "mvps": 0, "deaths": 0, "badges": [0, 0, 0, 0, 0], "seenSeason": 0, "tutDone": false}
 	for k in E.start: p[k] = int(E.start[k])
 	for k in E.startExtra: p[k] = int(E.startExtra[k])
 	return p
@@ -42,7 +43,7 @@ func load_or_new() -> void:
 	if typeof(v) != TYPE_DICTIONARY or int(v.get("v", 0)) != VERSION: return
 	for k in v: o[k] = v[k]
 	# JSON 读回来的数字都是 float：整数字段转回 int
-	for k in CUR_KEYS + ["trophies", "xp", "matches", "wins", "kills", "paint", "day", "dayWin", "tpBonus", "tut", "streak", "bestStreak", "map"]:
+	for k in CUR_KEYS + ["trophies", "xp", "matches", "wins", "kills", "paint", "day", "dayWin", "tpBonus", "tut", "streak", "bestStreak", "map", "mvps", "deaths", "seenSeason"]:
 		o[k] = int(o.get(k, 0))
 	for id in o.pilots: o.pilots[id] = {"lv": int(o.pilots[id].lv), "bt": int(o.pilots[id].bt)}
 	for id in o.chests: o.chests[id] = int(o.chests[id])
@@ -54,6 +55,8 @@ func load_or_new() -> void:
 	for k in o.lootRec: o.lootRec[k] = int(o.lootRec[k])
 	o.pass.cf = o.pass.cf.map(func(x): return int(x)); o.pass.cp = o.pass.cp.map(func(x): return int(x)); o.rank.road = o.rank.road.map(func(x): return int(x))
 	o.story.c = o.story.c.map(func(x): return int(x))
+	o.badges = o.badges.map(func(x): return int(x))
+	while o.badges.size() < 5: o.badges.append(0)
 
 func save() -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)
@@ -528,6 +531,17 @@ func pilot_look(pid: String) -> Dictionary:   # 3D 模型用：把皮肤的配�
 func mech_paint():
 	var K = skin(str(o.wear.get("mech", "")))
 	return K.paint if K != null else null
+func look_with(pid: String, pskin: String) -> Dictionary:   # 别人的驾驶员皮肤配色
+	var P: Dictionary = D.pilots[pid].duplicate()
+	var K = skin(pskin)
+	if K != null and str(K.get("pilot", "")) == pid:
+		for k in K.get("over", {}): P[k] = K.over[k]
+	return P
+func paint_of(id: String):
+	var K = skin(id)
+	return K.paint if K != null and K.has("paint") else null
+func my_looks() -> Dictionary:
+	return {"pskin": pilot_skin(str(o.pilot)), "paint": str(o.wear.get("mech", "")), "fx": str(o.wear.get("fx", "")), "frame": str(o.wear.get("frame", "")), "avatar": str(o.wear.get("avatar", ""))}
 
 # ---------------- 排位赛 ----------------
 func rank_tier(rp: int) -> int:
@@ -570,6 +584,9 @@ func apply_match(rw: Dictionary) -> Dictionary:
 	o.xp += int(rw.xp); o.matches += 1
 	if rw.won: o.wins += 1
 	o.kills += int(rw.kills); o.paint += int(rw.paint)
+	o.deaths += int(rw.get("deaths", 0))
+	if rw.mvp: o.mvps += 1
+	if rw.has("badge"): o.badges[clampi(int(rw.badge), 0, 4)] += 1
 	o.trophies = max(0, tr_before + int(rw.trophies))
 	var evs := active_events()
 	var mode: String = rw.mode
@@ -737,3 +754,62 @@ func safe_up() -> Dictionary:
 	if int(o.coins) < cost: return no("金币不够（需要 %d）" % cost)
 	o.coins -= cost; o.safeLv = lv + 1
 	return ok()
+
+# ================= 个人资料：头像 / 头像框 / 展示框 / 称号 / 签名 =================
+func avatar_path() -> String:
+	var av = skin(str(o.wear.get("avatar", "")))
+	if av != null: return "res://art/avatars/%s.png" % av.avatar
+	var pid: String = str(o.face) if str(o.face) != "" and has_pilot(str(o.face)) else str(o.pilot)
+	if pid == "" or not D.pilots.has(pid): return "res://art/icons/pilot.png"
+	return "res://art/faces/%s.png" % art_id(pid)
+
+func frame_key() -> String:
+	var fr = skin(str(o.wear.get("frame", "")))
+	return str(fr.frame) if fr != null else ""
+
+# 别人（AI）的头像：头像皮肤 > 驾驶员皮肤头像 > 驾驶员头像
+func looks_avatar(looks: Dictionary, pilot: String) -> String:
+	var av = skin(str(looks.get("avatar", "")))
+	if av != null: return "res://art/avatars/%s.png" % av.avatar
+	if looks.get("pskin", "") != "" and ResourceLoader.exists("res://art/faces/%s.png" % looks.pskin): return "res://art/faces/%s.png" % looks.pskin
+	return "res://art/faces/%s.png" % pilot if D.pilots.has(pilot) else "res://art/icons/pilot.png"
+
+func looks_frame(looks: Dictionary) -> String:
+	var fr = skin(str(looks.get("frame", "")))
+	return str(fr.frame) if fr != null else ""
+
+# 称号：按战绩解锁
+func titles() -> Array:
+	var R: Dictionary = E.rank
+	var best: int = int(o.rank.best)
+	var out: Array = [
+		{"id": "rookie", "name": "涂鸦新兵", "ok": true, "how": "默认称号"},
+		{"id": "vet", "name": "百战老兵", "ok": int(o.matches) >= 100, "how": "打满 100 场（%d / 100）" % int(o.matches)},
+		{"id": "winner", "name": "常胜将军", "ok": int(o.wins) >= 50, "how": "赢 50 场（%d / 50）" % int(o.wins)},
+		{"id": "killer", "name": "击毁专家", "ok": int(o.kills) >= 300, "how": "累计击毁 300（%d / 300）" % int(o.kills)},
+		{"id": "painter", "name": "城市画师", "ok": int(o.paint) >= 50000, "how": "累计涂地 50000 格（%d / 50000）" % int(o.paint)},
+		{"id": "mvp", "name": "MVP 收割机", "ok": int(o.mvps) >= 20, "how": "拿到 20 次 MVP（%d / 20）" % int(o.mvps)},
+		{"id": "streak", "name": "连胜狂人", "ok": int(o.bestStreak) >= 8, "how": "最高 8 连胜（%d / 8）" % int(o.bestStreak)},
+		{"id": "looter", "name": "撤离专家", "ok": int(o.lootRec.ex) >= 10, "how": "成功撤离 10 次（%d / 10）" % int(o.lootRec.ex)},
+		{"id": "rich", "name": "黑市大亨", "ok": int(o.lootRec.total) >= 100000, "how": "累计带出物资价值 100000"},
+		{"id": "pass", "name": "通行证满级", "ok": pass_level() >= int(E.pass.tiers), "how": "通行证升到 %d 级" % int(E.pass.tiers)},
+		{"id": "collector", "name": "收藏家", "ok": o.pilots.size() >= 15, "how": "拥有 15 位驾驶员（%d / 15）" % o.pilots.size()},
+	]
+	for t in range(3, R.tiers.size()):
+		out.append({"id": "rank%d" % t, "name": str(R.tiers[t].name), "ok": best >= t, "how": "排位最高达到「%s」" % R.tiers[t].name, "rank": t})
+	return out
+
+func title_name() -> String:
+	for t in titles():
+		if t.id == str(o.title) and t.ok: return t.name
+	return "涂鸦新兵"
+
+func stats() -> Array:
+	var m: int = max(1, int(o.matches))
+	return [["场次", str(o.matches)], ["胜场", str(o.wins)], ["胜率", "%d%%" % int(round(100.0 * int(o.wins) / m))], ["MVP", str(o.mvps)],
+		["击毁", str(o.kills)], ["倒下", str(o.deaths)], ["K/D", "%.2f" % (float(o.kills) / max(1, int(o.deaths)))], ["涂地", str(o.paint)],
+		["最高连胜", str(o.bestStreak)], ["奖杯", str(o.trophies)], ["排位最高", str(E.rank.tiers[int(o.rank.best)].name)], ["撤离成功", "%d / %d" % [int(o.lootRec.ex), int(o.lootRec.runs)]]]
+
+func set_show(i: int, item: Dictionary) -> void:
+	while o.show.size() <= i: o.show.append({})
+	o.show[i] = item; save()

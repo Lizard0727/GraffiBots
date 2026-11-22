@@ -150,6 +150,11 @@ class Mech:
 	var ai_urgent := false
 	var ai_seen := 0.0        # 盯住当前目标多久了（反应时间）
 	var ai_tgt := 0
+	var persona := ""        # AI 性格（bots.gd）：影响反应、瞄准、开火、挂机
+	var pz := {}
+	var afk_t := 0.0
+	var afk_next := 20.0
+	var looks := {}
 	var ai_mode_t := 0.0
 	var kills := 0
 	var deaths := 0
@@ -1638,6 +1643,13 @@ const SUPER_REACH := {"beam": 700, "missiles": 1000, "storm": 220, "bubble": 260
 func ai_think(p: Mech, dt: float) -> void:
 	if not p.alive: return
 	p.ai_t -= dt
+	# 挂机性格：隔一阵子就站着不动几秒
+	if p.pz.get("afk", false) and countdown <= 0:
+		if p.afk_t > 0:
+			p.afk_t -= dt; p.inp.mx = 0; p.inp.my = 0; p.inp.f = false; p.inp.w = false
+			return
+		p.afk_next -= dt
+		if p.afk_next <= 0: p.afk_t = rng.randf_range(4.0, 10.0); p.afk_next = rng.randf_range(15.0, 30.0)
 	var w := wdata(p)
 	var melee: bool = str(w.attack) == "punch" and not p.foot
 	var rng_w := float(side(p).range) if p.foot else float(w.range2)
@@ -1659,7 +1671,9 @@ func ai_think(p: Mech, dt: float) -> void:
 	else: p.ai_seen = 0.0; p.ai_tgt = tgt.id if tgt != null else 0
 	# 反应时间：刚看到敌人要愣一下才开火（逃亡圈里更谨慎，被打了马上还手）
 	var react := 0.3
+	if not p.pz.is_empty(): react = (float(p.pz.react[0]) + float(p.pz.react[1])) * 0.5 + 0.05
 	if mode in ["escape4", "escape8"]: react = 0.15 if time - p.last_hurt < 2.0 else 1.1
+	var aim_j := 0.06 * (float(p.pz.get("aim", 0.18)) / 0.18)
 	# 模式目标：每隔一会儿重新算一次（护送、送电池、躲毒圈、追球……）
 	p.ai_mode_t -= dt
 	if mode != "turf" and p.ai_mode_t <= 0:
@@ -1671,7 +1685,8 @@ func ai_think(p: Mech, dt: float) -> void:
 	if tgt != null and (melee or los(p.x, p.y, p.z + float(C.MUZZLE), tgt.x, tgt.y)):
 		var to := Vector2(tgt.x - p.x, tgt.y - p.y)
 		var lead := to.length() / 650.0
-		inp.a = atan2(tgt.y + tgt.vy * lead * 0.6 - p.y, tgt.x + tgt.vx * lead * 0.6 - p.x) + rng.randf_range(-0.06, 0.06)
+		var lk := 0.6 * float(p.pz.get("lead", 0.6)) / 0.6
+		inp.a = atan2(tgt.y + tgt.vy * lead * lk - p.y, tgt.x + tgt.vx * lead * lk - p.x) + rng.randf_range(-aim_j, aim_j)
 		inp.pt = atan2(tgt.z + 16 - (p.z + float(C.MUZZLE)), max(1.0, td))
 		inp.ad = td
 		var want := rng_w * (0.85 if str(w.attack) == "charge" else (0.35 if melee else 0.7))
@@ -1695,6 +1710,9 @@ func ai_think(p: Mech, dt: float) -> void:
 		else:
 			inp.f = td < rng_w + (30.0 if melee else 10.0)
 		if p.ai_seen < react: inp.f = false
+		if inp.f and not p.pz.is_empty() and rng.randf() > clampf(float(p.pz.fire) / 0.5, 0.35, 1.0): inp.f = false
+		var rt := float(p.pz.get("retreat", 0.0))
+		if rt > 0 and hp_k < rt and not melee and not p.ai_urgent: inp.mx = -dir.x + mv.x * 0.4; inp.my = -dir.y + mv.y * 0.4
 		# 技能
 		p.ai_skill -= dt
 		if p.skill_uses > 0 and p.skill_cd <= 0 and p.ai_skill <= 0:
@@ -2441,7 +2459,9 @@ func set_goal(p: Mech, g: Vector2) -> void:
 		p.ai_field = build_field(i)
 
 # 这个模式下 8 个（讨伐是 4 个）玩家位置各属于哪一队；第一个位置是真人玩家
-func team_layout() -> Array:
+func team_layout() -> Array: return Sim.layout_for(mode, teams)
+
+static func layout_for(mode: String, teams: int) -> Array:
 	if mode == "raid": return [1, 1, 1, 1]
 	if mode == "loot": return [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6]
 	if teams > 2:
