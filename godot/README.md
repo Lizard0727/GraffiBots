@@ -127,7 +127,7 @@ GitHub Releases 里的 `godot-proto` 有 `GraffiBots-Godot-Windows.zip`。解压
 | Shift | 滚轮形态 |
 | 空格 | 跳 |
 | F | 搜索 / 互动 |
-| Tab | 背包 |
+| Tab | 按住看战绩（搜刮撤离里是背包） |
 | 1~4 | 搜刮撤离：使用消耗品 |
 | N | 大地图 |
 | F11 | 全屏 |

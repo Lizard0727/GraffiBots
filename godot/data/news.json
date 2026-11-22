@@ -1,5 +1,31 @@
 [
  {
+  "ver": "3.1.1",
+  "date": "2026-11-22",
+  "title": "涂鸦机兵 电脑版 3.1.1 · 维护更新",
+  "title_en": "GraffiBots PC 3.1.1 · Maintenance",
+  "intro": "根据大家的反馈做了三项改进：击杀大通知、Tab 战绩表、胜负大字。",
+  "intro_en": "Three improvements from your feedback: kill announcements, a Tab scoreboard and a win/lose splash.",
+  "sections": [
+   {
+    "h": "对局里",
+    "h_en": "In matches",
+    "items": [
+     "击倒驾驶员时屏幕中间跳出大通知（击杀者头像 → 被击倒者头像），还有「第一滴血」「双杀 / 三杀 / 四杀 / 五杀！暴走！」；被击倒时也会提示是谁干的",
+     "机体被打爆是另一种通知：橙色警示条 + 碎掉的机甲图标（「机体击毁！」/「你的机体被打爆了」），不算进连杀",
+     "按住 Tab 查看战绩：每个人的驾驶员 / 机体、击毁、倒下、涂地和表现分（搜刮撤离里 Tab 还是背包）",
+     "对局结束先跳出「你胜利了！」/「你失败了」大字动画，再进入结算"
+    ],
+    "items_en": [
+     "Taking down a pilot shows a big center-screen announcement (killer portrait → victim), plus First Blood and Double / Triple / Quadra / Penta Kill; you also see who took you down",
+     "A destroyed mech gets its own announcement: an orange hazard band with a broken-mech icon (Mech Destroyed! / Your mech was destroyed); it doesn't count toward kill streaks",
+     "Hold Tab for the scoreboard: everyone's pilot / mech, takedowns, deaths, paint and score (Tab is still the backpack in Loot & Extract)",
+     "Matches now end with a big You won! / You lost splash before the results screen"
+    ]
+   }
+  ]
+ },
+ {
   "ver": "3.1",
   "date": "2026-11-22",
   "title": "涂鸦机兵 电脑版 3.1 ·「黎明之后」联动",

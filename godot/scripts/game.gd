@@ -506,6 +506,26 @@ func badge_chip(n: int, lose := false, size := 14) -> GCard:
 	var B: Dictionary = data.badges[n]
 	return UIKit.chip("败方MVP" if n == 4 and lose else str(B.name), Color(str(B.c)), size)
 
+# 3.1 维护：对局结束先跳「你胜利了 / 你失败了」大字（约 2.4 秒），再进结算
+func end_splash() -> void:
+	close_pause()
+	if cine != null and is_instance_valid(cine): cine.queue_free()
+	for c in result_ui.get_children(): c.queue_free()
+	var win := int(sim.result.get("winner", sim.winner))
+	var won: bool = win == me.team
+	var head := "你胜利了！" if won else ("平局" if win == 0 else "你失败了")
+	var en := "VICTORY" if won else ("DRAW" if win == 0 else "DEFEAT")
+	if sim.mode == "loot": won = me.extracted; head = "撤离成功！" if won else "撤离失败"; en = "EXTRACTED" if won else "FAILED"
+	var col := Color("#ffd23f") if won else (Color("#c9c5e6") if win == 0 and sim.mode != "loot" else Color("#ff4a5a"))
+	var sp := EndSplash.new(); sp.setup(head, en, col, won, font)
+	result_ui.add_child(sp)
+	result_ui.visible = true
+	sfx.play("win" if won else "lose")
+	if won: music.play("lobby")
+	get_tree().create_timer(2.4).timeout.connect(func():
+		if is_instance_valid(sp): sp.queue_free()
+		if state == "result": show_result())
+
 func show_result() -> void:
 	close_pause()
 	for c in result_ui.get_children(): c.queue_free()
@@ -515,7 +535,7 @@ func show_result() -> void:
 	var win := int(r.winner)
 	var md := sim.mode
 	var won: bool = win == me.team
-	var head := "胜利！" if won else ("平局" if win == 0 else "失败")
+	var head := "你胜利了！" if won else ("平局" if win == 0 else "你失败了")
 	var sub := ""
 	var pa: float = 100.0 * float(r.get("a", 0)) / max(1.0, float(r.get("tot", 1))); var pb: float = 100.0 * float(r.get("b", 0)) / max(1.0, float(r.get("tot", 1)))
 	sub = "我方 %.1f%%   对方 %.1f%%" % [pa, pb]
@@ -675,6 +695,7 @@ func begin_view() -> void:
 	DawnFx.clear(self)
 	for id in helper_nodes: helper_nodes[id].queue_free()
 	helper_nodes.clear()
+	hud.reset_kills()
 	for p in sim.players: mech_nodes[p.id] = make_mech_node(p)
 	paint_img.fill(Color(0, 0, 0, 0))
 	mini_img.copy_from(base_img_saved)
@@ -690,6 +711,7 @@ func begin_view() -> void:
 
 # 测试用（GB_DAWN=finale / guard / disc / tether）：把一个敌人拉到面前，触发联动机制，方便截图
 var _dawn_done := false
+var _kt := false
 func dawn_test_tick() -> void:
 	var kind := OS.get_environment("GB_DAWN")
 	if sim.time < 3.0: return
@@ -731,6 +753,11 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 # ---------------- 主循环 ----------------
 func _process(delta: float) -> void:
 	if OS.get_environment("GB_DAWN") != "" and sim != null and state == "play" and me != null: dawn_test_tick()
+	if OS.get_environment("GB_KILLTEST") != "" and sim != null and state == "play" and sim.time > 2.0 and not _kt:   # 截图用：假装连杀两个
+		_kt = true
+		var foes: Array = sim.players.filter(func(q): return q.team != me.team)
+		hud.kill_notice(["ko", foes[0].id, me.id], "ko"); hud.kill_notice(["wreck", foes[1].id, me.id], "wreck")
+	if OS.get_environment("GB_ENDTEST") != "" and sim != null and state == "play" and sim.time > 0.3: sim.time_left = 0.0
 	if OS.get_environment("GB_SHOT") != "" and (OS.get_environment("GB_SHOT_MENU") != "" or (sim != null and state != "menu")):   # 截图用
 		shot_t += delta
 		var sim_at := OS.get_environment("GB_SHOT_SIM")   # 按对局时间截图（机器慢的时候也准）
@@ -812,7 +839,7 @@ func _process(delta: float) -> void:
 					var fin: Array = []
 					for q in sim.players: fin.append([q.id, q.kills, q.deaths, q.painted, q.obj, q.balloons, q.float_t, q.seals, q.spirits, q.cubes, q.extracted])
 					net.broadcast_end(sim.result, fin)
-				show_result()
+				end_splash()
 		update_visuals(acc / TICK, real_dt)
 		turf_t -= delta
 		if turf_t <= 0:
@@ -1163,14 +1190,14 @@ func apply_events() -> void:
 				flash_light(pos4, Color("#ff8a1f"), 6.0, 12.0, 0.3)
 				shake = max(shake, 0.8 * near_me(e[3], e[4], 700.0))
 				sfx.play("wreck", vol_at(e[3], e[4]))
-				hud.feed(e, "击毁")
+				hud.feed(e, "击毁"); hud.kill_notice(e, "wreck")
 				if botchat != null: botchat.on_kill(player_by_id(e[2]), player_by_id(e[1]))
 				if e[1] == me.id or e[2] == me.id: hitstop(70)
 			"ko":
 				var pos5 := Vector3(e[3] * K, e[5] * K + 0.8, e[4] * K)
 				burst(pos5, team_col[e[6]], 30, 8.0, 0.22, 0.6); ring(pos5, 4.0, Color.WHITE, 0.5)
 				sfx.play("ko", vol_at(e[3], e[4]))
-				hud.feed(e, "击倒")
+				hud.feed(e, "击倒"); hud.kill_notice(e, "ko")
 				if botchat != null: botchat.on_kill(player_by_id(e[2]), player_by_id(e[1]))
 				if e[1] == me.id or e[2] == me.id: hitstop(90)
 			"use":
@@ -1662,7 +1689,7 @@ func _on_net_end(d: Dictionary) -> void:
 		q.kills = row[1]; q.deaths = row[2]; q.painted = row[3]; q.obj = row[4]; q.balloons = row[5]; q.float_t = row[6]; q.seals = row[7]; q.spirits = row[8]; q.cubes = row[9]; q.extracted = row[10]
 	sim.result = d.result; sim.winner = int(d.result.winner); sim.over = true
 	state = "result"
-	show_result()
+	end_splash()
 
 
 # ---------------- 联机自测（两个无画面进程：GB_LAN=host / GB_LAN=127.0.0.1） ----------------

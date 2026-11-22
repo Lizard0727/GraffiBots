@@ -6,6 +6,12 @@ var feeds: Array = []     # [text, color, time]
 var big_map := false      # N 键：大地图
 var banners: Array = []   # [text, color, time, pilot]
 var dmgs: Array = []      # [world pos, text, time, color, size]
+# 3.1 维护：击杀大通知（类似 MLBB）+ Tab 战绩
+var notices: Array = []   # {title, sub, killer, victim, col, t, mine, dur}
+var streak := {}          # 击杀者 id → {n, t, v: 这一串里打倒过的人}
+var first_blood := false
+var face_cache := {}
+const STREAK := ["", "", "双杀！", "三杀！", "四杀！", "五杀！暴走！"]
 
 # 状态图标：字段名 → [文字, 颜色]
 const STATUS := [
@@ -14,6 +20,158 @@ const STATUS := [
 	["lock_t", "被锁定", "#ff3b52"], ["jam_t", "干扰", "#9cff2e"], ["burn_t", "燃烧", "#ff6a1f"], ["poison_t", "中毒", "#9cff2e"],
 	["cloak_t", "隐身", "#c9c5e6"], ["rally_t", "鼓舞", "#ffd23f"], ["nano_t", "修复", "#5ff0d0"], ["sup_t", "补给", "#6dff8a"],
 ]
+
+func reset_kills() -> void:
+	notices.clear(); streak.clear(); first_blood = false
+
+func face_tex(p) -> Texture2D:
+	if p == null: return null
+	var pid: String = str(p.pilot)
+	var path := "res://art/faces/%s.png" % pid
+	if p == game.me and not game.autoplay: path = "res://art/faces/%s.png" % game.profile.art_id(pid)
+	elif str(p.looks.get("pskin", "")) != "" and ResourceLoader.exists("res://art/faces/%s.png" % p.looks.pskin): path = "res://art/faces/%s.png" % p.looks.pskin
+	if not face_cache.has(path): face_cache[path] = load(path) if ResourceLoader.exists(path) else null
+	return face_cache[path]
+
+# 击毁 / 击倒：跟我有关的、首杀、连杀都跳大通知
+func kill_notice(e: Array, kind: String) -> void:
+	var me: Sim.Mech = game.me
+	var t: Sim.Mech = game.player_by_id(e[1]); var k: Sim.Mech = game.player_by_id(e[2])
+	if t == null or t.npc and not t.spirit and not t.boss: return
+	var verb := "击毁了" if kind == "wreck" else "击倒了"
+	var title := ""; var sub := ""
+	var mine := false
+	var col := Color("#ffe14d")
+	var n := 0
+	if k != null and k != t and k.team != t.team and kind == "ko":
+		var st: Dictionary = streak.get(k.id, {"n": 0, "t": -99.0, "v": {}})
+		if game.sim.time - float(st.t) > 10.0: st = {"n": 0, "t": 0.0, "v": {}}
+		if not st.v.has(t.id): st.v[t.id] = true; st.n = int(st.n) + 1
+		st.t = game.sim.time; streak[k.id] = st
+		n = int(st.n)
+	var fb := false
+	if k != null and k != t and not first_blood and kind == "ko": first_blood = true; fb = true
+	var kname := ("你" if k == me else str(k.name)) if k != null else ""
+	var tname := "你" if t == me else str(t.name)
+	if kind == "wreck":   # 机体被打爆：另一种（橙色、机甲图标、小一号）通知
+		if k == me and t != me:
+			mine = true; col = Color("#ff9a2e"); title = "机体击毁！"; sub = "%s 的机体被你打爆了，驾驶员弹出" % tname
+		elif t == me:
+			mine = true; col = Color("#ff9a2e"); title = "你的机体被打爆了"; sub = ("%s 打爆了你的机体 • 用随身武器活下去！" % kname) if k != null and k != t else "机体损毁 • 用随身武器活下去！"
+		else: return
+	elif k == me and t != me:
+		mine = true; col = Color("#ffe14d")
+		title = "第一滴血！" if fb else (STREAK[mini(n, 5)] if n >= 2 else "击倒！")
+		sub = "你%s %s" % [verb, tname]
+	elif t == me:
+		mine = true; col = Color("#ff4a5a")
+		title = "你被击倒了"
+		sub = ("%s %s 你" % [kname, verb]) if k != null and k != t else "你倒下了"
+	elif fb or n >= 2:
+		col = game.team_col[k.team] if k.team != me.team else Color("#6dd8ff")
+		if k.team != me.team: col = Color("#ff7a5a")
+		title = "第一滴血！" if fb else STREAK[mini(n, 5)]
+		sub = "%s %s %s" % [kname, verb, tname]
+	else: return
+	if not mine and k != null and k.team == me.team: col = Color("#6dd8ff")
+	notices = notices.filter(func(x): return now() - float(x.t) < float(x.dur) and (x.mine or not mine))
+	notices.push_front({"title": title, "sub": sub, "killer": k, "victim": t, "col": col, "t": now(), "mine": mine, "dur": (1.8 if kind == "wreck" else 2.4) if mine else 1.8, "n": n, "kind": kind})
+	if notices.size() > 2: notices.pop_back()
+	if mine and k == me: game.sfx.play("wreck" if kind == "wreck" else ("win" if n >= 2 or fb else "ko"), 2.0 if n >= 2 else -2.0, 0.0)
+
+func draw_notices(vs: Vector2) -> void:
+	var y0 := vs.y * 0.24
+	var shown := 0
+	for nt in notices:
+		var age: float = now() - float(nt.t)
+		if age > float(nt.dur) or shown >= 2: continue
+		var a := clampf(age / 0.12, 0, 1) * clampf((float(nt.dur) - age) / 0.35, 0, 1)
+		var pop := 1.0 + 0.35 * maxf(0.0, 1.0 - age / 0.18)
+		var big: bool = nt.mine and nt.get("kind", "ko") == "ko"
+		var mech: bool = nt.get("kind", "ko") == "wreck"
+		var w := (560.0 if big else (480.0 if mech else 440.0)) * pop; var h := (78.0 if big else 62.0)
+		var cx := vs.x / 2; var cy := y0 + shown * 110.0
+		var col: Color = nt.col
+		# 斜切的横条 + 两端渐隐
+		var pts := PackedVector2Array([Vector2(cx - w / 2 + 24, cy - h / 2), Vector2(cx + w / 2 + 24, cy - h / 2), Vector2(cx + w / 2 - 24, cy + h / 2), Vector2(cx - w / 2 - 24, cy + h / 2)])
+		draw_colored_polygon(pts, Color(0.12, 0.08, 0.04, 0.85 * a) if mech else Color(0.04, 0.03, 0.1, 0.82 * a))
+		if mech:   # 警示斜纹
+			for i in 10:
+				var xx := cx - w / 2 + i * w / 10.0
+				draw_line(Vector2(xx, cy + h / 2), Vector2(xx + 18, cy + h / 2 - 8), Color(col, 0.5 * a), 4.0)
+		draw_polyline(PackedVector2Array([pts[0], pts[1]]), Color(col, a), 3.0)
+		draw_polyline(PackedVector2Array([pts[3], pts[2]]), Color(col, 0.6 * a), 2.0)
+		var shine := fmod(age * 1.6, 1.0)
+		draw_rect(Rect2(cx - w / 2 + shine * w, cy - h / 2, 30, h), Color(1, 1, 1, 0.06 * a))
+		# 头像：击杀者在左，被击倒的在右（打叉、变灰）
+		var r := h * 0.62
+		for side in [-1, 1]:
+			var p = nt.killer if side == -1 else nt.victim
+			var c := Vector2(cx + side * (w / 2 - r * 0.2), cy)
+			var pc: Color = game.team_col[p.team] if p != null else Color.GRAY
+			draw_circle(c, r + 4, Color(pc, a))
+			if mech and side == 1:   # 被打爆的机体：方块机身 + 裂缝 + 火星
+				draw_circle(c, r, Color(0.15, 0.12, 0.1, a))
+				draw_rect(Rect2(c - Vector2(r * 0.55, r * 0.45), Vector2(r * 1.1, r * 0.8)), Color(pc.darkened(0.3), a))
+				draw_rect(Rect2(c - Vector2(r * 0.3, r * 0.75), Vector2(r * 0.6, r * 0.32)), Color(0.8, 0.9, 1.0, 0.7 * a))
+				draw_polyline(PackedVector2Array([c + Vector2(-r * 0.2, -r * 0.45), c + Vector2(r * 0.05, -r * 0.05), c + Vector2(-r * 0.1, r * 0.15), c + Vector2(r * 0.2, r * 0.35)]), Color(1, 0.6, 0.2, a), 3.0)
+				for k2 in 4: draw_circle(c + Vector2(cos(age * 6 + k2) * r * 0.8, sin(age * 6 + k2 * 1.7) * r * 0.6), 3.0, Color(1, 0.6, 0.2, a * (1.0 - age / 1.8)))
+				continue
+			var tx := face_tex(p)
+			if tx != null: draw_texture_rect(tx, Rect2(c - Vector2(r, r), Vector2(r * 2, r * 2)), false, Color(1, 1, 1, a) if side == -1 else Color(0.55, 0.55, 0.6, a))
+			else: draw_circle(c, r, Color(0.2, 0.2, 0.3, a))
+			if side == 1:
+				draw_line(c + Vector2(-r * 0.6, -r * 0.6), c + Vector2(r * 0.6, r * 0.6), Color(1, 0.25, 0.3, a), 5.0)
+				draw_line(c + Vector2(r * 0.6, -r * 0.6), c + Vector2(-r * 0.6, r * 0.6), Color(1, 0.25, 0.3, a), 5.0)
+		# 中间两把交叉的刀
+		for sgn in [-1, 1]:
+			draw_line(Vector2(cx - 22 * sgn, cy + h * 0.28), Vector2(cx + 22 * sgn, cy - h * 0.28), Color(col, 0.35 * a), 4.0)
+		txt(str(nt.title), Vector2(cx, cy - h / 2 - (8 if big else 4)), int((40 if big else 28) * pop), Color(col, a), HORIZONTAL_ALIGNMENT_CENTER, 7)
+		txt(str(nt.sub), Vector2(cx, cy + 8), 20 if big else 16, Color(1, 1, 1, a), HORIZONTAL_ALIGNMENT_CENTER, 4)
+		shown += 1
+
+# Tab：战绩表（搜刮撤离里 Tab 还是背包）
+func draw_board(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
+	var ps: Array = sim.players.filter(func(q): return not q.npc and not q.spirit and not q.boss)
+	var teams: Array = []
+	for q in ps:
+		if not teams.has(q.team): teams.append(q.team)
+	teams.sort_custom(func(x, y): return (0 if x == me.team else x) < (0 if y == me.team else y))
+	var W := minf(vs.x - 80, 1060.0); var x0 := (vs.x - W) / 2
+	var rows := ps.size() + teams.size()
+	var H := 70.0 + rows * 40.0 + teams.size() * 6.0; var y := maxf(60.0, (vs.y - H) / 2)
+	draw_rect(Rect2(x0, y, W, H), Color(0.04, 0.03, 0.1, 0.9))
+	draw_rect(Rect2(x0, y, W, H), Color("#4b4396"), false, 2.0)
+	txt("战绩", Vector2(x0 + 22, y + 34), 26, Color("#ffe14d"), HORIZONTAL_ALIGNMENT_LEFT, 5)
+	txt("%s • %d:%02d" % [game.data.modes[sim.mode].name, int(maxf(0, sim.time_left)) / 60, int(maxf(0, sim.time_left)) % 60], Vector2(x0 + W - 22, y + 34), 16, Color("#c9c5e6"), HORIZONTAL_ALIGNMENT_RIGHT, 3)
+	var cols := [[0.06, "驾驶员 / 机体"], [0.5, "击毁"], [0.6, "倒下"], [0.7, "涂地"], [0.82, "表现分"]]
+	y += 52
+	for c in cols: txt(c[1], Vector2(x0 + W * c[0] + (0 if c[0] < 0.1 else 20), y), 14, Color("#a8a4c8"), HORIZONTAL_ALIGNMENT_LEFT if c[0] < 0.1 else HORIZONTAL_ALIGNMENT_CENTER, 2)
+	y += 10
+	var top := 1.0
+	for q in ps: top = maxf(top, Profile.perf(q))
+	for tm in teams:
+		var tc: Color = game.team_col[tm]
+		draw_rect(Rect2(x0 + 10, y, W - 20, 3), tc)
+		y += 6
+		var mem: Array = ps.filter(func(q): return q.team == tm)
+		mem.sort_custom(func(a2, b2): return Profile.perf(a2) > Profile.perf(b2))
+		for q in mem:
+			if q == me: draw_rect(Rect2(x0 + 10, y, W - 20, 38), Color(1, 0.88, 0.3, 0.12))
+			var tx := face_tex(q)
+			if tx != null: draw_texture_rect(tx, Rect2(x0 + 18, y + 3, 32, 32), false, Color(1, 1, 1, 1 if q.alive or not q.out else 0.4))
+			var nm := ("你" if q == me else str(q.name))
+			txt(nm, Vector2(x0 + 60, y + 18), 17, Color.WHITE if q.alive else Color("#8a84b0"), HORIZONTAL_ALIGNMENT_LEFT, 3)
+			txt("%s / %s" % [game.data.pilots[q.pilot].name, game.data.mechs[q.weapon].short if game.data.mechs[q.weapon].has("short") else game.data.mechs[q.weapon].name], Vector2(x0 + 60, y + 34), 12, Color(tc.lightened(0.3)), HORIZONTAL_ALIGNMENT_LEFT, 2)
+			txt(str(q.kills), Vector2(x0 + W * 0.5 + 20, y + 25), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 3)
+			txt(str(q.deaths), Vector2(x0 + W * 0.6 + 20, y + 25), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 3)
+			txt(str(q.painted), Vector2(x0 + W * 0.7 + 20, y + 25), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 3)
+			var pf := Profile.perf(q)
+			draw_rect(Rect2(x0 + W * 0.76, y + 16, W * 0.16, 8), Color(0, 0, 0, 0.6))
+			draw_rect(Rect2(x0 + W * 0.76, y + 16, W * 0.16 * pf / top, 8), Color("#ffe14d") if pf >= top else tc)
+			txt(str(int(pf)), Vector2(x0 + W * 0.94, y + 25), 15, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 3)
+			y += 40
+	txt("松开 Tab 关闭", Vector2(vs.x / 2, y + 22), 13, Color("#a8a4c8"), HORIZONTAL_ALIGNMENT_CENTER, 2)
 
 func now() -> float:
 	return Time.get_ticks_msec() / 1000.0
@@ -199,6 +357,8 @@ func _draw() -> void:
 	for f in feeds:
 		if now() - f[2] > 5: continue
 		txt(f[0], Vector2(vs.x - 20, fy), 15, f[1], HORIZONTAL_ALIGNMENT_RIGHT, 3); fy += 22
+	draw_notices(vs)
+	if not sim.loot and not game.chat_open and (Input.is_physical_key_pressed(KEY_TAB) or OS.get_environment("GB_BOARD") != ""): draw_board(sim, me, vs)
 	# ---- 技能横幅 / 大招特写（右侧斜条：驾驶员立绘滑进来 + 招式名） ----
 	for b in banners:
 		var age2: float = now() - b[2]
