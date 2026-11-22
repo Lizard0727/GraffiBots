@@ -114,7 +114,7 @@ static func atk_mul(S, by, t) -> float:
 		var ph := phase(by)
 		if ph == 1 or eternal(S, by): k *= 1.0 + 0.18 * frz_k(by)
 		elif ph == 3: k *= 0.85
-		k *= 1.0 + 0.05 * by.suns
+		k *= 1.0 + 0.04 * by.suns
 	if by.pilot == "coda": k *= 0.9
 	if by.pilot == "xiao":
 		var cap := 0.5 if moonless(S, by) else 0.3

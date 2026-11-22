@@ -22,15 +22,15 @@
     },
     chord: {
       name: '共鸣机兵', short: '共鸣', role: '共鸣拴索',
-      desc: '射出一根共鸣索拴住敌人，持续吸取生命（每秒 26 起，每秒 +25%，最多 3 秒），吸到的伤害 20% 回给自己。离太远或被墙挡住索会断。',
-      hp: 110, spd: 1.0, reload: 1.0, atkCd: 0.35, attack: 'tether', range: 300, leash: 360, dmg: 26, ramp: 0.25, tetherT: 3, drain: 0.2, speed: 900, size: 7,
+      desc: '射出一根共鸣索拴住敌人，持续吸取生命（每秒 30 起，每秒 +25%，最多 3 秒），吸到的伤害 30% 回给自己。离太远或被墙挡住索会断。',
+      hp: 125, spd: 1.0, reload: 1.0, atkCd: 0.35, attack: 'tether', range: 330, leash: 380, dmg: 30, ramp: 0.25, tetherT: 3, drain: 0.3, speed: 900, size: 7,
       splat: 10, trail: 6, fork: 140, special: 'resnet', spNeed: 240, collab: 'dawn', isNew: true,
     },
     vigil: {
       name: '守夜机兵', short: '守夜', role: '格挡反击',
-      desc: '点按是灯刃两连斩；按住举起夜幕盾（正面减伤 70%），松开打出反斩：伤害 = 30 + 挡下的伤害。举盾瞬间挨打是完美格挡。',
-      hp: 175, spd: 0.94, reload: 0.85, atkCd: 0.42, attack: 'guard', range: 70, arc: 1.6, dmg: 34, dmg2: 40, kb: 90, lunge: 100, paintR: 44,
-      block: 0.7, guardMax: 2.5, counter: 30, counterCap: 120, parry: 0.2, parryMul: 1.5, stun: 0.4, special: 'longnight', spNeed: 220, collab: 'dawn', isNew: true,
+      desc: '点按是灯刃两连斩；按住举起夜幕盾（正面减伤 70%），松开打出反斩：伤害 = 40 + 挡下的伤害。举盾瞬间挨打是完美格挡。',
+      hp: 190, spd: 0.96, reload: 0.85, atkCd: 0.42, attack: 'guard', range: 74, arc: 1.7, dmg: 40, dmg2: 46, kb: 90, lunge: 100, paintR: 44,
+      block: 0.7, guardMax: 2.5, counter: 40, counterCap: 120, parry: 0.2, parryMul: 1.5, stun: 0.4, special: 'longnight', spNeed: 220, collab: 'dawn', isNew: true,
     },
   };
   D.TRAITS = {
@@ -56,7 +56,7 @@
       id: 'xiwei', name: '熹微', code: '拾光', title: '拂晓站 · 拾光者', weapon: 'halo', accent: '#ffc24a', isNew: true, collab: 'dawn',
       hair: '#f6ead2', hair2: '#ffb648', skin: '#fde6d4', eye: '#ffae2a', style: 'braid', eyeShape: 'round', mouth: 'smile', outfit: 'dawnGlimmer', extra: ['sunpin'],
       skill: 'dial',
-      passive: { name: '晨昏刻度', desc: '脚下的日晷按 破晓→正午→黄昏→夜 循环（每段 4 秒，命中让日晷快进）。破晓回血、涂地变大；正午伤害 +18% 并给敌人叠「灼光」；黄昏命中引爆灼光（每层 9 伤害，回一半血）；夜伤害 -15%、移速 +15%。每转满一圈得 1 层「日轮」（最多 4 层，每层伤害 +5%、生命上限 +3%）。' },
+      passive: { name: '晨昏刻度', desc: '脚下的日晷按 破晓→正午→黄昏→夜 循环（每段 4 秒，命中让日晷快进）。破晓回血、涂地变大；正午伤害 +18% 并给敌人叠「灼光」；黄昏命中引爆灼光（每层 9 伤害，回一半血）；夜伤害 -15%、移速 +15%。每转满一圈得 1 层「日轮」（最多 4 层，每层伤害 +4%、生命上限 +3%）。' },
       line: '光会回来的——我亲眼见过一次。',
       bio: '拂晓站的拾光者，长夜结束那天站在启明号车顶，接住了第一缕阳光。从那以后，她身边的光会跟着一个看不见的日晷流转。总是笑着说「天会亮的」，却从来不提自己在长夜里丢了什么。',
       faction: '拂晓站', archive: ['身高 158cm', '蚀痕：左手腕的日晷纹', '喜欢：清晨的车顶、热牛奶', '讨厌：熄灯以后的车厢'],
