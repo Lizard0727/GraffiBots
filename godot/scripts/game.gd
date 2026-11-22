@@ -148,10 +148,14 @@ func _ready() -> void:
 			profile.o.show = [{"k": "pilot", "id": "blaze"}, {"k": "mech", "id": "roller"}, {}]; profile.o.sign = "涂满整座城市！"; profile.o.showBg = "flame"
 			profile.o.stash = {"can": 3, "battery": 2, "scrap": 9}
 			if OS.get_environment("GB_LOOTTAB") != "": lobby.loot_tab = OS.get_environment("GB_LOOTTAB")
+			if OS.get_environment("GB_SKIN") != "":
+				var SK2 = profile.skin(OS.get_environment("GB_SKIN")); profile.o.pilot = str(SK2.pilot); profile.o.wear.pilot[str(SK2.pilot)] = SK2.id
+				if not profile.o.skins.has(SK2.id): profile.o.skins.append(SK2.id)
 		lobby.refresh()
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
+		elif int(profile.o.get("seenSeason", 0)) != int(data.econ.pass.get("sid", 2)) and OS.get_environment("GB_SHOT") == "" or OS.get_environment("GB_INTRO") != "": lobby.season_intro()
 		var pop := OS.get_environment("GB_POPUP")   # 截图用
 		if OS.get_environment("GB_FLOW") != "": queue_match(OS.get_environment("GB_FLOW"))
 		if OS.get_environment("GB_TUT") != "": start_tutorial()
@@ -696,6 +700,7 @@ func _process(delta: float) -> void:
 		update_fx(real_dt); update_loot_ui(real_dt); hud.queue_redraw()
 		return
 	if state == "play" and sim != null and not tut.is_empty(): tut_tick()
+	if state == "play" and sim != null: entrance_tick()
 	if state == "play" and sim != null and paused and net.role == "":   # 单机暂停：模拟不走
 		update_visuals(1.0, 0.0); hud.queue_redraw()
 		return
@@ -1372,6 +1377,8 @@ func show_showroom(pid: String, mech: String, vis: bool, cam_x := 0.0) -> void:
 		var disc := MeshInstance3D.new(); disc.mesh = Models.mesh("cyl", 3.6, 0.3); disc.material_override = Models.toon(Color("#2a2550"), 0.1, 0.6); disc.position.y = -0.15; showroom.add_child(disc)
 		var rim := MeshInstance3D.new(); rim.mesh = Models.mesh("torus", 3.5, 3.75); rim.material_override = Models.glow(Color(str(data.pilots[pid].accent)), 2.4); showroom.add_child(rim)
 		var l := OmniLight3D.new(); l.position = Vector3(2, 5, 4); l.light_energy = 2.2; l.omni_range = 14; showroom.add_child(l)
+		var SK = profile.skin(profile.pilot_skin(pid))
+		if SK != null and SK.has("entrance") and state == "menu": play_entrance.call_deferred(turn, str(SK.entrance))
 	var m: Dictionary = map_def(cur_map)
 	showroom.position = Vector3(float(m.gw) / 2.0, -0.45, float(m.gh) + 14.0)
 
@@ -1731,3 +1738,58 @@ func pad_button(ev: InputEventJoypadButton) -> void:
 		JOY_BUTTON_LEFT_SHOULDER: me.inp.oq += 1
 		JOY_BUTTON_DPAD_DOWN: if sim.loot: loot_interact()
 		JOY_BUTTON_DPAD_UP: if sim.loot: bag_open = not bag_open; loot_ui_t = 0
+
+# ================= 皮肤专属进场（史诗以上的驾驶员皮肤）=================
+const ENTRANCE_COL := {"hammer": "#ffd35e", "drop": "#e0a030", "flag": "#ff5a36", "warbanner": "#ffd35e", "dj": "#ff3ea5", "idol": "#ff8ad8", "surf": "#1fd6ee",
+	"ice": "#bff6ff", "academy": "#8a6bff", "moon": "#f4e6c8", "sealer": "#8a6bff", "wraith": "#ff2d4b"}
+
+func play_entrance(target: Node3D, type: String) -> void:
+	if not is_instance_valid(target): return
+	var col := Color(str(ENTRANCE_COL.get(type, "#ffffff")))
+	var base := Vector3.ZERO
+	var tw := target.create_tween()
+	var land := func(big: bool): if is_instance_valid(target): land_fx(target.global_position, col, big)
+	match type:
+		"hammer":   # 蹲下蓄力 → 跳起 → 砸地出冲击波
+			tw.tween_property(target, "scale", Vector3(1.1, 0.8, 1.1), 0.3)
+			tw.tween_property(target, "scale", Vector3.ONE, 0.1)
+			tw.tween_property(target, "position", base + Vector3(0, 4.5, 0), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw.tween_property(target, "position", base, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw.tween_callback(land.bind(true))
+		"drop":   # 高空空降
+			target.position = base + Vector3(0, 12, 0)
+			tw.tween_property(target, "position", base, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw.tween_callback(land.bind(true))
+			tw.tween_property(target, "scale", Vector3(1.08, 0.88, 1.08), 0.1); tw.tween_property(target, "scale", Vector3.ONE, 0.2)
+		"flag", "warbanner":   # 走进来插旗
+			target.position = base + Vector3(-7, 0, 0)
+			tw.tween_property(target, "position", base, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tw.tween_callback(land.bind(type == "warbanner"))
+		"ice", "sealer", "wraith":   # 先爆一团光，再从光里长出来
+			target.scale = Vector3.ONE * 0.05
+			tw.tween_callback(land.bind(true))
+			tw.tween_property(target, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+		_:   # dj / idol / surf / academy / moon：转着出场
+			target.scale = Vector3.ONE * 0.1; target.rotation.y = -TAU
+			tw.tween_property(target, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.parallel().tween_property(target, "rotation:y", 0.0, 0.6)
+			tw.tween_callback(land.bind(false))
+
+func land_fx(pos: Vector3, col: Color, big: bool) -> void:
+	ring(pos + Vector3(0, 0.1, 0), 3.2 if big else 2.2, col, 0.6)
+	ring(pos + Vector3(0, 0.1, 0), 2.0 if big else 1.4, Color.WHITE, 0.45)
+	burst(pos + Vector3(0, 0.8, 0), col, 30 if big else 16, 7.0 if big else 4.5, 0.2, 0.7)
+	flash_light(pos + Vector3(0, 2, 0), col, 5.0 if big else 3.0, 10.0, 0.3)
+	if big: beam(pos, pos + Vector3(0, 9, 0), col, 0.9, 0.5)
+	sfx.play("boom", -6 if big else -12)
+
+# 开局倒数时：穿着史诗以上皮肤的玩家脚下爆一下（史诗：爆发特效；传说：再加光柱）
+func entrance_tick() -> void:
+	if sim == null or sim.countdown <= 0 or sim.countdown > 2.6 or sim.get_meta("ent_done", false): return
+	sim.set_meta("ent_done", true)
+	for q in sim.players:
+		if q.npc: continue
+		var SK = profile.skin(str(q.looks.get("pskin", ""))) if q != me else profile.skin(profile.pilot_skin(q.pilot))
+		if SK == null or int(SK.rare) < 3: continue
+		var col := Color(str(ENTRANCE_COL.get(str(SK.get("entrance", "")), data.rare[int(SK.rare)].c)))
+		land_fx(Vector3(q.x * K, q.z * K, q.y * K), col, int(SK.rare) >= 4)

@@ -805,6 +805,7 @@ func page_pass() -> void:
 		var b2h := hbox(6); b2h.alignment = BoxContainer.ALIGNMENT_CENTER; b2.add_child(b2h); b2h.add_child(L("豪华版 +%d级" % int(PS.boost), 15, Color.WHITE, 3)); b2h.add_child(UIKit.icon("gems", 22)); b2h.add_child(L(str(cost), 15, Color.WHITE, 3))
 		click(b2, func(): act(P.buy_pass(true), "豪华版通行证！直接升 %d 级" % int(PS.boost)))
 	var ca := UIKit.gold_button("全部领取", 18); ca.custom_minimum_size = Vector2(196, 46); bv.add_child(ca); click(ca, func(): show_items(P.claim_pass_all(), "通行证奖励"))
+	var rp := UIKit.flat_button("赛季动画", 15); rp.custom_minimum_size = Vector2(120, 46); bv.add_child(rp); click(rp, func(): season_intro())
 	# 横向滚动的 50 级奖励
 	var sc := ScrollContainer.new(); sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; at(sc, Vector2(24, 262), Vector2(vs.x - 48, vs.y - 280))
 	var row := hbox(8); sc.add_child(row)
@@ -1607,3 +1608,39 @@ func counter_row(id: String, is_pilot: bool, w: float) -> Control:
 		h.add_child(L(" ", 8))
 	if h.get_child_count() == 0: h.add_child(L("没有特别的克制关系", 12, Color("#8f8ab8")))
 	return h
+
+# ================= 赛季开场动画（每个赛季第一次进大厅播一次；通行证页可以重播）=================
+func season_intro() -> void:
+	var PS: Dictionary = D.econ.pass
+	var ov := Control.new(); ov.set_anchors_preset(Control.PRESET_FULL_RECT); ov.mouse_filter = Control.MOUSE_FILTER_STOP; add_child(ov)
+	var bg := ColorRect.new(); bg.color = Color(0.03, 0.02, 0.07, 0.97); bg.set_anchors_preset(Control.PRESET_FULL_RECT); ov.add_child(bg)
+	var st := MatchFlow.Stripes.new(); st.set_anchors_preset(Control.PRESET_FULL_RECT); ov.add_child(st)
+	var sp := UIKit.Splash.new(); sp.cols = [Color("#ff3ea5"), Color("#ffe600"), Color("#1fd6ee"), Color("#9cff2e"), Color("#ff8a1f")]; sp.seed_v = int(PS.get("sid", 2)) * 77; sp.position = Vector2.ZERO; sp.size = vs; sp.modulate.a = 0.0; ov.add_child(sp)
+	var t0 := L("新 赛 季", 22, Color("#7af0ff"), 5); t0.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; t0.position = Vector2(0, 30); t0.size = Vector2(vs.x, 30); ov.add_child(t0)
+	var title := L("赛季 %d「%s」" % [int(PS.get("sid", 2)), PS.season], 60, Color("#ffe14d"), 14); title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(0, 60); title.size = Vector2(vs.x, 80); title.pivot_offset = Vector2(vs.x / 2, 40); title.scale = Vector2(2.4, 2.4); title.modulate.a = 0.0; ov.add_child(title)
+	var tw := ov.create_tween()
+	tw.tween_property(title, "modulate:a", 1.0, 0.25); tw.parallel().tween_property(title, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(sp, "modulate:a", 0.55, 0.8)
+	var ids: Array = D.econ.get("seasonPilots", [])
+	var n := ids.size(); var cw := minf(330.0, (vs.x - 120) / max(1, n))
+	for i in n:
+		var pid: String = ids[i]; var Pd: Dictionary = D.pilots[pid]; var acc := Color(str(Pd.accent))
+		var x := vs.x / 2 - cw * n / 2 + cw * i
+		var card := UIKit.card(acc.darkened(0.3), Color(0.05, 0.03, 0.1, 0.9), acc, 20); card.skew = -0.1
+		card.position = Vector2(x + 8, vs.y + 40); card.size = Vector2(cw - 16, vs.y - 290); card.custom_minimum_size = card.size; ov.add_child(card)
+		var v := vbox(2); card.add_child(v)
+		v.add_child(UIKit.image("res://art/portraits/%s.png" % pid, Vector2(cw - 40, vs.y - 380), true))
+		var nl := L(str(Pd.name), 30, Color.WHITE, 6); nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(nl)
+		var cl := L("「%s」%s" % [Pd.code, Pd.title], 14, acc.lightened(0.4)); cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(cl)
+		var ct := ov.create_tween(); ct.tween_interval(0.5 + i * 0.35)
+		ct.tween_property(card, "position:y", 160.0, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		ct.tween_callback(func(): game.sfx.play("boom", -4))
+	var sub := L("全新驾驶员、通行证和赛季皮肤已经上线！", 18, Color("#e6e2fa"), 4); sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.position = Vector2(0, vs.y - 116); sub.size = Vector2(vs.x, 26); ov.add_child(sub)
+	var go := UIKit.gold_button("进入新赛季", 24); go.position = Vector2(vs.x / 2 - 130, vs.y - 82); go.size = Vector2(260, 62); go.custom_minimum_size = go.size; go.modulate.a = 0.0; ov.add_child(go)
+	var gt := ov.create_tween(); gt.tween_interval(0.6 + n * 0.35); gt.tween_property(go, "modulate:a", 1.0, 0.3); gt.tween_callback(func(): game.sfx.play("win"))
+	var close := func():
+		P.o.seenSeason = int(PS.get("sid", 2)); P.save()
+		var ft := ov.create_tween(); ft.tween_property(ov, "modulate:a", 0.0, 0.35); ft.tween_callback(ov.queue_free)
+	go.pressed.connect(func(): game.sfx.play("click"); close.call())
+	game.sfx.play("super")
