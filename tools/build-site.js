@@ -67,7 +67,10 @@ const maps = S.MAPS.map((m, i) => ({ name: m.name, en: tr(m.name), isNew: i >= S
 const apk = opt('--apk') || ['涂鸦机兵-GraffiBots.apk', 'GraffiBots.apk'].map((f) => path.join(DIST, f)).find((f) => fs.existsSync(f));
 // 2.1.2：每个包同时发布「带版本号」和「固定名字（latest）」两份；官网按钮用固定名字 + ?v=版本号，
 // 这样官网更新的那一刻，还开着旧页面的人点下载也不会 404（以前旧页面指向的旧版本文件已经被删掉了）
+// 3.0：电脑版（Godot）——公告来自 godot/data/news.json，安装包由官网工作流从 GitHub Releases 的 godot-proto 下载到 dist/
+const PC = JSON.parse(fs.readFileSync(path.join(ROOT, 'godot', 'data', 'news.json'), 'utf8'))[0];
 const DL = [
+  { id: 'pc', src: path.join(DIST, 'GraffiBots-Godot-Windows.zip'), file: `graffibots-pc-${PC.ver}-windows.zip`, latest: 'graffibots-pc-latest-windows.zip', ver: PC.ver },
   { id: 'offline', src: path.join(DIST, '涂鸦机兵-单文件版.html'), file: `graffibots-${S.VERSION}-offline.html`, latest: 'graffibots-latest-offline.html' },
   { id: 'win', src: path.join(DIST, 'GraffiBots-Windows.zip'), file: `graffibots-${S.VERSION}-windows.zip`, latest: 'graffibots-latest-windows.zip' },
   { id: 'full', src: path.join(DIST, 'GraffiBots.zip'), file: `graffibots-${S.VERSION}-full.zip`, latest: 'graffibots-latest-full.zip' },
@@ -75,7 +78,7 @@ const DL = [
 ];
 const downloads = DL.map((d) => {
   const have = !!(d.src && fs.existsSync(d.src));
-  return { id: d.id, file: `downloads/${d.latest}?v=${S.VERSION}`, name: d.file, size: have ? fs.statSync(d.src).size : 0, have: have && argv.includes('--downloads') };
+  return { id: d.id, file: `downloads/${d.latest}?v=${d.ver || S.VERSION}`, name: d.file, size: have ? fs.statSync(d.src).size : 0, have: have && argv.includes('--downloads'), ver: d.ver || S.VERSION };
 });
 
 const data = {
@@ -83,13 +86,21 @@ const data = {
   season: { name: E.SEASON && E.SEASON.name, ends: E.SEASON && E.SEASON.end },
   counts: { pilots: pilots.length, mechs: mechs.length, maps: maps.length, modes: modes.length, skins: (S.SKINS || []).length, talents: (S.TALENTS || []).length },
   notes, pilots, mechs, modes, maps, downloads, roles, ring,
+  // 3.0：电脑版正式版公告（首页置顶 + 更新日志第一条）
+  pc: Object.assign({}, PC, { release: 'https://github.com/Lizard0727/GraffiBots/releases/tag/godot-proto',
+    shots: [
+      { img: 'img/pc30-draft.jpg', cap: '排位选人 + 3D 模型', en_cap: 'Ranked draft with 3D models' },
+      { img: 'img/pc30-profile.jpg', cap: '个人资料与展示框', en_cap: 'Profile & showcase' },
+      { img: 'img/pc30-bigmap.jpg', cap: '搜刮撤离大地图', en_cap: 'Loot & Extract big map' },
+      { img: 'img/pc30-results.jpg', cap: '结算评级', en_cap: 'Match ratings' },
+    ] }),
   // 最新版本的截图（换版本时改这里）
   shots: [
     { img: 'img/v14-park.jpg', cap: '乐园模式', en_cap: 'Park Mode', sub: '花车巡游 + 打气球', en_sub: 'Parade float + balloons' },
     { img: 'img/v14-summer.jpg', cap: '夏日系列 + 新角色卡卡', en_cap: 'Summer skins + new pilot Kaka', sub: '1.4 新内容', en_sub: 'New in 1.4' },
     { img: 'img/v14-ranked.jpg', cap: '排位赛禁用阶段', en_cap: 'Ranked ban phase', sub: '黄金段位起', en_sub: 'From Gold tier' },
   ],
-  og: 'img/v14-summer.jpg',
+  og: 'img/pc30-draft.jpg',
 };
 
 // ---- 发布到网上：官网地址、搜索引擎（SEO）----

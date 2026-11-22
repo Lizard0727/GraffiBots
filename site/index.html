@@ -15,7 +15,7 @@
 <meta property="og:site_name" content="涂鸦机兵 GraffiBots">
 <meta property="og:title" content="涂鸦机兵 GraffiBots｜4v4 涂料机甲对战游戏">
 <meta property="og:description" content="涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。">
-<meta property="og:image" content="https://lizard0727.github.io/GraffiBots/img/v14-summer.jpg">
+<meta property="og:image" content="https://lizard0727.github.io/GraffiBots/img/pc30-draft.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="720">
 <meta property="og:locale" content="zh_CN">
@@ -23,9 +23,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="涂鸦机兵 GraffiBots">
 <meta name="twitter:description" content="GraffiBots official site: a 4v4 paint-mech brawler where you spray a gray city back into color. Play free in your browser or download the offline and Android versions.">
-<meta name="twitter:image" content="https://lizard0727.github.io/GraffiBots/img/v14-summer.jpg">
+<meta name="twitter:image" content="https://lizard0727.github.io/GraffiBots/img/pc30-draft.jpg">
 <meta property="og:url" content="https://lizard0727.github.io/GraffiBots/">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"涂鸦机兵 GraffiBots","alternateName":"GraffiBots","description":"涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。","inLanguage":["zh-CN","en"],"genre":["Action","Shooter","Multiplayer"],"gamePlatform":["Web browser","Android"],"applicationCategory":"Game","operatingSystem":"Windows, macOS, Linux, Android","playMode":["MultiPlayer","SinglePlayer"],"numberOfPlayers":{"@type":"QuantitativeValue","minValue":1,"maxValue":8},"softwareVersion":"2.2.1","datePublished":"2026-11-13","dateModified":"2026-11-19","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://lizard0727.github.io/GraffiBots/img/v14-summer.jpg","url":"https://lizard0727.github.io/GraffiBots/"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"涂鸦机兵 GraffiBots","alternateName":"GraffiBots","description":"涂鸦机兵 GraffiBots 官方网站：4 对 4 的涂料机甲乱斗，开着机兵把灰色的城市涂回彩色。免费在浏览器里玩，或下载离线版、安卓版，查看每次更新的内容。","inLanguage":["zh-CN","en"],"genre":["Action","Shooter","Multiplayer"],"gamePlatform":["Web browser","Android"],"applicationCategory":"Game","operatingSystem":"Windows, macOS, Linux, Android","playMode":["MultiPlayer","SinglePlayer"],"numberOfPlayers":{"@type":"QuantitativeValue","minValue":1,"maxValue":8},"softwareVersion":"2.2.1","datePublished":"2026-11-13","dateModified":"2026-11-19","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://lizard0727.github.io/GraffiBots/img/pc30-draft.jpg","url":"https://lizard0727.github.io/GraffiBots/"}</script>
 <!-- seo:end -->
 <style>
 @font-face { font-family: 'GBHead'; src: url('fonts/huangyou.woff2') format('woff2'); font-display: swap; }
@@ -142,6 +142,16 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .shot figcaption span { font-size: 12px; color: #5c5560; }
 @media (max-width: 820px) { .shots { grid-template-columns: minmax(0, 1fr); gap: 30px; } .shot:nth-child(2) { transform: rotate(1deg); } }
 
+.pc-banner { display: block; text-align: center; padding: 10px 16px; background: var(--np); color: #fff; font: 18px/1.3 var(--f-head); border-bottom: 3px solid var(--ink); text-decoration: none; }
+.pc-banner b { color: var(--ny); }
+.pc-banner:hover { filter: brightness(1.08); }
+.band.pc30 { background: linear-gradient(160deg, #2a1650, #120a26 70%); }
+.pc-cta { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: -10px 0 30px; }
+.pc-cta .size { opacity: .75; }
+.pc-shots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .pc-shots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .pc-shots { grid-template-columns: minmax(0, 1fr); } }
+.note.pcnote { border-color: var(--np); }
 .hl { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-flow: dense; gap: 18px; }
 .hl section { background: var(--wall-2); border: 2px solid var(--seam); border-radius: 12px; padding: 18px 20px; min-width: 0; }
 .hl section.big { grid-row: span 2; }
@@ -334,6 +344,7 @@ footer a { color: var(--dust); }
 </header>
 
 <main id="home">
+  <a class="pc-banner" href="#pc" id="pcBanner"></a>
   <section class="hero">
     <canvas id="wall" aria-hidden="true"></canvas>
     <div class="wrap">
@@ -348,6 +359,15 @@ footer a { color: var(--dust); }
         <ul class="facts" id="facts"></ul>
       </div>
       <a class="poster" href="#updates" id="poster"></a>
+    </div>
+  </section>
+
+  <section class="band pc30" id="pc">
+    <div class="wrap">
+      <header class="sec-h" style="--hl: var(--np)"><span class="sticker" id="pcTag"></span><h2 id="pcTitle"></h2><p id="pcIntro"></p></header>
+      <div class="pc-cta" id="pcCta"></div>
+      <div class="shots pc-shots" id="pcShots"></div>
+      <div class="hl" id="pcSecs"></div>
     </div>
   </section>
 
@@ -447,6 +467,7 @@ footer a { color: var(--dust); }
       dl: {
         web: ['网页版', '直接玩', '打开浏览器就能玩，不用安装。登录在线账号，进度保存在服务器上。'],
         offline: ['离线单文件', 'HTML 文件', '一个文件，双击就能玩，也可以发给朋友。不联网时和 AI 对战，局域网里可以用房间码联机。'],
+        pc: ['电脑版 3.0（正式版）', 'Windows · ZIP', '全新引擎重做的电脑版：匹配和排位选人、个人资料、好友和线上房间、搜刮撤离新内容，账号和网页版通用。解压后双击 GraffiBots.exe。'],
         win: ['Windows 版', 'ZIP · 双击 bat 启动', '解压后双击「涂鸦机兵.bat」：用 Edge / Chrome 的独立应用窗口打开游戏，显卡加速、没有地址栏和插件拖慢，比直接打开网页更流畅。'],
         full: ['完整包', 'ZIP · 需要 Node.js', '带服务器：在自己电脑上开服，局域网联机、在线账号都在里面。解压后运行「node server.js」。'],
         apk: ['安卓 App', 'APK', '安装到安卓手机上，全屏横屏玩，触屏双摇杆操作。'],
@@ -474,6 +495,7 @@ footer a { color: var(--dust); }
       dl: {
         web: ['Browser', 'Play now', 'Runs in your browser with nothing to install. Sign in to an online account and your progress is saved on the server.'],
         offline: ['Offline file', 'HTML file', 'One file: double-click to play, or send it to a friend. Fight AI offline, or link up on a local network with a room code.'],
+        pc: ['PC Edition 3.0 (official)', 'Windows · ZIP', 'Rebuilt in a new engine: matchmaking and ranked draft, profiles, friends and online rooms, new Loot & Extract content; accounts shared with the web version. Unzip and run GraffiBots.exe.'],
         win: ['Windows', 'ZIP · double-click the .bat', 'Unzip and double-click the launcher .bat file: the game opens in its own Edge / Chrome app window with GPU acceleration and no toolbar or extensions slowing it down — smoother than a browser tab.'],
         full: ['Full package', 'ZIP · needs Node.js', 'Includes the server: host on your own PC for LAN play and online accounts. Unzip and run “node server.js”.'],
         apk: ['Android app', 'APK', 'Install on an Android phone for full-screen landscape play with twin-stick touch controls.'],
@@ -515,6 +537,26 @@ footer a { color: var(--dust); }
     $('facts').innerHTML = [c.pilots, c.mechs, c.maps, c.modes].map((n, i) => `<li><b>${n}</b>${t('facts')[i]}</li>`).join('');
     $('poster').innerHTML = `<span class="tag">${esc(t('poster_tag'))}</span><span class="v">${esc(D.version)}</span><h2>${esc(titleOf(D.notes[0]))}</h2><time datetime="${D.date}">${esc(t('updated')(D.date))}</time><span class="go">${esc(t('poster_go'))}</span>`;
     $('poster').href = '#' + vid(D.version);
+    if (D.pc) {   // 3.0：海报和下载按钮换成电脑版正式版
+      const en2 = lang === 'en';
+      $('poster').innerHTML = `<span class="tag">${esc(en2 ? 'Official release' : '电脑版正式版')}</span><span class="v">PC ${esc(D.pc.ver)}</span><h2>${esc(en2 ? 'Rebuilt for PC' : '全新电脑版')}</h2><time datetime="${D.pc.date}">${esc(t('updated')(D.pc.date))}</time><span class="go">${esc(en2 ? 'See what’s new →' : '看看有什么新东西 →')}</span>`;
+      $('poster').href = '#pc';
+      $('dlBtn').textContent = en2 ? `Download PC ${D.pc.ver}` : `下载电脑版 ${D.pc.ver}`; $('dlBtn').href = '#pc';
+    }
+    // 3.0 电脑版正式版（置顶）
+    const PCN = D.pc, en = lang === 'en';
+    if (PCN) {
+      const pd = D.downloads.find((d) => d.id === 'pc');
+      $('pcBanner').innerHTML = en ? `<b>NEW</b> GraffiBots PC ${esc(PCN.ver)} is out — official release! Download now →` : `<b>重磅</b> 涂鸦机兵 电脑版 ${esc(PCN.ver)} 正式版上线！立即下载 →`;
+      $('pcTag').textContent = en ? `PC ${PCN.ver}` : `电脑版 ${PCN.ver}`;
+      $('pcTitle').textContent = en ? PCN.title_en : PCN.title;
+      $('pcIntro').textContent = (en ? PCN.intro_en : PCN.intro) + '  ' + PCN.date;
+      const dlBtn = pd && pd.have ? `<a class="btn btn-play" href="${esc(pd.file)}" download="${esc(pd.name)}">${esc(en ? 'Download PC ' + PCN.ver + ' (Windows)' : '下载电脑版 ' + PCN.ver + '（Windows）')}</a><span class="size">${mb(pd.size)}</span>`
+        : `<a class="btn btn-play" href="${esc(PCN.release)}" target="_blank" rel="noopener">${esc(en ? 'Download PC ' + PCN.ver + ' (Windows)' : '下载电脑版 ' + PCN.ver + '（Windows）')}</a>`;
+      $('pcCta').innerHTML = dlBtn + `<a class="btn btn-ghost btn-sm" href="${esc(PCN.release)}" target="_blank" rel="noopener">${esc(en ? 'Release page' : '发布页面')}</a><a class="btn btn-ghost btn-sm" href="#pc30">${esc(en ? 'Full announcement' : '完整公告')}</a>`;
+      $('pcShots').innerHTML = PCN.shots.map((x) => `<figure class="shot"><img src="${esc(x.img)}" alt="${esc(L(x, 'cap'))}" loading="lazy" width="1280" height="720"><figcaption><b>${esc(L(x, 'cap'))}</b></figcaption></figure>`).join('');
+      $('pcSecs').innerHTML = PCN.sections.map((sec) => `<section><h3>${esc(en ? sec.h_en : sec.h)}</h3><ul>${(en ? sec.items_en : sec.items).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('');
+    }
     // 最新更新
     const N = D.notes[0], secs = notesOf(N);
     $('latestTitle').textContent = (lang === 'en' ? N.en_title : N.title);
@@ -550,8 +592,10 @@ footer a { color: var(--dust); }
     $('dl').innerHTML = html;
     $('howSteps').innerHTML = t('how').map((s) => `<li>${esc(s)}</li>`).join('');
     // 更新日志
-    $('updIndex').innerHTML = D.notes.map((n) => `<a href="#${vid(n.v)}" data-v="${vid(n.v)}"><span class="vn">${esc(n.v)}</span><span class="tt">${esc(titleOf(n))}</span><time datetime="${n.date}">${n.date}</time></a>`).join('');
-    $('notes').innerHTML = D.notes.map((n, i) => `<article class="note" id="${vid(n.v)}"><div class="note-head"><span class="vnum">${esc(n.v)}</span><div><h2>${esc(titleOf(n))}</h2><time datetime="${n.date}">${n.date}</time></div>${i === 0 ? `<span class="sticker">${esc(t('latest'))}</span>` : ''}</div><div class="note-body">${notesOf(n).map(([h, items]) => `<section><h3>${esc(h)}</h3><ul>${items.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
+    const pcNote = D.pc ? `<article class="note pcnote" id="pc30"><div class="note-head"><span class="vnum">PC ${esc(D.pc.ver)}</span><div><h2>${esc(lang === 'en' ? D.pc.title_en : D.pc.title)}</h2><time datetime="${D.pc.date}">${D.pc.date}</time></div><span class="sticker">${esc(t('latest'))}</span></div><div class="note-body"><p>${esc(lang === 'en' ? D.pc.intro_en : D.pc.intro)}</p>${D.pc.sections.map((sec) => `<section><h3>${esc(lang === 'en' ? sec.h_en : sec.h)}</h3><ul>${(lang === 'en' ? sec.items_en : sec.items).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>` : '';
+    const pcIdx = D.pc ? `<a href="#pc30" data-v="pc30"><span class="vn">PC ${esc(D.pc.ver)}</span><span class="tt">${esc(lang === 'en' ? 'PC official release' : '电脑版正式版')}</span><time datetime="${D.pc.date}">${D.pc.date}</time></a>` : '';
+    $('updIndex').innerHTML = pcIdx + D.notes.map((n) => `<a href="#${vid(n.v)}" data-v="${vid(n.v)}"><span class="vn">${esc(n.v)}</span><span class="tt">${esc(titleOf(n))}</span><time datetime="${n.date}">${n.date}</time></a>`).join('');
+    $('notes').innerHTML = pcNote + D.notes.map((n, i) => `<article class="note" id="${vid(n.v)}"><div class="note-head"><span class="vnum">${esc(n.v)}</span><div><h2>${esc(titleOf(n))}</h2><time datetime="${n.date}">${n.date}</time></div>${i === 0 ? `<span class="sticker">${esc(t('latest'))}</span>` : ''}</div><div class="note-body">${notesOf(n).map(([h, items]) => `<section><h3>${esc(h)}</h3><ul>${items.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
     $('footVer').textContent = t('foot_ver')(D.version);
     document.title = lang === 'en' ? 'GraffiBots | 4v4 Paint-Mech Brawler' : '涂鸦机兵 GraffiBots｜4v4 涂料机甲对战游戏';
     route(false);
@@ -640,7 +684,7 @@ footer a { color: var(--dust); }
   // ---------- 路由：#home / #updates / #v1-2 / #download ... ----------
   function route(scroll = true) {
     const h = location.hash.slice(1);
-    const upd = h === 'updates' || /^v\d/.test(h);
+    const upd = h === 'updates' || h === 'pc30' || /^v\d/.test(h);
     $('home').hidden = upd; $('updates').hidden = !upd;
     for (const a of document.querySelectorAll('.nav a[data-route]')) { if ((a.dataset.route === 'updates') === upd) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
     for (const a of document.querySelectorAll('.upd-index a')) a.classList.toggle('on', a.dataset.v === h || (h === 'updates' && a === document.querySelector('.upd-index a')));

@@ -1,4 +1,4 @@
-# 2026-11：官网暂时冻结，不再随推送自动更新；需要时在 Actions 页面手动运行
+# 2026-11：官网只在需要时手动运行（Actions 页面或 gh workflow run site.yml）；3.0 起同时提供电脑版下载
 # 发布涂鸦机兵官网（GitHub Pages）：打包单文件版、完整包和安卓 APK，生成官网，一起发布。
 # 第一次使用：仓库 Settings → Pages → Source 选「GitHub Actions」。之后每次推送到 main / master 都会自动更新官网。
 # 官网地址：https://<用户名>.github.io/<仓库名>/ ，要和 public/config.js 里的 GB_SITE_URL 一致（游戏靠它检查新版本）。
@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -61,6 +62,13 @@ jobs:
           if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"; export GB_KEYSTORE="$RUNNER_TEMP/release.jks"; fi
           gradle assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk ../dist/涂鸦机兵-GraffiBots.apk
+
+      # 3.0：电脑版（Godot）安装包——从 GitHub Releases 的 godot-proto 下载，官网直接提供下载
+      - name: 下载电脑版安装包
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download godot-proto -p 'GraffiBots-Godot-Windows.zip' -D dist --clobber && ls -la dist
 
       - name: 生成官网
         run: node tools/build-site.js --out _site --downloads
