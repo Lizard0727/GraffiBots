@@ -143,6 +143,9 @@ func _ready() -> void:
 			for id in data.order:
 				if not profile.o.mechs.has(id): profile.o.mechs.append(id)
 			profile.o.rank.rp = 700
+			for K in data.econ.skins: if not profile.o.skins.has(K.id) and randf() < 0.6: profile.o.skins.append(K.id)
+			profile.o.wear.frame = "fr_flame"; profile.o.matches = 137; profile.o.wins = 80; profile.o.kills = 512; profile.o.mvps = 23; profile.o.badges = [12, 30, 41, 25, 23]
+			profile.o.show = [{"k": "pilot", "id": "blaze"}, {"k": "mech", "id": "roller"}, {}]; profile.o.sign = "涂满整座城市！"; profile.o.showBg = "flame"
 		lobby.refresh()
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
@@ -150,6 +153,7 @@ func _ready() -> void:
 		var pop := OS.get_environment("GB_POPUP")   # 截图用
 		if OS.get_environment("GB_FLOW") != "": queue_match(OS.get_environment("GB_FLOW"))
 		if pop == "account": lobby.account_popup()
+		elif pop in ["avatar", "frame", "title", "show_style"]: lobby.call(pop + "_popup")
 		elif pop != "": lobby.account_form(pop)
 		if OS.get_environment("GB_SHOT") == "": splash(layer)
 	if OS.get_environment("GB_LAN") != "": lan_test_setup(); return
@@ -509,7 +513,7 @@ func start_match(pilot: String, mech: String) -> void:
 	sim.ranked = ranked_on
 	var lay := sim.team_layout()
 	var pw: Dictionary = {"lv": 7, "bt": 1} if autoplay else profile.power(pilot)
-	me = sim.add_player(1, "你" if autoplay or str(profile.o.name) == "" else str(profile.o.name), lay[0], pilot, mech, false, pw)
+	me = sim.add_player(1, "你" if autoplay else profile.display_name(), lay[0], pilot, mech, false, pw)
 	if not autoplay: me.looks = profile.my_looks()
 	var blv: int = int(pw.lv)   # AI 强度跟着玩家等级（原版：人类玩家的平均等级）
 	var bot_pw := {"lv": blv, "bt": 2 if blv >= 9 else (1 if blv >= 5 else 0)}

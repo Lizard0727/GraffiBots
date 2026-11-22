@@ -138,7 +138,7 @@ func build_roster() -> void:
 	var pool_p: Array = D.pilotOrder.duplicate(); pool_p.erase(str(P.o.pilot)); pool_p.shuffle()
 	var pool_m: Array = D.order.duplicate(); pool_m.shuffle()
 	var acc_lv := P.level()
-	players = [{"name": str(P.o.name) if str(P.o.name) != "" else "你", "team": int(lay[0]), "me": true, "persona": "", "pilot": str(P.o.pilot), "mech": str(P.o.weapon),
+	players = [{"name": P.display_name(), "team": int(lay[0]), "me": true, "persona": "", "pilot": str(P.o.pilot), "mech": str(P.o.weapon),
 		"looks": P.my_looks(), "lv": acc_lv, "plv": plv, "bt": int(P.power(str(P.o.pilot)).bt), "tier": max(0, tier), "ready": false, "ready_at": 0.0, "never": false}]
 	var bot_lv: int = int(P.rank_bot_power().lv) if kind == "ranked" else plv
 	for i in range(1, lay.size()):

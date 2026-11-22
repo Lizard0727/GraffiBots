@@ -115,14 +115,12 @@ func build_top() -> void:
 	var lv := P.level()
 	var xp0 := Profile.xp_for_level(lv); var xp1 := Profile.xp_for_level(lv + 1)
 	var pc := UIKit.dark_card(true); at(pc, Vector2(16, 12), Vector2(236, 72))
-	click(pc, func(): account_popup())
+	click(pc, func(): open_sub("profile"))
 	var h := hbox(10); pc.add_child(h)
-	var pid: String = P.o.pilot
-	var fr := UIKit.card(Color(str(D.pilots[pid].accent)) if pid != "" else Color.GRAY, Color("#1a1430"), Color.WHITE, 12); fr.pad = Vector4(2, 2, 2, 2); fr.shadow = 0
-	fr.add_child(face(pid, 46) if pid != "" else UIKit.icon("pilot", 46)); h.add_child(fr)
+	h.add_child(UIKit.avatar(P.avatar_path(), P.frame_key(), 54, Color(str(D.pilots[P.o.pilot].accent)) if str(P.o.pilot) != "" else Color.WHITE))
 	var v := vbox(3); h.add_child(v)
 	var nh := hbox(6); v.add_child(nh)
-	nh.add_child(L(str(P.o.name) if str(P.o.name) != "" else "游客", 17, Color.WHITE)); nh.add_child(UIKit.chip("Lv.%d" % lv, Color("#7af0ff"), 13))
+	nh.add_child(L(P.display_name(), 17, Color.WHITE)); nh.add_child(UIKit.chip("Lv.%d" % lv, Color("#7af0ff"), 13))
 	v.add_child(UIKit.bar(float(P.o.xp - xp0) / max(1, xp1 - xp0), 150, 9, Color("#7af0ff")))
 	v.add_child(L("%d / %d XP" % [P.o.xp - xp0, xp1 - xp0], 12, Color("#9a96b8")))
 	var tc := UIKit.dark_card(); at(tc, Vector2(262, 12), Vector2(176, 72))
@@ -246,7 +244,7 @@ func build_sub() -> void:
 		var sp := UIKit.Splash.new(); sp.cols = [Color("#ff3ea5"), Color("#1fd6ee"), Color("#ffe14d"), Color("#9cff2e")]; sp.seed_v = sub.hash(); sp.modulate.a = 0.6; at(sp, Vector2.ZERO, vs)
 	var back := UIKit.flat_button("< 返回大厅", 17); at(back, Vector2(16, 96), Vector2(150, 44)); click(back, func(): sub = ""; refresh())
 	var titles := {"pilots": "驾驶员", "mechs": "机体", "chests": "宝箱商店", "talents": "天赋树", "quests": "任务", "pass": "通行证 • " + str(D.econ.pass.season),
-		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "局域网联机"}
+		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "局域网联机", "profile": "个人资料"}
 	at(L(str(titles[sub]), 34, Color("#ffe14d"), 8), Vector2(182, 94))
 	match sub:
 		"pilots": page_pilots()
@@ -261,6 +259,7 @@ func build_sub() -> void:
 		"ranked": page_ranked()
 		"loot": page_loot()
 		"lan": page_lan()
+		"profile": page_profile()
 	game.show_showroom(P.o.pilot, view_mech if see_3d else P.o.weapon, see_3d, -3.6)
 
 func grid(ids: Array, w: float, cols: int, make: Callable) -> void:
@@ -1333,3 +1332,215 @@ func account_form(kind: String) -> void:
 			bh.add_child(_acc_btn("注册", "pink", func(): go.call(true), 140))
 	v.add_child(msg)
 	v.add_child(bh)
+
+# ================= 个人资料：头像 / 头像框 / 称号 / 签名 / 战绩 / 展示框 =================
+const SHOW_STYLES := {"": ["默认", Color("#2e2760"), Color("#120e26"), Color("#7a70d0"), ""], "neon": ["霓虹", Color("#0f3a40"), Color("#071418"), Color("#2ef0c8"), "fr_neon"],
+	"gold": ["黄金", Color("#6a4a10"), Color("#1a1206"), Color("#ffc531"), "fr_gold"], "flame": ["烈焰", Color("#6a1a10"), Color("#1a0806"), Color("#ff8a1f"), "fr_flame"],
+	"master": ["大师", Color("#3a1a6a"), Color("#100620"), Color("#ff6ec4"), "fr_master"], "merc": ["沙鹰", Color("#4a3a20"), Color("#14100a"), Color("#e0a030"), "fr_merc"]}
+
+func page_profile() -> void:
+	var lw := 380.0
+	var lc := UIKit.dark_card(); at(lc, Vector2(16, 152), Vector2(lw, vs.y - 168))
+	var lv := vbox(10); lv.alignment = BoxContainer.ALIGNMENT_BEGIN; lc.add_child(lv)
+	var avb := UIKit.avatar(P.avatar_path(), P.frame_key(), 150, Color(str(D.pilots[P.o.pilot].accent)) if str(P.o.pilot) != "" else Color.WHITE)
+	avb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; lv.add_child(avb)
+	var nh := hbox(8); nh.alignment = BoxContainer.ALIGNMENT_CENTER; lv.add_child(nh)
+	nh.add_child(L(P.display_name(), 26, Color.WHITE, 5))
+	var rn := UIKit.flat_button("改名", 13); rn.custom_minimum_size = Vector2(56, 30); nh.add_child(rn); click(rn, func(): rename_popup())
+	var th := hbox(8); th.alignment = BoxContainer.ALIGNMENT_CENTER; lv.add_child(th)
+	th.add_child(UIKit.chip(P.title_name(), Color("#ffcf4d"), 14)); th.add_child(UIKit.chip("Lv.%d" % P.level(), Color("#7af0ff"), 14))
+	th.add_child(UIKit.chip(str(D.econ.rank.tiers[P.rank_tier(int(P.o.rank.rp))].name), Color("#ff9ad6"), 14))
+	var sg := UIKit.wrap(L("「%s」" % P.o.sign if str(P.o.sign) != "" else "还没有个性签名，点下面的按钮写一句吧", 15, Color("#d8d4f0") if str(P.o.sign) != "" else Color("#8f8ab8")), lw - 40)
+	sg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; lv.add_child(sg)
+	var A: Accounts = game.accounts
+	var al := L("账号：" + (A.current_name() if A.current() != "" else "游客（没有登录）"), 13, Color("#a8a4c8")); al.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; lv.add_child(al)
+	var bg := GridContainer.new(); bg.columns = 2; bg.add_theme_constant_override("h_separation", 10); bg.add_theme_constant_override("v_separation", 10); bg.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; lv.add_child(bg)
+	for b in [["更换头像", func(): avatar_popup()], ["更换头像框", func(): frame_popup()], ["更换称号", func(): title_popup()], ["个性签名", func(): sign_popup()], ["账号管理", func(): account_popup()], ["展示框样式", func(): show_style_popup()]]:
+		var c := UIKit.flat_button(b[0], 16); c.custom_minimum_size = Vector2(160, 44); bg.add_child(c); click(c, b[1])
+	# 中间：战绩
+	var mx := 16 + lw + 16; var mw := (vs.x - mx - 16) * 0.48
+	var mc := UIKit.dark_card(); at(mc, Vector2(mx, 152), Vector2(mw, vs.y - 168))
+	var mv := vbox(10); mc.add_child(mv)
+	mv.add_child(L("生涯战绩", 22, Color("#ffe14d"), 4))
+	var sgd := GridContainer.new(); sgd.columns = 3; sgd.add_theme_constant_override("h_separation", 8); sgd.add_theme_constant_override("v_separation", 8); mv.add_child(sgd)
+	for st in P.stats():
+		var c := UIKit.card(Color("#2e2760"), Color("#16122e"), Color("#4b4396"), 12); c.custom_minimum_size = Vector2((mw - 60) / 3, 62)
+		var v := vbox(0); c.add_child(v)
+		var a := L(st[1], 22, Color.WHITE, 3); a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(a)
+		var b2 := L(st[0], 13, Color("#a8a4c8")); b2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(b2)
+		sgd.add_child(c)
+	mv.add_child(L("结算评级", 18, Color("#ffe14d"), 3))
+	var bh := hbox(8); mv.add_child(bh)
+	for i in range(4, -1, -1):
+		var B: Dictionary = D.badges[i]
+		var c2 := UIKit.card(Color(str(B.c)).darkened(0.5), Color("#120e26"), Color(str(B.c)), 12); c2.custom_minimum_size = Vector2((mw - 72) / 5, 64)
+		var v2 := vbox(0); c2.add_child(v2)
+		var n := L(str(P.o.badges[i]), 22, Color(str(B.c)), 3); n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v2.add_child(n)
+		var nm := L(str(B.name), 12, Color.WHITE); nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v2.add_child(nm)
+		bh.add_child(c2)
+	# 右边：展示框（3 个位置，可以放驾驶员 / 机体 / 皮肤）
+	var rx := mx + mw + 16; var rw := vs.x - rx - 16
+	var ST: Array = SHOW_STYLES.get(str(P.o.showBg), SHOW_STYLES[""])
+	var rc := UIKit.card(ST[1], ST[2], ST[3], 16); at(rc, Vector2(rx, 152), Vector2(rw, vs.y - 168))
+	var rv := vbox(10); rc.add_child(rv)
+	var rh := hbox(8); rv.add_child(rh); rh.add_child(L("展示框", 22, Color("#ffe14d"), 4)); rh.add_child(L("点一格换展示的内容", 13, Color("#c8c4e8")))
+	var sh := hbox(10); rv.add_child(sh)
+	var cw := (rw - 48) / 3.0
+	for i in 3:
+		var it: Dictionary = P.o.show[i] if i < P.o.show.size() and typeof(P.o.show[i]) == TYPE_DICTIONARY else {}
+		var c := UIKit.card(ST[3].darkened(0.55), Color(0, 0, 0, 0.5), ST[3], 14, true); c.custom_minimum_size = Vector2(cw, vs.y - 260); c.pad = Vector4(6, 6, 6, 6)
+		var v := vbox(4); v.alignment = BoxContainer.ALIGNMENT_CENTER; c.add_child(v)
+		var k := str(it.get("k", ""))
+		if k == "pilot" and P.has_pilot(str(it.id)):
+			var pid := str(it.id)
+			v.add_child(UIKit.image(portrait_path(pid), Vector2(cw - 12, vs.y - 360), true))
+			v.add_child(centered(L(str(D.pilots[pid].name), 18, Color.WHITE, 4)))
+			var q: Dictionary = P.o.pilots[pid]
+			v.add_child(centered(L("Lv.%d  突破 %s" % [int(q.lv), ["0", "I", "II"][int(q.bt)]], 13, Color("#ffcf4d"))))
+		elif k == "mech" and P.has_mech(str(it.id)):
+			v.add_child(cc(game.thumbs.rect(str(it.id), minf(cw - 16, 170))))
+			v.add_child(centered(L(str(D.mechs[it.id].name), 18, Color.WHITE, 4)))
+			v.add_child(centered(L(game.role_name(str(it.id)), 13, Color("#7af0ff"))))
+		elif k == "skin" and P.o.skins.has(str(it.id)):
+			var K = P.skin(str(it.id))
+			if K.kind == "pilot": v.add_child(UIKit.image("res://art/portraits/%s.png" % K.id, Vector2(cw - 12, vs.y - 360), true))
+			elif K.kind == "avatar": v.add_child(cc(UIKit.image("res://art/avatars/%s.png" % K.avatar, Vector2(120, 120))))
+			elif K.kind == "frame": v.add_child(cc(UIKit.avatar(P.avatar_path(), str(K.frame), 120)))
+			else: v.add_child(cc(UIKit.icon("gems", 80)))
+			v.add_child(centered(L(str(K.name), 17, Color.WHITE, 4)))
+			var R = D.rare[int(K.rare)]
+			if R != null: v.add_child(centered(L(str(R.name), 13, Color(str(R.c)))))
+		else:
+			v.add_child(centered(L("+", 60, Color(1, 1, 1, 0.4))))
+			v.add_child(centered(L("空展示位", 15, Color("#c8c4e8"))))
+		click(c, func(): show_pick_popup(i))
+		sh.add_child(c)
+
+func _choice_grid(v: VBoxContainer, cols: int) -> GridContainer:
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; sc.custom_minimum_size = Vector2(820, 340); sc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(sc)
+	var g := GridContainer.new(); g.columns = cols; g.add_theme_constant_override("h_separation", 10); g.add_theme_constant_override("v_separation", 10); sc.add_child(g)
+	return g
+
+func _done_btn(v: VBoxContainer) -> void:
+	var ok := UIKit.gold_button("好的", 20); ok.custom_minimum_size = Vector2(160, 50); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok); click(ok, func(): close_popup())
+
+func avatar_popup() -> void:
+	var v := make_popup(Vector2(880, 520)); v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L("更换头像", 30, Color("#ffe14d"), 8)))
+	v.add_child(centered(L("可以用任何已拥有的驾驶员头像（穿了皮肤就显示皮肤），或者头像皮肤", 14, Color("#c8c4e8"))))
+	var g := _choice_grid(v, 9)
+	var cur_av := str(P.o.wear.get("avatar", ""))
+	for K in D.econ.skins.filter(func(k): return k.kind == "avatar" and P.o.skins.has(k.id)):
+		var c := UIKit.card(Color("#3a2a80"), Color("#120e26"), Color("#ffe14d") if cur_av == K.id else Color("#4b4396"), 12, true); c.pad = Vector4(4, 4, 4, 4); c.selected = cur_av == K.id
+		var cv := vbox(2); c.add_child(cv); cv.add_child(UIKit.avatar("res://art/avatars/%s.png" % K.avatar, "", 72)); cv.add_child(centered(L(str(K.name), 11, Color.WHITE)))
+		click(c, func(): P.o.wear.avatar = K.id; P.save(); avatar_popup(); refresh_keep()); g.add_child(c)
+	for pid in D.pilotOrder:
+		if not P.has_pilot(pid): continue
+		var on: bool = cur_av == "" and (str(P.o.face) == pid or (str(P.o.face) == "" and pid == str(P.o.pilot)))
+		var c := UIKit.card(Color("#2e2760"), Color("#120e26"), Color("#ffe14d") if on else Color("#4b4396"), 12, true); c.pad = Vector4(4, 4, 4, 4); c.selected = on
+		var cv := vbox(2); c.add_child(cv); cv.add_child(UIKit.avatar("res://art/faces/%s.png" % P.art_id(pid), "", 72)); cv.add_child(centered(L(str(D.pilots[pid].name), 11, Color.WHITE)))
+		click(c, func(): P.o.wear.avatar = ""; P.o.face = pid; P.save(); avatar_popup(); refresh_keep()); g.add_child(c)
+	_done_btn(v)
+
+func frame_popup() -> void:
+	var v := make_popup(Vector2(880, 520)); v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L("更换头像框", 30, Color("#ffe14d"), 8)))
+	v.add_child(centered(L("头像框来自皮肤商店、通行证、活动和排位奖励", 14, Color("#c8c4e8"))))
+	var g := _choice_grid(v, 6)
+	var cur := str(P.o.wear.get("frame", ""))
+	var opts: Array = [{"id": "", "frame": "", "name": "不戴头像框", "rare": 0}]
+	for K in D.econ.skins: if K.kind == "frame": opts.append(K)
+	for K in opts:
+		var own: bool = K.id == "" or P.o.skins.has(K.id)
+		var on: bool = cur == K.id
+		var c := UIKit.card(Color("#2e2760"), Color("#120e26"), Color("#ffe14d") if on else Color("#4b4396"), 12, own); c.pad = Vector4(6, 6, 6, 6); c.selected = on; c.dim = not own
+		var cv := vbox(2); c.add_child(cv)
+		cv.add_child(cc(UIKit.avatar(P.avatar_path(), str(K.frame), 96)))
+		cv.add_child(centered(L(str(K.name), 13, Color.WHITE)))
+		var R = D.rare[int(K.rare)] if int(K.rare) > 0 else null
+		cv.add_child(centered(L(("未拥有" if not own else (str(R.name) if R != null else "")), 11, Color("#ff8a8a") if not own else (Color(str(R.c)) if R != null else Color.WHITE))))
+		if own: click(c, func(): P.o.wear.frame = K.id; P.save(); frame_popup(); refresh_keep())
+		g.add_child(c)
+	_done_btn(v)
+
+func title_popup() -> void:
+	var v := make_popup(Vector2(880, 520)); v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L("更换称号", 30, Color("#ffe14d"), 8)))
+	var g := _choice_grid(v, 3)
+	for T in P.titles():
+		var on: bool = str(P.o.title) == T.id or (str(P.o.title) == "" and T.id == "rookie")
+		var c := UIKit.card(Color("#3a2a80") if T.ok else Color("#1e1a3a"), Color("#120e26"), Color("#ffe14d") if on else Color("#4b4396"), 12, T.ok); c.custom_minimum_size = Vector2(250, 64); c.selected = on; c.dim = not T.ok
+		var cv := vbox(0); c.add_child(cv)
+		cv.add_child(L(str(T.name), 18, Color("#ffcf4d") if T.ok else Color("#8f8ab8"), 3)); cv.add_child(L(("已解锁 • " if T.ok else "未解锁 • ") + str(T.how), 11, Color("#c8c4e8")))
+		if T.ok: click(c, func(): P.o.title = T.id; P.save(); title_popup(); refresh_keep())
+		g.add_child(c)
+	_done_btn(v)
+
+func show_style_popup() -> void:
+	var v := make_popup(Vector2(760, 380)); v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L("展示框样式", 30, Color("#ffe14d"), 8)))
+	v.add_child(centered(L("拥有对应的头像框就能解锁同款展示框样式", 14, Color("#c8c4e8"))))
+	var g := GridContainer.new(); g.columns = 3; g.add_theme_constant_override("h_separation", 12); g.add_theme_constant_override("v_separation", 12); g.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(g)
+	for k in SHOW_STYLES:
+		var ST: Array = SHOW_STYLES[k]
+		var own: bool = ST[4] == "" or P.o.skins.has(ST[4])
+		var c := UIKit.card(ST[1], ST[2], Color("#ffe14d") if str(P.o.showBg) == k else ST[3], 14, own); c.custom_minimum_size = Vector2(200, 70); c.dim = not own; c.selected = str(P.o.showBg) == k
+		c.add_child(centered(L(ST[0] + ("" if own else "（未解锁）"), 18, Color.WHITE, 4)))
+		if own: click(c, func(): P.o.showBg = k; P.save(); close_popup(); refresh_keep())
+		g.add_child(c)
+	_done_btn(v)
+
+func show_pick_popup(slot: int) -> void:
+	var v := make_popup(Vector2(900, 540)); v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	v.add_child(centered(L("展示位 %d" % (slot + 1), 28, Color("#ffe14d"), 8)))
+	var th := hbox(8); th.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(th)
+	for t in [["pilot", "驾驶员"], ["mech", "机体"], ["skin", "皮肤"]]:
+		var on: bool = show_tab == t[0]
+		var c := UIKit.card(Color("#ff6ad5") if on else Color("#2e2760"), Color("#a63cff") if on else Color("#17132f"), Color("#ffc4ef") if on else Color("#4b4396"), 12, true)
+		c.pad = Vector4(16, 4, 16, 4); c.add_child(L(t[1], 16, Color.WHITE, 3)); th.add_child(c); click(c, func(): show_tab = t[0]; show_pick_popup(slot))
+	var g := _choice_grid(v, 8)
+	var add := func(item: Dictionary, tex_ctl: Control, name: String) -> void:
+		var c := UIKit.card(Color("#2e2760"), Color("#120e26"), Color("#4b4396"), 12, true); c.pad = Vector4(4, 4, 4, 4)
+		var cv := vbox(2); c.add_child(cv); cv.add_child(tex_ctl); cv.add_child(centered(L(name, 11, Color.WHITE)))
+		click(c, func(): P.set_show(slot, item); close_popup(); refresh_keep()); g.add_child(c)
+	match show_tab:
+		"pilot":
+			for pid in D.pilotOrder: if P.has_pilot(pid): add.call({"k": "pilot", "id": pid}, UIKit.image("res://art/faces/%s.png" % P.art_id(pid), Vector2(84, 84), true), str(D.pilots[pid].name))
+		"mech":
+			for id in D.order: if P.has_mech(id): add.call({"k": "mech", "id": id}, game.thumbs.rect(id, 84), str(D.mechs[id].short if D.mechs[id].has("short") else D.mechs[id].name))
+		"skin":
+			for K in D.econ.skins:
+				if not P.o.skins.has(K.id): continue
+				var tc: Control = UIKit.image("res://art/faces/%s.png" % K.id, Vector2(84, 84), true) if K.kind == "pilot" else (UIKit.image("res://art/avatars/%s.png" % K.avatar, Vector2(84, 84)) if K.kind == "avatar" else (UIKit.avatar(P.avatar_path(), str(K.frame), 84) if K.kind == "frame" else UIKit.icon("gems", 84)))
+				add.call({"k": "skin", "id": K.id}, tc, str(K.name))
+	var clr := UIKit.flat_button("清空这一格", 16); clr.custom_minimum_size = Vector2(160, 44); clr.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(clr)
+	click(clr, func(): P.set_show(slot, {}); close_popup(); refresh_keep())
+
+var show_tab := "pilot"
+var edit_text := ""
+
+func rename_popup() -> void:
+	var v := make_popup(Vector2(600, 300))
+	v.add_child(centered(L("修改昵称", 28, Color("#ffe14d"), 8)))
+	v.add_child(centered(L("昵称 2 到 12 个字，对局里队友和对手看到的就是它（不会改登录用的账号名）", 13, Color("#c8c4e8"))))
+	edit_text = P.display_name()
+	var e := LineEdit.new(); e.text = edit_text; e.max_length = 12; e.custom_minimum_size = Vector2(360, 44); e.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; e.text_changed.connect(func(t): edit_text = t); v.add_child(e)
+	var ok := UIKit.gold_button("保存", 20); ok.custom_minimum_size = Vector2(160, 50); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok)
+	click(ok, func():
+		var n := edit_text.strip_edges()
+		if n.length() < 2 or n.length() > 12: toast("昵称要 2 到 12 个字"); return
+		P.o.nick = n; P.save(); close_popup(); refresh_keep(); toast("昵称改好了"))
+
+func sign_popup() -> void:
+	var v := make_popup(Vector2(640, 320))
+	v.add_child(centered(L("个性签名", 28, Color("#ffe14d"), 8)))
+	edit_text = str(P.o.sign)
+	var e := LineEdit.new(); e.text = edit_text; e.max_length = 30; e.placeholder_text = "最多 30 个字"; e.custom_minimum_size = Vector2(520, 44); e.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; e.text_changed.connect(func(t): edit_text = t); v.add_child(e)
+	var ok := UIKit.gold_button("保存", 20); ok.custom_minimum_size = Vector2(160, 50); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok)
+	click(ok, func(): P.o.sign = edit_text.strip_edges(); P.save(); close_popup(); refresh_keep())
+
+func refresh_keep() -> void:   # 刷新页面（弹窗不在 root 里，会留着）
+	refresh()
+
+func cc(c: Control) -> Control:
+	c.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; return c

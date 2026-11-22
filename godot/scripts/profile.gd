@@ -29,7 +29,7 @@ func new_profile() -> Dictionary:
 		"story": {"p": [0, 0, 0, 0, 0], "c": []}, "tl": {}, "ev": {}, "evLogin": {}, "rank": {"rp": 0, "best": 0, "road": [], "n": 0, "s": int(E.rank.season.id)},
 		"skins": [], "wear": {"pilot": {}, "mech": "", "fx": "", "frame": "", "avatar": ""}, "ranked": false,
 		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0}, "gear": {}, "gearOn": [], "safeLv": 1, "risk": "normal",
-		"face": "", "show": [], "showBg": "", "title": "", "sign": "", "mvps": 0, "deaths": 0, "badges": [0, 0, 0, 0, 0], "seenSeason": 0, "tutDone": false}
+		"face": "", "nick": "", "show": [], "showBg": "", "title": "", "sign": "", "mvps": 0, "deaths": 0, "badges": [0, 0, 0, 0, 0], "seenSeason": 0, "tutDone": false}
 	for k in E.start: p[k] = int(E.start[k])
 	for k in E.startExtra: p[k] = int(E.startExtra[k])
 	return p
@@ -813,3 +813,7 @@ func stats() -> Array:
 func set_show(i: int, item: Dictionary) -> void:
 	while o.show.size() <= i: o.show.append({})
 	o.show[i] = item; save()
+
+func display_name() -> String:
+	if str(o.get("nick", "")) != "": return str(o.nick)
+	return str(o.name) if str(o.name) != "" else "游客"
