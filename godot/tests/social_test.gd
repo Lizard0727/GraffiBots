@@ -52,11 +52,11 @@ func _init() -> void:
 	await wait(1.0)
 	check(SA.on.has(SB.fid()), "A 看到 B 在线")
 	var got := []
-	SB.invited.connect(func(n, ips): got.append([n, ips]))
+	SB.invited.connect(func(n, ips, code): got.append([n, ips, code]))
 	SA.invite(SB.fid())
-	await wait(1.0)
+	await wait(2.5)
 	check(got.size() == 1 and got[0][0] == "玩家A", "B 收到了 A 的组队邀请")
-	check(a[0].net.role == "host", "邀请时 A 自动开了局域网房间")
+	check(a[0].net.role == "host" and a[0].net.online and got.size() == 1 and str(got[0][2]).length() == 5, "邀请时 A 自动开了线上房间，邀请里带着房间号")
 	a[0].net.leave()
 	print("全部通过" if fails == 0 else "有 %d 项失败" % fails)
 	for t in ["A", "B"]:
