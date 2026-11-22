@@ -153,6 +153,7 @@ class Mech:
 	var persona := ""        # AI 性格（bots.gd）：影响反应、瞄准、开火、挂机
 	var pz := {}
 	var afk_t := 0.0
+	var typing_t := 0.0      # AI 在打字：站着不动
 	var afk_next := 20.0
 	var looks := {}
 	var ai_mode_t := 0.0
@@ -1648,6 +1649,7 @@ const SUPER_REACH := {"beam": 700, "missiles": 1000, "storm": 220, "bubble": 260
 func ai_think(p: Mech, dt: float) -> void:
 	if not p.alive: return
 	if tutorial: p.inp.mx = 0; p.inp.my = 0; p.inp.f = false; p.inp.w = false; return
+	if p.typing_t > 0: p.typing_t -= dt; p.inp.mx = 0; p.inp.my = 0; p.inp.f = false; return
 	p.ai_t -= dt
 	# 挂机性格：隔一阵子就站着不动几秒
 	if p.pz.get("afk", false) and countdown <= 0:

@@ -88,6 +88,8 @@ var ranked_bans := {}
 var prep := {}            # 匹配阶段定好的阵容（matchflow.gd）：players[i] 对应 team_layout 的第 i 个位置
 var matchflow: MatchFlow
 var thumbs: Thumbs
+var botchat: BotChat
+var social: Social
 var shot_t := 0.0
 
 # 触屏
@@ -112,6 +114,7 @@ func _ready() -> void:
 	net.snapshot.connect(func(sn): net_snap = sn)
 	net.match_ended.connect(_on_net_end)
 	net.status.connect(func(t): if lobby != null: lobby.toast(t))
+	net.chat.connect(func(pid, text, ch): if sim != null and state == "play": var q := player_by_id(pid); chat_add(q, text, ch, true); if q != null and botchat != null: botchat.react(q, text, ch, 0))
 	net.room_changed.connect(func(): if lobby != null and lobby.sub == "lan" and state == "menu": lobby.refresh())
 	settings = Settings.new()
 	music = Music.new(); add_child(music)
@@ -129,6 +132,9 @@ func _ready() -> void:
 	lobby = Lobby.new(self); menu = lobby; layer.add_child(menu)
 	matchflow = MatchFlow.new(self); layer.add_child(matchflow)
 	thumbs = Thumbs.new(self); add_child(thumbs)
+	social = Social.new(self); add_child(social)
+	social.invited.connect(func(n, ips): lobby.invite_popup(n, ips))
+	social.changed.connect(func(): if lobby != null and state == "menu" and lobby.sub == "friends": lobby.refresh())
 	result_ui = Control.new(); result_ui.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.theme = theme_ui; result_ui.visible = false; layer.add_child(result_ui)
 	build_map(0)
 	mode_view = ModeView.new(); add_child(mode_view)
@@ -618,6 +624,8 @@ func start_match(pilot: String, mech: String) -> void:
 		for q in sim.players:
 			if not mech_nodes.has(q.id): pass
 		bag_open = false
+	botchat = BotChat.new(self, sim) if net.role != "client" else null
+	chat_clear()
 	begin_view()
 	if net.role == "host":
 		var roster: Array = []
@@ -701,6 +709,9 @@ func _process(delta: float) -> void:
 		return
 	if state == "play" and sim != null and not tut.is_empty(): tut_tick()
 	if state == "play" and sim != null: entrance_tick()
+	if chat_ui != null: chat_tick()
+	if OS.get_environment("GB_CHATTEST") != "" and state == "play" and sim != null and sim.time > 1.0 and not sim.has_meta("ct"):   # 测试用
+		sim.set_meta("ct", true); chat_add(me, "你们是人机吗？", 0); botchat.react(me, "你们是人机吗？", 0, 0); botchat.react(me, "hi", 0, 0)
 	if state == "play" and sim != null and paused and net.role == "":   # 单机暂停：模拟不走
 		update_visuals(1.0, 0.0); hud.queue_redraw()
 		return
@@ -719,6 +730,7 @@ func _process(delta: float) -> void:
 				n.prev = n.cur; n.a_prev = n.a_cur
 			var cd0 := int(ceil(sim.countdown))
 			sim.step(TICK)
+			if botchat != null and botchat.sim == sim: botchat.tick(TICK)
 			if sim.countdown > 0 and int(ceil(sim.countdown)) != cd0: sfx.play("count")
 			elif sim.countdown <= 0 and cd0 == 1: sfx.play("go")
 			for p in sim.players:
@@ -1089,12 +1101,14 @@ func apply_events() -> void:
 				shake = max(shake, 0.8 * near_me(e[3], e[4], 700.0))
 				sfx.play("wreck", vol_at(e[3], e[4]))
 				hud.feed(e, "击毁")
+				if botchat != null: botchat.on_kill(player_by_id(e[2]), player_by_id(e[1]))
 				if e[1] == me.id or e[2] == me.id: hitstop(70)
 			"ko":
 				var pos5 := Vector3(e[3] * K, e[5] * K + 0.8, e[4] * K)
 				burst(pos5, team_col[e[6]], 30, 8.0, 0.22, 0.6); ring(pos5, 4.0, Color.WHITE, 0.5)
 				sfx.play("ko", vol_at(e[3], e[4]))
 				hud.feed(e, "击倒")
+				if botchat != null: botchat.on_kill(player_by_id(e[2]), player_by_id(e[1]))
 				if e[1] == me.id or e[2] == me.id: hitstop(90)
 			"mdrop":
 				var pos6 := Vector3(e[2] * K, e[4] * K, e[3] * K)
@@ -1248,6 +1262,7 @@ func read_input() -> void:
 		inp.j = t_btn.has("jump")
 		return
 	if pad_tick(inp): return
+	if chat_open: inp.mx = 0; inp.my = 0; inp.f = false; inp.w = false; inp.j = false; return
 	var mx := 0.0; var my := 0.0
 	if settings.pressed("left") or Input.is_physical_key_pressed(KEY_LEFT): mx -= 1
 	if settings.pressed("right") or Input.is_physical_key_pressed(KEY_RIGHT): mx += 1
@@ -1275,6 +1290,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		elif settings.is_key(ev, "super"): me.inp.qq += 1
 		elif settings.is_key(ev, "overload"): me.inp.oq += 1
 		elif ev.physical_keycode == KEY_ESCAPE: toggle_pause()
+		elif (ev.physical_keycode == KEY_ENTER or ev.physical_keycode == KEY_KP_ENTER) and tut.is_empty(): open_chat()
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 		me.inp.qq += 1
 	if ev is InputEventScreenTouch or ev is InputEventScreenDrag:
@@ -1354,6 +1370,7 @@ func start_from_lobby() -> void:
 
 func back_to_lobby() -> void:
 	close_pause()
+	chat_clear()
 	if not tut.is_empty(): tut_close()
 	if net.role == "client" and state == "play": net.leave()
 	state = "menu"; menu.visible = true; result_ui.visible = false
@@ -1793,3 +1810,67 @@ func entrance_tick() -> void:
 		if SK == null or int(SK.rare) < 3: continue
 		var col := Color(str(ENTRANCE_COL.get(str(SK.get("entrance", "")), data.rare[int(SK.rare)].c)))
 		land_fx(Vector3(q.x * K, q.z * K, q.y * K), col, int(SK.rare) >= 4)
+
+# ================= 对局聊天（Enter 打字，Tab 切换 队伍 / 全部；AI 会按性格接话）=================
+var chat_ui: VBoxContainer
+var chat_lines: Array = []    # [RichTextLabel, time]
+var chat_open := false
+var chat_ch := 0
+var chat_edit: LineEdit
+var chat_chl: Label
+
+func chat_layer() -> Node: return hud.get_parent()
+
+func chat_clear() -> void:
+	if chat_ui == null:
+		chat_ui = VBoxContainer.new(); chat_ui.add_theme_constant_override("separation", 2); chat_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE; chat_ui.theme = theme_ui
+		chat_layer().add_child(chat_ui)
+	for c in chat_ui.get_children(): c.queue_free()
+	chat_lines.clear()
+	close_chat()
+
+func chat_add(p, text: String, ch: int, remote := false) -> void:
+	if chat_ui == null or text.strip_edges() == "": return
+	if p != null and ch == 1 and me != null and p.team != me.team: return   # 对方的队伍频道看不到
+	var s := get_viewport().get_visible_rect().size
+	chat_ui.position = Vector2(16, s.y - 360); chat_ui.size = Vector2(460, 0)
+	var r := RichTextLabel.new(); r.bbcode_enabled = true; r.fit_content = true; r.scroll_active = false; r.custom_minimum_size = Vector2(460, 0); r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.add_theme_font_size_override("normal_font_size", 15); r.add_theme_constant_override("outline_size", 5); r.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	var who := "系统" if p == null else str(p.name)
+	var col: Color = Color("#ffe14d") if p == me else (team_col[p.team] if p != null else Color("#9a96b8"))
+	var chn := "[color=#7af0ff][队伍][/color] " if ch == 1 else "[color=#c8c4e8][全部][/color] "
+	r.text = chn + "[color=#%s]%s[/color]：%s" % [col.to_html(false), who.replace("[", "("), text.replace("[", "(")]
+	chat_ui.add_child(r)
+	chat_lines.append([r, Time.get_ticks_msec()])
+	while chat_lines.size() > 7: var old = chat_lines.pop_front(); old[0].queue_free()
+	if p == me and not remote: net.send_chat(me.id, text, ch)
+
+func chat_tick() -> void:
+	var now := Time.get_ticks_msec()
+	for l in chat_lines:
+		var age := (now - int(l[1])) / 1000.0
+		l[0].modulate.a = 1.0 if chat_open else clampf(1.0 - (age - 8.0) / 1.5, 0.0, 1.0)
+
+func open_chat() -> void:
+	if chat_open or state != "play" or me == null: return
+	chat_open = true
+	var s := get_viewport().get_visible_rect().size
+	var box := HBoxContainer.new(); box.name = "chatbox"; box.position = Vector2(16, s.y - 110); box.theme = theme_ui; chat_layer().add_child(box)
+	chat_chl = UIKit.label("[全部]" if chat_ch == 0 else "[队伍]", 16, Color("#7af0ff"), 4); box.add_child(chat_chl)
+	chat_edit = LineEdit.new(); chat_edit.custom_minimum_size = Vector2(380, 38); chat_edit.max_length = 60; chat_edit.placeholder_text = "Enter 发送 • Tab 切换频道 • Esc 取消"; box.add_child(chat_edit)
+	chat_edit.text_submitted.connect(func(t):
+		var tx: String = str(t).strip_edges()
+		if tx != "":
+			chat_add(me, tx, chat_ch)
+			if botchat != null: botchat.react(me, tx, chat_ch, 0)
+		close_chat())
+	chat_edit.gui_input.connect(func(ev):
+		if ev is InputEventKey and ev.pressed:
+			if ev.physical_keycode == KEY_ESCAPE: close_chat(); get_viewport().set_input_as_handled()
+			elif ev.physical_keycode == KEY_TAB: chat_ch = 1 - chat_ch; chat_chl.text = "[全部]" if chat_ch == 0 else "[队伍]"; get_viewport().set_input_as_handled())
+	chat_edit.grab_focus()
+
+func close_chat() -> void:
+	chat_open = false
+	var b = chat_layer().get_node_or_null("chatbox") if hud != null else null
+	if b != null: b.queue_free()

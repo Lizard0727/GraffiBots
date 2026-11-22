@@ -136,16 +136,16 @@ func build_top() -> void:
 	var cl := P.claimables()
 	var psc := UIKit.card(Color("#ff8a3d"), Color("#c0392b"), Color("#ffd0a0"), 16, true); psc.pad = Vector4(8, 6, 12, 6)
 	var pch := hbox(8); psc.add_child(pch); pch.add_child(UIKit.icon("star", 36))
-	var pcv := vbox(1); pch.add_child(pcv); pcv.add_child(L("通行证 Lv.%d" % P.pass_level(), 16, Color.WHITE, 4))
-	pcv.add_child(UIKit.bar(float(int(P.o.pass.xp) % int(D.econ.pass.xpPer)) / float(D.econ.pass.xpPer), 110, 8, Color("#fff3a8")))
+	var pcv := vbox(1); pch.add_child(pcv); pcv.add_child(L("通行证 Lv.%d" % P.pass_level(), 14, Color.WHITE, 4))
+	pcv.add_child(UIKit.bar(float(int(P.o.pass.xp) % int(D.econ.pass.xpPer)) / float(D.econ.pass.xpPer), 84, 8, Color("#fff3a8")))
 	at(psc, Vector2(cc.position.x + 342, 14)); click(psc, func(): open_sub("pass"))
-	badge(psc, cl.pass, Vector2(150, -8))
+	badge(psc, cl.pass, Vector2(124, -8))
 	var bx := vs.x - 16
-	for b in [["gear", func(): settings_popup(), 0], ["help", func(): help_popup(), 0], ["mail", func(): open_sub("mail"), cl.mail], ["event", func(): open_sub("events"), cl.events], ["book", func(): open_sub("quests"), cl.tasks]]:
-		bx -= 58
-		var rb := UIKit.card(Color("#3a3370"), Color("#1d1838"), Color("#6a60c0"), 26, true); rb.pad = Vector4(5, 5, 5, 5)
-		rb.add_child(UIKit.icon(b[0], 38)); at(rb, Vector2(bx, 18), Vector2(52, 52)); click(rb, b[1])
-		badge(rb, int(b[2]), Vector2(34, -6))
+	for b in [["gear", func(): settings_popup(), 0], ["help", func(): help_popup(), 0], ["team", func(): open_sub("friends"), game.social.S().reqIn.size()], ["mail", func(): open_sub("mail"), cl.mail], ["event", func(): open_sub("events"), cl.events], ["book", func(): open_sub("quests"), cl.tasks]]:
+		bx -= 53
+		var rb := UIKit.card(Color("#3a3370"), Color("#1d1838"), Color("#6a60c0"), 24, true); rb.pad = Vector4(5, 5, 5, 5)
+		rb.add_child(UIKit.icon(b[0], 34)); at(rb, Vector2(bx, 20), Vector2(48, 48)); click(rb, b[1])
+		badge(rb, int(b[2]), Vector2(31, -6))
 
 # ---------------- 大厅主页 ----------------
 func build_home() -> void:
@@ -244,7 +244,7 @@ func build_sub() -> void:
 		var sp := UIKit.Splash.new(); sp.cols = [Color("#ff3ea5"), Color("#1fd6ee"), Color("#ffe14d"), Color("#9cff2e")]; sp.seed_v = sub.hash(); sp.modulate.a = 0.6; at(sp, Vector2.ZERO, vs)
 	var back := UIKit.flat_button("< 返回大厅", 17); at(back, Vector2(16, 96), Vector2(150, 44)); click(back, func(): sub = ""; refresh())
 	var titles := {"pilots": "驾驶员", "mechs": "机体", "chests": "宝箱商店", "talents": "天赋树", "quests": "任务", "pass": "通行证 • " + str(D.econ.pass.season),
-		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "局域网联机", "profile": "个人资料"}
+		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "局域网联机", "profile": "个人资料", "friends": "好友"}
 	at(L(str(titles[sub]), 34, Color("#ffe14d"), 8), Vector2(182, 94))
 	match sub:
 		"pilots": page_pilots()
@@ -260,6 +260,7 @@ func build_sub() -> void:
 		"loot": page_loot()
 		"lan": page_lan()
 		"profile": page_profile()
+		"friends": page_friends()
 	game.show_showroom(P.o.pilot, view_mech if see_3d else P.o.weapon, see_3d, -3.6)
 
 func grid(ids: Array, w: float, cols: int, make: Callable) -> void:
@@ -1644,3 +1645,84 @@ func season_intro() -> void:
 		var ft := ov.create_tween(); ft.tween_property(ov, "modulate:a", 0.0, 0.35); ft.tween_callback(ov.queue_free)
 	go.pressed.connect(func(): game.sfx.play("click"); close.call())
 	game.sfx.play("super")
+
+# ================= 好友（social.gd）=================
+var fr_code := ""
+var fr_server := ""
+
+func page_friends() -> void:
+	var SO: Social = game.social
+	var S: Dictionary = SO.S()
+	var lw := 440.0
+	var lc := UIKit.dark_card(); at(lc, Vector2(16, 152), Vector2(lw, vs.y - 168))
+	var v := vbox(10); lc.add_child(v)
+	v.add_child(L("我的好友码", 16, Color("#c8c4e8")))
+	var ch := hbox(10); v.add_child(ch)
+	ch.add_child(L(SO.fid(), 40, Color("#ffe14d"), 8))
+	var cp := UIKit.flat_button("复制", 15); cp.custom_minimum_size = Vector2(80, 40); ch.add_child(cp); click(cp, func(): DisplayServer.clipboard_set(SO.fid()); toast("已复制好友码"))
+	var stt: Array = {"on": ["已连接游戏服务器", Color("#6dff8a")], "connecting": ["正在连接……", Color("#ffcf4d")]}.get(SO.state, ["没有连接游戏服务器", Color("#ff8a8a")])
+	v.add_child(L(stt[0], 15, stt[1]))
+	v.add_child(UIKit.wrap(L("好友通过 node server.js 开的游戏服务器互相找到（和在线账号用同一个地址）。网页版玩家连同一台服务器也能加。", 13, Color("#a8a4c8")), lw - 40))
+	if fr_server == "": fr_server = SO.server_addr()
+	var sh := hbox(8); v.add_child(sh)
+	var se := LineEdit.new(); se.text = fr_server; se.placeholder_text = "服务器地址，例如 192.168.1.5:3000"; se.custom_minimum_size = Vector2(290, 40); se.text_changed.connect(func(t): fr_server = t); sh.add_child(se)
+	var sb := UIKit.pink_button("连接", 16); sb.custom_minimum_size = Vector2(90, 42); sh.add_child(sb); click(sb, func(): SO.connect_server(fr_server.strip_edges()); refresh())
+	v.add_child(L("添加好友", 18, Color("#ffe14d"), 3))
+	var ah := hbox(8); v.add_child(ah)
+	var ae := LineEdit.new(); ae.text = fr_code; ae.placeholder_text = "对方的 6 位好友码"; ae.max_length = 6; ae.custom_minimum_size = Vector2(290, 40); ae.text_changed.connect(func(t): fr_code = t); ah.add_child(ae)
+	var ab := UIKit.gold_button("申请", 16); ab.custom_minimum_size = Vector2(90, 42); ah.add_child(ab)
+	click(ab, func():
+		var err := SO.request(fr_code)
+		if err != "": toast(err)
+		else: toast("已发送好友申请（对方在线时会收到）"); fr_code = ""; refresh())
+	if not S.reqIn.is_empty():
+		v.add_child(L("收到的申请", 16, Color("#ff9ad6"), 3))
+		for r in S.reqIn:
+			var rh := hbox(8); v.add_child(rh)
+			rh.add_child(UIKit.avatar("res://art/faces/%s.png" % r.pilot if D.pilots.has(str(r.pilot)) else "res://art/icons/pilot.png", "", 36))
+			var nl := L("%s（%s）" % [r.name, r.fid], 15, Color.WHITE); nl.custom_minimum_size.x = 200; rh.add_child(nl)
+			rh.add_child(claim_btn("通过", func(): SO.accept(r.fid); refresh(), true))
+			var rj := UIKit.flat_button("拒绝", 14); rj.custom_minimum_size = Vector2(70, 40); rh.add_child(rj); click(rj, func(): SO.reject(r.fid); refresh())
+	if not S.reqOut.is_empty():
+		v.add_child(L("等待通过：" + "、".join(S.reqOut.map(func(r): return str(r.fid))), 13, Color("#a8a4c8")))
+	# 右边：好友列表
+	var rx := 16 + lw + 16; var rw := vs.x - rx - 16
+	var rc := UIKit.dark_card(); at(rc, Vector2(rx, 152), Vector2(rw, vs.y - 168))
+	var rv := vbox(8); rc.add_child(rv)
+	var n_on: int = S.friends.filter(func(f): return SO.on.has(f.fid)).size()
+	rv.add_child(L("好友 %d 人 • 在线 %d" % [S.friends.size(), n_on], 20, Color("#ffe14d"), 4))
+	rv.add_child(UIKit.wrap(L("组队：点「邀请组队」会开一个局域网房间并把你的 IP 发给好友，好友一键加入后在「局域网联机」里开打（需要在同一个局域网，或者能连到你的电脑）。", 13, Color("#a8a4c8")), rw - 40))
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; sc.custom_minimum_size = Vector2(rw - 30, vs.y - 300); rv.add_child(sc)
+	var lst := vbox(6); sc.add_child(lst)
+	if S.friends.is_empty(): lst.add_child(L("还没有好友。把你的好友码发给朋友，或者输入对方的好友码申请。", 15, Color("#8f8ab8")))
+	var fl: Array = S.friends.duplicate()
+	fl.sort_custom(func(a, b): return SO.on.has(a.fid) and not SO.on.has(b.fid))
+	for f in fl:
+		var online: bool = SO.on.has(f.fid)
+		var c := UIKit.card(Color("#2e2760") if online else Color("#1e1a3a"), Color("#120e26"), Color("#6dff8a") if online else Color("#4b4396"), 12); c.custom_minimum_size = Vector2(rw - 50, 0)
+		var h := hbox(10); c.add_child(h)
+		var av := UIKit.avatar("res://art/faces/%s.png" % f.pilot if D.pilots.has(str(f.pilot)) else "res://art/icons/pilot.png", "", 48, Color("#6dff8a") if online else Color("#6a6a8a")); h.add_child(av)
+		if not online: av.modulate = Color(0.6, 0.6, 0.7)
+		var fv := vbox(0); fv.custom_minimum_size.x = 260; h.add_child(fv)
+		fv.add_child(L(str(f.name), 17, Color.WHITE))
+		var oc: Dictionary = SO.on.get(f.fid, {})
+		fv.add_child(L(("在线 • " + ("对局中" if oc.get("st", "") == "game" else "大厅")) if online else "离线", 13, Color("#6dff8a") if online else Color("#8f8ab8")))
+		h.add_child(UIKit.pill("trophy", str(int(f.get("tr", 0))), Color("#ffcf4d")))
+		var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; spc.mouse_filter = Control.MOUSE_FILTER_IGNORE; h.add_child(spc)
+		h.add_child(claim_btn("邀请组队", func(): SO.invite(f.fid), online))
+		var dl := UIKit.flat_button("删除", 13); dl.custom_minimum_size = Vector2(60, 40); h.add_child(dl); click(dl, func(): SO.remove(f.fid); refresh())
+		lst.add_child(c)
+
+func invite_popup(from_name: String, ips: Array) -> void:
+	var v := make_popup(Vector2(560, 300))
+	v.add_child(centered(L("组队邀请", 30, Color("#ffe14d"), 8)))
+	v.add_child(centered(L("%s 邀请你加入 TA 的局域网房间" % from_name, 18, Color.WHITE)))
+	v.add_child(centered(L("房主地址：" + ", ".join(ips), 14, Color("#a8a4c8"))))
+	var hb := hbox(16); hb.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(hb)
+	var no_b := UIKit.flat_button("拒绝", 18); no_b.custom_minimum_size = Vector2(140, 52); hb.add_child(no_b); click(no_b, func(): close_popup())
+	var ok_b := UIKit.gold_button("加入", 22); ok_b.custom_minimum_size = Vector2(160, 52); hb.add_child(ok_b)
+	click(ok_b, func():
+		close_popup()
+		var err: String = game.net.join(str(ips[0]), {"name": P.display_name(), "pilot": P.o.pilot, "weapon": P.o.weapon, "power": P.power(P.o.pilot)})
+		if err != "": toast(err)
+		else: lan_ip = str(ips[0]); open_sub("lan"))

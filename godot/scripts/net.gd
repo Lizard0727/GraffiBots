@@ -36,6 +36,9 @@ static func lan_ips() -> Array:
 	var out: Array = []
 	for ip in IP.get_local_addresses():
 		if ip.begins_with("192.168.") or ip.begins_with("10.") or (ip.begins_with("172.") and int(ip.split(".")[1]) >= 16 and int(ip.split(".")[1]) <= 31): out.append(ip)
+	if out.is_empty():   # 没有常见的局域网地址：列出所有非本机的 IPv4
+		for ip in IP.get_local_addresses():
+			if ip.count(".") == 3 and not ip.begins_with("127.") and not ip.begins_with("169.254."): out.append(ip)
 	return out
 
 func host(info: Dictionary) -> String:
@@ -135,6 +138,13 @@ func host_broadcast(sim: Sim) -> void:
 @rpc("authority", "unreliable_ordered")
 func recv_snapshot(s: Dictionary) -> void:
 	snapshot.emit(s)
+
+signal chat(pid: int, text: String, ch: int)
+func send_chat(pid: int, text: String, ch: int) -> void:
+	if role != "": rpc("chat_msg", pid, text, ch)
+@rpc("any_peer", "call_remote", "reliable")
+func chat_msg(pid: int, text: String, ch: int) -> void:
+	chat.emit(pid, text.substr(0, 60), ch)
 
 func broadcast_end(result: Dictionary, final_players: Array) -> void:
 	rpc("end_match", result, final_players)

@@ -50,6 +50,7 @@ jobs:
           GB_ACCOUNTS=/tmp/acc.json PORT=3917 node server.js &
           sleep 1
           GB_SERVER=127.0.0.1:3917 ~/godot/godot --headless --path godot --script res://tests/account_test.gd
+          GB_SERVER=127.0.0.1:3917 ~/godot/godot --headless --path godot --script res://tests/social_test.gd
 
       - name: 导出
         run: |
