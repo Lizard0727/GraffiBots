@@ -136,7 +136,7 @@ func _ready() -> void:
 	matchflow = MatchFlow.new(self); layer.add_child(matchflow)
 	thumbs = Thumbs.new(self); add_child(thumbs)
 	social = Social.new(self); add_child(social)
-	social.invited.connect(func(n, ips): lobby.invite_popup(n, ips))
+	social.invited.connect(func(n, ips, code): lobby.invite_popup(n, ips, code))
 	social.changed.connect(func(): if lobby != null and state == "menu" and lobby.sub == "friends": lobby.refresh())
 	result_ui = Control.new(); result_ui.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.theme = theme_ui; result_ui.visible = false; layer.add_child(result_ui)
 	build_map(0)
@@ -164,7 +164,10 @@ func _ready() -> void:
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
-		elif int(profile.o.get("seenSeason", 0)) != int(data.econ.pass.get("sid", 2)) and OS.get_environment("GB_SHOT") == "" or OS.get_environment("GB_INTRO") != "": lobby.season_intro()
+		elif OS.get_environment("GB_SHOT") == "" or OS.get_environment("GB_NEWS") != "":   # 新版本第一次进大厅：更新公告；新赛季：开场动画（盖在公告上面）
+			if str(profile.o.get("newsSeen", "")) != str(lobby.news_latest().get("ver", "")) or OS.get_environment("GB_NEWS") != "": lobby.news_popup()
+			if int(profile.o.get("seenSeason", 0)) != int(data.econ.pass.get("sid", 2)) and OS.get_environment("GB_SHOT") == "": lobby.season_intro()
+		if OS.get_environment("GB_INTRO") != "": lobby.season_intro()
 		var pop := OS.get_environment("GB_POPUP")   # 截图用
 		if OS.get_environment("GB_FLOW") != "": queue_match(OS.get_environment("GB_FLOW"))
 		if OS.get_environment("GB_TUT") != "": start_tutorial()
@@ -638,7 +641,8 @@ func start_match(pilot: String, mech: String) -> void:
 		net.cont_sig.clear()
 		for q in sim.players:
 			if not q.npc or sim.loot: roster.append([q.id, q.name, q.team, q.pilot, q.weapon, {"lv": q.lv, "bt": q.bt, "tal": q.tal.keys()}, q.bot, q.npc, q.loot_boss, q.max_hp])
-		net.broadcast_start({"mode": sel_mode, "map": midx, "seed": match_seed, "dur": dur, "roster": roster, "peers": peer_ids})
+		net.broadcast_start({"mode": sel_mode, "map": midx, "seed": match_seed, "dur": dur, "roster": roster, "peers": peer_ids, "ranked": ranked_on, "bans": ranked_bans})
+		if net.room.get("queue", false): net.room.queue = false; net.sync_room()
 
 # 对局画面初始化（单机 / 房主 / 客户端共用）
 func begin_view() -> void:
@@ -1589,6 +1593,7 @@ func _on_net_start(info: Dictionary) -> void:
 		if r.size() > 7: q.npc = bool(r[7]); q.loot_boss = bool(r[8]); q.max_hp = float(r[9])
 	me = player_by_id(my_id)
 	if me == null: me = sim.players[0]
+	sim.ranked = bool(info.get("ranked", false))   # 组队排位：队友也按排位结算
 	spectate_id = 0; net_snap = null
 	result_ui.visible = false
 	net_client_match = true
@@ -1611,8 +1616,20 @@ var lan_snaps := 0
 func lan_test_setup() -> void:
 	var who := OS.get_environment("GB_LAN")
 	if int(profile.o.tut) == 0: profile.tutorial(); profile.open_chest("starter")
+	if OS.get_environment("GB_MODE") == "rank":   # 组队排位测试：房主要能打排位
+		for id in data.pilotOrder: profile.o.pilots[id] = {"lv": 7, "bt": 1}
+		for id in data.order: if not profile.o.mechs.has(id): profile.o.mechs.append(id)
+		profile.o.rank.rp = 700
 	var info := {"name": "测试" + who, "pilot": profile.o.pilot, "weapon": profile.o.weapon, "power": profile.power(profile.o.pilot)}
-	print("联机测试：", who, " ", net.host(info) if who == "host" else net.join(who, info))
+	var srv := OS.get_environment("GB_SERVER"); var cf := OS.get_environment("GB_CODEFILE")
+	if srv != "" and who == "host":   # 线上房间测试：房主把房间号写进文件，客人读文件加入
+		print("线上测试：房主 ", net.host_online(info, srv))
+		net.room_changed.connect(func(): if str(net.room.get("code", "")) != "" and not FileAccess.file_exists(cf): var f := FileAccess.open(cf, FileAccess.WRITE); f.store_string(net.room.code); f.close(); print("房间号 ", net.room.code))
+	elif srv != "":
+		while not FileAccess.file_exists(cf): await get_tree().create_timer(0.2).timeout
+		await get_tree().create_timer(0.3).timeout
+		print("线上测试：加入 ", FileAccess.get_file_as_string(cf), " ", net.join_online(FileAccess.get_file_as_string(cf), info, srv))
+	else: print("联机测试：", who, " ", net.host(info) if who == "host" else net.join(who, info))
 	net.snapshot.connect(func(_s): lan_snaps += 1)
 	set_process(true)
 
@@ -1621,7 +1638,9 @@ func lan_test_tick(delta: float) -> void:
 	var who := OS.get_environment("GB_LAN")
 	if who == "host" and state == "menu" and net.room.players.size() >= 2 and lan_t > 2.0:
 		print("房主：房间里 %d 人，开打" % net.room.players.size())
-		sel_mode = OS.get_environment("GB_MODE") if OS.get_environment("GB_MODE") != "" else "turf"; sel_map = 0; start_match(profile.o.pilot, profile.o.weapon)
+		if OS.get_environment("GB_MODE") == "rank":
+			if not matchflow.visible: net.room.mode = "rank"; net.room.queue = true; net.sync_room(); queue_match("ranked")
+		else: sel_mode = OS.get_environment("GB_MODE") if OS.get_environment("GB_MODE") != "" else "turf"; sel_map = 0; start_match(profile.o.pilot, profile.o.weapon)
 	if int(lan_t * 2) != int((lan_t - delta) * 2) and int(lan_t) % 3 == 0:
 		print("%s t=%.0f state=%s players=%d snaps=%d me=%s time=%.1f" % [who, lan_t, state, sim.players.size() if sim != null else 0, lan_snaps, str(me.id) if me != null else "-", sim.time if sim != null else 0.0])
 	if sim != null and sim.loot and state == "play" and sim.countdown <= 0:   # 搜刮撤离联机测试
@@ -1639,6 +1658,7 @@ func lan_test_tick(delta: float) -> void:
 	if lan_t > float(OS.get_environment("GB_QUIT_AT") if OS.get_environment("GB_QUIT_AT") != "" else "20"):
 		if me != null and sim != null and sim.loot: print("%s 搜刮：背包 %d 件  容器 %d 个  模式 %s" % [who, me.inv.items.size(), sim.obj.conts.size(), sim.mode])
 		if me != null and sim != null: print("%s 结束：me=%d (%d,%d) alive=%s painted=%d" % [who, me.id, me.x, me.y, me.alive, me.painted])
+		if me != null and sim != null: print("%s 排位=%s 模式=%s 我的队=%d 队友=%s" % [who, sim.ranked, sim.mode, me.team, ", ".join(sim.players.filter(func(q): return q.team == me.team).map(func(q): return q.name))])
 		get_tree().quit()
 
 # ================= 暂停菜单（Esc）=================

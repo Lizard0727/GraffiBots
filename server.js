@@ -248,6 +248,65 @@ setInterval(() => {
 // =====================================================================
 // HTTP + WebSocket 服务器
 // =====================================================================
+// =====================================================================
+// 电脑版（Godot）线上联机：服务器只负责转发。对局由房主的电脑跑（和局域网一样），
+// 其他人的电脑只发操作、收画面；房主开房拿到房间号，好友输入房间号加入（最多 8 人）
+// =====================================================================
+class Relay {
+  constructor() { this.rooms = new Map(); }
+  newCode() {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s;
+    do { s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)]; } while (this.rooms.has(s));
+    return s;
+  }
+  handle(conn, m) {
+    switch (m.t) {
+      case 'rlyHost': {
+        this.leave(conn);
+        const r = { code: this.newCode(), peers: new Map([[1, conn]]), next: 2 };
+        this.rooms.set(r.code, r); conn.rly = { r, id: 1 };
+        conn.send({ t: 'rlyRoom', code: r.code, id: 1, peers: [] });
+        return true;
+      }
+      case 'rlyJoin': {
+        const r = this.rooms.get(String(m.code || '').toUpperCase().trim());
+        if (!r) { conn.send({ t: 'rlyErr', err: '房间不存在或已经关闭' }); return true; }
+        if (r.peers.size >= 8) { conn.send({ t: 'rlyErr', err: '房间满了' }); return true; }
+        this.leave(conn);
+        const id = r.next++;
+        r.peers.set(id, conn); conn.rly = { r, id };
+        conn.send({ t: 'rlyRoom', code: r.code, id, peers: [...r.peers.keys()].filter((x) => x !== id) });
+        for (const [pid, c] of r.peers) if (pid !== id) c.send({ t: 'rlyPeer', id, on: true });
+        return true;
+      }
+      case 'rlyPkt': {   // to：0 = 发给房间里其他所有人，正数 = 发给某个人，负数 = 除了这个人
+        const s = conn.rly;
+        if (!s || typeof m.d !== 'string' || m.d.length > 900000) return true;
+        const to = m.to | 0;
+        for (const [pid, c] of s.r.peers) {
+          if (pid === s.id || (to > 0 && pid !== to) || (to < 0 && pid === -to)) continue;
+          c.send({ t: 'rlyPkt', from: s.id, d: m.d, ch: m.ch | 0, md: m.md | 0 });
+        }
+        return true;
+      }
+      case 'rlyLeave': this.leave(conn); return true;
+    }
+    return false;
+  }
+  leave(conn) {
+    const s = conn.rly;
+    if (!s) return;
+    conn.rly = null;
+    s.r.peers.delete(s.id);
+    if (s.id === 1) {   // 房主走了：房间关闭
+      for (const c of s.r.peers.values()) { c.rly = null; c.send({ t: 'rlyClose' }); }
+      this.rooms.delete(s.r.code);
+    } else for (const c of s.r.peers.values()) c.send({ t: 'rlyPeer', id: s.id, on: false });
+  }
+}
+const relay = new Relay();
+
 function createServer() {
   const server = http.createServer((req, res) => {
     let url;
@@ -278,8 +337,8 @@ function createServer() {
     socket.setNoDelay(true);
     const conn = new WSConn(socket);
     const c = hub.connect(conn);
-    conn.onmessage = (txt) => { let m; try { m = JSON.parse(txt); } catch (e) { return; } hub.message(c, m); };
-    conn.onclose = () => hub.disconnect(c, conn);
+    conn.onmessage = (txt) => { let m; try { m = JSON.parse(txt); } catch (e) { return; } if (m && typeof m.t === 'string' && m.t.startsWith('rly') && relay.handle(conn, m)) return; hub.message(c, m); };
+    conn.onclose = () => { relay.leave(conn); hub.disconnect(c, conn); };
   });
   return server;
 }

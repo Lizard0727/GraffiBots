@@ -60,10 +60,41 @@ func join(ip: String, info: Dictionary) -> String:
 	status.emit("正在连接 %s……" % ip)
 	return ""
 
+# ---------------- 线上联机（通过 node server.js 转发，见 relay_peer.gd）----------------
+var online := false
+func host_online(info: Dictionary, addr: String) -> String:
+	var url := Accounts.server_url(addr)
+	if url == "": return "先在「好友」或「账号」里填游戏服务器地址"
+	var rp := RelayPeer.new()
+	if rp.start(url, true) != OK: return "连不上服务器"
+	_wire_relay(rp)
+	multiplayer.multiplayer_peer = rp
+	role = "host"; my_info = info; online = true
+	room.players = [info.merged({"peer": 1})]; room.code = ""
+	status.emit("正在向服务器申请房间……")
+	room_changed.emit()
+	return ""
+
+func join_online(code: String, info: Dictionary, addr: String) -> String:
+	var url := Accounts.server_url(addr)
+	if url == "": return "先在「好友」或「账号」里填游戏服务器地址"
+	if code.strip_edges().length() < 4: return "房间号是 5 位字母和数字"
+	var rp := RelayPeer.new()
+	if rp.start(url, false, code) != OK: return "连不上服务器"
+	_wire_relay(rp)
+	multiplayer.multiplayer_peer = rp
+	role = "client"; my_info = info; online = true
+	status.emit("正在加入房间 %s……" % code.to_upper())
+	return ""
+
+func _wire_relay(rp: RelayPeer) -> void:
+	rp.room_ready.connect(func(c): room.code = c; room_changed.emit(); if role == "host": status.emit("线上房间已开好：%s" % c))
+	rp.relay_failed.connect(func(err): status.emit(err); leave())
+
 func leave() -> void:
 	if multiplayer.multiplayer_peer != null: multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
-	role = ""; room = {"players": [], "mode": "turf", "map": -1}; inputs.clear()
+	role = ""; online = false; room = {"players": [], "mode": "turf", "map": -1}; inputs.clear()
 	room_changed.emit()
 
 func my_peer() -> int: return multiplayer.get_unique_id() if role != "" else 1

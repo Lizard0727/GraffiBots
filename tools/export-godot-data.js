@@ -24,6 +24,8 @@ for (let i = 0; i < S.MAP_N; i++) {
 // 阶段 5：日期转成秒（Godot 用 Time.get_unix_time_from_system() 比较）
 const sec = (ms) => Math.floor(ms / 1000);
 const GODOT_MAILS = [
+  { id: 'godot_v30', t: Date.UTC(2026, 10, 22, 4), from: '涂鸦机兵开发组', title: '电脑版 3.0 正式版上线礼包', body: '涂鸦机兵电脑版 3.0 正式版上线啦：匹配和排位选人、个人资料、好友和线上房间、对局聊天、搜刮撤离的消耗品 / 大地图 / 增援小队、新手教程、英文界面都来了。感谢一路陪伴，这份礼包请收下！',
+    keep: true, items: [{ k: 'gems', n: 500 }, { k: 'chest', id: 'airdrop', n: 2 }, { k: 'coins', n: 3000 }, { k: 'parts', n: 500 }, { k: 'crystals', n: 3 }] },
   { id: 'godot_pc', t: Date.UTC(2026, 10, 21, 4), from: '涂鸦机兵开发组', title: 'Godot 电脑版上线礼包', body: '涂鸦机兵 Godot 电脑版上线啦：全部角色和模式、全新画面和大厅、通行证、排位赛、搜刮撤离和局域网联机都搬过来了。这份上线礼包请收下！',
     keep: true, items: [{ k: 'gems', n: 300 }, { k: 'chest', id: 'airdrop', n: 1 }, { k: 'coins', n: 2000 }, { k: 'parts', n: 300 }] },
 ];

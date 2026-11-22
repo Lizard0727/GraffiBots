@@ -163,7 +163,10 @@ func build_home() -> void:
 	var logo := vbox(0); at(logo, Vector2(24, 92))
 	var lt := L("涂鸦机兵", 46, Color("#ffe14d"), 12); lt.add_theme_color_override("font_outline_color", Color("#ff3ea5")); logo.add_child(lt)
 	var lh := hbox(8); logo.add_child(lh)
-	lh.add_child(L("GRAFFI•BOTS", 18, Color("#5ff0ff"), 5)); lh.add_child(UIKit.chip("Godot 版", Color("#ffd23f"), 12))
+	lh.add_child(L("GRAFFI•BOTS", 18, Color("#5ff0ff"), 5)); lh.add_child(UIKit.chip("电脑版", Color("#ffd23f"), 12))
+	var nb := UIKit.card(Color("#ff6ad5"), Color("#a63cff"), Color("#ffc4ef"), 10, true); nb.pad = Vector4(8, 1, 8, 1); nb.add_child(L("公告", 13, Color.WHITE, 3)); lh.add_child(nb)
+	click(nb, func(): news_popup())
+	if str(P.o.get("newsSeen", "")) != str(news_latest().get("ver", "")): badge(nb, 1, Vector2(30, -8))
 	var nchest := 0
 	for k in P.o.chests: nchest += int(P.o.chests[k])
 	var menu := [
@@ -225,7 +228,7 @@ func build_home() -> void:
 	var pulse := fb.create_tween().set_loops()   # 绑在按钮上：按钮被换掉时动画跟着停
 	pulse.tween_method(func(a): fb.glow.a = a; fb.queue_redraw(), 0.35, 1.0, 0.8)
 	pulse.tween_method(func(a): fb.glow.a = a; fb.queue_redraw(), 1.0, 0.35, 0.8)
-	var lanb := UIKit.flat_button("局域网联机" + ("（%d 人）" % game.net.room.players.size() if game.net.role != "" else ""), 17); at(lanb, Vector2(rx, 534), Vector2(300, 44)); click(lanb, func(): open_sub("lan"))
+	var lanb := UIKit.flat_button("联机房间" + ("（%d 人）" % game.net.room.players.size() if game.net.role != "" else ""), 17); at(lanb, Vector2(rx, 534), Vector2(300, 44)); click(lanb, func(): open_sub("lan"))
 	game.show_showroom(pid, P.o.weapon, true, -2.2)
 
 func quests_done() -> int:
@@ -244,7 +247,7 @@ func build_sub() -> void:
 		var sp := UIKit.Splash.new(); sp.cols = [Color("#ff3ea5"), Color("#1fd6ee"), Color("#ffe14d"), Color("#9cff2e")]; sp.seed_v = sub.hash(); sp.modulate.a = 0.6; at(sp, Vector2.ZERO, vs)
 	var back := UIKit.flat_button("< 返回大厅", 17); at(back, Vector2(16, 96), Vector2(150, 44)); click(back, func(): sub = ""; refresh())
 	var titles := {"pilots": "驾驶员", "mechs": "机体", "chests": "宝箱商店", "talents": "天赋树", "quests": "任务", "pass": "通行证 • " + str(D.econ.pass.season),
-		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "局域网联机", "profile": "个人资料", "friends": "好友"}
+		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "联机房间", "profile": "个人资料", "friends": "好友"}
 	at(L(str(titles[sub]), 34, Color("#ffe14d"), 8), Vector2(182, 94))
 	match sub:
 		"pilots": page_pilots()
@@ -1217,6 +1220,8 @@ func page_loot() -> void:
 
 # ---------------- 局域网联机 ----------------
 var lan_ip := "192.168."
+var lan_server := ""
+var lan_code := ""
 var lan_name := ""
 
 func page_lan() -> void:
@@ -1224,7 +1229,7 @@ func page_lan() -> void:
 	var w := 520.0
 	var card := UIKit.dark_card(); at(card, Vector2(24, 152), Vector2(w, vs.y - 168))
 	var v := vbox(10); card.add_child(v)
-	v.add_child(UIKit.wrap(L("同一个 Wi-Fi / 局域网里的电脑可以一起玩：一个人开房，其他人输入房主的 IP 加入。不够的位置由 AI 补上。端口 %d（第一次开房时 Windows 防火墙可能会询问，选「允许」）。" % Net.PORT, 14, Color("#e6e2fa")), w - 40))
+	v.add_child(UIKit.wrap(L("局域网：同一个 Wi-Fi 里的电脑输入房主的 IP 加入（端口 %d，Windows 防火墙询问时选「允许」）。线上：通过游戏服务器转发，不在同一个网络也能一起玩，好友输入房间号或者在「好友」里点邀请。不够的位置由 AI 补上。" % Net.PORT, 13, Color("#e6e2fa")), w - 40))
 	if lan_name == "": lan_name = str(P.o.name) if str(P.o.name) != "" else "驾驶员%d" % (randi() % 900 + 100)
 	var nh := hbox(10); v.add_child(nh); nh.add_child(L("名字", 17, Color.WHITE))
 	var ne := LineEdit.new(); ne.text = lan_name; ne.max_length = 12; ne.custom_minimum_size = Vector2(240, 40); ne.text_changed.connect(func(t): lan_name = t); nh.add_child(ne)
@@ -1242,15 +1247,40 @@ func page_lan() -> void:
 			var err := N.join(lan_ip, info.call())
 			if err != "": toast(err)
 			refresh())
+		# 线上房间（通过 node server.js 转发）
+		v.add_child(L("线上房间（通过游戏服务器）", 17, Color("#7af0ff"), 3))
+		if lan_server == "": lan_server = str(game.accounts.data.get("server", ""))
+		var sh := hbox(8); v.add_child(sh); sh.add_child(L("服务器", 15, Color.WHITE))
+		var se := LineEdit.new(); se.text = lan_server; se.placeholder_text = I18n.t("服务器地址，例如 192.168.1.5:3000"); se.custom_minimum_size = Vector2(300, 38); se.text_changed.connect(func(t): lan_server = t); sh.add_child(se)
+		var save_srv := func() -> String:
+			var a := lan_server.strip_edges()
+			if a != "": game.accounts.data.server = a; game.accounts.save()
+			return a
+		var oh := UIKit.gold_button("开线上房间", 20); oh.custom_minimum_size = Vector2(0, 52); v.add_child(oh)
+		click(oh, func():
+			var err := N.host_online(info.call(), save_srv.call())
+			if err != "": toast(err)
+			refresh())
+		var ch := hbox(8); v.add_child(ch); ch.add_child(L("房间号", 15, Color.WHITE))
+		var ce := LineEdit.new(); ce.text = lan_code; ce.max_length = 5; ce.custom_minimum_size = Vector2(160, 38); ce.text_changed.connect(func(t): lan_code = t); ch.add_child(ce)
+		var cj := UIKit.pink_button("加入线上房间", 17); cj.custom_minimum_size = Vector2(160, 42); ch.add_child(cj)
+		click(cj, func():
+			var err := N.join_online(lan_code, info.call(), save_srv.call())
+			if err != "": toast(err)
+			refresh())
 		return
 	if N.role == "host":
-		var ips := Net.lan_ips()
-		v.add_child(L("你是房主 • 让朋友输入：" + (", ".join(ips) if not ips.is_empty() else "（没找到局域网 IP）"), 17, Color("#6dff8a")))
+		if N.online:
+			var code := str(N.room.get("code", ""))
+			v.add_child(L(("房间号：%s（让好友输入，或在「好友」里点邀请）" % code) if code != "" else "正在向服务器申请房间……", 18, Color("#6dff8a"), 3))
+		else:
+			var ips := Net.lan_ips()
+			v.add_child(L("你是房主 • 让朋友输入：" + (", ".join(ips) if not ips.is_empty() else "（没找到局域网 IP）"), 17, Color("#6dff8a")))
 		var mh := hbox(10); v.add_child(mh); mh.add_child(L("模式", 16, Color.WHITE))
 		var mo := OptionButton.new(); mo.custom_minimum_size = Vector2(200, 40)
-		var lan_modes: Array = D.modeOrder + ["loot"]   # 搜刮撤离也能联机
+		var lan_modes: Array = D.modeOrder + ["loot", "rank"]   # 搜刮撤离、组队排位也能联机
 		for i in lan_modes.size():
-			mo.add_item(I18n.t(str(D.modes[lan_modes[i]].name)), i)
+			mo.add_item(I18n.t("排位赛（组队，最多 4 人）" if lan_modes[i] == "rank" else str(D.modes[lan_modes[i]].name)), i)
 			if lan_modes[i] == N.room.mode: mo.select(i)
 		mo.item_selected.connect(func(k): N.room.mode = lan_modes[k]; N.sync_room()); mh.add_child(mo)
 		var ob := OptionButton.new(); ob.custom_minimum_size = Vector2(160, 40); ob.add_item(I18n.t("随机地图"), 0)
@@ -1258,10 +1288,15 @@ func page_lan() -> void:
 		ob.select(int(N.room.map) + 1); ob.item_selected.connect(func(k): N.room.map = k - 1; N.sync_room()); mh.add_child(ob)
 		var go := UIKit.gold_button("开始对战", 26); go.custom_minimum_size = Vector2(0, 64); v.add_child(go)
 		click(go, func():
+			if N.room.mode == "rank":   # 组队排位：房主走匹配 / 选人流程，房间里的人当队友
+				if N.room.players.size() > 4: toast("组队排位最多 4 人"); return
+				N.room.queue = true; N.sync_room(); game.queue_match("ranked"); return
 			game.sel_mode = N.room.mode; game.sel_map = int(N.room.map); game.loot_risk = "normal"
 			game.start_match(P.o.pilot, P.o.weapon))
 	else:
-		v.add_child(L("已加入房间，等房主开始…… 模式：%s" % D.modes.get(N.room.mode, {"name": N.room.mode}).name, 17, Color("#ffe14d")))
+		v.add_child(L("已加入房间，等房主开始…… 模式：%s" % ("排位赛（组队）" if N.room.mode == "rank" else str(D.modes.get(N.room.mode, {"name": N.room.mode}).name)), 17, Color("#ffe14d")))
+		if N.room.get("queue", false): v.add_child(L("房主正在匹配排位……", 16, Color("#7af0ff")))
+		if N.online and str(N.room.get("code", "")) != "": v.add_child(L("线上房间 %s" % N.room.code, 15, Color("#6dff8a")))
 	var lb := UIKit.flat_button("离开房间", 16); lb.custom_minimum_size = Vector2(140, 44); v.add_child(lb)
 	click(lb, func(): N.leave(); refresh())
 	# 房间里的人
@@ -1718,19 +1753,22 @@ func page_friends() -> void:
 		var dl := UIKit.flat_button("删除", 13); dl.custom_minimum_size = Vector2(60, 40); h.add_child(dl); click(dl, func(): SO.remove(f.fid); refresh())
 		lst.add_child(c)
 
-func invite_popup(from_name: String, ips: Array) -> void:
+func invite_popup(from_name: String, ips: Array, code := "") -> void:
 	var v := make_popup(Vector2(560, 300))
 	v.add_child(centered(L("组队邀请", 30, Color("#ffe14d"), 8)))
-	v.add_child(centered(L("%s 邀请你加入 TA 的局域网房间" % from_name, 18, Color.WHITE)))
-	v.add_child(centered(L("房主地址：" + ", ".join(ips), 14, Color("#a8a4c8"))))
+	v.add_child(centered(L("%s 邀请你加入 TA 的房间" % from_name, 18, Color.WHITE)))
+	v.add_child(centered(L(("线上房间号：" + code) if code != "" else ("房主地址：" + ", ".join(ips)), 14, Color("#a8a4c8"))))
 	var hb := hbox(16); hb.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(hb)
 	var no_b := UIKit.flat_button("拒绝", 18); no_b.custom_minimum_size = Vector2(140, 52); hb.add_child(no_b); click(no_b, func(): close_popup())
 	var ok_b := UIKit.gold_button("加入", 22); ok_b.custom_minimum_size = Vector2(160, 52); hb.add_child(ok_b)
 	click(ok_b, func():
 		close_popup()
-		var err: String = game.net.join(str(ips[0]), {"name": P.display_name(), "pilot": P.o.pilot, "weapon": P.o.weapon, "power": P.power(P.o.pilot)})
+		var info := {"name": P.display_name(), "pilot": P.o.pilot, "weapon": P.o.weapon, "power": P.power(P.o.pilot)}
+		var err: String = game.net.join_online(code, info, str(game.accounts.data.get("server", ""))) if code != "" else game.net.join(str(ips[0]), info)
 		if err != "": toast(err)
-		else: lan_ip = str(ips[0]); open_sub("lan"))
+		else:
+			if code == "": lan_ip = str(ips[0])
+			open_sub("lan"))
 
 func update_popup(url: String, date: String) -> void:
 	if popup != null: return   # 别打断别的弹窗
@@ -1740,3 +1778,32 @@ func update_popup(url: String, date: String) -> void:
 	var hb := hbox(16); hb.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(hb)
 	var later := UIKit.flat_button("以后再说", 18); later.custom_minimum_size = Vector2(150, 52); hb.add_child(later); click(later, func(): close_popup())
 	var go := UIKit.gold_button("去下载", 22); go.custom_minimum_size = Vector2(170, 52); hb.add_child(go); click(go, func(): OS.shell_open(url); close_popup())
+
+# ================= 更新公告（data/news.json：游戏里弹窗 + CI 生成 Release 说明）=================
+static var _news: Array = []
+func news_latest() -> Dictionary:
+	if _news.is_empty() and FileAccess.file_exists("res://data/news.json"):
+		var v = JSON.parse_string(FileAccess.get_file_as_string("res://data/news.json"))
+		if typeof(v) == TYPE_ARRAY: _news = v
+	return _news[0] if not _news.is_empty() else {}
+
+func news_popup() -> void:
+	var N := news_latest()
+	if N.is_empty(): return
+	var en := I18n.lang == "en"
+	var v := make_popup(Vector2(900, 600)); v.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var t := L(str(N.get("title_en" if en else "title", N.title)), 30, Color("#ffe14d"), 8); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(t)
+	v.add_child(centered(L("%s  •  %s" % [N.ver, N.date], 14, Color("#a8a4c8"))))
+	v.add_child(centered(UIKit.wrap(L(str(N.get("intro_en" if en else "intro", "")), 16, Color.WHITE), 820)))
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; sc.custom_minimum_size = Vector2(840, 380); sc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(sc)
+	var lst := vbox(10); sc.add_child(lst)
+	for sec in N.sections:
+		var c := UIKit.card(Color("#2e2760"), Color("#16122e"), Color("#4b4396"), 14); c.custom_minimum_size = Vector2(820, 0)
+		var cv := vbox(4); c.add_child(cv)
+		var hl := Label.new(); hl.text = str(sec.get("h_en" if en else "h", sec.h)); hl.add_theme_font_size_override("font_size", 19); hl.add_theme_color_override("font_color", Color("#7af0ff")); cv.add_child(hl)
+		for it in sec.get("items_en" if en else "items", sec.items):
+			var il := Label.new(); il.text = "•  " + str(it); il.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; il.custom_minimum_size.x = 780
+			il.add_theme_font_size_override("font_size", 15); il.add_theme_color_override("font_color", Color("#e6e2fa")); cv.add_child(il)
+		lst.add_child(c)
+	var ok := UIKit.gold_button("知道了", 22); ok.custom_minimum_size = Vector2(200, 54); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok)
+	click(ok, func(): P.o.newsSeen = str(N.ver); P.save(); close_popup(); refresh())

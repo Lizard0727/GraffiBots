@@ -1,0 +1,33 @@
+[
+ {"ver": "3.0", "date": "2026-11-22", "title": "涂鸦机兵 电脑版 3.0 正式版上线",
+  "title_en": "GraffiBots PC 3.0 — Official Release",
+  "intro": "网页版的全部内容都搬到电脑版了，还多了很多只有电脑版才有的东西。上线礼包已经寄到邮箱，记得领取！",
+  "intro_en": "Everything from the web version is now on PC, plus lots of PC-only features. A launch gift is waiting in your mailbox!",
+  "sections": [
+   {"h": "完整的游戏内容", "h_en": "The full game", "items": [
+     "全部 22 台机体、21 位驾驶员、14 张地图和 12 种模式（含排位赛和搜刮撤离）",
+     "通行证、邮件、任务线、限时活动、皮肤商店、天赋、宝箱，账号和网页版通用（转移码互导）"],
+    "items_en": ["All 22 mechs, 21 pilots, 14 maps and 12 modes (including Ranked and Loot & Extract)",
+     "Pass, mail, questlines, events, skin shop, talents and chests; accounts are shared with the web version (transfer codes)"]},
+   {"h": "全新的开局流程", "h_en": "New match flow", "items": [
+     "匹配对手 → 准备确认（有人没准备会重新匹配）→ 排位禁用 / 选人（中间放 3D 模型）→ VS 载入 → 观察阶段",
+     "AI 有性格、昵称和外观，对局里会聊天、回你的话；结算有 MVP / 钻石 / 黄金 / 白银 / 青铜评级"],
+    "items_en": ["Matchmaking → ready check (no-shows trigger a re-queue) → ranked bans / picks with 3D models → VS loading → observe phase",
+     "AI players have personalities, nicknames and looks, chat in matches and reply to you; results show MVP / Diamond / Gold / Silver / Bronze ratings"]},
+   {"h": "联机和社交", "h_en": "Online & social", "items": [
+     "局域网联机，以及通过游戏服务器的线上房间（输入房间号加入），所有模式都能一起打，包括组队排位和搜刮撤离",
+     "好友码加好友、在线状态、一键邀请组队；对局聊天（Enter）"],
+    "items_en": ["LAN play and online rooms through a game server (join with a room code) in every mode, including party Ranked and Loot & Extract",
+     "Friend codes, online status, one-click party invites; in-match chat (Enter)"]},
+   {"h": "搜刮撤离", "h_en": "Loot & Extract", "items": [
+     "消耗品（1~4 键或双击使用）、N 键大地图、全灭的小队位置会有增援小队空降",
+     "交易行（价格每小时浮动）和本周撤离排行"],
+    "items_en": ["Consumables (keys 1–4 or double-click), big map with N, reinforcement squads drop into wiped squad slots",
+     "Market with hourly prices and a weekly extraction leaderboard"]},
+   {"h": "个人资料和其他", "h_en": "Profile & more", "items": [
+     "个人资料：头像、动态头像框、称号、签名、生涯战绩、3 格展示框",
+     "新手教程、赛季开场动画、皮肤进场特效、暂停菜单、手柄、中文 / English、自动检查更新"],
+    "items_en": ["Profile: avatar, animated frames, titles, signature, career stats and a 3-slot showcase",
+     "Tutorial, season intro, skin entrance effects, pause menu, gamepad, 中文 / English, automatic update check"]}
+  ]}
+]

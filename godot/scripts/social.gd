@@ -6,7 +6,7 @@ extends Node
 
 const ALPHA := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 signal changed
-signal invited(from_name: String, ips: Array)
+signal invited(from_name: String, ips: Array, code: String)
 
 var game
 var ws: WebSocketPeer
@@ -129,8 +129,9 @@ func on_soc(from: String, m: Dictionary) -> void:
 			if not is_friend(from): return
 			if game.state == "play": soc_send(from, {"t": "invR", "ok": false, "why": "game"}); return
 			var ips: Array = m.get("ips", [])
-			if ips.is_empty(): game.lobby.toast("%s 在网页版邀请你组队（电脑版只能加入电脑版的局域网房间）" % c.get("name", "好友")); return
-			invited.emit(str(c.get("name", "好友")), ips)
+			var rc := str(m.get("room", ""))
+			if ips.is_empty() and rc == "": game.lobby.toast("%s 在网页版邀请你组队（电脑版只能加入电脑版的房间）" % c.get("name", "好友")); return
+			invited.emit(str(c.get("name", "好友")), ips, rc)
 		"invR":
 			if m.get("ok", true) == false: game.lobby.toast("%s %s" % [name_of(from), "正在对局中" if m.get("why", "") == "game" else "拒绝了邀请"])
 
@@ -159,12 +160,17 @@ func reject(f: String) -> void:
 func remove(f: String) -> void:
 	S().friends = S().friends.filter(func(x): return x.fid != f); on.erase(f); save()
 
-# 组队邀请：先开局域网房间（没开的话），再把房主 IP 发给好友
+# 组队邀请：连着游戏服务器就开线上房间（不在同一个网络也能进），否则开局域网房间；然后把房间号 / IP 发给好友
 func invite(f: String) -> void:
 	var N: Net = game.net
+	var info := {"name": game.profile.display_name(), "pilot": game.profile.o.pilot, "weapon": game.profile.o.weapon, "power": game.profile.power(game.profile.o.pilot)}
 	if N.role == "":
-		var err := N.host({"name": game.profile.display_name(), "pilot": game.profile.o.pilot, "weapon": game.profile.o.weapon, "power": game.profile.power(game.profile.o.pilot)})
+		var err := N.host_online(info, server_addr()) if state == "on" else N.host(info)
 		if err != "": game.lobby.toast(err); return
 	elif N.role != "host": game.lobby.toast("你在别人的房间里，只有房主能邀请"); return
-	soc_send(f, {"t": "inv", "card": card(), "ips": Net.lan_ips(), "port": Net.PORT})
-	game.lobby.toast("已邀请 %s 加入你的局域网房间" % name_of(f))
+	if N.online:   # 等服务器分好房间号再发
+		var t0 := Time.get_ticks_msec()
+		while str(N.room.get("code", "")) == "" and Time.get_ticks_msec() - t0 < 5000: await get_tree().process_frame
+		if str(N.room.get("code", "")) == "": game.lobby.toast("服务器没有分到房间号"); return
+	soc_send(f, {"t": "inv", "card": card(), "ips": Net.lan_ips() if not N.online else [], "port": Net.PORT, "room": str(N.room.get("code", "")) if N.online else ""})
+	game.lobby.toast("已邀请 %s 加入你的房间" % name_of(f))

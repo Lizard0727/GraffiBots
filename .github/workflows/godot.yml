@@ -51,6 +51,12 @@ jobs:
           sleep 1
           GB_SERVER=127.0.0.1:3917 ~/godot/godot --headless --path godot --script res://tests/account_test.gd
           GB_SERVER=127.0.0.1:3917 ~/godot/godot --headless --path godot --script res://tests/social_test.gd
+          # 线上房间：两个电脑版进程通过服务器转发对战（房主开房 → 客人用房间号加入 → 客人收到画面）
+          rm -f /tmp/code.txt
+          GB_LAN=host GB_SERVER=127.0.0.1:3917 GB_CODEFILE=/tmp/code.txt GB_NO_MUSIC=1 GB_QUIT_AT=22 timeout 120 ~/godot/godot --headless --path godot > /tmp/on_host.log 2>&1 &
+          GB_LAN=join GB_SERVER=127.0.0.1:3917 GB_CODEFILE=/tmp/code.txt GB_NO_MUSIC=1 GB_QUIT_AT=20 timeout 120 ~/godot/godot --headless --path godot > /tmp/on_cli.log 2>&1 || true
+          grep -E "线上测试|state=play" /tmp/on_cli.log | tail -3
+          grep -qE "state=play players=8 snaps=[1-9]" /tmp/on_cli.log
 
       - name: 导出
         run: |
@@ -64,6 +70,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           (cd build/godot/windows && zip -q ../../GraffiBots-Godot-Windows.zip GraffiBots.exe)
+          # 正式公告：Release 说明由 godot/data/news.json 生成（和游戏里的更新公告同一份）
+          python3 - > build/notes.md <<'PY'
+          import json
+          N = json.load(open("godot/data/news.json", encoding="utf-8"))[0]
+          out = ["# " + N["title"], "", N["intro"], ""]
+          for s in N["sections"]:
+              out += ["## " + s["h"]] + ["- " + i for i in s["items"]] + [""]
+          out += ["**下载**：解压 `GraffiBots-Godot-Windows.zip`，双击 `GraffiBots.exe`。存档在 `%APPDATA%/Godot/app_userdata/涂鸦机兵 GraffiBots`，覆盖安装不会丢。", "", "---", "", "# " + N["title_en"], "", N["intro_en"], ""]
+          for s in N["sections"]:
+              out += ["## " + s["h_en"]] + ["- " + i for i in s["items_en"]] + [""]
+          out += ["**Download**: unzip `GraffiBots-Godot-Windows.zip` and run `GraffiBots.exe`."]
+          print("\n".join(out))
+          PY
+          TITLE=$(python3 -c 'import json;N=json.load(open("godot/data/news.json",encoding="utf-8"))[0];print("涂鸦机兵 电脑版 %s（正式版）" % N["ver"])')
           gh release delete godot-proto --yes --cleanup-tag || true
           gh release create godot-proto build/GraffiBots-Godot-Windows.zip \
-            --title "Godot 版（最新）" --notes "涂鸦机兵 Godot 电脑版（Windows）：解压后双击 GraffiBots.exe。" --prerelease --target ${{ github.sha }}
+            --title "$TITLE" --notes-file build/notes.md --latest --target ${{ github.sha }}

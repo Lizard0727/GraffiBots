@@ -150,7 +150,14 @@ func build_roster() -> void:
 	players = [{"name": P.display_name(), "team": int(lay[0]), "me": true, "persona": "", "pilot": str(P.o.pilot), "mech": str(P.o.weapon),
 		"looks": P.my_looks(), "lv": acc_lv, "plv": plv, "bt": int(P.power(str(P.o.pilot)).bt), "tier": max(0, tier), "ready": false, "ready_at": 0.0, "never": false}]
 	var bot_lv: int = int(P.rank_bot_power().lv) if kind == "ranked" else plv
+	var friends: Array = game.net.room.players.filter(func(q): return int(q.peer) != 1) if game.net.role == "host" else []
 	for i in range(1, lay.size()):
+		if i - 1 < friends.size() and int(lay[i]) == int(lay[0]):   # 房间里的好友：当我的队友（组队）
+			var fq: Dictionary = friends[i - 1]
+			players.append({"name": I18n.keep(str(fq.name)), "team": int(lay[i]), "me": false, "friend": true, "persona": "", "pilot": str(fq.pilot) if kind != "ranked" else "", "face": str(fq.pilot), "mech": str(fq.weapon) if kind != "ranked" else "",
+				"want": {"pilot": str(fq.pilot), "mech": str(fq.weapon)}, "looks": {}, "lv": acc_lv, "plv": int(fq.get("power", {}).get("lv", 1)), "bt": int(fq.get("power", {}).get("bt", 0)),
+				"tier": max(0, tier), "ready": false, "ready_at": randf_range(0.4, 1.2), "never": false})
+			continue
 		var pid: String = pers[i - 1]
 		var Pz := Bots.persona(pid)
 		var lv: int = clampi(bot_lv + int(Pz.lv), 1, 11)
@@ -175,7 +182,7 @@ func build_roster() -> void:
 	if randf() < 0.16 and players.size() > 1:
 		var foes: Array = range(1, players.size()).filter(func(i): return int(players[i].team) != int(players[0].team))
 		var pick_i: int = foes.pick_random() if not foes.is_empty() and randf() < 0.7 else randi_range(1, players.size() - 1)
-		players[pick_i].never = true
+		if not players[pick_i].get("friend", false): players[pick_i].never = true
 
 # ================= 2. 准备确认 =================
 func enter_ready() -> void:
@@ -305,6 +312,7 @@ func meta(k: String, id: String) -> float: return float(D.meta.get("pilots" if k
 func dr_ai_pick(x: Dictionary) -> Dictionary:
 	var me: Dictionary = players[0]
 	var av := dr_avail(false)
+	if x.get("friend", false) and x.want.pilot in av.ps and x.want.mech in av.ms: return x.want   # 好友：选自己出战的驾驶员和机体
 	var ps: Array = av.ps; var ms: Array = av.ms
 	if me.pick == null:   # 给玩家至少留一个能用的
 		var mine := dr_avail(true)
@@ -358,6 +366,7 @@ func dr_next() -> void:
 			"quick": act = randf_range(0.7, 2.3)
 			"normal": act = randf_range(2.5, 6.0)
 			_: act = randf_range(6.5, 11.0)
+		if who.get("friend", false): act = 0.8
 		if T.t == "ban": act = minf(act, randf_range(2.5, 5.5))
 		if OS.get_environment("GB_FASTAI") != "": act = 0.4   # 测试用
 	T.act = act
@@ -659,6 +668,7 @@ func launch() -> void:
 	var rest: Array = players.slice(1)
 	if kind == "ranked":
 		rest = dr.A.filter(func(x): return not x.me) + dr.B
+	rest.sort_custom(func(a, b): return a.get("friend", false) and not b.get("friend", false))   # 房间里的好友排在最前面，和开局时的真人位置对上
 	var used := {}
 	for i in range(1, lay.size()):
 		for p in rest:
