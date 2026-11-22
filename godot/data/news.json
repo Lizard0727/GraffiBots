@@ -2,10 +2,10 @@
  {
   "ver": "3.2",
   "date": "2026-11-22",
-  "title": "涂鸦机兵 电脑版 3.2 · AI 大改 + 模型重做",
-  "title_en": "GraffiBots PC 3.2 · AI Overhaul + New Models",
-  "intro": "AI 分成 5 档，每个模式都知道该干什么；全部驾驶员和机体的 3D 模型重做；隐身终于藏得住了；还加了帧率显示。",
-  "intro_en": "AI now comes in 5 tiers and understands every mode; all pilot and mech 3D models are rebuilt; stealth actually hides you now; plus an FPS counter.",
+  "title": "涂鸦机兵 电脑版 3.2 · AI 大改 + 模型立绘重做",
+  "title_en": "GraffiBots PC 3.2 · AI Overhaul + New Models & Art",
+  "intro": "AI 分成 5 档，每个模式都知道该干什么；全部驾驶员和机体的 3D 模型重做；24 位驾驶员换上全新立绘和头像，抽到时有专属登场动画；隐身终于藏得住了；还加了帧率显示。",
+  "intro_en": "AI now comes in 5 tiers and understands every mode; all pilot and mech 3D models are rebuilt; all 24 pilots get brand-new art and avatars with a reveal animation; stealth actually hides you now; plus an FPS counter.",
   "sections": [
    {
     "h": "AI 5 档",
@@ -33,6 +33,20 @@
      "Zone: every AI goes for the zone and strafes inside it (almost double the time on point)",
      "Park: most AIs ride with the float and only pop balloons on the way; Escort: carriers head straight for the goal, allies escort, enemies chase",
      "Battery: full carriers go home to bank; Soccer: shoot the ball first; Escape: stay in the circle before fighting"
+    ]
+   },
+   {
+    "h": "全新驾驶员立绘",
+    "h_en": "New pilot art",
+    "items": [
+     "24 位驾驶员全部重画：偏写实的粗墨线画风、低饱和配色加一个主题色，每个人长相、发型、衣服都拉开了，不再撞脸",
+     "头像同步换新，背景加上了主题色笔刷、网点、墨点和档案框线",
+     "开宝箱抽到驾驶员时：刀光划过 → 背景砸进来 → 剪影滑入 → 白闪上色 → 名字登场 → 最后弹出头像（点一下可以直接跳到结尾）"
+    ],
+    "items_en": [
+     "All 24 pilots redrawn: semi-realistic heavy-ink style, muted palette with one accent color, and clearly different faces, hair and outfits — no more look-alikes",
+     "Avatars redone too, with accent brush strokes, halftone, ink splats and file-frame details in the background",
+     "Getting a pilot from a chest now plays a reveal: a slash, the background slams in, the silhouette slides in, a flash colors it, the name lands, and finally the avatar pops up (click to skip to the end)"
     ]
    },
    {

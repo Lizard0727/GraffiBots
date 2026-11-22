@@ -606,29 +606,73 @@ func open_anim(cid: String, r: Dictionary) -> void:
 	if OS.get_environment("GB_SHOT_OPEN") != "": do_open.call()
 
 # 新驾驶员亮相：斜切的彩色背景 + 立绘从右边滑进来 + 头像框 + 名字 / 称号 / 台词，点一下关掉
+# 抽到驾驶员：一小段动画（刀光 → 背景砸进来 → 剪影滑入 → 白闪上色 → 名字 → 最后弹出头像），点一下跳到结尾，再点关闭
 func pilot_reveal(pid: String) -> void:
 	var Pd: Dictionary = D.pilots[pid]; var acc := Color(str(Pd.accent))
 	var ov := Control.new(); ov.set_anchors_preset(Control.PRESET_FULL_RECT); ov.mouse_filter = Control.MOUSE_FILTER_STOP; add_child(ov)
-	var bg := ColorRect.new(); bg.color = Color(0.02, 0.02, 0.06, 0.92); bg.position = Vector2.ZERO; bg.size = vs; ov.add_child(bg)
-	var band := Polygon2D.new(); band.color = acc.darkened(0.25)
-	band.polygon = PackedVector2Array([Vector2(vs.x * 0.56, 0), Vector2(vs.x, 0), Vector2(vs.x, vs.y), Vector2(vs.x * 0.42, vs.y)]); ov.add_child(band)
-	var band2 := Polygon2D.new(); band2.color = acc.lightened(0.15)
-	band2.polygon = PackedVector2Array([Vector2(vs.x * 0.53, 0), Vector2(vs.x * 0.56, 0), Vector2(vs.x * 0.42, vs.y), Vector2(vs.x * 0.39, vs.y)]); ov.add_child(band2)
-	var por := UIKit.image(portrait_path(pid), Vector2(vs.y * 0.95 * 600.0 / 780.0, vs.y * 0.95)); ov.add_child(por)
-	por.position = Vector2(vs.x, vs.y * 0.05)
-	var av := UIKit.avatar("res://art/faces/%s.png" % pid, "", 150, acc); ov.add_child(av); av.position = Vector2(vs.x * 0.08, vs.y * 0.22)
-	var v := vbox(4); ov.add_child(v); v.position = Vector2(vs.x * 0.08, vs.y * 0.22 + 170)
-	v.add_child(L("新驾驶员！", 26, Color("#fff3a8"), 6))
-	v.add_child(L(str(Pd.name), 64, Color.WHITE, 10))
-	v.add_child(L("「%s」%s" % [Pd.code, Pd.title], 22, acc.lightened(0.35), 5))
-	v.add_child(UIKit.wrap(L("“%s”" % Pd.line, 18, Color("#e6e2fa"), 4), vs.x * 0.36))
-	v.add_child(L("点击任意位置继续", 15, Color("#a8a4c8"), 3))
-	ov.modulate.a = 0
+	var black := ColorRect.new(); black.color = Color(0, 0, 0, 0.96); black.size = vs; ov.add_child(black)
+	var stage := Control.new(); stage.size = vs; stage.mouse_filter = Control.MOUSE_FILTER_IGNORE; ov.add_child(stage)
+	var bgp := "res://art/revealbg/%s.jpg" % pid
+	var bg: Control
+	if ResourceLoader.exists(bgp): bg = UIKit.image(bgp, vs, true)
+	else:
+		var cr := ColorRect.new(); cr.color = acc.darkened(0.8); cr.size = vs; bg = cr
+	bg.size = vs; bg.pivot_offset = vs / 2; bg.scale = Vector2(1.18, 1.18); bg.modulate.a = 0; stage.add_child(bg)
+	var ph := vs.y * 1.02; var pw := ph * 600.0 / 780.0
+	var por := UIKit.image(portrait_path(pid), Vector2(pw, ph)); stage.add_child(por)
+	var por_x := vs.x * 0.97 - pw
+	por.position = Vector2(vs.x + 40, vs.y - ph + 6); por.modulate = Color(0, 0, 0, 1)
+	# 左边压暗，给字和头像腾地方
+	var shade := Polygon2D.new(); shade.color = Color(0, 0, 0, 0.55)
+	shade.polygon = PackedVector2Array([Vector2(0, 0), Vector2(vs.x * 0.47, 0), Vector2(vs.x * 0.36, vs.y), Vector2(0, vs.y)]); shade.modulate.a = 0; stage.add_child(shade)
+	# 刀光
+	var slash := Polygon2D.new(); slash.color = Color(1, 1, 1, 0.95)
+	var a0 := Vector2(-40, vs.y * 0.78); var a1 := Vector2(vs.x + 40, vs.y * 0.18); var nrm := (a1 - a0).orthogonal().normalized() * 7
+	slash.polygon = PackedVector2Array([Vector2.ZERO + nrm, a1 - a0 + nrm * 0.2, a1 - a0 - nrm * 0.2, Vector2.ZERO - nrm]); slash.position = a0; slash.scale = Vector2(0, 0)
+	ov.add_child(slash)
+	var slash2 := Polygon2D.new(); slash2.color = acc; slash2.polygon = slash.polygon; slash2.position = a0 + Vector2(0, 14); slash2.scale = Vector2(0, 0); ov.add_child(slash2)
+	# 名字
+	var txt := vbox(2); stage.add_child(txt); txt.position = Vector2(vs.x * 0.06 - 60, vs.y * 0.50); txt.modulate.a = 0
+	txt.add_child(L("新驾驶员！", 20, acc.lightened(0.3), 4))
+	txt.add_child(L(str(Pd.name), 72, Color.WHITE, 12))
+	txt.add_child(L("「%s」%s" % [Pd.code, Pd.title], 22, acc.lightened(0.35), 5))
+	txt.add_child(UIKit.wrap(L("“%s”" % Pd.line, 18, Color("#e6e2fa"), 4), vs.x * 0.34))
+	var flash := ColorRect.new(); flash.color = Color(1, 1, 1, 0); flash.size = vs; flash.mouse_filter = Control.MOUSE_FILTER_IGNORE; ov.add_child(flash)
+	# 最后弹出的头像
+	var card := Control.new(); card.size = Vector2(300, 300); card.pivot_offset = card.size / 2; card.position = Vector2(vs.x * 0.06 - 40, vs.y * 0.50 - 300); card.scale = Vector2.ZERO
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE; ov.add_child(card)
+	var rays := Rays.new(); rays.col = acc; rays.modulate.a = 0.55; rays.size = card.size; rays.position = Vector2(0, -10); card.add_child(rays)
+	var av := UIKit.avatar("res://art/faces/%s.png" % pid, "", 200, acc); card.add_child(av); av.position = (card.size - Vector2(200, 200)) / 2
+	var hint := L("点击任意位置继续", 15, Color("#c8c4e0"), 3); ov.add_child(hint); hint.position = Vector2(vs.x * 0.06, vs.y - 44); hint.modulate.a = 0
 	var tw := ov.create_tween()
-	tw.tween_property(ov, "modulate:a", 1.0, 0.2)
-	tw.parallel().tween_property(por, "position:x", vs.x - por.size.x - vs.x * 0.04, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	game.sfx.play("super")
-	ov.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed: ov.queue_free())
+	game.sfx.play("slash")
+	tw.tween_property(slash, "scale", Vector2(1, 1), 0.16).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(slash2, "scale", Vector2(1, 1), 0.2).set_delay(0.04).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func(): game.sfx.play("boom", -6))
+	tw.tween_property(bg, "modulate:a", 1.0, 0.12)
+	tw.parallel().tween_property(bg, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(slash, "modulate:a", 0.0, 0.3)
+	tw.parallel().tween_property(slash2, "modulate:a", 0.0, 0.4)
+	for k in 5:   # 震屏
+		tw.parallel().tween_property(stage, "position", Vector2(randf_range(-14, 14), randf_range(-10, 10)) * (1.0 - k / 5.0), 0.04).set_delay(k * 0.04)
+	tw.tween_property(stage, "position", Vector2.ZERO, 0.04)
+	tw.tween_property(por, "position:x", por_x, 0.38).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.12)
+	tw.tween_callback(func(): game.sfx.play("super"))
+	tw.tween_property(flash, "color:a", 0.85, 0.06)
+	tw.tween_callback(func(): por.modulate = Color.WHITE)
+	tw.tween_property(flash, "color:a", 0.0, 0.3)
+	tw.parallel().tween_property(shade, "modulate:a", 1.0, 0.3)
+	tw.parallel().tween_property(txt, "modulate:a", 1.0, 0.25).set_delay(0.08)
+	tw.parallel().tween_property(txt, "position:x", vs.x * 0.06, 0.35).set_delay(0.08).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.45)
+	tw.tween_callback(func(): game.sfx.play("win", -4))
+	tw.tween_property(card, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(hint, "modulate:a", 1.0, 0.3)
+	ov.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed:
+			if tw.is_running(): tw.custom_step(30.0)
+			else: ov.queue_free())
 
 class Rays extends Control:
 	var col := Color.WHITE

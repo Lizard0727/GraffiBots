@@ -3,9 +3,14 @@
 # 画风：偏写实的动漫插画、粗重墨线、低饱和配色 + 一个主题色、强烈明暗、颗粒笔触（不点名任何现有作品）
 # 运行：python3 tools/gen-portraits.py [id ...]     （不写 id = 全部；已经生成过的会跳过，加 --force 重新生成）
 # Key：在云端环境的 Network secrets 里给 api.openai.com 配 Bearer key（代理会自动带上），或者设置 OPENAI_API_KEY
+# 免费做法（3.2 实际用的）：用 Figma 免费帐号自带的 AI 生图（Figma MCP 的 generate_image，吃每月免费 AI 额度，不要 API Key），
+#   提示词 = STYLE_KEYED + LOOKS，背景要求纯绿 #00FF00（青绿系角色用纯品红 #FF00FF），下载到 tools/portraits-raw/<id>.png（仓库里存的是 683×1024 的 .jpg 原图，省空间），
+#   然后 python3 tools/gen-portraits.py --export-only 抠掉纯色背景并导出
 # 输出：godot/art/portraits/<id>.png（600×780，透明背景）、godot/art/faces/<id>.png（160×160 头像）、原图在 tools/portraits-raw/
 import base64, io, json, os, sys, time, urllib.request
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+import random
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 DATA = json.load(open(os.path.join(ROOT, 'godot', 'data', 'game.json'), encoding='utf-8'))
@@ -65,8 +70,99 @@ def gen(pid, force=False):
             print('失败，重试', pid, e); time.sleep(5 * (attempt + 1))
     raise SystemExit('生成失败：' + pid)
 
+def key(im):
+    # 抠纯色背景：取上面两个角的颜色当背景色，按颜色距离算透明度（边缘柔和），再去掉边缘的绿/品红溢色
+    a = np.asarray(im.convert('RGB')).astype(np.float32)
+    H, W, _ = a.shape
+    kc = (a[:12, :12].reshape(-1, 3).mean(0) + a[:12, -12:].reshape(-1, 3).mean(0)) / 2
+    green = kc[1] > kc[0]
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    # 「有多像背景」：绿幕 = g 比 r、b 都高多少；品红幕 = r、b 都比 g 高多少
+    sc = g - np.maximum(r, b) if green else np.minimum(r, b) - g
+    alpha = np.clip((140.0 - sc) / 80.0, 0, 1)          # sc ≥ 140 → 全透明，sc ≤ 60 → 不透明（头发缝里被包住的背景也一起抠）
+    # 只在背景附近去溢色，角色身体中间的颜色不动
+    near = np.asarray(Image.fromarray(((alpha < 0.99) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(9))) > 0
+    # 去溢色（只在背景附近）：绿幕把 g 压到 max(r,b)，品红幕把 r、b 一起压掉多出来的那部分
+    spill = np.maximum(0, sc) * near
+    if green: a[..., 1] -= spill
+    else: a[..., 0] -= spill; a[..., 2] -= spill
+    out = np.dstack([a, alpha * 255]).clip(0, 255).astype(np.uint8)
+    return Image.fromarray(out, 'RGBA')
+
+SERIF = '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf'
+MONO = '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'
+
+def make_bg(pid, W=1280, H=720):
+    # 抽卡展示用的背景（1280×720）：暗底 + 主题色光 + 斜向大笔刷 + 网点 + 墨点 + 划痕 + 大号英文名 + 档案框线
+    # 背景细节全部程序化生成（按 id 固定随机种子），角色本身用透明立绘叠在上面
+    rnd = random.Random(pid)
+    c = DATA['pilots'][pid]['accent'].lstrip('#'); acc = np.array([int(c[i:i + 2], 16) for i in (0, 2, 4)], np.float32)
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    base = acc * 0.10 + 6
+    img = np.ones((H, W, 3), np.float32) * base
+    # 角色身后的主题色光（偏右）
+    d = np.sqrt(((xx - W * 0.68) / (W * 0.42)) ** 2 + ((yy - H * 0.42) / (H * 0.7)) ** 2)
+    img += acc[None, None, :] * (np.clip(1 - d, 0, 1) ** 1.6)[..., None] * 0.55
+    im = Image.fromarray(img.clip(0, 255).astype(np.uint8))
+    lay = Image.new('RGBA', (W, H), (0, 0, 0, 0)); dr = ImageDraw.Draw(lay)
+    # 网点（左下 → 右上渐变大小）
+    step = 14
+    for y in range(0, H, step):
+        for x in range(0, W, step):
+            t = (x / W) * 0.6 + (1 - y / H) * 0.4
+            r = 5.5 * max(0.0, 1 - abs(t - 0.55) * 2.4)
+            if r > 0.6: dr.ellipse((x - r, y - r, x + r, y + r), fill=tuple(int(v) for v in acc * 0.55) + (70,))
+    # 斜向大笔刷（边缘抖动）
+    def stroke(x0, w, col, alpha, slope=0.42):
+        pts_l, pts_r = [], []
+        for i in range(0, H + 40, 20):
+            j = rnd.uniform(-10, 10); off = (H - i) * slope
+            pts_l.append((x0 + off + j, i)); pts_r.append((x0 + off + w + rnd.uniform(-14, 14), i))
+        dr.polygon(pts_l + pts_r[::-1], fill=col + (alpha,))
+    stroke(W * 0.38, W * 0.2, tuple(int(v) for v in acc * 0.85), 150)
+    stroke(W * 0.35, 10, (240, 236, 228), 150)
+    stroke(W * 0.62, 26, tuple(int(v) for v in acc), 110)
+    # 墨点 / 飞溅
+    for _ in range(9):
+        cx, cy = rnd.uniform(W * 0.3, W), rnd.uniform(0, H); R = rnd.uniform(8, 34)
+        col = (8, 6, 10, 200) if rnd.random() < 0.6 else tuple(int(v) for v in acc) + (170,)
+        dr.ellipse((cx - R, cy - R, cx + R, cy + R), fill=col)
+        for _ in range(rnd.randint(6, 14)):
+            a = rnd.uniform(0, 6.283); dd = R * rnd.uniform(1.2, 3.2); r2 = rnd.uniform(1.5, R * 0.3)
+            px, py = cx + np.cos(a) * dd, cy + np.sin(a) * dd
+            dr.ellipse((px - r2, py - r2, px + r2, py + r2), fill=col)
+        if rnd.random() < 0.5:   # 往下流的墨痕
+            L = rnd.uniform(30, 120); dr.rectangle((cx - R * 0.2, cy, cx + R * 0.2, cy + L), fill=col); dr.ellipse((cx - R * 0.3, cy + L - R * 0.3, cx + R * 0.3, cy + L + R * 0.3), fill=col)
+    # 划痕
+    for _ in range(40):
+        x, y = rnd.uniform(0, W), rnd.uniform(0, H); L = rnd.uniform(20, 140); a = rnd.uniform(-0.5, 0.5) - 1.1
+        dr.line((x, y, x + np.cos(a) * L, y + np.sin(a) * L), fill=(230, 226, 220, rnd.randint(18, 50)), width=1)
+    # 大号英文名（描边、半透明，竖排在右边 + 横排在底下）
+    name = pid.upper()
+    f = ImageFont.truetype(SERIF, 230)
+    dr.text((W * 0.30, H * 0.56), name, font=f, fill=(0, 0, 0, 0), stroke_width=3, stroke_fill=tuple(int(v) for v in acc) + (90,))
+    txt = Image.new('RGBA', (H, 200), (0, 0, 0, 0)); ImageDraw.Draw(txt).text((10, 0), (name + ' // ') * 3, font=ImageFont.truetype(SERIF, 120), fill=(255, 255, 255, 22))
+    lay.alpha_composite(txt.rotate(90, expand=True), (W - 190, 0))
+    # 档案框线 + 小字
+    fm = ImageFont.truetype(MONO, 15)
+    no = DATA['pilotOrder'].index(pid) + 1
+    for (x, y, sx, sy) in ((24, 24, 1, 1), (W - 24, 24, -1, 1), (24, H - 24, 1, -1), (W - 24, H - 24, -1, -1)):
+        dr.line((x, y, x + 60 * sx, y), fill=(240, 236, 228, 160), width=2); dr.line((x, y, x, y + 60 * sy), fill=(240, 236, 228, 160), width=2)
+    dr.text((40, H - 46), 'GRAFFIBOTS // PILOT FILE No.%02d // %s' % (no, name), font=fm, fill=(240, 236, 228, 120))
+    dr.text((W - 330, 34), 'CLEARANCE ▮▮▮▮▯  SYNC %d%%' % rnd.randint(71, 99), font=fm, fill=(240, 236, 228, 110))
+    dr.line((40, H - 54, W * 0.45, H - 54), fill=tuple(int(v) for v in acc) + (160,), width=2)
+    im = im.convert('RGBA'); im.alpha_composite(lay)
+    # 颗粒 + 暗角
+    g = np.asarray(im.convert('RGB')).astype(np.float32)
+    g += np.random.default_rng(len(pid) * 97).normal(0, 7, (H, W, 1))
+    vig = np.clip(1.25 - np.sqrt(((xx - W / 2) / (W * 0.62)) ** 2 + ((yy - H / 2) / (H * 0.62)) ** 2), 0.35, 1)
+    g *= vig[..., None]
+    return Image.fromarray(g.clip(0, 255).astype(np.uint8))
+
 def export(pid, raw):
-    im = Image.open(raw).convert('RGBA')
+    im = Image.open(raw)
+    if im.mode != 'RGBA' or im.getextrema()[3][0] == 255: im = key(im)
+    im = im.convert('RGBA')
     W, H = im.size
     # 立绘 600×780：按宽缩放，从上往下裁
     por = im.resize((600, int(H * 600 / W)), Image.LANCZOS).crop((0, 0, 600, 780))
@@ -77,7 +173,9 @@ def export(pid, raw):
     side = int((x1 - x0) * 0.62)
     cx = (x0 + x1) // 2; top = y0 + int(side * 0.12)
     face = im.crop((cx - side // 2, top, cx + side // 2, top + side)).resize((160, 160), Image.LANCZOS)
-    bg = Image.new('RGBA', (160, 160), P_BG(pid)); bg.alpha_composite(face)
+    bgi = make_bg(pid); os.makedirs(os.path.join(ROOT, 'godot', 'art', 'revealbg'), exist_ok=True)
+    bgi.save(os.path.join(ROOT, 'godot', 'art', 'revealbg', pid + '.jpg'), quality=88)
+    bg = bgi.crop((700, 120, 1180, 600)).resize((160, 160), Image.LANCZOS).convert('RGBA'); bg.alpha_composite(face)
     bg.save(os.path.join(ROOT, 'godot', 'art', 'faces', pid + '.png'), optimize=True)
 
 def P_BG(pid):
@@ -88,5 +186,10 @@ if __name__ == '__main__':
     force = '--force' in sys.argv
     ids = [a for a in sys.argv[1:] if not a.startswith('--')] or DATA['pilotOrder']
     for pid in ids:
+        if '--export-only' in sys.argv:
+            for ext in ('.png', '.jpg'):
+                raw = os.path.join(RAW, pid + ext)
+                if os.path.exists(raw): export(pid, raw); print('导出', pid); break
+            continue
         export(pid, gen(pid, force))
     print('完成', len(ids), '位驾驶员')
