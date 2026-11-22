@@ -1,5 +1,27 @@
 [
  {
+  "ver": "3.2.1",
+  "date": "2026-11-22",
+  "title": "涂鸦机兵 电脑版 3.2.1 · 维护更新",
+  "title_en": "GraffiBots PC 3.2.1 · Maintenance",
+  "intro": "修复抽到驾驶员时的登场画面点不掉的问题。",
+  "intro_en": "Fixes the pilot reveal screen that couldn't be dismissed.",
+  "sections": [
+   {
+    "h": "修复",
+    "h_en": "Fixes",
+    "items": [
+     "开宝箱抽到驾驶员时，登场画面点击没反应、关不掉 —— 现在点一下跳到最后一幕，再点一下关闭",
+     "登场画面也可以用空格 / 回车跳过，Esc 直接关闭"
+    ],
+    "items_en": [
+     "The pilot reveal after opening a chest ignored clicks and couldn't be closed — now one click skips to the end and another closes it",
+     "Space / Enter also skips the reveal, and Esc closes it"
+    ]
+   }
+  ]
+ },
+ {
   "ver": "3.2",
   "date": "2026-11-22",
   "title": "涂鸦机兵 电脑版 3.2 · AI 大改 + 模型立绘重做",

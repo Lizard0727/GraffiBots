@@ -669,10 +669,24 @@ func pilot_reveal(pid: String) -> void:
 	tw.tween_callback(func(): game.sfx.play("win", -4))
 	tw.tween_property(card, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(hint, "modulate:a", 1.0, 0.3)
-	ov.gui_input.connect(func(e):
-		if e is InputEventMouseButton and e.pressed:
-			if tw.is_running(): tw.custom_step(30.0)
-			else: ov.queue_free())
+	# 点击层：立绘 / 头像这些子节点默认会吃掉鼠标事件，导致点不掉 —— 全部设成忽略，最上面盖一个全屏透明按钮来接
+	_ignore_mouse(ov)
+	var catcher := Button.new(); catcher.flat = true; catcher.focus_mode = Control.FOCUS_ALL
+	catcher.add_theme_stylebox_override("focus", StyleBoxEmpty.new()); catcher.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	catcher.add_theme_stylebox_override("pressed", StyleBoxEmpty.new()); catcher.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	catcher.position = Vector2.ZERO; catcher.size = vs; ov.add_child(catcher); catcher.grab_focus()
+	var advance := func():
+		if tw.is_valid() and tw.is_running(): tw.custom_step(30.0)
+		elif is_instance_valid(ov): ov.queue_free()
+	catcher.button_down.connect(advance)   # 鼠标按下 / 空格 / 回车
+	catcher.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed and e.button_index != MOUSE_BUTTON_LEFT: advance.call()
+		elif e is InputEventKey and e.pressed and e.physical_keycode == KEY_ESCAPE and is_instance_valid(ov): ov.queue_free())
+
+func _ignore_mouse(n: Node) -> void:
+	for c in n.get_children():
+		if c is Control: (c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ignore_mouse(c)
 
 class Rays extends Control:
 	var col := Color.WHITE
