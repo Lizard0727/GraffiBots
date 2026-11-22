@@ -154,6 +154,8 @@ class Mech:
 	var pz := {}
 	var afk_t := 0.0
 	var typing_t := 0.0      # AI 在打字：站着不动
+	var flee_t := 0.0
+	var flee_threat := false
 	var afk_next := 20.0
 	var looks := {}
 	var ai_mode_t := 0.0
@@ -1664,7 +1666,7 @@ func ai_think(p: Mech, dt: float) -> void:
 	var tgt: Mech = null; var td := 1e9
 	var blind_r := 180.0 if p.blind_t > 0 else 1e9
 	# 交战距离：射程 + 200；逃亡圈里大家更在意捡箱子、躲毒圈，被打了才还手
-	var engage: float = minf(760.0, rng_w + 200.0)
+	var engage: float = minf(760.0, rng_w + 160.0)   # 和网页版一样：射程 + 160 内才会盯上
 	if mode in ["escape4", "escape8"] and time - p.last_hurt > 4.0: engage = minf(engage, rng_w * 0.75 + 40.0)
 	for e in players:
 		if not e.alive or e.team == p.team: continue
@@ -1678,19 +1680,30 @@ func ai_think(p: Mech, dt: float) -> void:
 	if tgt != null and tgt.id == p.ai_tgt: p.ai_seen += dt
 	else: p.ai_seen = 0.0; p.ai_tgt = tgt.id if tgt != null else 0
 	# 反应时间：刚看到敌人要愣一下才开火（逃亡圈里更谨慎，被打了马上还手）
+	if p.pz.is_empty() and D.has("bots"): p.pz = D.bots.personas.decent   # 没指定性格的 AI 按网页版默认的「不错」
 	var react := 0.3
 	if not p.pz.is_empty(): react = (float(p.pz.react[0]) + float(p.pz.react[1])) * 0.5 + 0.05
 	if mode in ["escape4", "escape8"]: react = 0.15 if time - p.last_hurt < 2.0 else 1.1
 	var aim_j := 0.06 * (float(p.pz.get("aim", 0.18)) / 0.18)
 	# 模式目标：每隔一会儿重新算一次（护送、送电池、躲毒圈、追球……）
 	p.ai_mode_t -= dt
-	if mode != "turf" and p.ai_mode_t <= 0:
+	# 弹出的驾驶员（网页版 fleeGoal）：附近有敌人就往反方向跑；没有就去找还有机体的队友抱团，没队友就躲草丛
+	if p.foot and not p.npc and not loot and not (p.guard is Dictionary):
+		p.flee_t -= dt
+		var threat := players.any(func(e): return e.alive and not e.out and e.team != p.team and dist2d(e, p) < 450)
+		if p.flee_t <= 0 or (threat and not p.flee_threat) or (p.ai_goal_cell >= 0 and Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() < 40):
+			p.flee_t = 0.6 if threat else 2.5; p.flee_threat = threat
+			set_goal(p, flee_goal(p))
+		p.ai_mode_t = 0.5
+	elif mode != "turf" and p.ai_mode_t <= 0:
 		p.ai_mode_t = rng.randf_range(0.25, 0.4) if mode == "soccer" else rng.randf_range(0.7, 1.1)
-		var g = mode_goal(p)
+		var g = null if keep_goal(p) else mode_goal(p)
 		if g != null: set_goal(p, g)
 		elif p.ai_urgent: p.ai_urgent = false
 	var has_goal: bool = mode != "turf" and (p.ai_goal_cell >= 0 or nav_w > 0)
-	if tgt != null and (melee or los(p.x, p.y, p.z + float(C.MUZZLE), tgt.x, tgt.y)):
+	# 交战距离（网页版 botThink）：远程 = 射程 ×1.05，近战 / 爱追人的性格至少 300；超出就先按目标走，不硬追
+	var fight_r: float = maxf(rng_w * 1.05, 300.0) if (melee or p.pz.get("chase", false)) else rng_w * 1.05
+	if tgt != null and td < fight_r and (melee or los(p.x, p.y, p.z + float(C.MUZZLE), tgt.x, tgt.y)):
 		var to := Vector2(tgt.x - p.x, tgt.y - p.y)
 		var lead := to.length() / 650.0
 		var lk := 0.6 * float(p.pz.get("lead", 0.6)) / 0.6
@@ -1703,7 +1716,10 @@ func ai_think(p: Mech, dt: float) -> void:
 		var mv := Vector2(-dir.y, dir.x) * p.ai_strafe * (0.3 if melee else 0.8)
 		if td > want: mv += dir
 		elif td < want * 0.6 and not melee: mv -= dir
-		if p.foot and hp_k < 0.5: mv = -dir + mv * 0.5   # 驾驶员残血：先跑
+		if p.foot:   # 驾驶员（网页版）：拿近战武器的冲上去，其他的边退边打
+			var perp := Vector2(-dir.y, dir.x) * p.ai_strafe
+			if str(side(p).kind) == "melee" and (hp_k > 0.45 or td < 90): mv = dir + perp * 0.3
+			else: mv = -dir * 0.7 + perp * 0.6
 		if p.ai_urgent and has_goal: mv = field_dir(p) + mv * 0.25   # 目标要紧：边打边走
 		if p.ai_t <= 0:
 			p.ai_t = rng.randf_range(0.6, 1.4)
@@ -2468,6 +2484,40 @@ func set_goal(p: Mech, g: Vector2) -> void:
 
 # 这个模式下 8 个（讨伐是 4 个）玩家位置各属于哪一队；第一个位置是真人玩家
 func team_layout() -> Array: return Sim.layout_for(mode, teams)
+
+func flee_goal(p: Mech) -> Vector2:
+	var ex := 0.0; var ey := 0.0; var n := 0
+	for e in players:
+		if e.alive and not e.out and e.team != p.team and dist2d(e, p) < 450: ex += e.x; ey += e.y; n += 1
+	if n == 0:
+		var best = null; var bd := INF
+		for a in players:
+			if a != p and a.alive and not a.out and not a.foot and a.team == p.team:
+				var d := dist2d(a, p)
+				if d < bd: bd = d; best = a
+		if best != null: return Vector2(best.x + (rng.randf_range(-30, 30) if bd > 70 else 0.0), best.y + (rng.randf_range(-30, 30) if bd > 70 else 0.0))
+		for k in 40:
+			var i := rng.randi() % (GW * GH)
+			if bush[i] == 1:
+				var bx := (i % GW + 0.5) * CELL; var by := (i / GW + 0.5) * CELL
+				if Vector2(bx - p.x, by - p.y).length() < 700: return Vector2(bx, by)
+		return Vector2(clampf(p.x + rng.randf_range(-300, 300), 40, W - 40), clampf(p.y + rng.randf_range(-300, 300), 40, H - 40))
+	ex /= n; ey /= n
+	var dx := p.x - ex; var dy := p.y - ey
+	for k in 12:
+		var d := 200.0 + k * 20; var a := atan2(dy, dx) + rng.randf_range(-0.6, 0.6)
+		var x := clampf(p.x + cos(a) * d, 40, W - 40); var y := clampf(p.y + sin(a) * d, 40, H - 40)
+		if top_at(x, y) == 0: return Vector2(x, y)
+	var l := maxf(1.0, Vector2(dx, dy).length())
+	return Vector2(clampf(p.x + dx / l * 200, 40, W - 40), clampf(p.y + dy / l * 200, 40, H - 40))
+
+# 逃亡圈：随机选的目标点还有效（在安全区里、还没走到）就继续走，不要每秒重选（网页版也是走到了才换）
+func keep_goal(p: Mech) -> bool:
+	if not mode in ["escape4", "escape8"] or p.ai_goal_cell < 0: return false
+	var c: Dictionary = obj.circle; var safe: Dictionary = c.to if c.to != null else c
+	var me_in: bool = Vector2(p.x - safe.x, p.y - safe.y).length() <= float(safe.r) * 0.75
+	var goal_in: bool = Vector2(p.ai_goal.x - safe.x, p.ai_goal.y - safe.y).length() <= float(safe.r) * 0.8
+	return me_in and goal_in and Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() > 40
 
 static func layout_for(mode: String, teams: int) -> Array:
 	if mode == "raid": return [1, 1, 1, 1]
