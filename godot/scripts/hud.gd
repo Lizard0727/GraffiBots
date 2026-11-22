@@ -3,6 +3,7 @@ extends Control
 
 var game
 var feeds: Array = []     # [text, color, time]
+var big_map := false      # N 键：大地图
 var banners: Array = []   # [text, color, time, pilot]
 var dmgs: Array = []      # [world pos, text, time, color, size]
 
@@ -185,6 +186,7 @@ func _draw() -> void:
 			if p == me: draw_line(pos, pos + Vector2(cos(me.inp.a), sin(me.inp.a)) * 10, Color.WHITE, 2)
 		elif sim.visible_to(me.team, p):
 			draw_circle(pos, 5, Color("#ff3b52"))
+	if big_map: draw_big_map(sim, me, vs)
 	# ---- 击毁消息 ----
 	var fy := 110.0 + mh
 	for f in feeds:
@@ -305,6 +307,13 @@ func draw_loot_panel(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
 	var bag := sim.loot_value(sim.inv_keys(me.inv)); var safe := sim.loot_value(sim.inv_keys(me.safe))
 	draw_rect(Rect2(vs.x / 2 - 230, 62, 460, 30), Color(0, 0, 0, 0.7))
 	txt("背包 %d • 安全箱 %d • 格子 %d / %d" % [bag, safe, sim.inv_cells(me.inv), int(me.inv.w) * int(me.inv.h)], Vector2(vs.x / 2, 77), 16, Color("#ffe14d"))
+	var uses: Array = []   # 消耗品：1-4 键使用
+	for i in game.USE_KEYS.size():
+		var uk: String = game.USE_KEYS[i]; var n := 0
+		for inv in [me.inv, me.safe]:
+			for it in inv.items: if str(it.k) == uk: n += 1
+		if n > 0: uses.append("%d %s×%d" % [i + 1, game.data.loot.items[uk].name, n])
+	if not uses.is_empty(): txt("   ".join(uses), Vector2(vs.x / 2, vs.y - 150), 15, Color("#6dff8a"))
 	# 最近的撤离点：开放 / 还要多久开放，方向箭头
 	var best = null; var bd := 1e9
 	for e in sim.obj.ex:
@@ -326,3 +335,37 @@ func draw_loot_panel(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
 	if nc != null and me.open_c == 0:
 		var CT: Dictionary = game.data.loot.conts.get(nc.type, {})
 		txt("%s 搜索「%s」 • %s 背包" % [Settings.key_name(game.settings.keys.interact), CT.get("name", "遗骸" if nc.type == "body" else "物资"), Settings.key_name(game.settings.keys.bag)], Vector2(vs.x / 2, vs.y * 0.7), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 5)
+
+# ---- 大地图（N 键，所有模式都能开；搜刮撤离显示撤离点、拉闸、队友和看得见的敌人）----
+func draw_big_map(sim: Sim, me: Sim.Mech, vs: Vector2) -> void:
+	var aw := vs.x * 0.8; var ah := vs.y * 0.8
+	var k := minf(aw / sim.W, ah / sim.H)
+	var w := sim.W * k; var h := sim.H * k
+	var x0 := (vs.x - w) / 2; var y0 := (vs.y - h) / 2 + 10
+	draw_rect(Rect2(0, 0, vs.x, vs.y), Color(0, 0, 0, 0.55))
+	draw_rect(Rect2(x0 - 8, y0 - 8, w + 16, h + 16), Color(0.03, 0.02, 0.08, 0.95))
+	draw_texture_rect(game.mini_tex, Rect2(x0, y0, w, h), false)
+	var P := func(x: float, y: float) -> Vector2: return Vector2(x0 + x * k, y0 + y * k)
+	var o: Dictionary = sim.obj
+	if sim.loot:
+		for e in o.ex:
+			var op := sim.ex_open(e); var ep: Vector2 = P.call(e.x, e.y)
+			draw_circle(ep, 9, Color("#6dff8a") if op else Color("#7a7690")); draw_arc(ep, 13, 0, TAU, 24, Color(1, 1, 1, 0.7), 2)
+			var nm: String = str(game.data.loot.ext.get(e.type, {}).get("name", "撤离点"))
+			var lab := nm + ("（开放中）" if op else ("（拉闸后开放）" if float(e.open) > 1e8 else ("（%d 秒后开放）" % int(ceil(float(e.open) - sim.time)) if sim.time < float(e.open) else "（已关闭）")))
+			txt(lab, ep + Vector2(0, -20), 13, Color("#6dff8a") if op else Color("#c8c4e8"), HORIZONTAL_ALIGNMENT_CENTER, 3)
+		if o.get("lever") != null: draw_rect(Rect2(P.call(o.lever.x, o.lever.y) - Vector2(5, 5), Vector2(10, 10)), Color("#ffb43d"))
+	if o.has("circle"):
+		var c0: Dictionary = o.circle
+		draw_arc(P.call(c0.x, c0.y), c0.r * k, 0, TAU, 64, Color("#ff6b8a"), 3)
+		if c0.to != null: draw_arc(P.call(c0.to.x, c0.to.y), float(c0.to.r) * k, 0, TAU, 64, Color(1, 1, 1, 0.6), 2)
+	for p in sim.players:
+		if not p.alive: continue
+		var pp: Vector2 = P.call(p.x, p.y)
+		if p.team == me.team:
+			draw_circle(pp, 7 if p == me else 5, Color.WHITE if p == me else game.team_col[p.team])
+			if p == me: draw_line(pp, pp + Vector2(cos(me.inp.a), sin(me.inp.a)) * 16, Color.WHITE, 3)
+			elif p.name != "": txt(p.name, pp + Vector2(0, -14), 12, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 3)
+		elif sim.visible_to(me.team, p):
+			draw_circle(pp, 5, Color("#ffb43d") if p.guard != null else Color("#ff3b52"))
+	txt("大地图（N 关闭）", Vector2(vs.x / 2, y0 - 22), 18, Color("#ffe14d"), HORIZONTAL_ALIGNMENT_CENTER, 4)

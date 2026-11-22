@@ -154,6 +154,8 @@ class Mech:
 	var pz := {}
 	var afk_t := 0.0
 	var typing_t := 0.0      # AI 在打字：站着不动
+	var use_t := 0.0         # 搜刮撤离：消耗品冷却
+	var late := false        # 中途加入的增援
 	var flee_t := 0.0
 	var flee_threat := false
 	var afk_next := 20.0
@@ -2683,6 +2685,7 @@ func init_loot() -> void:
 
 # 中立守卫（守中间的高级物资）+ 灰石指挥官 Boss 小队（在城区之间巡逻）
 func setup_loot_guards(bot_lv: int) -> void:
+	obj.bot_lv = bot_lv
 	var L: Dictionary = M.loot; var gt := int(D.loot.guardTeam)
 	var gw := ["bucket", "riot", "blaster", "fist", "roller", "flamer"]
 	var k := 0
@@ -2755,12 +2758,73 @@ func update_loot(dt: float) -> void:
 			ev(["lever", p.id])
 	for e in obj.ex:
 		if not e.told and ex_open(e): e.told = true; ev(["exo", e.x, e.y])
+	if tick_n % 30 == 0: loot_reinforce()   # 2.1.1：全灭的小队位置由 AI 增援小队补上
 	var humans_left := 0; var any_human := false; var squads_left := 0
 	for p in players:
 		if p.guard != null: continue
 		if not p.bot: any_human = true; if not p.out: humans_left += 1
 		if not p.out: squads_left += 1
 	if (any_human and humans_left == 0) or squads_left == 0: finish(-1)
+
+# ---- 消耗品（2.1.1）：急救针 / 护盾电池 / 肾上腺素 / 维修包 ----
+func use_item(p: Mech, from_safe: bool, idx: int) -> bool:
+	var inv: Dictionary = p.safe if from_safe else p.inv
+	if not p.alive or idx < 0 or idx >= inv.items.size() or p.use_t > time: return false
+	var k: String = inv.items[idx].k
+	var U = D.loot.items.get(k, {}).get("use")
+	if U == null: return false
+	inv.items.remove_at(idx); p.use_t = time + 1.0
+	if U.has("heal"): p.hp = min(max_hp_of(p), p.hp + float(U.heal))
+	if U.has("shield"): p.shield = max(p.shield, float(U.shield)); p.shield_t = max(p.shield_t, 10.0)
+	if U.has("rush"): p.rush_t = max(p.rush_t, float(U.rush))
+	ev(["use", p.id, k])
+	return true
+
+# ---- 中途增援（2.1.1）：小队全灭 25 秒后，AI 增援小队从离活人最远的出生点空降进场 ----
+func loot_slots() -> Dictionary:
+	if not obj.has("wiped"): obj.wiped = {}
+	for t in range(1, teams + 1):
+		if obj.wiped.has(t): continue
+		var n := 0; var out_n := 0
+		for p in players:
+			if p.team == t and p.guard == null: n += 1; out_n += 1 if p.out else 0
+		if n > 0 and out_n == n: obj.wiped[t] = time
+	return obj.wiped
+
+func loot_reinforce() -> void:
+	var LT: Dictionary = D.loot
+	var w := loot_slots()
+	for t in w.keys():
+		if int(obj.get("joins", 0)) >= int(LT.maxJoins) or time_left < float(LT.joinMin) * 0.8: break
+		if time - float(w[t]) >= float(LT.botJoinWait): add_late_squad(int(t))
+
+func add_late_squad(t: int) -> Array:
+	obj.joins = int(obj.get("joins", 0)) + 1; obj.wiped.erase(t)
+	var best := Vector2.ZERO; var bd := -1.0
+	for sp in M.loot.spawns:
+		var sv := Vector2(sp[0] * CELL, sp[1] * CELL); var d := 1e9
+		for p in players:
+			if p.alive and not p.out and p.guard == null: d = minf(d, sv.distance_to(Vector2(p.x, p.y)))
+		if d > bd: bd = d; best = sv
+	spawns[t] = best
+	var lv: int = int(obj.get("bot_lv", 5)); var pw := {"lv": lv, "bt": 2 if lv >= 9 else (1 if lv >= 5 else 0)}
+	var names := Bots.nicks(3) if not Bots.B.is_empty() else ["增援1", "增援2", "增援3"]
+	var next := 0
+	for p in players: next = max(next, p.id)
+	var rows: Array = []
+	for i in 3:
+		var pil: String = D.pilotOrder[rng.randi() % D.pilotOrder.size()]
+		var wpn: String = str(D.pilots[pil].weapon) if rng.randf() < 0.5 else str(D.order[rng.randi() % D.order.size()])
+		var q := add_player(next + 1 + i, names[i], t, pil, wpn, true, pw)
+		q.persona = "decent"; q.late = true
+		if risk == "high" and rng.randf() < 0.6: var bd2: Array = D.loot.bags.pack; q.inv = {"w": int(bd2[0]), "h": int(bd2[1]), "items": []}
+		rows.append([q.id, q.name, q.team, q.pilot, q.weapon, q.lv, q.bt])
+	var squads := 0; var seen := {}
+	for p in players:
+		if p.guard == null and not p.out and not seen.has(p.team): seen[p.team] = true; squads += 1
+	ev(["pjn", rows])
+	ev(["sqj", t, names[0], squads])
+	return rows
 
 func bot_take(p: Mech, c: Dictionary) -> bool:   # AI 拿最值钱的、放得下的
 	var best := -1; var bv := -1

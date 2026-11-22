@@ -168,6 +168,7 @@ func _ready() -> void:
 		var pop := OS.get_environment("GB_POPUP")   # 截图用
 		if OS.get_environment("GB_FLOW") != "": queue_match(OS.get_environment("GB_FLOW"))
 		if OS.get_environment("GB_TUT") != "": start_tutorial()
+		if OS.get_environment("GB_BIGMAP") != "": hud.big_map = true
 		if OS.get_environment("GB_PAUSE") != "": get_tree().create_timer(float(OS.get_environment("GB_PAUSE"))).timeout.connect(func(): toggle_pause())
 		if pop == "account": lobby.account_popup()
 		elif pop in ["avatar", "frame", "title", "show_style"]: lobby.call(pop + "_popup")
@@ -1116,6 +1117,22 @@ func apply_events() -> void:
 				hud.feed(e, "击倒")
 				if botchat != null: botchat.on_kill(player_by_id(e[2]), player_by_id(e[1]))
 				if e[1] == me.id or e[2] == me.id: hitstop(90)
+			"use":
+				var uq := player_by_id(e[1])
+				if uq != null:
+					var U: Dictionary = data.loot.items[e[2]].get("use", {})
+					var uc := Color("#4fd8ff") if U.has("shield") else (Color("#ffe14d") if U.has("rush") else Color("#6dff8a"))
+					var up := Vector3(uq.x * K, uq.z * K + 1.2, uq.y * K)
+					burst(up, uc, 18, 3.5, 0.18, 0.6, 4.0); ring(up - Vector3(0, 1.1, 0), 1.6, uc, 0.45)
+					if uq == me: sfx.play("pickup"); hud.banner("使用了 %s" % data.loot.items[e[2]].name, uc)
+			"pjn":   # 搜刮撤离：中途加入的增援小队（客户端的镜像也要把人加上）
+				for r in e[1]:
+					var nq := player_by_id(int(r[0]))
+					if nq == null: nq = sim.add_player(int(r[0]), str(r[1]), int(r[2]), str(r[3]), str(r[4]), true, {"lv": int(r[5]), "bt": int(r[6])})
+					if not mech_nodes.has(nq.id): mech_nodes[nq.id] = make_mech_node(nq)
+			"sqj":
+				hud.banner("增援小队「%s」空降进场！当前 %d 支小队" % [e[2], int(e[3])], Color("#ffb43d"))
+				sfx.play("boom", -8)
 			"mdrop":
 				var pos6 := Vector3(e[2] * K, e[4] * K, e[3] * K)
 				beam(pos6 + Vector3(0, 30, 0), pos6, team_col[player_by_id(e[1]).team], 1.4, 0.35); ring(pos6, 5.0, Color.WHITE, 0.5)
@@ -1297,6 +1314,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		elif settings.is_key(ev, "overload"): me.inp.oq += 1
 		elif ev.physical_keycode == KEY_ESCAPE: toggle_pause()
 		elif (ev.physical_keycode == KEY_ENTER or ev.physical_keycode == KEY_KP_ENTER) and tut.is_empty(): open_chat()
+		elif ev.physical_keycode == KEY_N: hud.big_map = not hud.big_map
+		elif sim.loot and ev.physical_keycode >= KEY_1 and ev.physical_keycode <= KEY_4: use_quick(USE_KEYS[ev.physical_keycode - KEY_1])
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 		me.inp.qq += 1
 	if ev is InputEventScreenTouch or ev is InputEventScreenDrag:
@@ -1469,7 +1488,18 @@ func host_loot(p: Sim.Mech, op: String, args: Array) -> bool:
 		"take": return sim.loot_take(p, int(args[0]), int(args[1]), bool(args[2]))
 		"drop": sim.loot_drop(p, int(args[0]), bool(args[1])); return true
 		"move": return sim.loot_move(p, int(args[0]), bool(args[1]))
+		"use": return sim.use_item(p, bool(args[0]), int(args[1]))
 	return false
+
+# 1-4 键 / 手柄十字键左：用背包（没有就用安全箱）里的消耗品
+const USE_KEYS := ["stim", "repair", "shieldc", "adren"]
+func use_quick(k: String) -> void:
+	if sim == null or not sim.loot or me == null: return
+	for from_safe in [false, true]:
+		var inv: Dictionary = me.safe if from_safe else me.inv
+		for i in inv.items.size():
+			if str(inv.items[i].k) == k: loot_do("use", [from_safe, i]); return
+	hud.banner("没有「%s」" % data.loot.items[k].name, Color("#ff8a8a"))
 
 func rare_col(k: String) -> Color:
 	var r := int(data.loot.items[k].r)
@@ -1537,8 +1567,11 @@ class BagGrid extends Control:
 		for i in inv.items.size():
 			var it: Dictionary = inv.items[i]
 			if cx >= int(it.x) and cx < int(it.x) + int(it.w) and cy >= int(it.y) and cy < int(it.y) + int(it.h):
-				if ev.button_index == MOUSE_BUTTON_RIGHT: game.loot_do("move", [i, not is_safe])
+				if ev.button_index == MOUSE_BUTTON_LEFT and ev.double_click and game.data.loot.items[it.k].has("use"): game.loot_do("use", [is_safe, i])
+				elif ev.button_index == MOUSE_BUTTON_RIGHT: game.loot_do("move", [i, not is_safe])
+				elif game.data.loot.items[it.k].has("use") and not ev.double_click: pass   # 消耗品：单击不丢（双击使用，Shift+单击丢掉）
 				else: game.loot_do("drop", [i, is_safe])
+				if ev.button_index == MOUSE_BUTTON_LEFT and ev.shift_pressed and game.data.loot.items[it.k].has("use"): game.loot_do("drop", [i, is_safe])
 				game.sfx.play("click"); game.loot_ui_t = 0
 				accept_event(); return
 
@@ -1794,6 +1827,8 @@ func pad_button(ev: InputEventJoypadButton) -> void:
 		JOY_BUTTON_LEFT_SHOULDER: me.inp.oq += 1
 		JOY_BUTTON_DPAD_DOWN: if sim.loot: loot_interact()
 		JOY_BUTTON_DPAD_UP: if sim.loot: bag_open = not bag_open; loot_ui_t = 0
+		JOY_BUTTON_DPAD_LEFT: if sim.loot: use_quick("repair" if me.hp < me.max_hp * 0.4 else "stim")
+		JOY_BUTTON_BACK: hud.big_map = not hud.big_map
 
 # ================= 皮肤专属进场（史诗以上的驾驶员皮肤）=================
 const ENTRANCE_COL := {"hammer": "#ffd35e", "drop": "#e0a030", "flag": "#ff5a36", "warbanner": "#ffd35e", "dj": "#ff3ea5", "idol": "#ff8ad8", "surf": "#1fd6ee",
