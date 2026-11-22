@@ -1,4 +1,4 @@
-# 模型展示：把所有机体 / 驾驶员排成一排排截图（GALLERY=mechs|pilots，OUT=图片路径）
+# 模型展示：把所有机体 / 驾驶员排成一排排截图（GALLERY=mechs|pilots，OUT=图片路径，BG=背景色，TC=机体队伍色）
 extends SceneTree
 var frames := 0
 func _init() -> void: pass
@@ -6,7 +6,7 @@ func setup() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/game.json"))
 	var kind := OS.get_environment("GALLERY")
 	var w := Node3D.new(); root.add_child(w)
-	var env := Environment.new(); env.background_mode = Environment.BG_COLOR; env.background_color = Color("#2a2640"); env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color = Color("#9090b0"); env.ambient_light_energy = 0.6
+	var env := Environment.new(); env.background_mode = Environment.BG_COLOR; env.background_color = Color(OS.get_environment("BG")) if OS.get_environment("BG") != "" else Color("#2a2640"); env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color = Color("#9090b0"); env.ambient_light_energy = 0.6
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	var we := WorldEnvironment.new(); we.environment = env; w.add_child(we)
 	var sun := DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-40, 50, 0); sun.light_energy = 1.2; w.add_child(sun)
@@ -23,7 +23,7 @@ func setup() -> void:
 		var node: Node3D
 		if kind == "mechs":
 			var P: Dictionary = data.pilots[data.pilotOrder[i % data.pilotOrder.size()]]
-			node = Models.build_mech(id, data.mechs[id], Color("#ff4fa8"), P).root
+			node = Models.build_mech(id, data.mechs[id], Color(OS.get_environment("TC")) if OS.get_environment("TC") != "" else Color("#ff4fa8"), P).root
 		else:
 			node = Chars.build_char(data.pilots[id], Color("#4fc3ff")).root
 		node.position = Vector3(0, -(i / cols) * rowh, (i % cols) * sp)
