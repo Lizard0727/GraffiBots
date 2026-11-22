@@ -1710,12 +1710,12 @@ func tut_set(i: int) -> void:
 	var U: Dictionary = tut.ui
 	for k in U.dots.get_child_count(): U.dots.get_child(k).color = Color("#6dff8a") if k < i else (Color("#ffe14d") if k == i else Color(1, 1, 1, 0.2))
 	if i >= TUT_STEPS.size():
-		U.st.text = "完成"; U.tx.text = "全部学会了！回大厅打开你的新手宝箱吧。"; sfx.play("win"); tut.done_t = tut.t
+		U.st.text = I18n.t("完成"); U.tx.text = I18n.t("全部学会了！回大厅打开你的新手宝箱吧。"); sfx.play("win"); tut.done_t = tut.t
 		return
 	var K: Dictionary = settings.keys
-	var txt: String = TUT_STEPS[i][1]
+	var txt: String = I18n.t(TUT_STEPS[i][1])
 	for a in ["up", "left", "down", "right", "jump", "skill", "super"]: txt = txt.replace("{%s}" % a, Settings.key_name(K[a]))
-	U.st.text = "%d / %d  •  %s" % [i + 1, TUT_STEPS.size(), TUT_STEPS[i][0]]; U.tx.text = txt
+	U.st.text = "%d / %d  •  %s" % [i + 1, TUT_STEPS.size(), I18n.t(TUT_STEPS[i][0])]; U.tx.text = txt
 	sfx.play("pickup")
 
 func tut_tick() -> void:
@@ -1906,7 +1906,7 @@ func open_chat() -> void:
 	chat_edit.gui_input.connect(func(ev):
 		if ev is InputEventKey and ev.pressed:
 			if ev.physical_keycode == KEY_ESCAPE: close_chat(); get_viewport().set_input_as_handled()
-			elif ev.physical_keycode == KEY_TAB: chat_ch = 1 - chat_ch; chat_chl.text = "[全部]" if chat_ch == 0 else "[队伍]"; get_viewport().set_input_as_handled())
+			elif ev.physical_keycode == KEY_TAB: chat_ch = 1 - chat_ch; chat_chl.text = I18n.t("[全部]" if chat_ch == 0 else "[队伍]"); get_viewport().set_input_as_handled())
 	chat_edit.grab_focus()
 
 func close_chat() -> void:

@@ -123,7 +123,7 @@ func _process(delta: float) -> void:
 func _input(ev: InputEvent) -> void:   # 手柄 A：准备 / 锁定；B：取消匹配
 	if not visible or not (ev is InputEventJoypadButton) or not ev.pressed: return
 	if ev.button_index == JOY_BUTTON_A:
-		if phase == "ready" and not players[0].ready: players[0].ready = true; game.sfx.play("lock"); dyn.btn.get_child(0).text = "已准备"; dyn.btn.dim = true
+		if phase == "ready" and not players[0].ready: players[0].ready = true; game.sfx.play("lock"); dyn.btn.get_child(0).text = I18n.t("已准备"); dyn.btn.dim = true
 		elif phase == "draft" and not dr.done and dr.turns[dr.cur].who.me and dr.turns[dr.cur].t == "pick":
 			var a2 := dr_avail(true)
 			if dr.sel.pilot in a2.ps and dr.sel.mech in a2.ms: dr_commit(dr.turns[dr.cur], {"pilot": dr.sel.pilot, "mech": dr.sel.mech})
@@ -133,7 +133,7 @@ func tick_search() -> void:
 	dyn.timer.text = "%02d:%02d" % [int(t) / 60, int(t) % 60]
 	var n := lay.size()
 	var found := clampi(int(floor(t / wait * n)), 1, n)
-	dyn.found.text = "已找到 %d / %d 名玩家" % [found, n]
+	dyn.found.text = I18n.t("已找到 %d / %d 名玩家" % [found, n])
 	dyn.radar.blips = found
 	if t >= wait:
 		build_roster()
@@ -160,7 +160,14 @@ func build_roster() -> void:
 			"looks": Bots.looks(pilot, pid, tier if tier >= 0 else 2), "lv": clampi(acc_lv + randi_range(-6, 8) + int(Pz.lv) * 3, 1, 60), "plv": lv, "bt": 2 if lv >= 9 else (1 if lv >= 5 else 0),
 			"tier": clampi(tier + randi_range(-1, 1), 0, D.econ.rank.tiers.size() - 1) if tier >= 0 else 0,
 			"ready": false, "ready_at": randf_range(0.5, 3.0) if quick else randf_range(0.8, 9.0), "never": pid == "afk" and randf() < 0.45})
+	for i in players.size(): players[i].idx = i
 	# 小概率有人一直不点准备（多半是对手）
+	for i in players.size(): players[i].idx = i
+	if OS.get_environment("GB_NOSHOW") != "":   # 测试用：我准备了，但有一个对手一直不点
+		players[0].ready = true
+		for p in players: p.never = false; p.ready_at = minf(float(p.ready_at), 1.5)
+		players[players.size() - 1].never = true
+		return
 	if OS.get_environment("GB_AUTOREADY") != "":   # 测试用：我自动准备、所有人都会准备
 		players[0].ready = true
 		for p in players: p.never = false; p.ready_at = minf(float(p.ready_at), 1.5)
@@ -194,7 +201,7 @@ func enter_ready() -> void:
 	click(b, func():
 		if players[0].ready or phase != "ready": return
 		players[0].ready = true; game.sfx.play("lock")
-		b.get_child(0).text = "已准备"; b.dim = true; b.queue_redraw())
+		b.get_child(0).text = I18n.t("已准备"); b.dim = true; b.queue_redraw())
 
 func _ready_col(list: Array, pos: Vector2, w: float, head: String, big: bool) -> void:
 	var v := box(true, 6 if big else 4); at(v, pos, Vector2(w, 0))
@@ -217,7 +224,7 @@ func _pcard(p: Dictionary, w: float, h: float) -> GCard:
 		nh.add_child(UIKit.chip("Lv.%d" % int(p.lv), Color("#7af0ff"), 12))
 		if kind == "ranked": nh.add_child(UIKit.chip(str(D.econ.rank.tiers[int(p.tier)].name), Color("#ffcf4d"), 12))
 	var st := L("等待中…", 13 if h > 50 else 11, Color("#8f8ab8")); v.add_child(st)
-	dyn.cards[p] = {"card": c, "st": st}
+	dyn.cards[int(p.idx)] = {"card": c, "st": st}
 	return c
 
 func tick_ready() -> void:
@@ -227,12 +234,12 @@ func tick_ready() -> void:
 	for p in players:
 		if not p.me and not p.ready and not p.never and t >= float(p.ready_at): p.ready = true; game.sfx.play("pickup", -10)
 		if p.ready: n_ready += 1
-		var cd: Dictionary = dyn.cards.get(p, {})
+		var cd: Dictionary = dyn.cards.get(int(p.get("idx", -1)), {})
 		if cd.is_empty(): continue
-		if p.ready and cd.st.text != "已准备":
-			cd.st.text = "已准备"; cd.st.add_theme_color_override("font_color", Color("#6dff8a"))
+		if p.ready and not cd.get("done", false):
+			cd.done = true; cd.st.text = I18n.t("已准备"); cd.st.add_theme_color_override("font_color", Color("#6dff8a"))
 			cd.card.border = Color("#6dff8a"); cd.card.queue_redraw()
-	dyn.cnt.text = "已准备 %d / %d" % [n_ready, players.size()]
+	dyn.cnt.text = I18n.t("已准备 %d / %d" % [n_ready, players.size()])
 	if dyn.has("fail_t"):
 		if t >= float(dyn.fail_t):
 			if not players[0].ready: cancel("你没有点准备，已退出匹配")
@@ -240,13 +247,13 @@ func tick_ready() -> void:
 		return
 	if n_ready == players.size():
 		dyn.fail_t = t + 0.9
-		dyn.msg.add_theme_color_override("font_color", Color("#6dff8a")); dyn.msg.text = "所有人都准备好了！"
+		dyn.msg.add_theme_color_override("font_color", Color("#6dff8a")); dyn.msg.text = I18n.t("所有人都准备好了！")
 		dyn.fail_t = t + 0.9
 		_after_ready.call_deferred()
 		return
 	if left <= 0:
 		var miss := players.filter(func(p): return not p.ready).size()
-		dyn.msg.text = ("你没有点准备" if not players[0].ready else "有 %d 名玩家没有准备，正在为你重新匹配…" % miss)
+		dyn.msg.text = I18n.t("你没有点准备" if not players[0].ready else "有 %d 名玩家没有准备，正在为你重新匹配…" % miss)
 		dyn.fail_t = t + 2.2
 
 func _after_ready() -> void:
@@ -447,7 +454,7 @@ func refresh_draft(full := true) -> void:
 	if not dr.done:
 		if T.who.me: turn_txt = "轮到你禁用" if T.t == "ban" else "轮到你选择"
 		else: turn_txt = ("队友" if T.side == "A" else "对手") + ("正在禁用…" if T.t == "ban" else "正在选择…")
-	dyn.turn.text = turn_txt
+	dyn.turn.text = I18n.t(turn_txt)
 	for side in ["A", "B"]:
 		var col: BoxContainer = dyn.colA if side == "A" else dyn.colB
 		for c in col.get_children(): col.remove_child(c); c.queue_free()
@@ -505,10 +512,10 @@ func update_stage(T) -> void:
 			who_name = "准备禁用"
 	if pilot == "" or mech == "": pilot = str(P.o.pilot) if str(P.o.pilot) != "" else "blaze"; mech = str(P.o.weapon); who_name = ""
 	var key := pilot + "|" + mech + "|" + str(is_me)
-	dyn.stage_lbl.text = "%s  •  %s" % [pilot_name(pilot), str(D.mechs[mech].name)]
+	dyn.stage_lbl.text = I18n.t("%s  •  %s" % [pilot_name(pilot), str(D.mechs[mech].name)])
 	var C: Dictionary = D.counters.get(mech, {"beats": [], "weak": []})
 	var role: String = game.role_name(mech)
-	dyn.stage_lbl2.text = (who_name + "  •  " if who_name != "" else "") + role + ("  •  克制 %s" % "、".join(C.beats.slice(0, 2).map(func(m): return mech_name(m.id))) if not C.beats.is_empty() else "")
+	dyn.stage_lbl2.text = I18n.t((who_name + "  •  " if who_name != "" else "") + role + ("  •  克制 %s" % "、".join(C.beats.slice(0, 2).map(func(m): return mech_name(m.id))) if not C.beats.is_empty() else ""))
 	if key == stage_key: return
 	stage_key = key
 	for c in stage_turn.get_children(): c.queue_free()
