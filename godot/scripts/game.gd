@@ -152,6 +152,8 @@ func _ready() -> void:
 		if int(profile.o.tut) == 0: lobby.welcome()
 		var pop := OS.get_environment("GB_POPUP")   # 截图用
 		if OS.get_environment("GB_FLOW") != "": queue_match(OS.get_environment("GB_FLOW"))
+		if OS.get_environment("GB_TUT") != "": start_tutorial()
+		if OS.get_environment("GB_PAUSE") != "": get_tree().create_timer(float(OS.get_environment("GB_PAUSE"))).timeout.connect(func(): toggle_pause())
 		if pop == "account": lobby.account_popup()
 		elif pop in ["avatar", "frame", "title", "show_style"]: lobby.call(pop + "_popup")
 		elif pop != "": lobby.account_form(pop)
@@ -439,63 +441,116 @@ func role_name(id: String) -> String:
 	if c == null: return ""
 	return "%s • %s" % [data.roles[c[0]].name, data.tags.get(c[1], "")]
 
+# 结算评级（网页版 1.9）：表现分 = 击毁 ×100 + 涂地 ×0.2 + 目标 ×150 − 倒下 ×40；每队 MVP，其余按占最高分的比例给钻石 / 黄金 / 白银 / 青铜标
+func badges_of() -> Dictionary:
+	var ps: Array = sim.players.filter(func(q): return not q.npc and not q.spirit)
+	var top := 1.0
+	for q in ps: top = maxf(top, Profile.perf(q))
+	var mv := {}
+	var teams: Array = []
+	if sim.winner > 0 and sim.teams == 2:
+		for q in ps: if not teams.has(q.team): teams.append(q.team)
+	elif sim.winner > 0: teams = [sim.winner]
+	for t in teams:
+		var m = Profile.mvp_of(sim, t)
+		if m != null: mv[m.id] = true
+	var out := {}
+	for q in ps:
+		var f := Profile.perf(q) / top
+		out[q.id] = 4 if mv.has(q.id) else (3 if f >= 0.75 else (2 if f >= 0.5 else (1 if f >= 0.25 else 0)))
+	return out
+
+func badge_chip(n: int, lose := false, size := 14) -> GCard:
+	var B: Dictionary = data.badges[n]
+	return UIKit.chip("败方MVP" if n == 4 and lose else str(B.name), Color(str(B.c)), size)
+
 func show_result() -> void:
+	close_pause()
 	for c in result_ui.get_children(): c.queue_free()
-	var bg := ColorRect.new(); bg.color = Color(0.03, 0.02, 0.08, 0.7); bg.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.add_child(bg)
-	var pc := PanelContainer.new(); pc.set_anchors_preset(Control.PRESET_CENTER); pc.position = Vector2(-330, -280); pc.custom_minimum_size = Vector2(660, 560); result_ui.add_child(pc)
-	var box := VBoxContainer.new(); box.add_theme_constant_override("separation", 10); pc.add_child(box)
+	var s := get_viewport().get_visible_rect().size
+	var bg := ColorRect.new(); bg.color = Color(0.03, 0.02, 0.08, 0.78); bg.set_anchors_preset(Control.PRESET_FULL_RECT); result_ui.add_child(bg)
 	var r: Dictionary = sim.result
 	var win := int(r.winner)
-	var t := Label.new(); t.text = "胜利！" if win == me.team else ("平局" if win == 0 else "失败"); t.add_theme_font_size_override("font_size", 64)
-	t.add_theme_color_override("font_color", Color("#ffe14d") if win == me.team else Color("#c9c5e6")); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; box.add_child(t)
-	var pa: float = 100.0 * float(r.a) / max(1.0, float(r.tot)); var pb: float = 100.0 * float(r.b) / max(1.0, float(r.tot))
-	var s := Label.new(); s.text = "我方 %.1f%%   对方 %.1f%%" % [pa, pb]
 	var md := sim.mode
-	if md in ["escape4", "escape8"]: s.text = "第 1 名！" if win == me.team else "我方出局了"
-	elif md == "raid": s.text = "讨伐成功！百目被打倒了" if win == 1 else "时间到了，百目还活着"
+	var won: bool = win == me.team
+	var head := "胜利！" if won else ("平局" if win == 0 else "失败")
+	var sub := ""
+	var pa: float = 100.0 * float(r.get("a", 0)) / max(1.0, float(r.get("tot", 1))); var pb: float = 100.0 * float(r.get("b", 0)) / max(1.0, float(r.get("tot", 1)))
+	sub = "我方 %.1f%%   对方 %.1f%%" % [pa, pb]
+	if md in ["escape4", "escape8"]: sub = "第 1 名！" if won else "我方出局了"
+	elif md == "raid": sub = "讨伐成功！百目被打倒了" if win == 1 else "时间到了，百目还活着"
 	elif md == "loot":
-		t.text = "撤离成功！" if me.extracted else "撤离失败"
-		t.add_theme_color_override("font_color", Color("#ffe14d") if me.extracted else Color("#c9c5e6"))
+		head = "撤离成功！" if me.extracted else "撤离失败"; won = me.extracted
 		var kv := sim.loot_value(sim.obj.banked.get(me.id, []) if me.extracted else sim.inv_keys(me.safe))
-		s.text = ("带出物资价值 %d" % kv) if me.extracted else ("只保住了安全箱里的物资（价值 %d）" % kv)
-	elif md == "elim": s.text = "局数  %d : %d" % [sim.obj.wins[1], sim.obj.wins[2]]
-	elif md == "zone": s.text = "剩余倒计时  我方 %d   对方 %d" % [int(sim.obj.count[1]), int(sim.obj.count[2])]
-	elif md != "turf": s.text = "比分  %d : %d" % [sim.obj.score[1], sim.obj.score[2]]
-	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; s.add_theme_font_size_override("font_size", 26); box.add_child(s)
+		sub = ("带出物资价值 %d" % kv) if me.extracted else ("只保住了安全箱里的物资（价值 %d）" % kv)
+	elif md == "elim": sub = "局数  %d : %d" % [sim.obj.wins[1], sim.obj.wins[2]]
+	elif md == "zone": sub = "剩余倒计时  我方 %d   对方 %d" % [int(sim.obj.count[1]), int(sim.obj.count[2])]
+	elif md != "turf": sub = "比分  %d : %d" % [sim.obj.score[1], sim.obj.score[2]]
+	var bdg := badges_of()
+	# 顶部横幅
+	var ban := UIKit.card(Color("#ffcf4d") if won else (Color("#6a6a8a") if win == 0 else Color("#5a3a8a")), Color("#c56a10") if won else Color("#1e1a3a"), Color.WHITE, 18)
+	ban.skew = -0.12; ban.position = Vector2(s.x / 2 - 300, 24); ban.size = Vector2(600, 96); ban.custom_minimum_size = ban.size; result_ui.add_child(ban)
+	var bv := VBoxContainer.new(); bv.add_theme_constant_override("separation", 0); ban.add_child(bv)
+	var hl := UIKit.label(head, 52, Color("#2a1a08") if won else Color.WHITE, 0 if won else 6); hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; bv.add_child(hl)
+	var sl := UIKit.label(sub, 18, Color("#3a2408") if won else Color("#e6e2fa")); sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; bv.add_child(sl)
+	ban.scale = Vector2(0.6, 0.6); ban.pivot_offset = ban.size / 2
+	var tw := ban.create_tween(); tw.tween_property(ban, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# 左边：我的卡片 + 奖励
+	var lc := UIKit.dark_card(); lc.position = Vector2(24, 140); lc.size = Vector2(360, s.y - 230); lc.custom_minimum_size = lc.size; result_ui.add_child(lc)
+	var lv := VBoxContainer.new(); lv.add_theme_constant_override("separation", 8); lc.add_child(lv)
+	var av := UIKit.avatar(profile.avatar_path(), profile.frame_key(), 110, team_col[me.team]); av.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; lv.add_child(av)
+	var nl := UIKit.label(me.name, 22, Color.WHITE, 4); nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; lv.add_child(nl)
+	var my_b: int = int(bdg.get(me.id, 0))
+	var bc := badge_chip(my_b, not won and win != 0, 20); bc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; lv.add_child(bc)
+	var stl := UIKit.label("击毁 %d   倒下 %d   涂地 %d" % [me.kills, me.deaths, me.painted], 15, Color("#c8c4e8")); stl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; lv.add_child(stl)
 	if not autoplay:   # 对战奖励：经验、奖杯、金币、首胜宝石、任务
 		var rw := profile.match_reward(sim, me)
+		rw.deaths = me.deaths; rw.badge = my_b
 		var res := profile.apply_match(rw)
-		var parts: Array = ["经验 +%d" % rw.xp, "奖杯 %+d" % rw.trophies]
-		for it in res.items: parts.append(lobby.item_text(it)[0])
-		if res.lv_ups > 0: parts.append("账号升到 %d 级！天赋点 +%d" % [profile.level(), res.lv_ups])
-		parts.append("通行证经验 +%d" % res.pass_xp + ("（升到 %d 级）" % res.pass_after if res.pass_after > res.pass_before else ""))
+		var g := GridContainer.new(); g.columns = 2; g.add_theme_constant_override("h_separation", 8); g.add_theme_constant_override("v_separation", 6); g.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; lv.add_child(g)
+		g.add_child(UIKit.pill("star", "经验 +%d" % rw.xp, Color("#7af0ff"))); g.add_child(UIKit.pill("trophy", "奖杯 %+d" % rw.trophies, Color("#ffcf4d")))
+		for it in res.items:
+			if data.econ.cur.has(it.k): g.add_child(UIKit.pill(str(it.k), "+%d" % int(it.n), Color("#ffe14d")))
+			else: g.add_child(UIKit.pill("gift", lobby.item_text(it)[0], Color("#ff9ad6")))
+		var extra: Array = []
+		if res.lv_ups > 0: extra.append("账号升到 %d 级！天赋点 +%d" % [profile.level(), res.lv_ups])
+		extra.append("通行证经验 +%d" % res.pass_xp + ("（升到 %d 级）" % res.pass_after if res.pass_after > res.pass_before else ""))
 		if not res.rank.is_empty():
 			var T: Dictionary = data.econ.rank.tiers[res.rank.t1]
-			parts.append("排位 %+d 分 → %s %d 分" % [res.rank.d, T.name, res.rank.rp1])
-		if rw.mvp: parts.append("MVP")
-		var rl := Label.new(); rl.text = "   ".join(parts); rl.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY; rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		rl.add_theme_font_size_override("font_size", 17); rl.add_theme_color_override("font_color", Color("#ffe14d")); box.add_child(rl)
-		if not res.quests.is_empty():
-			var ql := Label.new(); ql.text = "完成任务：" + "、".join(res.quests); ql.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			ql.add_theme_font_size_override("font_size", 15); ql.add_theme_color_override("font_color", Color("#6dff8a")); box.add_child(ql)
-	var grid := GridContainer.new(); grid.columns = 5; grid.add_theme_constant_override("h_separation", 22); box.add_child(grid)
-	for h in ["", "驾驶员 / 机体", "击毁", "倒下", "涂地"]:
-		var l := Label.new(); l.text = h; l.add_theme_color_override("font_color", Color("#9a96b8")); l.add_theme_font_size_override("font_size", 15); grid.add_child(l)
-	var ps := sim.players.filter(func(q): return not q.npc); ps.sort_custom(func(a, b): return a.team < b.team or (a.team == b.team and a.painted > b.painted))
-	for p in ps:
-		var c: Color = team_col[p.team]
-		for v in [p.name, "%s / %s" % [data.pilots[p.pilot].name, data.mechs[p.weapon].short], str(p.kills), str(p.deaths), str(p.painted)]:
-			var l := Label.new(); l.text = v; l.add_theme_font_size_override("font_size", 15); l.add_theme_color_override("font_color", Color.WHITE if p == me else c); grid.add_child(l)
-	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); box.add_child(hb)
-	var again := Button.new(); again.text = "再来一局"; again.custom_minimum_size = Vector2(220, 60)
+			extra.append("排位 %+d 分 → %s %d 分" % [res.rank.d, T.name, res.rank.rp1])
+		if not res.quests.is_empty(): extra.append("完成任务：" + "、".join(res.quests))
+		for e in extra:
+			var el := UIKit.label(e, 14, Color("#6dff8a") if e.begins_with("完成") else Color("#ffe14d")); el.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; el.custom_minimum_size.x = 330; el.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; lv.add_child(el)
+	# 右边：全员表现
+	var rc := UIKit.dark_card(); rc.position = Vector2(400, 140); rc.size = Vector2(s.x - 424, s.y - 230); rc.custom_minimum_size = rc.size; result_ui.add_child(rc)
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; rc.add_child(sc)
+	var rv := VBoxContainer.new(); rv.add_theme_constant_override("separation", 4); rv.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sc.add_child(rv)
+	var hdr := HBoxContainer.new(); rv.add_child(hdr)
+	for h in [["", 44], ["玩家", 190], ["驾驶员 / 机体", 190], ["击毁", 60], ["倒下", 60], ["涂地", 70], ["评级", 100]]:
+		var l := UIKit.label(h[0], 14, Color("#9a96b8")); l.custom_minimum_size.x = h[1]; hdr.add_child(l)
+	var ps: Array = sim.players.filter(func(q): return not q.npc and not q.spirit)
+	ps.sort_custom(func(a, b): return (a.team == me.team and b.team != me.team) or (a.team == b.team and Profile.perf(a) > Profile.perf(b)) or (a.team != me.team and b.team != me.team and a.team < b.team))
+	for q in ps:
+		var row := UIKit.card(team_col[q.team].darkened(0.6) if q != me else Color("#5a2a8a"), Color("#120e26"), team_col[q.team] if q != me else Color("#ff9ad6"), 10)
+		row.pad = Vector4(6, 2, 6, 2); row.shadow = 2; rv.add_child(row)
+		var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 0); row.add_child(h)
+		var a: UIKit.Avatar = UIKit.avatar(profile.avatar_path(), profile.frame_key(), 38, team_col[q.team]) if q == me else UIKit.avatar(profile.looks_avatar(q.looks, q.pilot), profile.looks_frame(q.looks), 38, team_col[q.team])
+		var aw := Control.new(); aw.custom_minimum_size = Vector2(44, 40); aw.add_child(a); h.add_child(aw)
+		for cell in [[q.name, 190, Color("#ffe14d") if q == me else Color.WHITE], ["%s / %s" % [data.pilots[q.pilot].name, data.mechs[q.weapon].short if data.mechs[q.weapon].has("short") else data.mechs[q.weapon].name], 190, Color("#c8c4e8")],
+				[str(q.kills), 60, Color.WHITE], [str(q.deaths), 60, Color.WHITE], [str(q.painted), 70, Color.WHITE]]:
+			var l := UIKit.label(cell[0], 15, cell[2]); l.custom_minimum_size.x = cell[1]; l.clip_text = true; h.add_child(l)
+		h.add_child(badge_chip(int(bdg.get(q.id, 0)), q.team != win and win != 0 and sim.teams == 2, 12))
+	# 按钮
+	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 20); hb.position = Vector2(0, s.y - 76); hb.size = Vector2(s.x, 60); result_ui.add_child(hb)
+	var again := UIKit.gold_button("再来一局", 24); again.custom_minimum_size = Vector2(240, 60); hb.add_child(again)
 	again.pressed.connect(func():
-		result_ui.visible = false
+		sfx.play("click"); result_ui.visible = false
 		if autoplay: start_match(sel_pilot, sel_mech)
-		else: back_to_lobby(); queue_match("ranked" if sim.ranked else ("loot" if sim.loot else "normal"))); hb.add_child(again)
-	var back := Button.new(); back.text = "返回菜单"; back.custom_minimum_size = Vector2(220, 60)
-	back.pressed.connect(func(): result_ui.visible = false; back_to_lobby()); hb.add_child(back)
+		else: back_to_lobby(); queue_match("ranked" if sim.ranked else ("loot" if sim.loot else "normal")))
+	var back := UIKit.flat_button("返回大厅", 20); back.custom_minimum_size = Vector2(220, 60); hb.add_child(back)
+	back.pressed.connect(func(): sfx.play("click"); result_ui.visible = false; back_to_lobby())
 	result_ui.visible = true
-	sfx.play("win" if win == me.team else "lose")
+	sfx.play("win" if won else "lose")
 
 # ---------------- 开局 ----------------
 func start_match(pilot: String, mech: String) -> void:
@@ -602,6 +657,12 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 
 # ---------------- 主循环 ----------------
 func _process(delta: float) -> void:
+	if OS.get_environment("GB_SHOT") != "" and (OS.get_environment("GB_SHOT_MENU") != "" or (sim != null and state != "menu")):   # 截图用
+		shot_t += delta
+		if shot_t >= float(OS.get_environment("GB_SHOT_AT") if OS.get_environment("GB_SHOT_AT") != "" else "8"):
+			get_viewport().get_texture().get_image().save_png(OS.get_environment("GB_SHOT"))
+			print("截图：", OS.get_environment("GB_SHOT"), " FPS ", Engine.get_frames_per_second())
+			get_tree().quit()
 	if OS.get_environment("GB_LAN") != "": lan_test_tick(delta)
 	var real_dt := delta
 	if hitstop_until > 0 and Time.get_ticks_msec() >= hitstop_until: Engine.time_scale = 1.0; hitstop_until = 0
@@ -631,6 +692,10 @@ func _process(delta: float) -> void:
 		net_snap_t += delta
 		update_visuals(clampf(net_snap_t / (2.0 / 30.0), 0, 1), real_dt)
 		update_fx(real_dt); update_loot_ui(real_dt); hud.queue_redraw()
+		return
+	if state == "play" and sim != null and not tut.is_empty(): tut_tick()
+	if state == "play" and sim != null and paused and net.role == "":   # 单机暂停：模拟不走
+		update_visuals(1.0, 0.0); hud.queue_redraw()
 		return
 	if state == "play" and sim != null:
 		read_input()
@@ -696,12 +761,6 @@ func _process(delta: float) -> void:
 	update_fx(real_dt)
 	update_loot_ui(real_dt)
 	hud.queue_redraw()
-	if OS.get_environment("GB_SHOT") != "" and (OS.get_environment("GB_SHOT_MENU") != "" or (sim != null and state != "menu")):
-		shot_t += real_dt
-		if shot_t >= float(OS.get_environment("GB_SHOT_AT") if OS.get_environment("GB_SHOT_AT") != "" else "8"):
-			get_viewport().get_texture().get_image().save_png(OS.get_environment("GB_SHOT"))
-			print("截图：", OS.get_environment("GB_SHOT"), " FPS ", Engine.get_frames_per_second())
-			get_tree().quit()
 
 # 受击闪白 / 隐身半透明：给机兵所有零件挂一层叠加材质（每台机兵一份）
 func set_overlay(n: Dictionary, flash: float, ghost: bool) -> void:
@@ -1206,7 +1265,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		elif settings.is_key(ev, "skill"): me.inp.gq += 1
 		elif settings.is_key(ev, "super"): me.inp.qq += 1
 		elif settings.is_key(ev, "overload"): me.inp.oq += 1
-		elif ev.physical_keycode == KEY_ESCAPE: back_to_lobby()
+		elif ev.physical_keycode == KEY_ESCAPE: toggle_pause()
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 		me.inp.qq += 1
 	if ev is InputEventScreenTouch or ev is InputEventScreenDrag:
@@ -1285,6 +1344,8 @@ func start_from_lobby() -> void:
 	start_match(o.pilot, o.weapon)
 
 func back_to_lobby() -> void:
+	close_pause()
+	if not tut.is_empty(): tut_close()
 	if net.role == "client" and state == "play": net.leave()
 	state = "menu"; menu.visible = true; result_ui.visible = false
 	music.play("menu")
@@ -1479,3 +1540,146 @@ func lan_test_tick(delta: float) -> void:
 	if lan_t > float(OS.get_environment("GB_QUIT_AT") if OS.get_environment("GB_QUIT_AT") != "" else "20"):
 		if me != null and sim != null: print("%s 结束：me=%d (%d,%d) alive=%s painted=%d" % [who, me.id, me.x, me.y, me.alive, me.painted])
 		get_tree().quit()
+
+# ================= 暂停菜单（Esc）=================
+var paused := false
+var pause_ui: Control
+
+func toggle_pause() -> void:
+	if pause_ui != null: close_pause(); return
+	paused = true
+	var layer: Node = hud.get_parent()
+	pause_ui = Control.new(); pause_ui.set_anchors_preset(Control.PRESET_FULL_RECT); pause_ui.theme = theme_ui; layer.add_child(pause_ui)
+	var bg := ColorRect.new(); bg.color = Color(0.03, 0.02, 0.08, 0.72); bg.set_anchors_preset(Control.PRESET_FULL_RECT); pause_ui.add_child(bg)
+	var s := get_viewport().get_visible_rect().size
+	var c := UIKit.dark_card(); c.position = Vector2(s.x / 2 - 260, s.y / 2 - 200); c.size = Vector2(520, 400); c.custom_minimum_size = c.size; pause_ui.add_child(c)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); c.add_child(v)
+	var t := UIKit.label("暂停" if net.role == "" else "菜单（联机中不会暂停）", 34, Color("#ffe14d"), 8); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(t)
+	if not tut.is_empty(): var tl := UIKit.label("新手教程进行中", 16, Color("#7af0ff")); tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(tl)
+	var row := func(label: String, ctl: Control) -> void:
+		var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 12); v.add_child(h)
+		var l := UIKit.label(label, 17, Color.WHITE); l.custom_minimum_size.x = 120; h.add_child(l); h.add_child(ctl)
+	var sv := HSlider.new(); sv.min_value = -40; sv.max_value = 6; sv.value = settings.sfx_db; sv.custom_minimum_size = Vector2(300, 28)
+	sv.value_changed.connect(func(x): settings.sfx_db = x; settings.save(); settings.apply(self)); row.call("音效音量", sv)
+	var mv := HSlider.new(); mv.min_value = -40; mv.max_value = 0; mv.value = settings.music_db; mv.custom_minimum_size = Vector2(300, 28)
+	mv.value_changed.connect(func(x): settings.music_db = x; settings.save(); settings.apply(self)); row.call("音乐音量", mv)
+	var q := OptionButton.new()
+	for k in Settings.QUALITY_ORDER: q.add_item(str(Settings.QUALITY[k].name))
+	q.select(Settings.QUALITY_ORDER.find(settings.quality)); q.item_selected.connect(func(k): settings.quality = Settings.QUALITY_ORDER[k]; settings.save(); settings.apply(self)); row.call("画质", q)
+	var K: Dictionary = settings.keys
+	var kn := func(a): return Settings.key_name(K[a])
+	var keys := UIKit.label("%s%s%s%s 移动 • 左键攻击 • %s 技能 • %s/右键 大招 • %s 超载 • %s 滚轮 • %s 跳" % [kn.call("up"), kn.call("left"), kn.call("down"), kn.call("right"), kn.call("skill"), kn.call("super"), kn.call("overload"), kn.call("wheel"), kn.call("jump")], 13, Color("#c8c4e8"))
+	keys.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; keys.custom_minimum_size.x = 480; v.add_child(keys)
+	var go := UIKit.gold_button("继续（Esc）", 22); go.custom_minimum_size = Vector2(0, 56); v.add_child(go); go.pressed.connect(func(): sfx.play("click"); close_pause())
+	var quit_txt := "跳过教程" if not tut.is_empty() else "退出对局"
+	var qb := UIKit.pink_button(quit_txt, 20); qb.custom_minimum_size = Vector2(0, 52); v.add_child(qb)
+	qb.pressed.connect(func():
+		sfx.play("click")
+		if not tut.is_empty(): tut_end(false); return
+		if autoplay or sim == null: back_to_lobby(); return
+		confirm_quit(v))
+
+func confirm_quit(v: VBoxContainer) -> void:
+	for ch in v.get_children(): ch.queue_free()
+	var t := UIKit.label("确定要退出吗？", 30, Color("#ff6b5a"), 6); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(t)
+	var msg := "逃跑按输一局结算：扣奖杯%s，没有其他奖励。" % ("和排位分" if sim.ranked else "")
+	if net.role != "": msg = "退出后会离开联机房间。"
+	if sim.loot: msg = "撤离失败：只保住安全箱里的东西，背包里的物资和带进来的装备都会丢掉。"
+	var l := UIKit.label(msg, 16, Color("#e6e2fa")); l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.custom_minimum_size.x = 480; l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(l)
+	var a := UIKit.flat_button("再想想", 20); a.custom_minimum_size = Vector2(0, 54); v.add_child(a); a.pressed.connect(func(): sfx.play("click"); close_pause(); toggle_pause())
+	var b := UIKit.pink_button("确定退出", 20); b.custom_minimum_size = Vector2(0, 54); v.add_child(b)
+	b.pressed.connect(func():
+		sfx.play("click")
+		if net.role == "" and not sim.over:   # 逃跑：按输一局算
+			var rw := profile.match_reward(sim, me)
+			rw.won = false; rw.draw = false; rw.mvp = false; rw.xp = 0
+			if not sim.loot: rw.trophies = -int(data.econ.trophy.loss)
+			rw.deaths = me.deaths
+			profile.apply_match(rw)
+		back_to_lobby())
+
+func close_pause() -> void:
+	paused = false
+	if pause_ui != null: pause_ui.queue_free(); pause_ui = null
+
+# ================= 新手教程（照网页版 1.0 的 7 步）=================
+var tut := {}
+var tut_ui: Control
+const TUT_STEPS := [["移动", "用 {up}{left}{down}{right} 移动，往前走一段"], ["开火", "鼠标瞄准，按住左键开火，打中对面的训练靶"],
+	["涂地", "朝地面开火把地涂满颜色！涂地多的一队获胜，站在己方颜色上跑得更快"], ["跳跃", "按 {jump} 跳上旁边的矮台（高台要走楼梯或踩弹跳板）"],
+	["技能", "按 {skill} 使用驾驶员技能（技能是充能制，用完会慢慢回复）"], ["大招", "大招充满了！按 {super} 或鼠标右键发动（平时靠打中敌人和涂地充能）"],
+	["弹出驾驶员", "糟糕，机体被打爆了！驾驶员会弹出继续战斗，躲好活过几秒，新机体就会空投到你脚下"]]
+
+func start_tutorial() -> void:
+	sel_mode = "turf"; sel_map = 0
+	if cur_map != 0: build_map(0)
+	match_seed = randi() % 1000000 + 1
+	sim = Sim.new(data, 0, match_seed, 300.0, "turf")
+	sim.tutorial = true; sim.countdown = 3.5
+	me = sim.add_player(1, profile.display_name(), 1, "blaze", "blaster", false, {"lv": 1, "bt": 0})
+	sim.add_player(2, "训练靶 A", 2, "titan", "roller", true, {"lv": 1, "bt": 0})
+	sim.add_player(3, "训练靶 B", 2, "doc", "charger", true, {"lv": 1, "bt": 0})
+	spectate_id = 0
+	begin_view()
+	tut = {"step": -1, "x0": 0.0, "y0": 0.0, "paint0": 0, "sk0": 0, "sp_sent": false, "sp_full": false, "wr_t": -1.0, "was_foot": false, "done_t": 0.0, "t": 0.0}
+	var layer: Node = hud.get_parent()
+	tut_ui = Control.new(); tut_ui.set_anchors_preset(Control.PRESET_FULL_RECT); tut_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE; tut_ui.theme = theme_ui; layer.add_child(tut_ui)
+	var s := get_viewport().get_visible_rect().size
+	var c := UIKit.card(Color("#2e2760"), Color("#120e26"), Color("#7af0ff"), 16); c.position = Vector2(s.x / 2 - 360, 96); c.size = Vector2(720, 110); c.custom_minimum_size = c.size; tut_ui.add_child(c)
+	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 14); c.add_child(h)
+	h.add_child(UIKit.avatar("res://art/faces/vet.png", "", 80, Color("#7af0ff")))
+	var v := VBoxContainer.new(); v.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(v)
+	var st := UIKit.label("新手教程", 15, Color("#7af0ff")); v.add_child(st)
+	var tx := UIKit.label("先熟悉一下操作吧！", 19, Color.WHITE, 3); tx.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; tx.custom_minimum_size.x = 480; v.add_child(tx)
+	var dots := HBoxContainer.new(); dots.add_theme_constant_override("separation", 6); v.add_child(dots)
+	for i in TUT_STEPS.size(): var d := ColorRect.new(); d.custom_minimum_size = Vector2(26, 6); d.color = Color(1, 1, 1, 0.2); dots.add_child(d)
+	var sk := UIKit.flat_button("跳过教程", 14); sk.custom_minimum_size = Vector2(100, 40); h.add_child(sk); sk.pressed.connect(func(): sfx.play("click"); tut_end(false))
+	tut.ui = {"st": st, "tx": tx, "dots": dots}
+
+func tut_set(i: int) -> void:
+	tut.step = i
+	if i == 2: tut.paint0 = me.painted
+	if i == 4: tut.sk0 = me.skill_uses
+	var U: Dictionary = tut.ui
+	for k in U.dots.get_child_count(): U.dots.get_child(k).color = Color("#6dff8a") if k < i else (Color("#ffe14d") if k == i else Color(1, 1, 1, 0.2))
+	if i >= TUT_STEPS.size():
+		U.st.text = "完成"; U.tx.text = "全部学会了！回大厅打开你的新手宝箱吧。"; sfx.play("win"); tut.done_t = tut.t
+		return
+	var K: Dictionary = settings.keys
+	var txt: String = TUT_STEPS[i][1]
+	for a in ["up", "left", "down", "right", "jump", "skill", "super"]: txt = txt.replace("{%s}" % a, Settings.key_name(K[a]))
+	U.st.text = "%d / %d  •  %s" % [i + 1, TUT_STEPS.size(), TUT_STEPS[i][0]]; U.tx.text = txt
+	sfx.play("pickup")
+
+func tut_tick() -> void:
+	tut.t = float(tut.t) + get_process_delta_time()
+	if sim.countdown > 0 or me == null: return
+	if int(tut.step) < 0: tut.x0 = me.x; tut.y0 = me.y; tut_set(0); return
+	match int(tut.step):
+		0: if Vector2(me.x - float(tut.x0), me.y - float(tut.y0)).length() > 240: tut_set(1)
+		1: if sim.tut_hits >= 2: tut_set(2)
+		2: if me.painted - int(tut.paint0) > 60: tut_set(3)
+		3: if me.z > 20 and not me.foot: tut_set(4)
+		4: if me.skill_uses < int(tut.sk0): tut_set(5)
+		5:
+			if not tut.sp_sent: tut.sp_sent = true; me.sp = float(data.mechs[me.weapon].spNeed)
+			elif tut.sp_full and me.sp < 1.0: tut_set(6)
+			if me.sp >= float(data.mechs[me.weapon].spNeed): tut.sp_full = true
+		6:
+			if float(tut.wr_t) < 0: tut.wr_t = float(tut.t) + 1.2
+			elif float(tut.wr_t) > 0 and float(tut.t) >= float(tut.wr_t) and not me.foot and not tut.was_foot: sim.wreck(me, null); tut.wr_t = 0.0001
+			if me.foot: tut.was_foot = true
+			elif tut.was_foot: tut_set(7)
+		_:
+			if float(tut.t) - float(tut.done_t) > 2.4: tut_end(true)
+
+func tut_end(done: bool) -> void:
+	profile.o.tutDone = true; profile.save()
+	tut_close()
+	back_to_lobby()
+	if int(profile.o.tut) == 0: lobby.welcome()
+	elif done: lobby.toast("教程完成！")
+
+func tut_close() -> void:
+	tut = {}
+	if tut_ui != null: tut_ui.queue_free(); tut_ui = null

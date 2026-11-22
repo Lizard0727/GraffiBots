@@ -707,7 +707,14 @@ func welcome() -> void:
 	var art := UIKit.image("res://art/chests/starter.png", Vector2(220, 238)); art.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(art)
 	art.pivot_offset = Vector2(110, 200)
 	var bob := art.create_tween().set_loops(); bob.tween_property(art, "rotation", 0.05, 0.5); bob.tween_property(art, "rotation", -0.05, 0.5)
-	var b := UIKit.gold_button("领取新手宝箱", 24); b.custom_minimum_size = Vector2(280, 62); b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(b)
+	var hb := hbox(16); hb.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(hb)
+	if not P.o.get("tutDone", false):   # 第一次：先玩 1 分钟的新手教程，学完再开宝箱
+		var tb := UIKit.gold_button("开始新手教程", 24); tb.custom_minimum_size = Vector2(280, 62); hb.add_child(tb)
+		click(tb, func(): bob.kill(); close_popup(); game.start_tutorial())
+		var sb := UIKit.flat_button("跳过，直接领宝箱", 17); sb.custom_minimum_size = Vector2(200, 62); hb.add_child(sb)
+		click(sb, func(): bob.kill(); P.o.tutDone = true; P.save(); welcome())
+		return
+	var b := UIKit.gold_button("领取新手宝箱", 24); b.custom_minimum_size = Vector2(280, 62); hb.add_child(b)
 	click(b, func():
 		bob.kill()
 		P.tutorial()

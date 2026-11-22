@@ -197,6 +197,8 @@ var events: Array = []               # 给画面 / 音效的事件
 var time := 0.0
 var time_left := 180.0
 var countdown := 3.0
+var tutorial := false      # 新手教程：时间不走、敌人是不动的训练靶、玩家不会倒下
+var tut_hits := 0
 var over := false
 var winner := 0
 var result := {}
@@ -343,7 +345,7 @@ func step(dt: float) -> void:
 		countdown -= dt
 		return
 	time += dt
-	time_left -= dt
+	if not tutorial: time_left -= dt
 	field_budget = 1   # 超大地图每帧最多新算 1 个导航场
 	tick_n += 1
 	for p in players:
@@ -1116,6 +1118,9 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 	if tOV != null and tOV.has("undying"): dmg = min(dmg, max(0.0, t.hp - 1))
 	if t.tal.has("d5") and not t.foot and not t.d5_used and dmg >= t.hp:   # 不屈装甲
 		dmg = max(0.0, t.hp - 1); t.d5_used = true; t.inv_t = 1.5; ev(["guard", t.id])
+	if tutorial and by != null and by.team != t.team:
+		if not t.bot: dmg = minf(dmg, maxf(0.0, t.hp - 1.0))
+		elif not by.bot: tut_hits += 1
 	t.hp -= dmg; t.last_hurt = time; t.flash = 1.0
 	if by != null and by != t and by.team != t.team:
 		var bo = ov_of(by)
@@ -1642,6 +1647,7 @@ const SUPER_REACH := {"beam": 700, "missiles": 1000, "storm": 220, "bubble": 260
 
 func ai_think(p: Mech, dt: float) -> void:
 	if not p.alive: return
+	if tutorial: p.inp.mx = 0; p.inp.my = 0; p.inp.f = false; p.inp.w = false; return
 	p.ai_t -= dt
 	# 挂机性格：隔一阵子就站着不动几秒
 	if p.pz.get("afk", false) and countdown <= 0:
