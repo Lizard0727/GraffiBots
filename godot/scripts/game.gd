@@ -396,9 +396,14 @@ func build_map(idx: int) -> void:
 	paint_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, zero)
 	paint_tex = ImageTexture.create_from_image(paint_img); base_tex = ImageTexture.create_from_image(base_img); mini_tex = ImageTexture.create_from_image(mini_img)
 	# 地形网格：同一行连续同高的格子合成一块（顶面）；侧面也按行 / 列合并，分成「高台侧面 / 大墙 / 细墙」三种材质
-	var st_top := SurfaceTool.new(); st_top.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var sts := [SurfaceTool.new(), SurfaceTool.new(), SurfaceTool.new()]
-	for s2 in sts: s2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# 3.2.2：超大地图（撤离）把地形切成 48×48 格的小块，每块一个网格 —— 画面外的块会被视锥剔除（以前整张图一个网格，每帧 150 万个三角形全画）
+	var CH := 48 if gw * gh >= 50000 else maxi(gw, gh) + 1
+	var chunks := {}   # [种类, 块x, 块y] → SurfaceTool（种类 0 = 顶面，1~3 = 三种侧面）
+	var stc := func(kd: int, cx: int, cy: int) -> SurfaceTool:
+		var key := Vector3i(kd, clampi(cx, 0, gw - 1) / CH, clampi(cy, 0, gh - 1) / CH)
+		if not chunks.has(key):
+			var st0 := SurfaceTool.new(); st0.begin(Mesh.PRIMITIVE_TRIANGLES); chunks[key] = st0
+		return chunks[key]
 	# 3.1：墙在画面上矮一点（碰撞不变），不会像一块块石碑挡住后面的人
 	var wall_h := float(B.get("wall_h", 120))
 	var TV := PackedInt32Array(T)
@@ -422,9 +427,9 @@ func build_map(idx: int) -> void:
 		while x0 < gw:
 			var h0: float = TV[cy * gw + x0]
 			var x1 := x0 + 1
-			while x1 < gw and TV[cy * gw + x1] == h0: x1 += 1
+			while x1 < gw and TV[cy * gw + x1] == h0 and x1 % CH != 0: x1 += 1
 			var hh: float = h0 * K
-			quad.call(st_top, [Vector3(x0, hh, cy), Vector3(x1, hh, cy), Vector3(x1, hh, cy + 1), Vector3(x0, hh, cy + 1)], Vector3.UP, [])
+			quad.call(stc.call(0, x0, cy), [Vector3(x0, hh, cy), Vector3(x1, hh, cy), Vector3(x1, hh, cy + 1), Vector3(x0, hh, cy + 1)], Vector3.UP, [])
 			x0 = x1
 	for dir in [Vector2i(0, 1), Vector2i(0, -1)]:
 		for cy in gh:
@@ -434,10 +439,10 @@ func build_map(idx: int) -> void:
 				if nh >= h - 0.01: cx += 1; continue
 				var kd: int = kind.call(cx, cy)
 				var e := cx + 1
-				while e < gw and is_equal_approx(hgt.call(e, cy), h) and is_equal_approx(hgt.call(e, cy + dir.y), nh) and kind.call(e, cy) == kd: e += 1
+				while e < gw and is_equal_approx(hgt.call(e, cy), h) and is_equal_approx(hgt.call(e, cy + dir.y), nh) and kind.call(e, cy) == kd and e % CH != 0: e += 1
 				var zz: float = cy + (1 if dir.y == 1 else 0)
 				var v := [Vector3(cx, nh, zz), Vector3(e, nh, zz), Vector3(e, h, zz), Vector3(cx, h, zz)] if dir.y == -1 else [Vector3(e, nh, zz), Vector3(cx, nh, zz), Vector3(cx, h, zz), Vector3(e, h, zz)]
-				quad.call(sts[kd], v, Vector3(0, 0, dir.y), [lo, lo, hi, hi])
+				quad.call(stc.call(kd + 1, cx, cy), v, Vector3(0, 0, dir.y), [lo, lo, hi, hi])
 				cx = e
 	for dir in [Vector2i(1, 0), Vector2i(-1, 0)]:
 		for cx in gw:
@@ -447,13 +452,11 @@ func build_map(idx: int) -> void:
 				if nh >= h - 0.01: cy += 1; continue
 				var kd: int = kind.call(cx, cy)
 				var e := cy + 1
-				while e < gh and is_equal_approx(hgt.call(cx, e), h) and is_equal_approx(hgt.call(cx + dir.x, e), nh) and kind.call(cx, e) == kd: e += 1
+				while e < gh and is_equal_approx(hgt.call(cx, e), h) and is_equal_approx(hgt.call(cx + dir.x, e), nh) and kind.call(cx, e) == kd and e % CH != 0: e += 1
 				var xx: float = cx + (1 if dir.x == 1 else 0)
 				var v := [Vector3(xx, nh, e), Vector3(xx, nh, cy), Vector3(xx, h, cy), Vector3(xx, h, e)] if dir.x == -1 else [Vector3(xx, nh, cy), Vector3(xx, nh, e), Vector3(xx, h, e), Vector3(xx, h, cy)]
-				quad.call(sts[kd], v, Vector3(dir.x, 0, 0), [lo, lo, hi, hi])
+				quad.call(stc.call(kd + 1, cx, cy), v, Vector3(dir.x, 0, 0), [lo, lo, hi, hi])
 				cy = e
-	var mesh := ArrayMesh.new()
-	st_top.commit(mesh)
 	turf_mat = ShaderMaterial.new(); turf_mat.shader = load("res://shaders/turf.gdshader")
 	turf_mat.set_shader_parameter("paint_tex", paint_tex); turf_mat.set_shader_parameter("base_tex", base_tex); turf_mat.set_shader_parameter("grid_size", Vector2(gw, gh))
 	turf_mat.set_shader_parameter("team_a", team_col[1]); turf_mat.set_shader_parameter("team_b", team_col[2])
@@ -461,14 +464,12 @@ func build_map(idx: int) -> void:
 	turf_mat.set_shader_parameter("pat", Vector4i(int(pt[0]), int(pt[1]), int(pt[2]), int(pt[3])))
 	turf_mat.set_shader_parameter("detail", Color(Biomes.col(B.detail[0]), float(B.detail[1])))
 	turf_mat.set_shader_parameter("glow_k", float(B.get("glow", 0.0))); turf_mat.set_shader_parameter("gloss", float(B.get("gloss", 0.0)))
-	mesh.surface_set_material(0, turf_mat)
 	var side_mats := [Biomes.wall_mat(B.side, 0.12), Biomes.wall_mat(B.wall, float(B.get("cap_w", 0.06))), Biomes.wall_mat(B.thin, float(B.get("cap_w", 0.06)))]
-	var mi := MeshInstance3D.new(); mi.mesh = mesh; map_root.add_child(mi)
-	for k in 3:
-		var sm2 := ArrayMesh.new(); sts[k].commit(sm2)
-		if sm2.get_surface_count() == 0: continue
-		sm2.surface_set_material(0, side_mats[k])
-		var smi := MeshInstance3D.new(); smi.mesh = sm2; map_root.add_child(smi)
+	for key in chunks:
+		var cm := ArrayMesh.new(); (chunks[key] as SurfaceTool).commit(cm)
+		if cm.get_surface_count() == 0: continue
+		cm.surface_set_material(0, turf_mat if key.x == 0 else side_mats[key.x - 1])
+		var cmi := MeshInstance3D.new(); cmi.mesh = cm; map_root.add_child(cmi)
 	if OS.get_environment("GB_SHOT") != "": print("地图 %s 建好了：%d ms" % [m.name, Time.get_ticks_msec() - t_build])
 	# 电梯（超大地图）
 	for k in m.get("lifts", {}):
@@ -828,13 +829,16 @@ func _process(delta: float) -> void:
 				if q != null:
 					for k in net.inputs[peer]: q.inp[k] = net.inputs[peer][k]
 		acc += min(delta, 0.1)
+		var _p0 := Time.get_ticks_usec()
 		while acc >= TICK:
 			acc -= TICK
 			for p in sim.players:
 				var n: Dictionary = mech_nodes[p.id]
 				n.prev = n.cur; n.a_prev = n.a_cur
 			var cd0 := int(ceil(sim.countdown))
+			var _ps := Time.get_ticks_usec()
 			sim.step(TICK)
+			_prof("sim", _ps)
 			if botchat != null and botchat.sim == sim: botchat.tick(TICK)
 			if sim.countdown > 0 and int(ceil(sim.countdown)) != cd0: sfx.play("count")
 			elif sim.countdown <= 0 and cd0 == 1: sfx.play("go")
@@ -843,13 +847,16 @@ func _process(delta: float) -> void:
 				n.cur = Vector3(p.x * K, p.z * K, p.y * K); n.a_cur = float(p.inp.a)
 				if not p.alive: n.prev = n.cur
 			if net.role == "host": net.host_collect(sim); net.host_broadcast(sim)
+			var _pe := Time.get_ticks_usec()
 			apply_events()
+			_prof("events", _pe); _pe = Time.get_ticks_usec()
 			if sim.dirty.size() > 0:
 				for i in sim.dirty:
 					var t := sim.grid[i]
 					paint_img.set_pixel(i % sim.GW, i / sim.GW, Color(1 if t == me.team else 0, 1 if t > 0 and t != me.team else 0, 0, 1 if t > 0 else 0))
 					mini_img.set_pixel(i % sim.GW, i / sim.GW, team_col[t] if t > 0 else base_cols[i])
-				paint_tex.update(paint_img); mini_tex.update(mini_img)
+				paint_dirty = true
+			_prof("paint", _pe)
 			if sim.over and state == "play":
 				state = "result"
 				if net.role == "host":
@@ -857,9 +864,16 @@ func _process(delta: float) -> void:
 					for q in sim.players: fin.append([q.id, q.kills, q.deaths, q.painted, q.obj, q.balloons, q.float_t, q.seals, q.spirits, q.cubes, q.extracted])
 					net.broadcast_end(sim.result, fin)
 				end_splash()
+		if paint_dirty:   # 3.2.2：一帧最多上传一次涂料贴图（以前每个 tick 都传，超大地图一次 1.5 MB）
+			paint_dirty = false; var _pu := Time.get_ticks_usec()
+			paint_tex.update(paint_img); mini_tex.update(mini_img)
+			_prof("upload", _pu)
+		_prof("tickloop", _p0)
+		var _pv := Time.get_ticks_usec()
 		update_visuals(acc / TICK, real_dt)
+		_prof("visuals", _pv); _pv = Time.get_ticks_usec()
 		turf_t -= delta
-		if turf_t <= 0:
+		if turf_t <= 0 and not sim.loot:   # 3.2.2：撤离模式不比涂地，不用每 0.5 秒数一遍 38 万格（以前每次卡 80~120 ms）
 			turf_t = 0.5
 			var a := 0; var b := 0; var tot := 0
 			for i in sim.grid.size():
@@ -868,6 +882,7 @@ func _process(delta: float) -> void:
 				if sim.grid[i] == 1: a += 1
 				elif sim.grid[i] == 2: b += 1
 			turf = [a, b, tot]
+		_prof("turf", _pv)
 	else:
 		var t := Time.get_ticks_msec() / 1000.0
 		var c := Vector3(float(map_def(cur_map).gw) / 2.0, 0, float(map_def(cur_map).gh) / 2.0)
@@ -882,9 +897,34 @@ func _process(delta: float) -> void:
 			cam.position = c + Vector3(sin(t * 0.12) * 55, 48, cos(t * 0.12) * 55)
 			cam.look_at(c)
 		if sim != null: update_visuals(1.0, real_dt)
+	var _pf := Time.get_ticks_usec()
 	update_fx(real_dt)
+	_prof("fx", _pf); _pf = Time.get_ticks_usec()
 	update_loot_ui(real_dt)
+	_prof("lootui", _pf)
 	hud.queue_redraw()
+	_prof_flush()
+
+# 性能分析（GB_PROF=1）：每秒打印各段平均耗时 / 最大耗时（毫秒）
+var paint_dirty := false
+var _pacc := {}
+var _pt := 0.0
+var _pframes := 0
+func _prof(k: String, t0: int) -> void:
+	if not _profon: return
+	var d := (Time.get_ticks_usec() - t0) / 1000.0
+	var a: Array = _pacc.get(k, [0.0, 0.0]); a[0] += d; a[1] = maxf(a[1], d); _pacc[k] = a
+var _profon := OS.get_environment("GB_PROF") != ""
+func _prof_flush() -> void:
+	if not _profon: return
+	_pframes += 1
+	if Time.get_ticks_msec() / 1000.0 - _pt < 2.0: return
+	_pt = Time.get_ticks_msec() / 1000.0
+	var line := "PROF fps=%d frames=%d" % [Engine.get_frames_per_second(), _pframes]
+	for k in _pacc: line += "  %s %.2f/%.1f" % [k, _pacc[k][0] / maxi(1, _pframes), _pacc[k][1]]
+	line += "  proc %.1f" % (Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0)
+	line += "  objs %d draws %d prims %dk nodes %d" % [Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000, Performance.get_monitor(Performance.OBJECT_NODE_COUNT)]
+	print(line); _pacc = {}; _pframes = 0
 
 # 受击闪白 / 隐身半透明：给机兵所有零件挂一层叠加材质（每台机兵一份）
 func set_overlay(n: Dictionary, flash: float, ghost: bool) -> void:
@@ -897,13 +937,20 @@ func set_overlay(n: Dictionary, flash: float, ghost: bool) -> void:
 	for mi in n.parts: mi.material_overlay = mat if mode > 0 else null
 
 func update_visuals(alpha: float, delta: float) -> void:
+	# 3.2.2：撤离模式（55 个单位）里离镜头很远的直接不显示、不算动画
+	var cull := sim.loot and cam != null
+	var focus := Vector3.ZERO
+	if cull:
+		var fw := -cam.global_transform.basis.z
+		focus = cam.global_position + fw * (cam.global_position.y / maxf(0.2, -fw.y))
 	for p in sim.players:
 		var n: Dictionary = mech_nodes[p.id]
 		var root: Node3D = n.root
 		var vis: bool = p.alive and (me == null or p.team == me.team or sim.visible_to(me.team, p))
-		root.visible = vis
-		if not vis: continue
 		var pos: Vector3 = n.prev.lerp(n.cur, alpha)
+		if vis and cull and (absf(pos.x - focus.x) > 34.0 or absf(pos.z - focus.z) > 26.0): vis = false
+		root.visible = vis
+		if not vis: root.position = pos; continue
 		var vel: Vector3 = (pos - root.position) / max(delta, 0.001)
 		n.vel = n.vel.lerp(vel, min(1.0, delta * 10.0))
 		root.position = pos

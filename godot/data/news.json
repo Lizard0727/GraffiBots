@@ -1,5 +1,33 @@
 [
  {
+  "ver": "3.2.2",
+  "date": "2026-11-22",
+  "title": "涂鸦机兵 电脑版 3.2.2 · 撤离模式卡顿修复",
+  "title_en": "GraffiBots PC 3.2.2 · Extraction Mode Performance Fix",
+  "intro": "修复撤离模式掉到 5~10 帧的问题：画面要画的三角形少了约九成，模拟和 AI 的耗时也大幅降低。",
+  "intro_en": "Fixes Extraction mode dropping to 5–10 FPS: about 90% fewer triangles to draw, and much cheaper simulation and AI.",
+  "sections": [
+   {
+    "h": "撤离模式性能",
+    "h_en": "Extraction performance",
+    "items": [
+     "草丛 / 树丛按区块绘制，画面外的不再画；超大地图用低面数模型且不投影（每帧要画的三角形从约 150 万降到约 13 万）",
+     "地形网格切成小块，看不见的部分自动剔除；离镜头很远的机兵不再计算动画",
+     "去掉了每 0.5 秒统计一次全图涂地的操作（撤离不比涂地，以前每次会卡顿 80~120 毫秒）",
+     "涂料贴图一帧最多上传一次",
+     "AI 寻路重写：同一帧最多只算一次局部寻路，离你很远的 AI 思考频率降低；整局模拟平均耗时降低约 40%"
+    ],
+    "items_en": [
+     "Bushes and trees are drawn per region so off-screen ones are skipped; the giant map uses low-poly, non-shadow-casting foliage (from ~1.5M to ~130k triangles per frame)",
+     "Terrain is split into chunks so hidden parts are culled; mechs far from the camera no longer animate",
+     "Removed the whole-map turf count every 0.5 s (Extraction has no turf score; it caused 80–120 ms hitches)",
+     "The paint texture uploads at most once per frame",
+     "Rewritten AI pathfinding: at most one local path per frame, and far-away AIs think less often; average simulation cost per match down ~40%"
+    ]
+   }
+  ]
+ },
+ {
   "ver": "3.2.1",
   "date": "2026-11-22",
   "title": "涂鸦机兵 电脑版 3.2.1 · 维护更新",

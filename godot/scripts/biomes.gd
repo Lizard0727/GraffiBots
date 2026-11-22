@@ -161,19 +161,35 @@ static func bushes(root: Node3D, b: Dictionary, gw: int, gh: int, T: PackedInt32
 		"tarp": parts = [[Models.mesh("box", 0.9, 0.7, 0.9), col("#6a5a3a"), 0.35, 1.0], [Models.mesh("box", 1.0, 0.12, 1.0), bc, 0.74, 1.0]]
 		"deadbush": parts = [[Models.mesh("cone", 0.5, 0.9), bc, 0.4, 1.0]]
 		_: parts = [[Models.mesh("sph", 0.75), bc, 0.5, 1.0]]
-	for pi in parts.size():
-		var p: Array = parts[pi]
-		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = p[0]; mm.instance_count = cells.size()
-		var off := Vector3.ZERO
-		for k in cells.size():
-			var i: int = cells[k]; var s := rn.randf_range(0.85, 1.3)
-			if kind in ["grass", "tallgrass", "drygrass"]: off = Vector3(rn.randf_range(-0.4, 0.4), 0, rn.randf_range(-0.4, 0.4))
-			var bas := Basis(Vector3.UP, rn.randf() * TAU).scaled(Vector3(s, s * (1.2 if kind == "pine" else 0.9), s))
-			if kind in ["grass", "tallgrass", "drygrass"]: bas = bas.rotated(Vector3(1, 0, 0), rn.randf_range(-0.25, 0.25))
-			mm.set_instance_transform(k, Transform3D(bas, Vector3(i % gw + 0.5, float(T[i]) * K + float(p[2]) * s, i / gw + 0.5) + off))
-		var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; mmi.material_override = toon(p[1], 0.15)
-		root.add_child(mmi)
+	# 3.2.2：超大地图的草丛按 32×32 格分块（每块一个 MultiMesh，画面外的块会被剔除）、用低面数的球、不投影
+	# （以前整张撤离地图 2000 多个球是一个 MultiMesh，永远画全部，加上阴影每帧 130 万个三角形）
+	if giant:
+		for pi in parts.size():
+			if parts[pi][0] is SphereMesh:
+				var lo := SphereMesh.new(); lo.radius = (parts[pi][0] as SphereMesh).radius; lo.height = lo.radius * 2; lo.radial_segments = 9; lo.rings = 5
+				parts[pi][0] = lo
+	var BS := 32 if giant else 1 << 20
+	var groups := {}
+	for i in cells:
+		var key := Vector2i((i % gw) / BS, (i / gw) / BS)
+		if not groups.has(key): groups[key] = []
+		groups[key].append(i)
+	for key in groups:
+		var gcells: Array = groups[key]
+		for pi in parts.size():
+			var p: Array = parts[pi]
+			var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = p[0]; mm.instance_count = gcells.size()
+			var off := Vector3.ZERO
+			for k in gcells.size():
+				var i: int = gcells[k]; var s := rn.randf_range(0.85, 1.3)
+				if kind in ["grass", "tallgrass", "drygrass"]: off = Vector3(rn.randf_range(-0.4, 0.4), 0, rn.randf_range(-0.4, 0.4))
+				var bas := Basis(Vector3.UP, rn.randf() * TAU).scaled(Vector3(s, s * (1.2 if kind == "pine" else 0.9), s))
+				if kind in ["grass", "tallgrass", "drygrass"]: bas = bas.rotated(Vector3(1, 0, 0), rn.randf_range(-0.25, 0.25))
+				mm.set_instance_transform(k, Transform3D(bas, Vector3(i % gw + 0.5, float(T[i]) * K + float(p[2]) * s, i / gw + 0.5) + off))
+			var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; mmi.material_override = toon(p[1], 0.15)
+			if giant: mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(mmi)
 
 # 场地边缘：一圈矮墙（不发光）
 static func border(root: Node3D, b: Dictionary, gw: int, gh: int) -> void:

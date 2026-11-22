@@ -229,6 +229,8 @@ class Mech:
 	var ai_mem := {}          # 3.2：AI 记得敌人最后出现的位置 id → [x, y, vx, vy, 时间]
 	var ai_jump_t := 0.0
 	var ai_freeze_t := 0.0
+	var ai_pend := Vector2.ZERO       # 3.2.2：等寻路名额的目标
+	var ai_pend_on := false
 	var ai_guess_t := 0.0
 	var cine_t := 0.0         # 绝响终章
 	var cine_with := 0
@@ -301,7 +303,7 @@ func _init(data: Dictionary, map_idx: int = 0, seed_v: int = 0, duration: float 
 			bush[i] = 1 if bb.unicode_at(i) == 49 else 0
 	for k in M.pads: pad[int(k)] = int(M.pads[k])
 	for k in M.get("lifts", {}): lift[int(k)] = int(M.lifts[k])
-	if GW * GH > 50000: build_nav()
+	if GW * GH > 50000: build_nav(); build_lwalk()
 	time_left = duration
 	if seed_v != 0: rng.seed = seed_v
 	else: rng.randomize()
@@ -412,12 +414,25 @@ func respawn(p: Mech) -> void:
 func max_hp_of(p: Mech) -> float:
 	return (float(C.PILOT_HP) if p.foot else p.max_hp) * Dawn.max_hp_k(p)
 
+var humans: Array = []   # 3.2.2：这一 tick 活着的真人玩家（撤离模式按距离给 AI 降频）
+func far_from_humans(p: Mech) -> bool:
+	if humans.is_empty(): return false
+	for h in humans:
+		if absf(h.x - p.x) < 1500.0 and absf(h.y - p.y) < 1100.0: return false
+	return true
+var alive_pilots := {}   # 3.2.2：这一 tick 场上活着的驾驶员（near_pilot 先查这里，没有就不用遍历全员）
 func near_pilot(p: Mech, pid: String, r: float) -> bool:
+	if not alive_pilots.has(pid): return false
 	for a in players:
 		if a != p and a.alive and a.team == p.team and a.pilot == pid and dist2d(a, p) < r: return true
 	return false
 
 # ---------------- 主循环 ----------------
+# 性能分析（prof_on = true 时按段累计耗时，毫秒）
+var prof_on := false
+var prof := {}
+func _pf(k: String, t0: int) -> void: prof[k] = float(prof.get(k, 0.0)) + (Time.get_ticks_usec() - t0) / 1000.0
+
 func step(dt: float) -> void:
 	dirty.clear()
 	events.clear()
@@ -428,20 +443,37 @@ func step(dt: float) -> void:
 	time += dt
 	if not tutorial: time_left -= dt
 	field_budget = 1   # 超大地图每帧最多新算 1 个导航场
+	alive_pilots.clear(); humans.clear()
+	for q in players:
+		if q.alive: alive_pilots[q.pilot] = true
+		if not q.bot and q.alive: humans.append(q)
 	tick_n += 1
+	var t0 := Time.get_ticks_usec() if prof_on else 0
 	for p in players:
 		if p.boss: boss_think(p, dt)
 		elif p.bot:
 			# 超大地图人多：AI 隔帧思考（守卫更少），输入会保持到下次思考
 			var every := 1
-			if loot: every = 4 if p.guard != null else 2
-			if (tick_n + p.slot) % every == 0: ai_think(p, dt * every)
-		update_player(p, dt)
+			if loot:
+				every = 4 if p.guard != null else 2
+				if far_from_humans(p): every = 8 if p.guard != null else 4   # 3.2.2：离真人玩家很远（屏幕外）的 AI 想得更慢
+			if (tick_n + p.slot) % every == 0:
+				if prof_on:
+					var ta := Time.get_ticks_usec(); ai_think(p, dt * every); _pf("ai", ta)
+				else: ai_think(p, dt * every)
+		if prof_on:
+			var tu := Time.get_ticks_usec(); update_player(p, dt); _pf("player", tu)
+		else: update_player(p, dt)
+	if prof_on: t0 = Time.get_ticks_usec()
 	update_helpers(dt)
+	if prof_on: _pf("helpers", t0); t0 = Time.get_ticks_usec()
 	update_projs(dt)
+	if prof_on: _pf("projs", t0); t0 = Time.get_ticks_usec()
 	update_shells(dt)
 	update_missiles(dt)
+	if prof_on: _pf("shells", t0); t0 = Time.get_ticks_usec()
 	if not over: update_mode(dt)
+	if prof_on: _pf("mode", t0)
 	if time_left <= 0 and not over: finish()
 
 func finish(win: int = -1) -> void:
@@ -493,9 +525,27 @@ func update_player(p: Mech, dt: float) -> void:
 			p.skill_regen -= float(C.SKILL_REGEN); p.skill_uses += 1
 			if p.skill_uses >= p.skill_max: p.skill_regen = 0
 	elif p.skill_uses >= p.skill_max: p.skill_regen = 0
-	for k in ["rush_t", "slow_t", "silence_t", "smoke_t", "cloak_t", "reveal_t", "rally_t", "bind_t", "seal_t", "dslow_t", "poss_t", "blind_t", "mark_t", "lock_t", "jam_t", "sup_t", "nano_t", "aura_t", "blink_t", "combo_t"]:
-		var v: float = p.get(k)
-		if v > 0: p.set(k, max(0.0, v - dt))
+	# 3.2.2：各种状态计时直接减（以前用 p.get / p.set 反射，每人每 tick 20 次，很慢）
+	if p.rush_t > 0: p.rush_t = maxf(0.0, p.rush_t - dt)
+	if p.slow_t > 0: p.slow_t = maxf(0.0, p.slow_t - dt)
+	if p.silence_t > 0: p.silence_t = maxf(0.0, p.silence_t - dt)
+	if p.smoke_t > 0: p.smoke_t = maxf(0.0, p.smoke_t - dt)
+	if p.cloak_t > 0: p.cloak_t = maxf(0.0, p.cloak_t - dt)
+	if p.reveal_t > 0: p.reveal_t = maxf(0.0, p.reveal_t - dt)
+	if p.rally_t > 0: p.rally_t = maxf(0.0, p.rally_t - dt)
+	if p.bind_t > 0: p.bind_t = maxf(0.0, p.bind_t - dt)
+	if p.seal_t > 0: p.seal_t = maxf(0.0, p.seal_t - dt)
+	if p.dslow_t > 0: p.dslow_t = maxf(0.0, p.dslow_t - dt)
+	if p.poss_t > 0: p.poss_t = maxf(0.0, p.poss_t - dt)
+	if p.blind_t > 0: p.blind_t = maxf(0.0, p.blind_t - dt)
+	if p.mark_t > 0: p.mark_t = maxf(0.0, p.mark_t - dt)
+	if p.lock_t > 0: p.lock_t = maxf(0.0, p.lock_t - dt)
+	if p.jam_t > 0: p.jam_t = maxf(0.0, p.jam_t - dt)
+	if p.sup_t > 0: p.sup_t = maxf(0.0, p.sup_t - dt)
+	if p.nano_t > 0: p.nano_t = maxf(0.0, p.nano_t - dt)
+	if p.aura_t > 0: p.aura_t = maxf(0.0, p.aura_t - dt)
+	if p.blink_t > 0: p.blink_t = maxf(0.0, p.blink_t - dt)
+	if p.combo_t > 0: p.combo_t = maxf(0.0, p.combo_t - dt)
 	if p.rep_t > 0:
 		p.rep_t -= dt
 		if not p.foot: p.hp = min(max_hp_of(p), p.hp + max_hp_of(p) * 0.03 * dt)
@@ -515,7 +565,9 @@ func update_player(p: Mech, dt: float) -> void:
 	var OV = ov_of(p)
 	if p.ov_t > 0: p.ov_t = max(0.0, p.ov_t - dt)
 	if OV != null: overload_tick(p, OV, dt)
+	var _td := Time.get_ticks_usec() if prof_on else 0
 	Dawn.tick(self, p, dt)
+	if prof_on: _pf("pl.dawn", _td)
 	if not p.alive: return
 	if p.pilot == "zero" and int(time * 30) % 6 == 0:   # 沈零被动：战场感知
 		for e in players:
@@ -547,7 +599,9 @@ func update_player(p: Mech, dt: float) -> void:
 	if p.sp_t > 0 and p.sp_kind == "beam": mul = 0.4
 	elif p.firing and not p.wheel:
 		mul = {"blaster": 0.9, "charger": 0.5, "bucket": 0.85, "gatling": 0.6, "mortar": 0.9, "prism": 0.55}.get(p.weapon, 1.0)
+	var _tm := Time.get_ticks_usec() if prof_on else 0
 	step_move(p, dt, mul)
+	if prof_on: _pf("pl.move", _tm)
 	# 敌方涂料掉血；脱战回血（大厨更快）
 	var mh := max_hp_of(p)
 	if enemy_paint and not p.npc and p.inv_t <= 0 and not (p.sp_t > 0 and p.sp_kind == "charge") and p.hp > mh * 0.3:
@@ -571,7 +625,9 @@ func update_player(p: Mech, dt: float) -> void:
 	if p.wheel:
 		p.charge = 0; p.burst_n = 0
 	else:
+		var _tw := Time.get_ticks_usec() if prof_on else 0
 		p.firing = weapon_logic(p, dt, w)
+		if prof_on: _pf("pl.weapon", _tw)
 	var recent := time - p.last_atk < 0.9
 	p.hidden = (p.smoke_t > 0 or p.cloak_t > 0 or ((inb or (p.wheel and own)) and not recent)) and p.reveal_t <= 0
 	if p.inp.qq != p.last_qq:
@@ -1000,6 +1056,11 @@ func update_projs(dt: float) -> void:
 		var speed: float = Vector3(pr.vx, pr.vy, pr.vz).length() + (float(C.PROJ_G) * (pr.t - pr.ts) if pr.t > pr.ts else 0.0)
 		var steps := maxi(1, int(ceil(speed * dt / 8.0)))
 		var sdt := dt / steps
+		# 3.2.2：先粗筛这一 tick 子弹可能碰到的人（撤离模式 55 个单位，每个子步都全员检查太慢）
+		var reach: float = speed * dt + 90.0 + float(pr.size)
+		var cand: Array = []
+		for t in players:
+			if t.alive and t.team != pr.team and absf(t.x - pr.x) < reach and absf(t.y - pr.y) < reach: cand.append(t)
 		for _s in steps:
 			pr.t += sdt
 			var np := proj_pos(pr, pr.t)
@@ -1028,7 +1089,7 @@ func update_projs(dt: float) -> void:
 				if absf(dx * ux + dy * uy) <= h.half and absf(-dx * uy + dy * ux) < 9 + pr.size: blocked = true; break
 			if blocked:
 				dead = true; ev(["block", pr.x, pr.y, pr.z]); break
-			var v := hit_player(pr.team, pr.x, pr.y, pr.z, pr.size)
+			var v: Mech = hit_player_in(cand, pr.x, pr.y, pr.z, pr.size) if not cand.is_empty() else null
 			if v != null:
 				var far: bool = owner != null and owner.pilot == "frost" and pr.t * Vector2(pr.vx, pr.vy).length() > pr.range * 0.6
 				var close := 1.0
@@ -1052,6 +1113,15 @@ func update_projs(dt: float) -> void:
 		if dead: ev(["pdie", pr.x, pr.y, pr.z, pr.team, pr.size])
 		else: out.append(pr)
 	projs = out
+
+func hit_player_in(cand: Array, x: float, y: float, z: float, pad_r: float) -> Mech:
+	for t in cand:
+		if not t.alive: continue
+		var R: float = t.rad if t.rad > 0 else (float(C.PILOT_R) if t.foot else float(C.R))
+		var hh := 120.0 if t.boss else (22.0 if t.foot else float(C.PH))
+		if Vector2(t.x - x, t.y - y).length() < R + pad_r and z > t.z - pad_r and z < t.z + hh + pad_r:
+			return t
+	return null
 
 func hit_player(team: int, x: float, y: float, z: float, pad_r: float) -> Mech:
 	for t in players:
@@ -1782,6 +1852,7 @@ func ai_think(p: Mech, dt: float) -> void:
 	if mode in ["escape4", "escape8"] and time - p.last_hurt > 4.0: engage = minf(engage, rng_w * 0.75 + 40.0)
 	var focus: bool = p.pz.get("focus", false)
 	var best_sc := 1e9
+	var _t1 := Time.get_ticks_usec() if prof_on else 0
 	for e in players:
 		if not e.alive or e.team == p.team: continue
 		var d := dist2d(e, p)
@@ -1791,6 +1862,7 @@ func ai_think(p: Mech, dt: float) -> void:
 		if p.guard is Dictionary and guard_anchor(p).distance_to(Vector2(e.x, e.y)) > 460 and time - p.last_hurt > 3: continue
 		var sc: float = d * (0.55 + 0.45 * e.hp / maxf(1.0, max_hp_of(e))) if focus else d   # 高手 / 大神优先打残血
 		if sc < best_sc: best_sc = sc; td = d; tgt = e
+	if prof_on: _pf("ai.target", _t1)
 	var inp := p.inp
 	inp.j = false
 	var hp_k := p.hp / max_hp_of(p)
@@ -1812,11 +1884,15 @@ func ai_think(p: Mech, dt: float) -> void:
 			p.flee_t = 0.6 if threat else 2.5; p.flee_threat = threat
 			set_goal(p, flee_goal(p))
 		p.ai_mode_t = 0.5
+	elif p.ai_pend_on and field_budget > 0: set_goal(p, p.ai_pend)
 	elif mode != "turf" and p.ai_mode_t <= 0:
 		p.ai_mode_t = rng.randf_range(0.25, 0.4) if mode == "soccer" else rng.randf_range(0.7, 1.1)
+		var _t2 := Time.get_ticks_usec() if prof_on else 0
 		var g = null if keep_goal(p) else mode_goal(p)
+		if prof_on: _pf("ai.modegoal", _t2); _t2 = Time.get_ticks_usec()
 		if g != null: set_goal(p, g)
 		elif p.ai_urgent: p.ai_urgent = false
+		if prof_on: _pf("ai.setgoal", _t2)
 	var has_goal: bool = mode != "turf" and (p.ai_goal_cell >= 0 or nav_w > 0)
 	# 交战距离（网页版 botThink）：远程 = 射程 ×1.05，近战 / 爱追人的性格至少 300；超出就先按目标走，不硬追
 	var fight_r: float = maxf(rng_w * 1.05, 300.0) if (melee or p.pz.get("chase", false)) else rng_w * 1.05
@@ -1916,14 +1992,19 @@ func ai_think(p: Mech, dt: float) -> void:
 			inp.oq += 1
 		return
 	# 看不见敌人：高手会揣测躲起来的人在哪（不是 100% 准）
-	if ai_guess(p, w, rng_w, melee, dt): return
+	var _t3 := Time.get_ticks_usec() if prof_on else 0
+	var _gs := ai_guess(p, w, rng_w, melee, dt)
+	if prof_on: _pf("ai.guess", _t3)
+	if _gs: return
 	# 没有敌人：去涂地
 	if has_goal:
 		if Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() < 30: p.ai_mode_t = min(p.ai_mode_t, 0.1)
 	elif p.ai_goal_cell < 0 or Vector2(p.ai_goal.x - p.x, p.ai_goal.y - p.y).length() < 40 or p.ai_t <= -3.0:
 		if nav_w == 0: pick_roam(p)
 		p.ai_t = 0
+	var _t4 := Time.get_ticks_usec() if prof_on else 0
 	var d := field_dir(p)
+	if prof_on: _pf("ai.fielddir", _t4)
 	if p.ai_t <= 0:
 		p.ai_t = 0.5
 		if Vector2(p.x, p.y).distance_to(p.ai_last) < 12: p.ai_stuck += 1
@@ -2678,9 +2759,12 @@ func set_goal(p: Mech, g: Vector2) -> void:
 	if nav_w > 0:   # 超大地图：粗导航格，同一个目标格的导航场大家共用
 		p.ai_goal = g
 		if p.guard != null: p.ai_field = PackedInt32Array(); return   # 守卫就在岗位附近：直接走过去
-		if Vector2(p.x, p.y).distance_to(g) < 900 and field_budget > -2:
-			field_budget -= 1
+		if Vector2(p.x, p.y).distance_to(g) < 900:
+			if field_budget <= 0: p.ai_pend = g; p.ai_pend_on = true; return   # 3.2.2：这一帧的寻路名额用完了，下一次思考再算（不挤在同一帧）
+			field_budget -= 1; p.ai_pend_on = false
+			var _tl := Time.get_ticks_usec() if prof_on else 0
 			local_field(p, g)
+			if prof_on: _pf("sg.local", _tl)
 			var bx := int(p.x / CELL) - p.ai_local_org.x; var by := int(p.y / CELL) - p.ai_local_org.y
 			var reach: bool = p.ai_local.size() > 0 and bx >= 0 and by >= 0 and bx < LW and by < LW and p.ai_local[by * LW + bx] >= 0
 			if not reach and loot: skip_goal(p)
@@ -2689,7 +2773,9 @@ func set_goal(p: Mech, g: Vector2) -> void:
 		var ci := clampi(int(g.y / CELL) / NC, 0, nav_h - 1) * nav_w + clampi(int(g.x / CELL) / NC, 0, nav_w - 1)
 		if ci != p.ai_goal_cell and (field_cache.has(ci) or field_budget > 0):
 			if not field_cache.has(ci): field_budget -= 1
+			var _tc := Time.get_ticks_usec() if prof_on else 0
 			p.ai_goal_cell = ci; p.ai_field = coarse_field(ci)
+			if prof_on: _pf("sg.coarse", _tc)
 		return
 	var cx := clampi(int(g.x / CELL), 0, GW - 1); var cy := clampi(int(g.y / CELL), 0, GH - 1)
 	var i := cy * GW + cx
@@ -2779,17 +2865,15 @@ func coarse_field(goal: int) -> PackedInt32Array:
 	if field_cache.has(goal): return field_cache[goal]
 	var f := PackedInt32Array(); f.resize(nav_w * nav_h); f.fill(-1)
 	if goal < 0 or goal >= f.size(): return f
-	var q := PackedInt32Array([goal]); f[goal] = 0
-	var head := 0
-	while head < q.size():
+	var q := PackedInt32Array(); q.resize(nav_w * nav_h); q[0] = goal; var qn := 1
+	f[goal] = 0; var head := 0
+	while head < qn:
 		var c := q[head]; head += 1
-		var cx := c % nav_w; var cy := c / nav_w
-		for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var nx: int = cx + dd.x; var ny: int = cy + dd.y
-			if nx < 0 or ny < 0 or nx >= nav_w or ny >= nav_h: continue
-			var ni := ny * nav_w + nx
-			if f[ni] >= 0 or nav_ok[ni] == 0: continue
-			f[ni] = f[c] + 1; q.append(ni)
+		var cx := c % nav_w; var cy := c / nav_w; var nd := f[c] + 1
+		if cx + 1 < nav_w and f[c + 1] < 0 and nav_ok[c + 1] != 0: f[c + 1] = nd; q[qn] = c + 1; qn += 1
+		if cx > 0 and f[c - 1] < 0 and nav_ok[c - 1] != 0: f[c - 1] = nd; q[qn] = c - 1; qn += 1
+		if cy + 1 < nav_h and f[c + nav_w] < 0 and nav_ok[c + nav_w] != 0: f[c + nav_w] = nd; q[qn] = c + nav_w; qn += 1
+		if cy > 0 and f[c - nav_w] < 0 and nav_ok[c - nav_w] != 0: f[c - nav_w] = nd; q[qn] = c - nav_w; qn += 1
 	if field_cache.size() > 80: field_cache.clear()
 	field_cache[goal] = f
 	return f
@@ -3136,6 +3220,10 @@ func loot_goal(p: Mech):
 
 const LW := 64
 func loot_walk(i: int) -> bool: return solid[i] == 0 and top[i] <= 90
+var lwalk := PackedByteArray()   # 撤离模式：每格能不能走（预先算好，寻路时直接查表）
+func build_lwalk() -> void:
+	lwalk.resize(GW * GH)
+	for i in GW * GH: lwalk[i] = 1 if solid[i] == 0 and top[i] <= 90 else 0
 
 func local_field(p: Mech, g: Vector2) -> void:
 	var gx := int(g.x / CELL); var gy := int(g.y / CELL)
@@ -3153,19 +3241,20 @@ func local_field(p: Mech, g: Vector2) -> void:
 				var x := lx + dx; var y := ly + dy
 				if start < 0 and x >= 0 and y >= 0 and x < LW and y < LW and loot_walk((oy + y) * GW + ox + x): start = y * LW + x
 	if start < 0: p.ai_local = PackedInt32Array(); return
-	var q := PackedInt32Array([start]); f[start] = 0; var head := 0
-	while head < q.size():
+	# 3.2.2：BFS 不再每格新建方向数组、不再逐格调函数（撤离模式卡顿的主因），可走表预先算好
+	if lwalk.size() != GW * GH: build_lwalk()
+	var q := PackedInt32Array(); q.resize(LW * LW); q[0] = start; var qn := 1
+	f[start] = 0; var head := 0
+	var lw := lwalk; var tp := top
+	while head < qn:
 		var c := q[head]; head += 1
 		var cx := c % LW; var cy := c / LW
-		var ht: int = top[(oy + cy) * GW + ox + cx]
-		for dd in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var nx: int = cx + dd.x; var ny: int = cy + dd.y
-			if nx < 0 or ny < 0 or nx >= LW or ny >= LW: continue
-			var ni := ny * LW + nx
-			if f[ni] >= 0: continue
-			var gi := (oy + ny) * GW + ox + nx
-			if not loot_walk(gi) or absi(top[gi] - ht) > 24: continue
-			f[ni] = f[c] + 1; q.append(ni)
+		var g0 := (oy + cy) * GW + ox + cx
+		var ht: int = tp[g0]; var nd := f[c] + 1
+		if cx + 1 < LW and f[c + 1] < 0 and lw[g0 + 1] == 1 and absi(tp[g0 + 1] - ht) <= 24: f[c + 1] = nd; q[qn] = c + 1; qn += 1
+		if cx > 0 and f[c - 1] < 0 and lw[g0 - 1] == 1 and absi(tp[g0 - 1] - ht) <= 24: f[c - 1] = nd; q[qn] = c - 1; qn += 1
+		if cy + 1 < LW and f[c + LW] < 0 and lw[g0 + GW] == 1 and absi(tp[g0 + GW] - ht) <= 24: f[c + LW] = nd; q[qn] = c + LW; qn += 1
+		if cy > 0 and f[c - LW] < 0 and lw[g0 - GW] == 1 and absi(tp[g0 - GW] - ht) <= 24: f[c - LW] = nd; q[qn] = c - LW; qn += 1
 	p.ai_local = f
 
 func local_dir(p: Mech) -> Vector2:
