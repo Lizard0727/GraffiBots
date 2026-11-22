@@ -817,8 +817,8 @@ func set_show(i: int, item: Dictionary) -> void:
 	o.show[i] = item; save()
 
 func display_name() -> String:
-	if str(o.get("nick", "")) != "": return str(o.nick)
-	return str(o.name) if str(o.name) != "" else "游客"
+	if str(o.get("nick", "")) != "": return I18n.keep(str(o.nick))
+	return I18n.keep(str(o.name)) if str(o.name) != "" else "游客"
 
 # ================= 交易行（价格每小时浮动，和网页版 economy.js 同一个公式）+ 本周撤离排行 =================
 static func khash(k: String) -> int:
@@ -858,6 +858,7 @@ func loot_board() -> Array:
 	var st: int = (wk * 2654435761) & 0xFFFFFFFF
 	var rows: Array = []
 	for n in BOARD_NAMES:
+		I18n.keep(n)
 		st = (st * 1664525 + 1013904223) & 0xFFFFFFFF
 		var r := float(st) / 4294967296.0
 		rows.append({"name": n, "v": int(round((3000 + pow(r, 2.2) * 42000) / 10.0)) * 10})

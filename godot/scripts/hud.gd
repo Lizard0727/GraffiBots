@@ -39,6 +39,7 @@ func float_text(p: Sim.Mech, s: String, c: Color) -> void:
 	dmgs.append([Vector3(p.x * game.K, (p.z + 70) * game.K, p.y * game.K), s, now(), c, 22])
 
 func txt(s: String, pos: Vector2, size: int, c: Color, align := HORIZONTAL_ALIGNMENT_CENTER, outline := 4) -> void:
+	s = I18n.t(s)
 	var f: Font = game.font
 	var w := 1000.0
 	var p := pos - Vector2(w / 2 if align == HORIZONTAL_ALIGNMENT_CENTER else (w if align == HORIZONTAL_ALIGNMENT_RIGHT else 0.0), -size * 0.35)

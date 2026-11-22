@@ -90,4 +90,15 @@ const out = {
 };
 const json = JSON.stringify(out).replace(/·/g, '•').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]\uFE0F?/gu, '');   // Godot 版的字体没有「·」
 fs.writeFileSync(path.join(__dirname, '..', 'godot', 'data', 'game.json'), json);
+// 英文：网页版的词典（i18n-en.js）和带数字的句式（i18n.js 的 PATTERNS）
+{
+  const win = {}; global.window = win;
+  require('../public/i18n-en.js');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'i18n.js'), 'utf8');
+  const pat = eval(src.slice(src.indexOf('const PATTERNS = [') + 'const PATTERNS = '.length, src.indexOf('];', src.indexOf('const PATTERNS = [')) + 1));
+  const fixDot = (t) => t.replace(/·/g, '•');
+  const out = { dict: Object.fromEntries(Object.entries(win.GB_EN).map(([k, v]) => [fixDot(k), v])), patterns: pat.map(([re, rep]) => [fixDot(re.source), rep]) };
+  fs.writeFileSync(path.join(__dirname, '..', 'godot', 'data', 'i18n_en.json'), JSON.stringify(out));
+  console.log('godot/data/i18n_en.json', Object.keys(out.dict).length, '条词典', out.patterns.length, '条句式');
+}
 console.log('godot/data/game.json', (json.length / 1024).toFixed(0) + ' KB', S.WEAPON_ORDER.length + ' 机体', S.PILOTS.length + ' 驾驶员', maps.length + ' 地图');

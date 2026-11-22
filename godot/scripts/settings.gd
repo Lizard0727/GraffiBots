@@ -23,6 +23,7 @@ var quality := "high"
 var sfx_db := -6.0
 var music_db := -12.0
 var keys := DEFAULT_KEYS.duplicate()
+var lang := "zh" if OS.get_locale_language() == "zh" else "en"
 
 func _init() -> void:
 	var c := ConfigFile.new()
@@ -32,6 +33,7 @@ func _init() -> void:
 	max_fps = c.get_value("display", "max_fps", max_fps)
 	render_scale = c.get_value("display", "render_scale", render_scale)
 	quality = c.get_value("display", "quality", quality)
+	lang = str(c.get_value("display", "lang", lang))
 	if not QUALITY.has(quality): quality = "high"
 	sfx_db = c.get_value("audio", "sfx", sfx_db)
 	music_db = c.get_value("audio", "music", music_db)
@@ -40,7 +42,7 @@ func _init() -> void:
 func save() -> void:
 	var c := ConfigFile.new()
 	c.set_value("display", "fullscreen", fullscreen); c.set_value("display", "vsync", vsync); c.set_value("display", "max_fps", max_fps)
-	c.set_value("display", "render_scale", render_scale); c.set_value("display", "quality", quality)
+	c.set_value("display", "render_scale", render_scale); c.set_value("display", "quality", quality); c.set_value("display", "lang", lang)
 	c.set_value("audio", "sfx", sfx_db); c.set_value("audio", "music", music_db)
 	for a in keys: c.set_value("keys", a, keys[a])
 	c.save(PATH)

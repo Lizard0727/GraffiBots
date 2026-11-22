@@ -60,7 +60,7 @@ static func nicks(n: int) -> Array:
 			if randf() < 0.3:
 				s += (["", "丶", "_", ""].pick_random() + str(randi_range(1, 998))) if zh_re.search(s) else str(randi_range(1, 98))
 			s = s.substr(0, 12)
-			if not used.has(s): used[s] = true; out.append(s); break
+			if not used.has(s): used[s] = true; out.append(I18n.keep(s)); break
 		if out.size() <= i: out.append("玩家%d" % randi_range(1000, 9999))
 	return out
 

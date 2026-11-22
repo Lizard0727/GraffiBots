@@ -128,6 +128,8 @@ func _ready() -> void:
 	var layer := CanvasLayer.new(); add_child(layer); layer.add_child(hud)
 	accounts = Accounts.new()
 	Bots.init(data)
+	I18n.lang = settings.lang if OS.get_environment("GB_LANG") == "" else OS.get_environment("GB_LANG")
+	I18n.load_all()
 	profile = load_profile()
 	lobby = Lobby.new(self); menu = lobby; layer.add_child(menu)
 	matchflow = MatchFlow.new(self); layer.add_child(matchflow)
@@ -170,6 +172,7 @@ func _ready() -> void:
 		elif pop in ["avatar", "frame", "title", "show_style"]: lobby.call(pop + "_popup")
 		elif pop != "": lobby.account_form(pop)
 		if OS.get_environment("GB_SHOT") == "": splash(layer)
+		if OS.get_environment("GB_SHOT") == "": check_update()
 	if OS.get_environment("GB_LAN") != "": lan_test_setup(); return
 	if autoplay:
 		var gm := OS.get_environment("GB_MAP")
@@ -1592,7 +1595,7 @@ func toggle_pause() -> void:
 	var mv := HSlider.new(); mv.min_value = -40; mv.max_value = 0; mv.value = settings.music_db; mv.custom_minimum_size = Vector2(300, 28)
 	mv.value_changed.connect(func(x): settings.music_db = x; settings.save(); settings.apply(self)); row.call("音乐音量", mv)
 	var q := OptionButton.new()
-	for k in Settings.QUALITY_ORDER: q.add_item(str(Settings.QUALITY[k].name))
+	for k in Settings.QUALITY_ORDER: q.add_item(I18n.t(str(Settings.QUALITY[k].name)))
 	q.select(Settings.QUALITY_ORDER.find(settings.quality)); q.item_selected.connect(func(k): settings.quality = Settings.QUALITY_ORDER[k]; settings.save(); settings.apply(self)); row.call("画质", q)
 	var K: Dictionary = settings.keys
 	var kn := func(a): return Settings.key_name(K[a])
@@ -1836,9 +1839,9 @@ func chat_add(p, text: String, ch: int, remote := false) -> void:
 	chat_ui.position = Vector2(16, s.y - 360); chat_ui.size = Vector2(460, 0)
 	var r := RichTextLabel.new(); r.bbcode_enabled = true; r.fit_content = true; r.scroll_active = false; r.custom_minimum_size = Vector2(460, 0); r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_theme_font_size_override("normal_font_size", 15); r.add_theme_constant_override("outline_size", 5); r.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	var who := "系统" if p == null else str(p.name)
+	var who := I18n.t("系统") if p == null else str(p.name)
 	var col: Color = Color("#ffe14d") if p == me else (team_col[p.team] if p != null else Color("#9a96b8"))
-	var chn := "[color=#7af0ff][队伍][/color] " if ch == 1 else "[color=#c8c4e8][全部][/color] "
+	var chn := ("[color=#7af0ff]%s[/color] " % I18n.t("[队伍]")) if ch == 1 else ("[color=#c8c4e8]%s[/color] " % I18n.t("[全部]"))
 	r.text = chn + "[color=#%s]%s[/color]：%s" % [col.to_html(false), who.replace("[", "("), text.replace("[", "(")]
 	chat_ui.add_child(r)
 	chat_lines.append([r, Time.get_ticks_msec()])
@@ -1857,7 +1860,7 @@ func open_chat() -> void:
 	var s := get_viewport().get_visible_rect().size
 	var box := HBoxContainer.new(); box.name = "chatbox"; box.position = Vector2(16, s.y - 110); box.theme = theme_ui; chat_layer().add_child(box)
 	chat_chl = UIKit.label("[全部]" if chat_ch == 0 else "[队伍]", 16, Color("#7af0ff"), 4); box.add_child(chat_chl)
-	chat_edit = LineEdit.new(); chat_edit.custom_minimum_size = Vector2(380, 38); chat_edit.max_length = 60; chat_edit.placeholder_text = "Enter 发送 • Tab 切换频道 • Esc 取消"; box.add_child(chat_edit)
+	chat_edit = LineEdit.new(); chat_edit.custom_minimum_size = Vector2(380, 38); chat_edit.max_length = 60; chat_edit.placeholder_text = I18n.t("Enter 发送 • Tab 切换频道 • Esc 取消"); box.add_child(chat_edit)
 	chat_edit.text_submitted.connect(func(t):
 		var tx: String = str(t).strip_edges()
 		if tx != "":
@@ -1874,3 +1877,27 @@ func close_chat() -> void:
 	chat_open = false
 	var b = chat_layer().get_node_or_null("chatbox") if hud != null else null
 	if b != null: b.queue_free()
+
+# ================= 检查更新：和 GitHub Releases 上「godot-proto」的发布时间比 =================
+const RELEASE_API := "https://api.github.com/repos/Lizard0727/GraffiBots/releases/tags/godot-proto"
+var build_info := {}
+
+func load_build_info() -> Dictionary:
+	if build_info.is_empty() and FileAccess.file_exists("res://data/build.json"):
+		var v = JSON.parse_string(FileAccess.get_file_as_string("res://data/build.json"))
+		if typeof(v) == TYPE_DICTIONARY: build_info = v
+	return build_info
+
+func check_update() -> void:
+	var bi := load_build_info()
+	if bi.is_empty(): return   # 开发版（不是 CI 打的包）不检查
+	var hr := HTTPRequest.new(); add_child(hr)
+	hr.request_completed.connect(func(result, code, _h, body):
+		hr.queue_free()
+		if result != HTTPRequest.RESULT_SUCCESS or code != 200: return
+		var j = JSON.parse_string(body.get_string_from_utf8())
+		if typeof(j) != TYPE_DICTIONARY or not j.has("assets") or j.assets.is_empty(): return
+		var remote := Time.get_unix_time_from_datetime_string(str(j.assets[0].get("updated_at", "")).trim_suffix("Z"))
+		var local := Time.get_unix_time_from_datetime_string(str(bi.get("built", "")).trim_suffix("Z"))
+		if remote > local + 600: lobby.update_popup(str(j.get("html_url", "https://github.com/Lizard0727/GraffiBots/releases/tag/godot-proto")), str(j.assets[0].updated_at).substr(0, 10)))
+	hr.request(RELEASE_API, ["User-Agent: GraffiBots-Godot", "Accept: application/vnd.github+json"])

@@ -52,7 +52,7 @@ func say(p, trigger: String, o := {}) -> bool:
 	var fresh: Array = arr.filter(func(l): return str(l[0]).strip_edges() != "" and (not used.has(l[0]) or str(l[0]).length() <= 3))
 	if fresh.is_empty(): return false
 	var line: Array = fresh.pick_random()
-	var text := Bots.humanize(str(line[0]))
+	var text := Bots.humanize(str(line[0])) if I18n.lang != "en" or line.size() < 2 else str(line[1])
 	used[line[0]] = true
 	var ch: int = int(o.ch) if o.has("ch") else (int(FORCE_CH[trigger]) if FORCE_CH.has(trigger) else (1 if randf() < float(STYLE_TEAM.get(style, 0.5)) else 0))
 	var at := t + float(o.get("delay", 0.0)) + Bots.type_time(text) * (0.5 if is_end else 1.0)

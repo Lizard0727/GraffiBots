@@ -24,7 +24,7 @@ static func image(path: String, size: Vector2, cover := false) -> TextureRect:
 	return t
 
 static func label(s: String, size := 16, c := Color("#f2eefc"), outline := 0, oc := Color(0, 0, 0, 0.8)) -> Label:
-	var l := Label.new(); l.text = s; l.add_theme_font_size_override("font_size", size); l.add_theme_color_override("font_color", c)
+	var l := Label.new(); l.text = I18n.t(s); l.add_theme_font_size_override("font_size", size); l.add_theme_color_override("font_color", c)
 	if outline > 0: l.add_theme_constant_override("outline_size", outline); l.add_theme_color_override("font_outline_color", oc)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l

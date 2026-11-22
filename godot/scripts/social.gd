@@ -97,7 +97,7 @@ func save() -> void: game.profile.save(); changed.emit()
 func add_friend_entry(f: String, c: Dictionary) -> void:
 	var s := S()
 	s.reqIn = s.reqIn.filter(func(x): return x.fid != f); s.reqOut = s.reqOut.filter(func(x): return x.fid != f)
-	if not is_friend(f): s.friends.append({"fid": f, "name": str(c.get("name", f)), "pilot": str(c.get("pilot", "")), "tr": int(c.get("tr", 0))})
+	if not is_friend(f): s.friends.append({"fid": f, "name": I18n.keep(str(c.get("name", f))), "pilot": str(c.get("pilot", "")), "tr": int(c.get("tr", 0))})
 
 func on_soc(from: String, m: Dictionary) -> void:
 	var c: Dictionary = m.get("card", {}) if typeof(m.get("card")) == TYPE_DICTIONARY else {}

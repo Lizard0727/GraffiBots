@@ -55,6 +55,7 @@ jobs:
       - name: 导出
         run: |
           mkdir -p build/godot/windows
+          echo "{\"built\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"commit\":\"${GITHUB_SHA::7}\"}" > godot/data/build.json   # 游戏里检查更新用
           ~/godot/godot --headless --path godot --export-release "Windows Desktop" ../build/godot/windows/GraffiBots.exe
           ls -la build/godot/windows
 
