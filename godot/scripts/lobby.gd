@@ -1224,7 +1224,7 @@ func page_lan() -> void:
 	var w := 520.0
 	var card := UIKit.dark_card(); at(card, Vector2(24, 152), Vector2(w, vs.y - 168))
 	var v := vbox(10); card.add_child(v)
-	v.add_child(UIKit.wrap(L("同一个 Wi-Fi / 局域网里的电脑可以一起玩：一个人开房，其他人输入房主的 IP 加入。不够的位置由 AI 补上。端口 %d（第一次开房时 Windows 防火墙可能会询问，选「允许」）。搜刮撤离暂时只能单机玩。" % Net.PORT, 14, Color("#e6e2fa")), w - 40))
+	v.add_child(UIKit.wrap(L("同一个 Wi-Fi / 局域网里的电脑可以一起玩：一个人开房，其他人输入房主的 IP 加入。不够的位置由 AI 补上。端口 %d（第一次开房时 Windows 防火墙可能会询问，选「允许」）。" % Net.PORT, 14, Color("#e6e2fa")), w - 40))
 	if lan_name == "": lan_name = str(P.o.name) if str(P.o.name) != "" else "驾驶员%d" % (randi() % 900 + 100)
 	var nh := hbox(10); v.add_child(nh); nh.add_child(L("名字", 17, Color.WHITE))
 	var ne := LineEdit.new(); ne.text = lan_name; ne.max_length = 12; ne.custom_minimum_size = Vector2(240, 40); ne.text_changed.connect(func(t): lan_name = t); nh.add_child(ne)
@@ -1248,10 +1248,11 @@ func page_lan() -> void:
 		v.add_child(L("你是房主 • 让朋友输入：" + (", ".join(ips) if not ips.is_empty() else "（没找到局域网 IP）"), 17, Color("#6dff8a")))
 		var mh := hbox(10); v.add_child(mh); mh.add_child(L("模式", 16, Color.WHITE))
 		var mo := OptionButton.new(); mo.custom_minimum_size = Vector2(200, 40)
-		for i in D.modeOrder.size():
-			mo.add_item(I18n.t(str(D.modes[D.modeOrder[i]].name)), i)
-			if D.modeOrder[i] == N.room.mode: mo.select(i)
-		mo.item_selected.connect(func(k): N.room.mode = D.modeOrder[k]; N.sync_room()); mh.add_child(mo)
+		var lan_modes: Array = D.modeOrder + ["loot"]   # 搜刮撤离也能联机
+		for i in lan_modes.size():
+			mo.add_item(I18n.t(str(D.modes[lan_modes[i]].name)), i)
+			if lan_modes[i] == N.room.mode: mo.select(i)
+		mo.item_selected.connect(func(k): N.room.mode = lan_modes[k]; N.sync_room()); mh.add_child(mo)
 		var ob := OptionButton.new(); ob.custom_minimum_size = Vector2(160, 40); ob.add_item(I18n.t("随机地图"), 0)
 		for i in D.maps.size(): ob.add_item(I18n.t(str(D.maps[i].name)), i + 1)
 		ob.select(int(N.room.map) + 1); ob.item_selected.connect(func(k): N.room.map = k - 1; N.sync_room()); mh.add_child(ob)

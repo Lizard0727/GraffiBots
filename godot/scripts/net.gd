@@ -1,6 +1,6 @@
 # 涂鸦机兵 Godot 电脑版 —— 局域网联机（ENet）
 # 房主跑完整的对战模拟（权威），其他人只把操作发给房主；房主每 2 帧广播一次状态快照（位置、子弹、特效事件、涂料变化、模式状态）
-# 搜刮撤离的容器太多，暂时只能单机玩；其余 11 种模式都能联机
+# 全部模式都能联机；搜刮撤离的容器只同步有变化的那些
 class_name Net
 extends Node
 
@@ -131,9 +131,37 @@ func host_broadcast(sim: Sim) -> void:
 	var missiles: Array = []
 	for m in sim.missiles: missiles.append([m.x, m.y, m.z, m.t, m.team])
 	var snap := {"t": sim.time, "tl": sim.time_left, "cd": sim.countdown, "pl": players, "g": grid_ch, "ev": ev_buf, "pj": projs, "sh": shells, "hp": helpers, "ms": missiles,
-		"obj": ser(sim.obj), "rv": sim.reveal}
+		"obj": ser(sim.obj) if not sim.loot else ser(loot_obj(sim)), "rv": sim.reveal}
+	if sim.loot: snap.lp = loot_players(sim); snap.cdl = loot_conts(sim)
 	rpc("recv_snapshot", snap)
 	ev_buf = []; dirty_buf = PackedInt32Array()
+
+# ---------------- 搜刮撤离：容器只发变化的，背包 / 安全箱 / 搜索进度单独发 ----------------
+var cont_sig := {}
+func loot_obj(sim: Sim) -> Dictionary:
+	var o := {}
+	for k in sim.obj:
+		if k != "conts" and k != "cont_map": o[k] = sim.obj[k]
+	return o
+func loot_players(sim: Sim) -> Array:
+	var out: Array = []
+	for p in sim.players: out.append([p.id, p.open_c, p.srch, p.inv, p.safe, p.kit])
+	return out
+func loot_conts(sim: Sim) -> Array:
+	var out: Array = []
+	for c in sim.obj.conts:
+		var sig := "%d|%d|%d" % [c.items.size(), int(c.rev), hash(c.items)]
+		if cont_sig.get(c.id, "") != sig:
+			cont_sig[c.id] = sig
+			out.append([c.id, c.type, c.x, c.y, c.z, c.tier, c.items, c.rev])
+	return out
+
+signal loot_cmd_in(peer: int, op: String, args: Array)
+func send_loot(op: String, args: Array) -> void:
+	if role == "client": rpc_id(1, "loot_cmd", op, args)
+@rpc("any_peer", "reliable")
+func loot_cmd(op: String, args: Array) -> void:
+	if role == "host": loot_cmd_in.emit(multiplayer.get_remote_sender_id(), op, args)
 
 @rpc("authority", "unreliable_ordered")
 func recv_snapshot(s: Dictionary) -> void:
@@ -199,5 +227,17 @@ static func apply_snapshot(sim: Sim, s: Dictionary) -> void:
 	sim.shells = s.sh.map(func(r): return {"x0": r[0], "y0": r[1], "z0": r[2], "x1": r[3], "y1": r[4], "z1": r[5], "T": r[6], "t": r[7], "team": r[8]})
 	sim.helpers = s.hp.map(func(r): return {"id": r[0], "kind": r[1], "x": r[2], "y": r[3], "z": r[4], "team": r[5], "r": r[6], "ang": r[7], "fall": r[8], "t": r[9], "owner": null, "gift": false})
 	sim.missiles = s.ms.map(func(r): return {"x": r[0], "y": r[1], "z": r[2], "t": r[3], "team": r[4]})
-	sim.obj = deser(s.obj, sim)
+	if sim.loot:   # 容器列表留在本地，只更新变化的
+		var conts: Array = sim.obj.conts; var cmap: Dictionary = sim.obj.cont_map
+		sim.obj = deser(s.obj, sim); sim.obj.conts = conts; sim.obj.cont_map = cmap
+		for r in s.get("cdl", []):
+			var c = cmap.get(int(r[0]))
+			if c == null:
+				c = {"id": int(r[0])}; conts.append(c); cmap[c.id] = c
+			c.type = r[1]; c.x = r[2]; c.y = r[3]; c.z = r[4]; c.tier = r[5]; c.items = r[6]; c.rev = r[7]
+		for r in s.get("lp", []):
+			var p = by_id.get(int(r[0]))
+			if p == null: continue
+			p.open_c = int(r[1]); p.srch = float(r[2]); p.inv = r[3]; p.safe = r[4]; p.kit = int(r[5])
+	else: sim.obj = deser(s.obj, sim)
 	sim.reveal = s.rv

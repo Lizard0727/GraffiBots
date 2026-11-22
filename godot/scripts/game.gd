@@ -114,6 +114,7 @@ func _ready() -> void:
 	net.snapshot.connect(func(sn): net_snap = sn)
 	net.match_ended.connect(_on_net_end)
 	net.status.connect(func(t): if lobby != null: lobby.toast(t))
+	net.loot_cmd_in.connect(func(peer, op, args): host_loot(player_by_id(int(peer_ids.get(peer, -1))), op, args))
 	net.chat.connect(func(pid, text, ch): if sim != null and state == "play": var q := player_by_id(pid); chat_add(q, text, ch, true); if q != null and botchat != null: botchat.react(q, text, ch, 0))
 	net.room_changed.connect(func(): if lobby != null and lobby.sub == "lan" and state == "menu": lobby.refresh())
 	settings = Settings.new()
@@ -602,6 +603,7 @@ func start_match(pilot: String, mech: String) -> void:
 			var rp: Dictionary = remote[i - 1]
 			var q := sim.add_player(i + 1, str(rp.name), lay[i], str(rp.pilot), str(rp.weapon), false, rp.get("power", {}))
 			peer_ids[int(rp.peer)] = q.id
+			if is_loot: q.safe = {"w": 2, "h": 2, "items": []}
 			continue
 		var pp: Array = prep.get("players", [])
 		if i < pp.size():   # 匹配 / 选人阶段已经定好的对手和队友
@@ -632,8 +634,9 @@ func start_match(pilot: String, mech: String) -> void:
 	begin_view()
 	if net.role == "host":
 		var roster: Array = []
+		net.cont_sig.clear()
 		for q in sim.players:
-			if not q.npc: roster.append([q.id, q.name, q.team, q.pilot, q.weapon, {"lv": q.lv, "bt": q.bt, "tal": q.tal.keys()}, q.bot])
+			if not q.npc or sim.loot: roster.append([q.id, q.name, q.team, q.pilot, q.weapon, {"lv": q.lv, "bt": q.bt, "tal": q.tal.keys()}, q.bot, q.npc, q.loot_boss, q.max_hp])
 		net.broadcast_start({"mode": sel_mode, "map": midx, "seed": match_seed, "dur": dur, "roster": roster, "peers": peer_ids})
 
 # 对局画面初始化（单机 / 房主 / 客户端共用）
@@ -1446,9 +1449,27 @@ func near_cont():
 	return best
 
 func loot_interact() -> void:
-	if me.open_c != 0: me.open_c = 0; loot_ui_t = 0; return
+	if me.open_c != 0: me.open_c = 0; loot_ui_t = 0; net.send_loot("open", [0]); return
 	var c = near_cont()
-	if c != null: me.open_c = c.id; me.srch = 0; sfx.play("click"); loot_ui_t = 0
+	if c != null: me.open_c = c.id; me.srch = 0; sfx.play("click"); loot_ui_t = 0; net.send_loot("open", [c.id])
+
+# 局域网：客户端的搜刮操作发给房主执行（房主的模拟才是准的），本地先不改
+func loot_do(op: String, args: Array) -> bool:
+	if net.role == "client": net.send_loot(op, args); return true
+	return host_loot(me, op, args)
+
+func host_loot(p: Sim.Mech, op: String, args: Array) -> bool:
+	if p == null or sim == null or not sim.loot: return false
+	match op:
+		"open":
+			var cid := int(args[0])
+			if cid == 0: p.open_c = 0
+			elif sim.obj.cont_map.has(cid) and sim.can_reach(p, sim.obj.cont_map[cid]): p.open_c = cid; p.srch = 0
+			return true
+		"take": return sim.loot_take(p, int(args[0]), int(args[1]), bool(args[2]))
+		"drop": sim.loot_drop(p, int(args[0]), bool(args[1])); return true
+		"move": return sim.loot_move(p, int(args[0]), bool(args[1]))
+	return false
 
 func rare_col(k: String) -> Color:
 	var r := int(data.loot.items[k].r)
@@ -1477,9 +1498,9 @@ func update_loot_ui(delta: float) -> void:
 			if i < int(c.rev):
 				var nl := UIKit.label("%s  %dx%d  %d" % [it.name, int(it.w), int(it.h), int(it.v)], 15, rare_col(k), 3); nl.custom_minimum_size.x = 210; row.add_child(nl)
 				var tb := UIKit.flat_button("拿", 14); tb.custom_minimum_size = Vector2(48, 30); row.add_child(tb)
-				tb.pressed.connect(func(): if sim.loot_take(me, c.id, i): sfx.play("pickup"); loot_ui_t = 0)
+				tb.pressed.connect(func(): if loot_do("take", [c.id, i, false]): sfx.play("pickup"); loot_ui_t = 0)
 				var sb := UIKit.flat_button("安全箱", 13); sb.custom_minimum_size = Vector2(70, 30); row.add_child(sb)
-				sb.pressed.connect(func(): if sim.loot_take(me, c.id, i, true): sfx.play("pickup"); loot_ui_t = 0)
+				sb.pressed.connect(func(): if loot_do("take", [c.id, i, true]): sfx.play("pickup"); loot_ui_t = 0)
 			elif i == int(c.rev):
 				row.add_child(UIKit.label("搜索中……", 15, Color("#c9c5e6"))); row.add_child(UIKit.bar(me.srch / max(0.01, sim.search_need(c, me)), 140, 10, Color("#ffe14d")))
 			else: row.add_child(UIKit.label("？？？", 15, Color("#6a668a")))
@@ -1516,8 +1537,8 @@ class BagGrid extends Control:
 		for i in inv.items.size():
 			var it: Dictionary = inv.items[i]
 			if cx >= int(it.x) and cx < int(it.x) + int(it.w) and cy >= int(it.y) and cy < int(it.y) + int(it.h):
-				if ev.button_index == MOUSE_BUTTON_RIGHT: game.sim.loot_move(game.me, i, not is_safe)
-				else: game.sim.loot_drop(game.me, i, is_safe)
+				if ev.button_index == MOUSE_BUTTON_RIGHT: game.loot_do("move", [i, not is_safe])
+				else: game.loot_do("drop", [i, is_safe])
 				game.sfx.play("click"); game.loot_ui_t = 0
 				accept_event(); return
 
@@ -1528,9 +1549,11 @@ func _on_net_start(info: Dictionary) -> void:
 	sel_mode = str(info.mode); loot_risk = "normal"; ranked_on = false
 	var midx := int(info.map)
 	if midx != cur_map: build_map(midx)
-	sim = Sim.new(data, midx, int(info.seed), float(info.dur), sel_mode)
+	sim = Sim.new(data, 0 if sel_mode == "loot" else midx, int(info.seed), float(info.dur), sel_mode)
 	var my_id := int(info.peers.get(net.my_peer(), info.peers.get(str(net.my_peer()), 1)))
-	for r in info.roster: sim.add_player(int(r[0]), str(r[1]), int(r[2]), str(r[3]), str(r[4]), bool(r[6]), r[5])
+	for r in info.roster:
+		var q := sim.add_player(int(r[0]), str(r[1]), int(r[2]), str(r[3]), str(r[4]), bool(r[6]), r[5])
+		if r.size() > 7: q.npc = bool(r[7]); q.loot_boss = bool(r[8]); q.max_hp = float(r[9])
 	me = player_by_id(my_id)
 	if me == null: me = sim.players[0]
 	spectate_id = 0; net_snap = null
@@ -1565,10 +1588,23 @@ func lan_test_tick(delta: float) -> void:
 	var who := OS.get_environment("GB_LAN")
 	if who == "host" and state == "menu" and net.room.players.size() >= 2 and lan_t > 2.0:
 		print("房主：房间里 %d 人，开打" % net.room.players.size())
-		sel_mode = "turf"; sel_map = 0; start_match(profile.o.pilot, profile.o.weapon)
+		sel_mode = OS.get_environment("GB_MODE") if OS.get_environment("GB_MODE") != "" else "turf"; sel_map = 0; start_match(profile.o.pilot, profile.o.weapon)
 	if int(lan_t * 2) != int((lan_t - delta) * 2) and int(lan_t) % 3 == 0:
 		print("%s t=%.0f state=%s players=%d snaps=%d me=%s time=%.1f" % [who, lan_t, state, sim.players.size() if sim != null else 0, lan_snaps, str(me.id) if me != null else "-", sim.time if sim != null else 0.0])
+	if sim != null and sim.loot and state == "play" and sim.countdown <= 0:   # 搜刮撤离联机测试
+		if who == "host" and not sim.has_meta("lt"):   # 把客户端的人挪到一个容器旁边，并且搜完
+			for peer in peer_ids:
+				var q := player_by_id(int(peer_ids[peer]))
+				var c: Dictionary = sim.obj.conts.filter(func(k): return k.items.size() > 0)[0]
+				q.x = c.x + 10; q.y = c.y; q.z = c.z; c.rev = c.items.size(); sim.set_meta("lt", c.id); print("房主：把 %d 号挪到容器 %d 旁边" % [q.id, c.id])
+		if who != "host" and lan_t > 9.0 and not sim.has_meta("lt"):
+			var best = null; var bd := 1e9
+			for c in sim.obj.conts:
+				var d := Vector2(c.x - me.x, c.y - me.y).length()
+				if d < bd and c.items.size() > 0: bd = d; best = c
+			if best != null and bd < 60: sim.set_meta("lt", best.id); loot_do("take", [best.id, 0, false]); print("客户端：拿容器 %d 的第一件（距离 %.0f，容器里 %d 件）" % [best.id, bd, best.items.size()])
 	if lan_t > float(OS.get_environment("GB_QUIT_AT") if OS.get_environment("GB_QUIT_AT") != "" else "20"):
+		if me != null and sim != null and sim.loot: print("%s 搜刮：背包 %d 件  容器 %d 个  模式 %s" % [who, me.inv.items.size(), sim.obj.conts.size(), sim.mode])
 		if me != null and sim != null: print("%s 结束：me=%d (%d,%d) alive=%s painted=%d" % [who, me.id, me.x, me.y, me.alive, me.painted])
 		get_tree().quit()
 
