@@ -120,6 +120,15 @@ func _process(delta: float) -> void:
 		"observe": tick_observe()
 	if stage_turn != null and is_instance_valid(stage_turn): stage_turn.rotation.y += delta * 0.6
 
+func _input(ev: InputEvent) -> void:   # 手柄 A：准备 / 锁定；B：取消匹配
+	if not visible or not (ev is InputEventJoypadButton) or not ev.pressed: return
+	if ev.button_index == JOY_BUTTON_A:
+		if phase == "ready" and not players[0].ready: players[0].ready = true; game.sfx.play("lock"); dyn.btn.get_child(0).text = "已准备"; dyn.btn.dim = true
+		elif phase == "draft" and not dr.done and dr.turns[dr.cur].who.me and dr.turns[dr.cur].t == "pick":
+			var a2 := dr_avail(true)
+			if dr.sel.pilot in a2.ps and dr.sel.mech in a2.ms: dr_commit(dr.turns[dr.cur], {"pilot": dr.sel.pilot, "mech": dr.sel.mech})
+	elif ev.button_index == JOY_BUTTON_B and phase == "search": cancel("已取消匹配")
+
 func tick_search() -> void:
 	dyn.timer.text = "%02d:%02d" % [int(t) / 60, int(t) % 60]
 	var n := lay.size()

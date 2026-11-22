@@ -302,6 +302,7 @@ func pilot_detail(id: String) -> void:
 	info.add_child(L("%s「%s」" % [Pd.name, Pd.code], 30, acc.lightened(0.3), 6))
 	var rh := hbox(6); info.add_child(rh)
 	rh.add_child(UIKit.chip(str(Pd.title), Color("#ffd23f"))); rh.add_child(UIKit.chip(role_name(id), acc.lightened(0.2)))
+	info.add_child(counter_row(id, true, iw))
 	var hx := UIKit.HexChart.new(); hx.vals = D.hex.pilot[id]; hx.axes = D.hex.axes.pilot; hx.grades = D.hex.grades; hx.col = acc.lightened(0.2); hx.font = game.font
 	hx.custom_minimum_size = Vector2(iw, 190); info.add_child(hx)
 	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; sc.custom_minimum_size = Vector2(iw, vs.y - 610); info.add_child(sc)
@@ -361,6 +362,7 @@ func page_mechs() -> void:
 	var h := hbox(8); panel.add_child(h)
 	var v := vbox(5); v.custom_minimum_size = Vector2(300, 0); h.add_child(v)
 	v.add_child(L(str(w.name), 28, Color("#ffe14d"), 6)); v.add_child(UIKit.chip(role_name(id), Color("#7af0ff")))
+	v.add_child(counter_row(id, false, 290))
 	v.add_child(UIKit.wrap(L(str(w.desc), 13, Color("#e6e2fa")), 290))
 	var sh := hbox(6); v.add_child(sh); sh.add_child(UIKit.icon("super", 26)); sh.add_child(UIKit.wrap(L("大招 • %s：%s" % [w.specialInfo.name, w.specialInfo.desc], 13, Color("#fff3a8")), 260))
 	if w.trait != null:
@@ -695,7 +697,7 @@ func help_popup() -> void:
 	var K: Dictionary = game.settings.keys
 	var kn := func(a): return Settings.key_name(K[a])
 	for line in ["%s%s%s%s 移动 • 鼠标瞄准 • 左键攻击" % [kn.call("up"), kn.call("left"), kn.call("down"), kn.call("right")], "%s 技能 • %s / 右键 大招 • %s 超载" % [kn.call("skill"), kn.call("super"), kn.call("overload")],
-			"%s 滚轮形态（在己方涂料上更快） • %s 跳 • Esc 回大厅 • F11 全屏" % [kn.call("wheel"), kn.call("jump")], "按键可以在「设置 → 按键」里改"]:
+			"%s 滚轮形态（在己方涂料上更快） • %s 跳 • Esc 暂停 • F11 全屏" % [kn.call("wheel"), kn.call("jump")], "手柄：左摇杆移动 • 右摇杆瞄准 • RT 开火 • A 跳 • B 滚轮 • X 技能 • Y 大招 • LB 超载 • Start 暂停", "按键可以在「设置 → 按键」里改"]:
 		v.add_child(centered(UIKit.wrap(L(line, 16, Color("#e6e2fa")), 580)))
 	var ok := UIKit.gold_button("知道了", 22); ok.custom_minimum_size = Vector2(180, 54); ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; v.add_child(ok); click(ok, func(): close_popup())
 
@@ -731,6 +733,7 @@ func confirm_reset() -> void:
 
 # ================= 阶段 5 页面：通行证 / 邮件 / 活动 / 皮肤商店 / 排位 / 任务线 =================
 var quest_tab := "daily"
+var loot_tab := "stash"
 var ev_tab := ""
 var shop_kind := "pilot"
 var mail_sel := ""
@@ -1145,29 +1148,65 @@ func page_loot() -> void:
 	var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL; sp.mouse_filter = Control.MOUSE_FILTER_IGNORE; v.add_child(sp)
 	var go := UIKit.gold_button("进入禁区", 30); go.custom_minimum_size = Vector2(0, 70); v.add_child(go)
 	click(go, func(): game.sfx.play("go"); game.queue_match("loot"))
-	# 仓库
+	# 右边：仓库 / 交易行 / 本周排行
 	var rx := 24 + lw + 16; var rw := vs.x - rx - 24
-	var top := hbox(10); at(top, Vector2(rx, 152))
-	top.add_child(L("仓库 • 总价值 %d" % P.stash_value(), 20, Color("#ffe14d"), 4))
-	top.add_child(claim_btn("一键卖出（稀有及以下）", func(): show_items(P.sell_all(), "卖出物资"), not P.o.stash.is_empty()))
-	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; at(sc, Vector2(rx, 200), Vector2(rw, vs.y - 216))
+	tabs(Vector2(rx, 152), [["stash", "仓库"], ["market", "交易行"], ["board", "本周排行"]], loot_tab, func(k): loot_tab = k)
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; at(sc, Vector2(rx, 248), Vector2(rw, vs.y - 264))
 	var lst := vbox(6); sc.add_child(lst)
-	if P.o.stash.is_empty(): lst.add_child(L("仓库是空的。去禁区里搜点好东西带出来吧！", 15, Color("#a8a4c8")))
-	var keys: Array = P.o.stash.keys()
-	keys.sort_custom(func(x, y): return int(LT.items[x].v) > int(LT.items[y].v))
-	for k in keys:
-		var it: Dictionary = LT.items[k]; var rc := Color(str(LT.rare[int(it.r)].c))
-		var c3 := UIKit.card(rc.darkened(0.6), Color("#120f26"), rc.darkened(0.2), 12); c3.custom_minimum_size = Vector2(rw - 20, 0)
-		var h3 := hbox(10); c3.add_child(h3)
-		var nl := L("%s x%d" % [it.name, int(P.o.stash[k])], 16, rc, 3); nl.custom_minimum_size.x = 220; h3.add_child(nl)
-		h3.add_child(L("%s • %dx%d • 价值 %d" % [LT.rare[int(it.r)].name, int(it.w), int(it.h), int(it.v)], 13, Color("#c9c5e6")))
-		var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; spc.mouse_filter = Control.MOUSE_FILTER_IGNORE; h3.add_child(spc)
-		if it.has("ex"):
-			var exs := ""
-			for ck in it.ex: exs += "%s %d " % [P.cur_name(ck), int(it.ex[ck])]
-			h3.add_child(claim_btn("兑换 " + exs, func(): show_items(P.ex_loot(k), "兑换"), true))
-		h3.add_child(claim_btn("卖 %d" % (int(it.v) / 10), func(): act(P.sell_loot(k), "卖出了"), true))
-		lst.add_child(c3)
+	var top := hbox(10); at(top, Vector2(rx, 200))
+	match loot_tab:
+		"stash":
+			top.add_child(L("仓库 • 总价值 %d" % P.stash_value(), 20, Color("#ffe14d"), 4))
+			top.add_child(claim_btn("一键卖出（稀有及以下）", func(): show_items(P.sell_all(), "卖出物资"), not P.o.stash.is_empty()))
+			if P.o.stash.is_empty(): lst.add_child(L("仓库是空的。去禁区里搜点好东西带出来吧！", 15, Color("#a8a4c8")))
+			var keys: Array = P.o.stash.keys()
+			keys.sort_custom(func(x, y): return int(LT.items[x].v) > int(LT.items[y].v))
+			for k in keys:
+				var it: Dictionary = LT.items[k]; var rc := Color(str(LT.rare[int(it.r)].c))
+				var c3 := UIKit.card(rc.darkened(0.6), Color("#120f26"), rc.darkened(0.2), 12); c3.custom_minimum_size = Vector2(rw - 20, 0)
+				var h3 := hbox(10); c3.add_child(h3)
+				var nl := L("%s x%d" % [it.name, int(P.o.stash[k])], 16, rc, 3); nl.custom_minimum_size.x = 220; h3.add_child(nl)
+				h3.add_child(L("%s • %dx%d • 价值 %d" % [LT.rare[int(it.r)].name, int(it.w), int(it.h), int(it.v)], 13, Color("#c9c5e6")))
+				var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; spc.mouse_filter = Control.MOUSE_FILTER_IGNORE; h3.add_child(spc)
+				if it.has("ex"):
+					var exs := ""
+					for ck in it.ex: exs += "%s %d " % [P.cur_name(ck), int(it.ex[ck])]
+					h3.add_child(claim_btn("兑换 " + exs, func(): show_items(P.ex_loot(k), "兑换"), true))
+				h3.add_child(claim_btn("回收 %d" % (int(it.v) / 10), func(): act(P.sell_loot(k), "卖出了"), true))
+				lst.add_child(c3)
+		"market":
+			var q0 := P.market_price(LT.items.keys()[0])
+			var left_s: int = max(0, int(q0.next) - int(Time.get_unix_time_from_system()))
+			top.add_child(L("交易行 • 价格每小时浮动，所有玩家看到的一样", 18, Color("#ffe14d"), 4))
+			top.add_child(L("%d 分钟后换价" % (left_s / 60 + 1), 14, Color("#7af0ff")))
+			var keys2: Array = LT.items.keys()
+			keys2.sort_custom(func(x, y): return int(LT.items[x].r) > int(LT.items[y].r) or (int(LT.items[x].r) == int(LT.items[y].r) and int(LT.items[x].v) > int(LT.items[y].v)))
+			for k in keys2:
+				var it: Dictionary = LT.items[k]; var rc := Color(str(LT.rare[int(it.r)].c)); var q := P.market_price(k)
+				var c4 := UIKit.card(rc.darkened(0.65), Color("#120f26"), rc.darkened(0.25), 12); c4.custom_minimum_size = Vector2(rw - 20, 0)
+				var h4 := hbox(10); c4.add_child(h4)
+				var nl2 := L(str(it.name), 16, rc, 3); nl2.custom_minimum_size.x = 170; h4.add_child(nl2)
+				var tr: float = float(q.trend)
+				var tl := L(("涨 %+d%%" if tr >= 0 else "跌 %d%%") % int(round(tr * 100)), 13, Color("#6dff8a") if tr >= 0 else Color("#ff6b5a")); tl.custom_minimum_size.x = 70; h4.add_child(tl)
+				var pl := L("卖 %d" % int(q.sell) + ("   买 %d" % int(q.buy) if int(q.buy) > 0 else "   不出售"), 14, Color("#ffd23f")); pl.custom_minimum_size.x = 150; h4.add_child(pl)
+				h4.add_child(L("持有 %d" % int(P.o.stash.get(k, 0)), 13, Color("#c9c5e6")))
+				var spc2 := Control.new(); spc2.size_flags_horizontal = Control.SIZE_EXPAND_FILL; spc2.mouse_filter = Control.MOUSE_FILTER_IGNORE; h4.add_child(spc2)
+				h4.add_child(claim_btn("卖出", func(): act(P.mkt_sell(k), "卖出了 " + str(it.name)), int(P.o.stash.get(k, 0)) > 0))
+				if int(q.buy) > 0: h4.add_child(claim_btn("买入", func(): act(P.mkt_buy(k), "买入了 " + str(it.name)), int(P.o.coins) >= int(q.buy)))
+				lst.add_child(c4)
+		"board":
+			top.add_child(L("本周撤离价值排行（每周一换榜）", 18, Color("#ffe14d"), 4))
+			var rows := P.loot_board()
+			for i in rows.size():
+				var r: Dictionary = rows[i]
+				var me: bool = r.get("me", false)
+				var cl: Color = [Color("#ffd23f"), Color("#cfd8e2"), Color("#e09a5a")][i] if i < 3 else Color("#7a70d0")
+				var c5 := UIKit.card(Color("#5a2a8a") if me else cl.darkened(0.7), Color("#120f26"), Color("#ff9ad6") if me else cl.darkened(0.2), 12); c5.custom_minimum_size = Vector2(rw - 20, 0)
+				var h5 := hbox(14); c5.add_child(h5)
+				var rk := L("#%d" % (i + 1), 20, cl, 3); rk.custom_minimum_size.x = 60; h5.add_child(rk)
+				var nm := L(str(r.name), 17, Color("#ffe14d") if me else Color.WHITE); nm.custom_minimum_size.x = 260; h5.add_child(nm)
+				h5.add_child(L("单次撤离 %d" % int(r.v), 16, Color("#ffd23f")))
+				lst.add_child(c5)
 
 
 # ---------------- 局域网联机 ----------------
@@ -1551,3 +1590,20 @@ func refresh_keep() -> void:   # 刷新页面（弹窗不在 root 里，会留�
 
 func cc(c: Control) -> Control:
 	c.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; return c
+
+# 2.2 克制关系：克制谁（绿）/ 被谁克制（红），鼠标停在头像上看原因
+func counter_row(id: String, is_pilot: bool, w: float) -> Control:
+	var C: Dictionary = D.counters.get(id, {"beats": [], "weak": []})
+	var h := hbox(4)
+	for part in [["克制", C.beats, Color("#6dff8a")], ["怕", C.weak, Color("#ff6b5a")]]:
+		if (part[1] as Array).is_empty(): continue
+		h.add_child(L(part[0], 13, part[2]))
+		for m in (part[1] as Array).slice(0, 3):
+			var c := UIKit.card(part[2].darkened(0.6), Color("#120e26"), part[2], 8); c.pad = Vector4(2, 1, 4, 1); c.shadow = 0; c.tooltip_text = str(m.why); c.mouse_filter = Control.MOUSE_FILTER_STOP
+			var ch := hbox(2); c.add_child(ch)
+			if is_pilot: ch.add_child(UIKit.image("res://art/faces/%s.png" % m.id, Vector2(22, 22), true)); ch.add_child(L(str(D.pilots[m.id].name), 11, Color.WHITE))
+			else: ch.add_child(game.thumbs.rect(str(m.id), 22)); ch.add_child(L(str(D.mechs[m.id].short if D.mechs[m.id].has("short") else D.mechs[m.id].name), 11, Color.WHITE))
+			h.add_child(c)
+		h.add_child(L(" ", 8))
+	if h.get_child_count() == 0: h.add_child(L("没有特别的克制关系", 12, Color("#8f8ab8")))
+	return h

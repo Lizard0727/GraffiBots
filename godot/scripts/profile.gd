@@ -28,7 +28,7 @@ func new_profile() -> Dictionary:
 		"pass": {"xp": 0, "prem": false, "dlx": false, "cf": [], "cp": [], "bc": 0}, "mailGot": [], "mailDel": [],
 		"story": {"p": [0, 0, 0, 0, 0], "c": []}, "tl": {}, "ev": {}, "evLogin": {}, "rank": {"rp": 0, "best": 0, "road": [], "n": 0, "s": int(E.rank.season.id)},
 		"skins": [], "wear": {"pilot": {}, "mech": "", "fx": "", "frame": "", "avatar": ""}, "ranked": false,
-		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0}, "gear": {}, "gearOn": [], "safeLv": 1, "risk": "normal",
+		"stash": {}, "lootRec": {"runs": 0, "ex": 0, "best": 0, "total": 0, "gold": 0, "wk": 0, "wbest": 0}, "gear": {}, "gearOn": [], "safeLv": 1, "risk": "normal",
 		"face": "", "nick": "", "show": [], "showBg": "", "title": "", "sign": "", "mvps": 0, "deaths": 0, "badges": [0, 0, 0, 0, 0], "seenSeason": 0, "tutDone": false}
 	for k in E.start: p[k] = int(E.start[k])
 	for k in E.startExtra: p[k] = int(E.startExtra[k])
@@ -643,6 +643,8 @@ func apply_match(rw: Dictionary) -> Dictionary:
 		var lost: Array = []
 		if rw.lootex:
 			R2.ex = int(R2.ex) + 1; R2.total = int(R2.total) + int(rw.lootv); R2.best = max(int(R2.best), int(rw.lootv))
+			if int(R2.get("wk", 0)) != week_index(): R2.wk = week_index(); R2.wbest = 0
+			R2.wbest = max(int(R2.wbest), int(rw.lootv)); R2.gold = int(R2.get("gold", 0)) + int(rw.get("lootgold", 0))
 			if int(rw.get("paid", 0)) > 0: o.coins = max(0, int(o.coins) - int(rw.paid))
 		elif rw.get("risk", "normal") == "high":
 			for gk in o.gearOn.duplicate():
@@ -817,3 +819,49 @@ func set_show(i: int, item: Dictionary) -> void:
 func display_name() -> String:
 	if str(o.get("nick", "")) != "": return str(o.nick)
 	return str(o.name) if str(o.name) != "" else "游客"
+
+# ================= 交易行（价格每小时浮动，和网页版 economy.js 同一个公式）+ 本周撤离排行 =================
+static func khash(k: String) -> int:
+	var h := 7
+	for i in k.length(): h = (h * 31 + k.unicode_at(i)) % 100003
+	return h
+static func market_mult(k: String, hour: int) -> float:
+	var h := float(khash(k))
+	return clampf(1.0 + 0.28 * sin(hour * 0.37 + h) + 0.1 * sin(hour * 1.73 + h * 0.5) + 0.05 * sin(hour * 4.1 + h * 1.3), 0.6, 1.45)
+func market_price(k: String) -> Dictionary:
+	var I: Dictionary = D.loot.items.get(k, {})
+	if I.is_empty(): return {}
+	var hour := int(floor(Time.get_unix_time_from_system() / 3600.0))
+	var m := market_mult(k, hour); var m0 := market_mult(k, hour - 1)
+	var sell: int = max(1, int(round(float(I.v) / 10.0 * m)))
+	return {"sell": sell, "buy": 0 if I.has("ex") else max(2, int(round(sell * 1.2))), "mult": m, "trend": m - m0, "next": (hour + 1) * 3600}
+func mkt_sell(k: String, n := 1) -> Dictionary:
+	var q := market_price(k)
+	if q.is_empty(): return no("没有这种物资")
+	if int(o.stash.get(k, 0)) < n: return no("仓库里没有这么多")
+	o.stash[k] = int(o.stash[k]) - n
+	if o.stash[k] <= 0: o.stash.erase(k)
+	var it := {"k": "coins", "n": int(q.sell) * n}
+	o.coins += it.n
+	return ok([it])
+func mkt_buy(k: String, n := 1) -> Dictionary:
+	var q := market_price(k)
+	if q.is_empty(): return no("没有这种物资")
+	if int(q.buy) <= 0: return no("这件物资不在交易行出售")
+	if int(o.coins) < int(q.buy) * n: return no("金币不够（需要 %d）" % (int(q.buy) * n))
+	o.coins -= int(q.buy) * n; o.stash[k] = int(o.stash.get(k, 0)) + n
+	save()
+	return {"ok": true, "items": []}
+const BOARD_NAMES := ["今晚吃涂料", "xXSniperXx", "摸鱼专业户", "Kiwi", "喷漆小王子", "ZeroLag", "奶茶三分糖", "Tofu", "涂鸦大王", "ghost404", "老六", "paintgod", "夜猫子", "Blitz", "熬夜冠军", "momo233", "稳住别浪", "Nova", "一只咸鱼", "Ace"]
+func loot_board() -> Array:
+	var wk := week_index()
+	var st: int = (wk * 2654435761) & 0xFFFFFFFF
+	var rows: Array = []
+	for n in BOARD_NAMES:
+		st = (st * 1664525 + 1013904223) & 0xFFFFFFFF
+		var r := float(st) / 4294967296.0
+		rows.append({"name": n, "v": int(round((3000 + pow(r, 2.2) * 42000) / 10.0)) * 10})
+	var mine: int = int(o.lootRec.get("wbest", 0)) if int(o.lootRec.get("wk", -1)) == wk else 0
+	rows.append({"name": display_name(), "v": mine, "me": true})
+	rows.sort_custom(func(a, b): return int(a.v) > int(b.v))
+	return rows

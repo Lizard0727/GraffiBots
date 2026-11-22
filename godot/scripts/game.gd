@@ -146,6 +146,8 @@ func _ready() -> void:
 			for K in data.econ.skins: if not profile.o.skins.has(K.id) and randf() < 0.6: profile.o.skins.append(K.id)
 			profile.o.wear.frame = "fr_flame"; profile.o.matches = 137; profile.o.wins = 80; profile.o.kills = 512; profile.o.mvps = 23; profile.o.badges = [12, 30, 41, 25, 23]
 			profile.o.show = [{"k": "pilot", "id": "blaze"}, {"k": "mech", "id": "roller"}, {}]; profile.o.sign = "涂满整座城市！"; profile.o.showBg = "flame"
+			profile.o.stash = {"can": 3, "battery": 2, "scrap": 9}
+			if OS.get_environment("GB_LOOTTAB") != "": lobby.loot_tab = OS.get_environment("GB_LOOTTAB")
 		lobby.refresh()
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
@@ -1240,6 +1242,7 @@ func read_input() -> void:
 		inp.w = wheel_hold
 		inp.j = t_btn.has("jump")
 		return
+	if pad_tick(inp): return
 	var mx := 0.0; var my := 0.0
 	if settings.pressed("left") or Input.is_physical_key_pressed(KEY_LEFT): mx -= 1
 	if settings.pressed("right") or Input.is_physical_key_pressed(KEY_RIGHT): mx += 1
@@ -1258,6 +1261,7 @@ func read_input() -> void:
 	inp.j = settings.pressed("jump")
 
 func _unhandled_input(ev: InputEvent) -> void:
+	if ev is InputEventJoypadButton and ev.pressed: pad_button(ev)
 	if state != "play" or me == null: return
 	if ev is InputEventKey and ev.pressed and not ev.echo:
 		if sim.loot and settings.is_key(ev, "interact"): loot_interact()
@@ -1683,3 +1687,47 @@ func tut_end(done: bool) -> void:
 func tut_close() -> void:
 	tut = {}
 	if tut_ui != null: tut_ui.queue_free(); tut_ui = null
+
+# ================= 手柄（Xbox 布局；PS 手柄同位置）=================
+#   左摇杆移动 • 右摇杆瞄准 • RT 开火 • A 跳 • B 滚轮（按住）• X 技能 • Y 大招 • LB 超载 • 十字键下 搜索 • 十字键上 背包 • Start 暂停
+var pad_active := false
+var pad_aim := Vector2.RIGHT
+const PAD_DEAD := 0.22
+
+func pad_vec(ax: JoyAxis, ay: JoyAxis) -> Vector2:
+	var v := Vector2(Input.get_joy_axis(0, ax), Input.get_joy_axis(0, ay))
+	return Vector2.ZERO if v.length() < PAD_DEAD else v
+
+func pad_tick(inp: Dictionary) -> bool:
+	if Input.get_connected_joypads().is_empty(): return false
+	var mv := pad_vec(JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y)
+	var av := pad_vec(JOY_AXIS_RIGHT_X, JOY_AXIS_RIGHT_Y)
+	var rt := Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT)
+	var any := mv != Vector2.ZERO or av != Vector2.ZERO or rt > 0.3 or Input.is_joy_button_pressed(0, JOY_BUTTON_A) or Input.is_joy_button_pressed(0, JOY_BUTTON_B)
+	if any: pad_active = true
+	if not pad_active: return false
+	if Input.get_last_mouse_velocity().length() > 200: pad_active = false; return false   # 动了鼠标就切回键鼠
+	inp.mx = mv.x; inp.my = mv.y
+	if av != Vector2.ZERO: pad_aim = av
+	elif mv != Vector2.ZERO: pad_aim = mv
+	inp.a = atan2(pad_aim.y, pad_aim.x)
+	var rng: float = float(data.mechs[me.weapon].get("range2", 300.0))
+	inp.ad = clampf(av.length(), 0.35, 1.0) * rng if av != Vector2.ZERO else rng * 0.7
+	inp.pt = 0.0
+	inp.f = rt > 0.4
+	inp.w = Input.is_joy_button_pressed(0, JOY_BUTTON_B)
+	inp.j = Input.is_joy_button_pressed(0, JOY_BUTTON_A)
+	return true
+
+func pad_button(ev: InputEventJoypadButton) -> void:
+	pad_active = true
+	if ev.button_index == JOY_BUTTON_START:
+		if state == "play": toggle_pause()
+		return
+	if state != "play" or me == null or paused: return
+	match ev.button_index:
+		JOY_BUTTON_X: me.inp.gq += 1
+		JOY_BUTTON_Y: me.inp.qq += 1
+		JOY_BUTTON_LEFT_SHOULDER: me.inp.oq += 1
+		JOY_BUTTON_DPAD_DOWN: if sim.loot: loot_interact()
+		JOY_BUTTON_DPAD_UP: if sim.loot: bag_open = not bag_open; loot_ui_t = 0
