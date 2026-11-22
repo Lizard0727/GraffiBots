@@ -146,6 +146,20 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .pc-banner b { color: var(--ny); }
 .pc-banner:hover { filter: brightness(1.08); }
 .band.pc30 { background: linear-gradient(160deg, #2a1650, #120a26 70%); }
+/* 3.1「黎明之后」联动专区 */
+.band.dawn { background: linear-gradient(180deg, #23214f 0%, #4a2e5a 45%, #c8784e 100%); color: #fff; }
+.dawn-video { position: relative; border: 3px solid var(--ink); border-radius: 18px; overflow: hidden; box-shadow: 6px 6px 0 var(--ink); background: #000; aspect-ratio: 16 / 9; margin: 18px 0 26px; }
+.dawn-video video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.dawn-ops { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 900px) { .dawn-ops { grid-template-columns: minmax(0, 1fr); } }
+.dawn-op { background: rgba(10, 8, 26, .55); border: 3px solid var(--ink); border-radius: 18px; padding: 14px; box-shadow: 5px 5px 0 var(--ink); display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; align-items: start; }
+.dawn-op img { width: 120px; height: 156px; object-fit: cover; object-position: top; border-radius: 12px; background: rgba(255,255,255,.08); }
+.dawn-op h3 { margin: 0; font: 30px/1.1 var(--f-head); }
+.dawn-op .t { font-size: 13px; opacity: .85; margin: 2px 0 6px; }
+.dawn-op .q { font-style: italic; font-size: 14px; margin: 0 0 8px; color: #ffe7a8; }
+.dawn-op dl { margin: 0; font-size: 13px; line-height: 1.45; }
+.dawn-op dt { font-weight: 800; color: #ffe7a8; margin-top: 6px; }
+.dawn-op dd { margin: 0; opacity: .92; }
 .pc-cta { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: -10px 0 30px; }
 .pc-cta .size { opacity: .75; }
 .pc-shots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -362,6 +376,14 @@ footer a { color: var(--dust); }
     </div>
   </section>
 
+  <section class="band dawn" id="dawn">
+    <div class="wrap">
+      <header class="sec-h"><span class="sticker" id="dawnTag"></span><h2 id="dawnTitle"></h2><p id="dawnIntro"></p></header>
+      <div class="dawn-video" id="dawnVideo"></div>
+      <div class="dawn-ops" id="dawnOps"></div>
+    </div>
+  </section>
+
   <section class="band pc30" id="pc">
     <div class="wrap">
       <header class="sec-h" style="--hl: var(--np)"><span class="sticker" id="pcTag"></span><h2 id="pcTitle"></h2><p id="pcIntro"></p></header>
@@ -539,8 +561,8 @@ footer a { color: var(--dust); }
     $('poster').href = '#' + vid(D.version);
     if (D.pc) {   // 3.0：海报和下载按钮换成电脑版正式版
       const en2 = lang === 'en';
-      $('poster').innerHTML = `<span class="tag">${esc(en2 ? 'Official release' : '电脑版正式版')}</span><span class="v">PC ${esc(D.pc.ver)}</span><h2>${esc(en2 ? 'Rebuilt for PC' : '全新电脑版')}</h2><time datetime="${D.pc.date}">${esc(t('updated')(D.pc.date))}</time><span class="go">${esc(en2 ? 'See what’s new →' : '看看有什么新东西 →')}</span>`;
-      $('poster').href = '#pc';
+      $('poster').innerHTML = `<span class="tag">${esc(D.dawn ? (en2 ? 'New collab' : '全新联动') : (en2 ? 'Official release' : '电脑版正式版'))}</span><span class="v">PC ${esc(D.pc.ver)}</span><h2>${esc(D.dawn ? (en2 ? 'After Dawn collab' : '黎明之后 联动') : (en2 ? 'Rebuilt for PC' : '全新电脑版'))}</h2><time datetime="${D.pc.date}">${esc(t('updated')(D.pc.date))}</time><span class="go">${esc(en2 ? 'See what’s new →' : '看看有什么新东西 →')}</span>`;
+      $('poster').href = D.dawn ? '#dawn' : '#pc';
       $('dlBtn').textContent = en2 ? `Download PC ${D.pc.ver}` : `下载电脑版 ${D.pc.ver}`; $('dlBtn').href = '#pc';
     }
     // 3.0 电脑版正式版（置顶）
@@ -556,6 +578,17 @@ footer a { color: var(--dust); }
       $('pcCta').innerHTML = dlBtn + `<a class="btn btn-ghost btn-sm" href="${esc(PCN.release)}" target="_blank" rel="noopener">${esc(en ? 'Release page' : '发布页面')}</a><a class="btn btn-ghost btn-sm" href="#pc30">${esc(en ? 'Full announcement' : '完整公告')}</a>`;
       $('pcShots').innerHTML = PCN.shots.map((x) => `<figure class="shot"><img src="${esc(x.img)}" alt="${esc(L(x, 'cap'))}" loading="lazy" width="1280" height="720"><figcaption><b>${esc(L(x, 'cap'))}</b></figcaption></figure>`).join('');
       $('pcSecs').innerHTML = PCN.sections.map((sec) => `<section><h3>${esc(en ? sec.h_en : sec.h)}</h3><ul>${(en ? sec.items_en : sec.items).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('');
+    }
+    // 3.1「黎明之后」联动专区
+    if (D.dawn) {
+      const W = D.dawn, en = lang === 'en';
+      $('pcBanner').innerHTML = en ? `<b>NEW</b> PC ${esc(D.pc.ver)} · After Dawn collab is live — watch the battle film →` : `<b>重磅</b> 电脑版 ${esc(D.pc.ver)}「黎明之后」联动上线！看 1 分钟战斗影片 →`;
+      $('pcBanner').href = '#dawn';
+      $('dawnTag').textContent = en ? 'Collab event' : '联动活动';
+      $('dawnTitle').textContent = en ? 'After Dawn' : '黎明之后';
+      $('dawnIntro').textContent = en ? 'Three new operators from Daybreak Station, three new mechs, a hand-drawn story and the battle film below. Live now in PC ' + D.pc.ver + '.' : '拂晓站的三位干员、三台全新机甲、专属手书剧情和下面这段 1 分钟战斗影片，电脑版 ' + D.pc.ver + ' 现已上线。';
+      $('dawnVideo').innerHTML = `<video src="${esc(W.video)}" poster="${esc(W.poster)}" controls preload="none" playsinline></video>`;
+      $('dawnOps').innerHTML = W.ops.map((o) => `<article class="dawn-op" style="border-color:${esc(o.accent)}"><img src="${esc(o.img)}" alt="${esc(en ? o.en : o.name)}" loading="lazy"><div><h3 style="color:${esc(o.accent)}">${esc(en ? o.en : o.name)}</h3><p class="t">${esc(en ? o.en_title : o.title)}</p><p class="q">“${esc(en ? o.en_line : o.line)}”</p><dl><dt>${esc((en ? 'Passive · ' : '被动 · ') + (en ? o.en_passive : o.passive))}</dt><dd>${esc(en ? (o.en_pdesc || o.pdesc) : o.pdesc)}</dd><dt>${esc((en ? 'Mech · ' : '专属机甲 · ') + (en ? o.en_mech : o.mech))}</dt><dd>${esc(en ? (o.en_mdesc || o.mdesc) : o.mdesc)}</dd><dt>${esc((en ? 'Skill / Overload · ' : '技能 / 超载 · ') + (en ? o.en_skill + ' / ' + o.en_ov : o.skill + ' / ' + o.ov))}</dt></dl></div></article>`).join('');
     }
     // 最新更新
     const N = D.notes[0], secs = notesOf(N);
@@ -592,10 +625,11 @@ footer a { color: var(--dust); }
     $('dl').innerHTML = html;
     $('howSteps').innerHTML = t('how').map((s) => `<li>${esc(s)}</li>`).join('');
     // 更新日志
+    const pcOldNotes = (D.pcOld || []).map((N) => `<article class="note pcnote" id="pcv${esc(String(N.ver).replace('.', ''))}"><div class="note-head"><span class="vnum">PC ${esc(N.ver)}</span><div><h2>${esc(lang === 'en' ? N.title_en : N.title)}</h2><time datetime="${N.date}">${N.date}</time></div></div><div class="note-body"><p>${esc(lang === 'en' ? N.intro_en : N.intro)}</p>${N.sections.map((sec) => `<section><h3>${esc(lang === 'en' ? sec.h_en : sec.h)}</h3><ul>${(lang === 'en' ? sec.items_en : sec.items).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
     const pcNote = D.pc ? `<article class="note pcnote" id="pc30"><div class="note-head"><span class="vnum">PC ${esc(D.pc.ver)}</span><div><h2>${esc(lang === 'en' ? D.pc.title_en : D.pc.title)}</h2><time datetime="${D.pc.date}">${D.pc.date}</time></div><span class="sticker">${esc(t('latest'))}</span></div><div class="note-body"><p>${esc(lang === 'en' ? D.pc.intro_en : D.pc.intro)}</p>${D.pc.sections.map((sec) => `<section><h3>${esc(lang === 'en' ? sec.h_en : sec.h)}</h3><ul>${(lang === 'en' ? sec.items_en : sec.items).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>` : '';
     const pcIdx = D.pc ? `<a href="#pc30" data-v="pc30"><span class="vn">PC ${esc(D.pc.ver)}</span><span class="tt">${esc(lang === 'en' ? 'PC official release' : '电脑版正式版')}</span><time datetime="${D.pc.date}">${D.pc.date}</time></a>` : '';
     $('updIndex').innerHTML = pcIdx + D.notes.map((n) => `<a href="#${vid(n.v)}" data-v="${vid(n.v)}"><span class="vn">${esc(n.v)}</span><span class="tt">${esc(titleOf(n))}</span><time datetime="${n.date}">${n.date}</time></a>`).join('');
-    $('notes').innerHTML = pcNote + D.notes.map((n, i) => `<article class="note" id="${vid(n.v)}"><div class="note-head"><span class="vnum">${esc(n.v)}</span><div><h2>${esc(titleOf(n))}</h2><time datetime="${n.date}">${n.date}</time></div>${i === 0 ? `<span class="sticker">${esc(t('latest'))}</span>` : ''}</div><div class="note-body">${notesOf(n).map(([h, items]) => `<section><h3>${esc(h)}</h3><ul>${items.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
+    $('notes').innerHTML = pcNote + pcOldNotes + D.notes.map((n, i) => `<article class="note" id="${vid(n.v)}"><div class="note-head"><span class="vnum">${esc(n.v)}</span><div><h2>${esc(titleOf(n))}</h2><time datetime="${n.date}">${n.date}</time></div>${i === 0 ? `<span class="sticker">${esc(t('latest'))}</span>` : ''}</div><div class="note-body">${notesOf(n).map(([h, items]) => `<section><h3>${esc(h)}</h3><ul>${items.map((x) => `<li>${fmt(x)}</li>`).join('')}</ul></section>`).join('')}</div></article>`).join('');
     $('footVer').textContent = t('foot_ver')(D.version);
     document.title = lang === 'en' ? 'GraffiBots | 4v4 Paint-Mech Brawler' : '涂鸦机兵 GraffiBots｜4v4 涂料机甲对战游戏';
     route(false);

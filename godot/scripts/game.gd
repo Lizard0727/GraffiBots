@@ -37,6 +37,8 @@ var cam: Camera3D
 var env: Environment
 var sun: DirectionalLight3D
 var map_root: Node3D
+var fill_light: DirectionalLight3D
+var weather: Node3D       # 3.1：天气粒子（跟着镜头走）
 var paint_img: Image
 var paint_tex: ImageTexture
 var base_tex: ImageTexture
@@ -46,6 +48,9 @@ var base_cols := PackedColorArray()
 var turf_mat: ShaderMaterial
 var mech_nodes := {}
 var helper_nodes := {}
+var dawn_nodes := {}      # 3.1「黎明之后」联动的画面节点（dawn_fx.gd）
+var night_rect: ColorRect
+var cine: Control
 var proj_mm := [null, null, null]
 var shell_mm := [null, null, null]
 var missile_mm: MultiMesh
@@ -161,7 +166,9 @@ func _ready() -> void:
 				var SK2 = profile.skin(OS.get_environment("GB_SKIN")); profile.o.pilot = str(SK2.pilot); profile.o.wear.pilot[str(SK2.pilot)] = SK2.id
 				if not profile.o.skins.has(SK2.id): profile.o.skins.append(SK2.id)
 		lobby.refresh()
+		if OS.get_environment("GB_DAWNTAB") != "": lobby.dawn_tab = OS.get_environment("GB_DAWNTAB")
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
+		if OS.get_environment("GB_TEGAKI") != "": lobby.play_tegaki(data.dawn.story[int(OS.get_environment("GB_TEGAKI"))])
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
 		elif OS.get_environment("GB_SHOT") == "" or OS.get_environment("GB_NEWS") != "":   # 新版本第一次进大厅：更新公告；新赛季：开场动画（盖在公告上面）
@@ -176,7 +183,8 @@ func _ready() -> void:
 		if pop == "account": lobby.account_popup()
 		elif pop in ["avatar", "frame", "title", "show_style"]: lobby.call(pop + "_popup")
 		elif pop != "": lobby.account_form(pop)
-		if OS.get_environment("GB_SHOT") == "": splash(layer)
+		if OS.get_environment("GB_PV_RENDER") != "" or OS.get_environment("GB_PV") != "": play_dawn_pv()
+		elif OS.get_environment("GB_SHOT") == "": splash(layer)
 		if OS.get_environment("GB_SHOT") == "": check_update()
 	if OS.get_environment("GB_LAN") != "": lan_test_setup(); return
 	if autoplay:
@@ -226,14 +234,14 @@ func setup_world() -> void:
 	var sky := Sky.new(); var sm := ProceduralSkyMaterial.new(); sky.sky_material = sm
 	env.background_mode = Environment.BG_SKY; env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY; env.ambient_light_energy = 0.55
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES; env.tonemap_exposure = 1.0; env.tonemap_white = 2.2
-	env.glow_enabled = true; env.glow_intensity = 0.7; env.glow_bloom = 0.08; env.glow_hdr_threshold = 1.1
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC; env.tonemap_exposure = 0.92; env.tonemap_white = 3.2
+	env.glow_enabled = true; env.glow_intensity = 0.32; env.glow_bloom = 0.0; env.glow_hdr_threshold = 1.35; env.glow_strength = 0.8
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	if RenderingServer.get_rendering_device() != null:   # Forward+ / Mobile 才有 SSAO
 		env.ssao_enabled = true; env.ssao_radius = 1.6; env.ssao_intensity = 1.6
 		env.ssil_enabled = false
 	env.fog_enabled = true; env.fog_density = 0.0035; env.fog_light_energy = 0.8
-	env.adjustment_enabled = true; env.adjustment_saturation = 1.15; env.adjustment_contrast = 1.06
+	env.adjustment_enabled = true; env.adjustment_saturation = 1.02; env.adjustment_contrast = 1.04
 	var we := WorldEnvironment.new(); we.environment = env; add_child(we)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55, 32, 0)
@@ -242,7 +250,7 @@ func setup_world() -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 70
 	add_child(sun)
-	var fill := DirectionalLight3D.new(); fill.rotation_degrees = Vector3(-35, 210, 0); fill.light_energy = 0.35; fill.light_color = Color("#8fb4ff"); add_child(fill)
+	fill_light = DirectionalLight3D.new(); fill_light.rotation_degrees = Vector3(-35, 210, 0); fill_light.light_energy = 0.35; fill_light.light_color = Color("#8fb4ff"); add_child(fill_light)
 	cam = Camera3D.new(); cam.fov = 40; add_child(cam)
 	cam.position = Vector3(60, 60, 75); cam.look_at(Vector3(60, 0, 40))
 	# 子弹 / 炮弹 / 导弹（MultiMesh，一次画完）
@@ -303,72 +311,126 @@ func base_color(gw: int, i: int, pal: Array) -> Color:
 	if (cx / 4 + cy / 4) % 2 == 0: c = c.lightened(0.03)
 	return c
 
+func biome_id(idx: int) -> String:
+	return str(map_def(idx).get("biome", "city" if idx == LOOT_MAP else "plaza"))
+
+# 3.1：每张地图自己的灯光（太阳角度 / 颜色、天空、雾），泛光压低
+func apply_light(B: Dictionary) -> void:
+	var sm: ProceduralSkyMaterial = env.sky.sky_material
+	var top := Biomes.col(B.sky[0]); var hor := Biomes.col(B.sky[1])
+	sm.sky_top_color = top; sm.sky_horizon_color = hor; sm.ground_horizon_color = hor.darkened(0.1); sm.ground_bottom_color = top.darkened(0.5)
+	sm.sky_curve = 0.18; sm.sun_angle_max = 4; sm.sun_curve = 0.3
+	if B.get("dark", false):
+		env.background_mode = Environment.BG_COLOR; env.background_color = top
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color = Color("#b8c4d8")
+	else:
+		env.background_mode = Environment.BG_SKY; env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_energy = float(B.amb) * 0.62
+	env.fog_light_color = Biomes.col(B.fog[0]); env.fog_density = float(B.fog[1])
+	sun.light_color = Biomes.col(B.sun[0]); sun.light_energy = float(B.sun[1]) * 0.9
+	sun.rotation_degrees = Vector3(float(B.sun[2]), float(B.sun[3]), 0)
+	if fill_light != null: fill_light.light_color = Biomes.col(B.fill[0]); fill_light.light_energy = float(B.fill[1])
+
 func build_map(idx: int) -> void:
 	var t_build := Time.get_ticks_msec()
 	cur_map = idx
 	if map_root != null: map_root.queue_free()
 	map_root = Node3D.new(); add_child(map_root)
+	weather = null
 	var m: Dictionary = map_def(idx)
 	decode_map(m)
-	var pal := palette(idx if idx != LOOT_MAP else 7)
-	var sm: ProceduralSkyMaterial = env.sky.sky_material
-	sm.sky_top_color = pal[0]; sm.sky_horizon_color = Color(pal[1]).darkened(0.35); sm.ground_horizon_color = Color(pal[0]).lightened(0.05); sm.ground_bottom_color = Color(pal[0]).darkened(0.5)
-	sm.sky_curve = 0.25
-	env.fog_light_color = Color(pal[1]).darkened(0.55)
+	var bid := biome_id(idx); var B := Biomes.of(bid)
+	apply_light(B)
 	var gw := int(m.gw); var gh := int(m.gh)
-	# 底色 / 小地图：直接写字节，比一格一格 set_pixel 快很多（超大地图有 38 万格）
+	var T := map_top
+	# 墙的连通块：细长的墙（篱笆 / 隔板）用另一种材质；墙顶的摆设也按块放（超大地图跳过）
+	var comp := PackedInt32Array(); comp.resize(gw * gh); comp.fill(-1)
+	var comps: Array = []
+	var thin := PackedByteArray(); thin.resize(gw * gh)
+	if gw * gh < 50000:
+		for i in gw * gh:
+			if map_solid[i] != 1 or comp[i] >= 0: continue
+			var id := comps.size(); var st: Array = [i]; comp[i] = id
+			var x0 := gw; var y0 := gh; var x1 := 0; var y1 := 0; var cells: Array = []
+			while not st.is_empty():
+				var j: int = st.pop_back(); cells.append(j)
+				var jx := j % gw; var jy := j / gw
+				x0 = mini(x0, jx); x1 = maxi(x1, jx); y0 = mini(y0, jy); y1 = maxi(y1, jy)
+				for d in [1, -1, gw, -gw]:
+					var k: int = j + d
+					if k < 0 or k >= gw * gh or (d == 1 and k % gw == 0) or (d == -1 and j % gw == 0): continue
+					if map_solid[k] == 1 and comp[k] < 0: comp[k] = id; st.append(k)
+			var ww := x1 - x0 + 1; var hh := y1 - y0 + 1
+			var is_thin := mini(ww, hh) <= 2 and maxi(ww, hh) >= 5
+			if is_thin:
+				for j in cells: thin[j] = 1
+			comps.append({"x0": x0, "y0": y0, "x1": x1, "y1": y1, "n": cells.size(), "thin": is_thin})
+	# 底色（alpha 是材质编号）+ 小地图
 	base_cols.resize(gw * gh)
 	var bytes := PackedByteArray(); bytes.resize(gw * gh * 4)
+	var mbytes := PackedByteArray(); mbytes.resize(gw * gh * 4)
+	var mg := Biomes.col(B.mini)
+	var mats := [0, 85, 170, 255]
 	for i in gw * gh:
-		var c := base_color(gw, i, pal); base_cols[i] = c
-		bytes[i * 4] = c.r8; bytes[i * 4 + 1] = c.g8; bytes[i * 4 + 2] = c.b8; bytes[i * 4 + 3] = 255
+		var t := T[i]
+		var mt := 3 if map_solid[i] == 1 else (0 if t == 0 else (1 if t % 40 == 0 or t == 210 else 2))
+		var c := Biomes.cell_color(B, mt, i % gw, i / gw, map_bush[i] == 1, float(t))
+		bytes[i * 4] = c.r8; bytes[i * 4 + 1] = c.g8; bytes[i * 4 + 2] = c.b8; bytes[i * 4 + 3] = mats[mt]
+		var mc := mg
+		if mt == 3: mc = mg.lerp(Color(0.92, 0.92, 0.96), 0.55)
+		elif map_bush[i] == 1: mc = Color("#2f6a40")
+		elif mt > 0: mc = mg.lightened(0.12 if t < 60 else 0.22)
+		base_cols[i] = mc
+		mbytes[i * 4] = mc.r8; mbytes[i * 4 + 1] = mc.g8; mbytes[i * 4 + 2] = mc.b8; mbytes[i * 4 + 3] = 255
 	var base_img := Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, bytes)
-	base_img_saved = base_img
-	mini_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, bytes)
+	mini_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, mbytes)
+	base_img_saved = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, mbytes)
 	var zero := PackedByteArray(); zero.resize(gw * gh * 4)
 	paint_img = Image.create_from_data(gw, gh, false, Image.FORMAT_RGBA8, zero)
 	paint_tex = ImageTexture.create_from_image(paint_img); base_tex = ImageTexture.create_from_image(base_img); mini_tex = ImageTexture.create_from_image(mini_img)
-	# 地形网格：同一行连续同高的格子合成一块（顶面）；侧面也按行 / 列合并
+	# 地形网格：同一行连续同高的格子合成一块（顶面）；侧面也按行 / 列合并，分成「高台侧面 / 大墙 / 细墙」三种材质
 	var st_top := SurfaceTool.new(); st_top.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var st_side := SurfaceTool.new(); st_side.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var T := map_top
+	var sts := [SurfaceTool.new(), SurfaceTool.new(), SurfaceTool.new()]
+	for s2 in sts: s2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# 3.1：墙在画面上矮一点（碰撞不变），不会像一块块石碑挡住后面的人
+	var wall_h := float(B.get("wall_h", 120))
+	var TV := PackedInt32Array(T)
+	for i in gw * gh:
+		if map_solid[i] == 1: TV[i] = int(wall_h)
 	var hgt := func(cx: int, cy: int) -> float:
 		if cx < 0 or cy < 0 or cx >= gw or cy >= gh: return -0.5
-		return float(T[cy * gw + cx]) * K
-	var neon: Array = []
+		return float(TV[cy * gw + cx]) * K
+	var kind := func(cx: int, cy: int) -> int:
+		var i := cy * gw + cx
+		if map_solid[i] != 1: return 0
+		return 2 if thin[i] == 1 else 1
 	var quad := func(st: SurfaceTool, v: Array, n: Vector3, cols: Array) -> void:
 		for k in [0, 1, 2, 0, 2, 3]:
 			st.set_normal(n)
 			if cols.size() > 0: st.set_color(cols[k])
 			st.set_uv(Vector2(v[k].x / gw, v[k].z / gh)); st.add_vertex(v[k])
-	var side_col := func(h: float) -> Color:
-		return Color(pal[4]).darkened(0.35) if h < 2 else (Color(pal[4]).lightened(0.05) if h < 6 else Color(pal[4]).lightened(0.12))
+	var lo := Color(0.62, 0.62, 0.66, 0.0); var hi := Color(1, 1, 1, 1)
 	for cy in gh:
 		var x0 := 0
 		while x0 < gw:
-			var h0: float = T[cy * gw + x0]
+			var h0: float = TV[cy * gw + x0]
 			var x1 := x0 + 1
-			while x1 < gw and T[cy * gw + x1] == h0: x1 += 1
+			while x1 < gw and TV[cy * gw + x1] == h0: x1 += 1
 			var hh: float = h0 * K
 			quad.call(st_top, [Vector3(x0, hh, cy), Vector3(x1, hh, cy), Vector3(x1, hh, cy + 1), Vector3(x0, hh, cy + 1)], Vector3.UP, [])
 			x0 = x1
-	# 侧面：沿 y 方向的边（上 / 下）按行合并，沿 x 方向的边（左 / 右）按列合并
 	for dir in [Vector2i(0, 1), Vector2i(0, -1)]:
 		for cy in gh:
 			var cx := 0
 			while cx < gw:
 				var h: float = hgt.call(cx, cy); var nh: float = hgt.call(cx, cy + dir.y)
 				if nh >= h - 0.01: cx += 1; continue
+				var kd: int = kind.call(cx, cy)
 				var e := cx + 1
-				while e < gw and is_equal_approx(hgt.call(e, cy), h) and is_equal_approx(hgt.call(e, cy + dir.y), nh): e += 1
+				while e < gw and is_equal_approx(hgt.call(e, cy), h) and is_equal_approx(hgt.call(e, cy + dir.y), nh) and kind.call(e, cy) == kd: e += 1
 				var zz: float = cy + (1 if dir.y == 1 else 0)
-				var sc: Color = side_col.call(h); var lo := sc.darkened(0.45)
 				var v := [Vector3(cx, nh, zz), Vector3(e, nh, zz), Vector3(e, h, zz), Vector3(cx, h, zz)] if dir.y == -1 else [Vector3(e, nh, zz), Vector3(cx, nh, zz), Vector3(cx, h, zz), Vector3(e, h, zz)]
-				quad.call(st_side, v, Vector3(0, 0, dir.y), [lo, lo, sc, sc])
-				if h - nh >= 1.8 and nh > -0.4 and neon.size() < 6000:
-					var seg := cx
-					while seg < e:
-						neon.append([Vector3(seg + 0.5, h, zz + dir.y * 0.02), dir, pal[2] if (seg / 6 + cy / 6) % 2 == 0 else pal[3]]); seg += 1
+				quad.call(sts[kd], v, Vector3(0, 0, dir.y), [lo, lo, hi, hi])
 				cx = e
 	for dir in [Vector2i(1, 0), Vector2i(-1, 0)]:
 		for cx in gw:
@@ -376,84 +438,44 @@ func build_map(idx: int) -> void:
 			while cy < gh:
 				var h: float = hgt.call(cx, cy); var nh: float = hgt.call(cx + dir.x, cy)
 				if nh >= h - 0.01: cy += 1; continue
+				var kd: int = kind.call(cx, cy)
 				var e := cy + 1
-				while e < gh and is_equal_approx(hgt.call(cx, e), h) and is_equal_approx(hgt.call(cx + dir.x, e), nh): e += 1
+				while e < gh and is_equal_approx(hgt.call(cx, e), h) and is_equal_approx(hgt.call(cx + dir.x, e), nh) and kind.call(cx, e) == kd: e += 1
 				var xx: float = cx + (1 if dir.x == 1 else 0)
-				var sc: Color = side_col.call(h); var lo := sc.darkened(0.45)
 				var v := [Vector3(xx, nh, e), Vector3(xx, nh, cy), Vector3(xx, h, cy), Vector3(xx, h, e)] if dir.x == -1 else [Vector3(xx, nh, cy), Vector3(xx, nh, e), Vector3(xx, h, e), Vector3(xx, h, cy)]
-				quad.call(st_side, v, Vector3(dir.x, 0, 0), [lo, lo, sc, sc])
-				if h - nh >= 1.8 and nh > -0.4 and neon.size() < 6000:
-					var seg := cy
-					while seg < e:
-						neon.append([Vector3(xx + dir.x * 0.02, h, seg + 0.5), dir, pal[2] if (cx / 6 + seg / 6) % 2 == 0 else pal[3]]); seg += 1
+				quad.call(sts[kd], v, Vector3(dir.x, 0, 0), [lo, lo, hi, hi])
 				cy = e
 	var mesh := ArrayMesh.new()
-	st_top.commit(mesh); st_side.commit(mesh)
+	st_top.commit(mesh)
 	turf_mat = ShaderMaterial.new(); turf_mat.shader = load("res://shaders/turf.gdshader")
 	turf_mat.set_shader_parameter("paint_tex", paint_tex); turf_mat.set_shader_parameter("base_tex", base_tex); turf_mat.set_shader_parameter("grid_size", Vector2(gw, gh))
 	turf_mat.set_shader_parameter("team_a", team_col[1]); turf_mat.set_shader_parameter("team_b", team_col[2])
-	var side_mat := StandardMaterial3D.new(); side_mat.vertex_color_use_as_albedo = true; side_mat.cull_mode = BaseMaterial3D.CULL_DISABLED; side_mat.roughness = 0.9
-	mesh.surface_set_material(0, turf_mat); mesh.surface_set_material(1, side_mat)
+	var pt: Array = B.pat
+	turf_mat.set_shader_parameter("pat", Vector4i(int(pt[0]), int(pt[1]), int(pt[2]), int(pt[3])))
+	turf_mat.set_shader_parameter("detail", Color(Biomes.col(B.detail[0]), float(B.detail[1])))
+	turf_mat.set_shader_parameter("glow_k", float(B.get("glow", 0.0))); turf_mat.set_shader_parameter("gloss", float(B.get("gloss", 0.0)))
+	mesh.surface_set_material(0, turf_mat)
+	var side_mats := [Biomes.wall_mat(B.side, 0.12), Biomes.wall_mat(B.wall, float(B.get("cap_w", 0.06))), Biomes.wall_mat(B.thin, float(B.get("cap_w", 0.06)))]
 	var mi := MeshInstance3D.new(); mi.mesh = mesh; map_root.add_child(mi)
-	if neon.size() > 0:
-		var nm := MultiMesh.new(); nm.transform_format = MultiMesh.TRANSFORM_3D; nm.use_colors = true
-		var bx := BoxMesh.new(); bx.size = Vector3(1.0, 0.1, 0.1)
-		var nmat := StandardMaterial3D.new(); nmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; nmat.vertex_color_use_as_albedo = true; nmat.albedo_color = Color(2.2, 2.2, 2.2)
-		bx.material = nmat; nm.mesh = bx; nm.instance_count = neon.size()
-		for k in neon.size():
-			var e: Array = neon[k]
-			var rot := Basis(Vector3.UP, PI / 2) if e[1].x != 0 else Basis()
-			nm.set_instance_transform(k, Transform3D(rot, e[0])); nm.set_instance_color(k, e[2])
-		var nmi := MultiMeshInstance3D.new(); nmi.multimesh = nm; nmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; map_root.add_child(nmi)
-	var bush_cells: Array = []
-	var step_b := 2 if gw * gh < 50000 else 3
-	for i in gw * gh:
-		if map_bush[i] == 1 and (i % gw + i / gw) % step_b == 0: bush_cells.append(i)
-	if bush_cells.size() > 0:
-		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D
-		var sph := SphereMesh.new(); sph.radius = 0.8; sph.height = 1.3; sph.radial_segments = 10; sph.rings = 6; sph.material = Models.toon(Color("#3fbf5f"), 0.05, 0.3)
-		mm.mesh = sph; mm.instance_count = bush_cells.size()
-		var rn := RandomNumberGenerator.new(); rn.seed = 7 + idx
-		for k in bush_cells.size():
-			var i: int = bush_cells[k]; var s := rn.randf_range(0.9, 1.35)
-			mm.set_instance_transform(k, Transform3D(Basis(Vector3.UP, rn.randf() * TAU).scaled(Vector3(s, s * 0.85, s)), Vector3(i % gw + 0.5, float(T[i]) * K + 0.5, i / gw + 0.5)))
-		var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; map_root.add_child(mmi)
+	for k in 3:
+		var sm2 := ArrayMesh.new(); sts[k].commit(sm2)
+		if sm2.get_surface_count() == 0: continue
+		sm2.surface_set_material(0, side_mats[k])
+		var smi := MeshInstance3D.new(); smi.mesh = sm2; map_root.add_child(smi)
 	if OS.get_environment("GB_SHOT") != "": print("地图 %s 建好了：%d ms" % [m.name, Time.get_ticks_msec() - t_build])
 	# 电梯（超大地图）
 	for k in m.get("lifts", {}):
 		var i := int(k)
-		var lm := MeshInstance3D.new(); var lb := BoxMesh.new(); lb.size = Vector3(0.95, 0.15, 0.95); lb.material = Models.glow(Color("#7af0ff"), 1.8); lm.mesh = lb
+		var lm := MeshInstance3D.new(); var lb := BoxMesh.new(); lb.size = Vector3(0.95, 0.15, 0.95); lb.material = Models.glow(Color("#7af0ff"), 1.3); lm.mesh = lb
 		lm.position = Vector3(i % gw + 0.5, float(T[i]) * K + 0.08, i / gw + 0.5); map_root.add_child(lm)
-	# 弹跳板
+	# 弹跳板：黄色圆盘 + 一圈深色底座
 	for k in m.pads:
 		var i := int(k)
-		var pmi := MeshInstance3D.new(); var cyl := CylinderMesh.new(); cyl.top_radius = 0.48; cyl.bottom_radius = 0.5; cyl.height = 0.12; cyl.material = Models.glow(Color("#ffd23f"), 1.8); pmi.mesh = cyl
-		pmi.position = Vector3(i % gw + 0.5, float(map_top[i]) * K + 0.06, i / gw + 0.5); map_root.add_child(pmi)
-	# 场地外：围栏 + 远处的城市剪影
-	var fence_mat := Models.glow(pal[2], 2.0)
-	for e in [[Vector3(gw / 2.0, 0.6, -0.4), Vector3(gw + 1, 0.15, 0.15)], [Vector3(gw / 2.0, 0.6, gh + 0.4), Vector3(gw + 1, 0.15, 0.15)], [Vector3(-0.4, 0.6, gh / 2.0), Vector3(0.15, 0.15, gh + 1)], [Vector3(gw + 0.4, 0.6, gh / 2.0), Vector3(0.15, 0.15, gh + 1)]]:
-		var b := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = e[1]; bm.material = fence_mat; b.mesh = bm; b.position = e[0]; map_root.add_child(b)
-	var floor_mi := MeshInstance3D.new(); var pm2 := PlaneMesh.new(); pm2.size = Vector2(max(600, gw * 3), max(600, gh * 3))
-	var fm := StandardMaterial3D.new(); fm.albedo_color = Color(pal[0]).darkened(0.3); fm.roughness = 0.6; fm.metallic_specular = 0.6; pm2.material = fm
-	floor_mi.mesh = pm2; floor_mi.position = Vector3(gw / 2.0, -0.6, gh / 2.0); map_root.add_child(floor_mi)
-	var win_img := Image.create(8, 16, false, Image.FORMAT_RGBA8)
-	var rn2 := RandomNumberGenerator.new(); rn2.seed = idx
-	for yy in 16:
-		for xx in 8: win_img.set_pixel(xx, yy, Color(pal[2 + (xx + yy) % 2]) * (1.6 if rn2.randf() < 0.35 else 0.0) if (xx % 2 == 0 and yy % 2 == 0) else Color(0, 0, 0))
-	var win_tex := ImageTexture.create_from_image(win_img)
-	var bmat := StandardMaterial3D.new(); bmat.albedo_color = Color(pal[0]).lightened(0.05); bmat.emission_enabled = true; bmat.emission_texture = win_tex; bmat.emission_energy_multiplier = 1.4
-	bmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST; bmat.uv1_scale = Vector3(3, 2, 1)
-	for k in 46:
-		var a := k / 46.0 * TAU + rn2.randf() * 0.1; var rr: float = rn2.randf_range(95, 140) * max(1.0, gw / 120.0)
-		var bh := rn2.randf_range(14, 48); var bw := rn2.randf_range(8, 18)
-		var b := MeshInstance3D.new(); var bm2 := BoxMesh.new(); bm2.size = Vector3(bw, bh, bw); bm2.material = bmat; b.mesh = bm2
-		b.position = Vector3(gw / 2.0 + cos(a) * rr, bh / 2.0 - 1, gh / 2.0 + sin(a) * rr * 0.8); b.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		map_root.add_child(b)
-	# 四盏彩灯（电脑版）
-	if desktop:
-		for e in [[Vector3(gw * 0.25, 8, gh * 0.3), pal[2]], [Vector3(gw * 0.75, 8, gh * 0.7), pal[3]], [Vector3(gw * 0.5, 9, gh * 0.5), Color("#ffffff")]]:
-			var ol := OmniLight3D.new(); ol.position = e[0]; ol.light_color = e[1]; ol.light_energy = 1.6; ol.omni_range = 40; ol.omni_attenuation = 1.2
-			map_root.add_child(ol)
+		var p0 := Vector3(i % gw + 0.5, float(map_top[i]) * K, i / gw + 0.5)
+		Biomes.part(map_root, Models.mesh("cyl", 0.56, 0.1), p0 + Vector3(0, 0.05, 0), Models.toon(Color("#2a2a32"), 0.0, 0.3, false))
+		Biomes.part(map_root, Models.mesh("cyl", 0.44, 0.12), p0 + Vector3(0, 0.1, 0), Models.glow(Color("#ffd23f"), 1.15))
+	var wx: Node3D = Biomes.decorate(self, map_root, bid, m, TV, map_solid, map_bush, comps, idx)
+	if wx != null: weather = wx; map_root.add_child(wx)
 
 # ---------------- 菜单 ----------------
 func role_name(id: String) -> String:
@@ -526,6 +548,8 @@ func show_result() -> void:
 	if not autoplay:   # 对战奖励：经验、奖杯、金币、首胜宝石、任务
 		var rw := profile.match_reward(sim, me)
 		rw.deaths = me.deaths; rw.badge = my_b
+		rw.dawn = me.pilot in data.dawn.pilots or me.weapon in data.dawn.mechs
+		rw.dawnmap = cur_map >= 0 and cur_map < data.maps.size() and str(data.maps[cur_map].get("biome", "")) == "dawn"
 		var res := profile.apply_match(rw)
 		var g := GridContainer.new(); g.columns = 2; g.add_theme_constant_override("h_separation", 8); g.add_theme_constant_override("v_separation", 6); g.size_flags_horizontal = Control.SIZE_SHRINK_CENTER; lv.add_child(g)
 		g.add_child(UIKit.pill("star", "经验 +%d" % rw.xp, Color("#7af0ff"))); g.add_child(UIKit.pill("trophy", "奖杯 %+d" % rw.trophies, Color("#ffcf4d")))
@@ -648,6 +672,7 @@ func start_match(pilot: String, mech: String) -> void:
 func begin_view() -> void:
 	for id in mech_nodes: mech_nodes[id].root.queue_free()
 	mech_nodes.clear()
+	DawnFx.clear(self)
 	for id in helper_nodes: helper_nodes[id].queue_free()
 	helper_nodes.clear()
 	for p in sim.players: mech_nodes[p.id] = make_mech_node(p)
@@ -662,6 +687,29 @@ func begin_view() -> void:
 	menu.visible = false
 	state = "play"
 	acc = 0.0
+
+# 测试用（GB_DAWN=finale / guard / disc / tether）：把一个敌人拉到面前，触发联动机制，方便截图
+var _dawn_done := false
+func dawn_test_tick() -> void:
+	var kind := OS.get_environment("GB_DAWN")
+	if sim.time < 3.0: return
+	var foe: Sim.Mech = null
+	for q in sim.players:
+		if q.team != me.team and q.alive and not q.npc: foe = q; break
+	if foe == null: return
+	if not _dawn_done:
+		_dawn_done = true
+		foe.x = me.x + 200; foe.y = me.y; foe.z = me.z; foe.inv_t = 0
+		me.inp.a = 0.0; me.inp.ad = 200.0
+		if kind == "finale": me.linger = 5; me.sp = float(data.mechs[me.weapon].spNeed); me.inp.qq = int(me.inp.qq) + 1
+		if kind == "night": me.sp = float(data.mechs[me.weapon].spNeed); me.inp.qq = int(me.inp.qq) + 1
+	if kind in ["disc", "tether"]: me.inp.f = int(sim.time * 10) % 12 == 0
+	if kind == "guard": me.inp.f = true
+
+# 3.1：联动战斗影片（pv/dawn_pv.ogv 存在就直接播视频，否则实时播 3D 版）
+func play_dawn_pv() -> void:
+	var pv := DawnPV.new(); pv.setup(self)
+	lobby.add_child(pv)
 
 func make_mech_node(p: Sim.Mech) -> Dictionary:
 	var col: Color = team_col[p.team]
@@ -682,9 +730,11 @@ func make_mech_node(p: Sim.Mech) -> Dictionary:
 
 # ---------------- 主循环 ----------------
 func _process(delta: float) -> void:
+	if OS.get_environment("GB_DAWN") != "" and sim != null and state == "play" and me != null: dawn_test_tick()
 	if OS.get_environment("GB_SHOT") != "" and (OS.get_environment("GB_SHOT_MENU") != "" or (sim != null and state != "menu")):   # 截图用
 		shot_t += delta
-		if shot_t >= float(OS.get_environment("GB_SHOT_AT") if OS.get_environment("GB_SHOT_AT") != "" else "8"):
+		var sim_at := OS.get_environment("GB_SHOT_SIM")   # 按对局时间截图（机器慢的时候也准）
+		if (sim_at == "" and shot_t >= float(OS.get_environment("GB_SHOT_AT") if OS.get_environment("GB_SHOT_AT") != "" else "8")) or (sim_at != "" and sim != null and sim.countdown <= 0 and sim.time >= float(sim_at)):
 			get_viewport().get_texture().get_image().save_png(OS.get_environment("GB_SHOT"))
 			print("截图：", OS.get_environment("GB_SHOT"), " FPS ", Engine.get_frames_per_second())
 			get_tree().quit()
@@ -871,6 +921,7 @@ func update_visuals(alpha: float, delta: float) -> void:
 		var h: float = m.t / 0.5 * 30.0
 		missile_mm.set_instance_transform(mc, Transform3D(Basis(Vector3.RIGHT, PI), Vector3(m.x * K, m.z * K + h, m.y * K))); mc += 1
 	missile_mm.visible_instance_count = mc
+	DawnFx.update(self, delta)
 	sync_helpers(delta)
 	mode_view.sync(delta, me.team)
 	update_camera(delta)
@@ -925,6 +976,7 @@ func update_camera(delta: float) -> void:
 		cam.position = cam.position.lerp(target, min(1.0, delta * 6.0))
 		cam.look_at(cam.position - off + Vector3(0, 1.0, 0))
 		cam.fov = 42 + fov_punch * 6
+		if weather != null and is_instance_valid(weather): weather.global_position = Vector3(mp.x, 0, mp.z)
 		if shake > 0:
 			var s := shake * shake * 0.8
 			cam.position += Vector3(randf_range(-s, s), randf_range(-s, s) * 0.5, randf_range(-s, s))
@@ -1157,7 +1209,9 @@ func apply_events() -> void:
 				burst(Vector3(e[3] * K, e[5] * K + 1.5, e[4] * K), Color("#ffe14d"), 24, 6.0, 0.2, 0.6, -4.0)
 				sfx.play("super", vol_at(e[3], e[4]))
 				if e[1] == me.id:
-					hud.banner("大招 • " + str(data.mechs[me.weapon].specialInfo.name), Color("#ffe14d"), data.pilots[me.pilot])
+					var spn := str(data.mechs[me.weapon].specialInfo.name)
+					if str(e[2]) == "finale": spn = "绝响"
+					hud.banner("大招 • " + spn, Color("#7ad8ff") if str(e[2]) == "finale" else Color("#ffe14d"), data.pilots[me.pilot])
 					fov_punch = 1.0; shake = max(shake, 0.4)
 			"heal":
 				var p4 := player_by_id(e[1])
@@ -1195,7 +1249,8 @@ func apply_events() -> void:
 			"dmg":
 				hud.dmg_text(player_by_id(e[1]), int(e[2]), e[3] == me.id)
 				if e[1] == me.id: shake = max(shake, 0.18)
-			_: mode_event(e)
+			_:
+				if not DawnFx.event(self, e): mode_event(e)
 
 # 超载 + 各模式的事件：横幅、音效、特效
 func mode_event(e: Array) -> void:

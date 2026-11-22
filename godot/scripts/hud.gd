@@ -92,6 +92,13 @@ func _draw() -> void:
 		var hc := Color("#6dff8a") if self_p else (Color("#ff5a6a") if p.team != me.team else Color("#4fc3ff"))
 		draw_rect(Rect2(s.x - w / 2, s.y, w * k, 6), hc)
 		if p.shield > 0: draw_rect(Rect2(s.x - w / 2, s.y - 4, w * clampf(p.shield / p.max_hp, 0, 1), 3), Color("#7af0ff"))
+		# 3.1「黎明之后」：夜债（血条上一段紫色，超过生命变红）、回响（青色条）、余韵 / 日轮小点
+		if p.debt > 0.5:
+			var dk := clampf(p.debt / p.max_hp, 0, k)
+			draw_rect(Rect2(s.x - w / 2 + w * (k - dk), s.y, w * dk, 6), Color("#ff3b52") if p.debt >= p.hp else Color("#9a7aff"))
+		if p.echo_sum > 0.5: draw_rect(Rect2(s.x - w / 2, s.y + 7, w * clampf(p.echo_sum / 120.0, 0, 1), 2), Color("#7ad8ff"))
+		if p.pilot == "coda" and p.linger > 0:
+			for i in 5: draw_circle(Vector2(s.x + w / 2 + 8, s.y + 6 - i * 7), 2.6, Color("#7ad8ff") if i < p.linger else Color(1, 1, 1, 0.18))
 		if self_p:
 			var sw := (w - 4) / 3.0
 			for i in 3:
@@ -259,7 +266,17 @@ func _draw() -> void:
 		var bx2 := vs.x - 70; var by2 := vs.y - 70
 		var ak: float = me.ammo / 3.0 if str(w.attack) != "charge" or me.charge <= 0 or me.foot else me.charge
 		ring(Vector2(bx2, by2), 40, ak, Color("#ffae2e"), atk_name, "左键 • %d/3" % int(me.ammo), false, false)
-		ring(Vector2(bx2 - 104, by2 + 6), 32, spk, Color("#ffdf2e"), "大招", "E / 右键", spk >= 1 and not me.foot, me.foot)
+		var fin: bool = Dawn.can_finale(me)
+		ring(Vector2(bx2 - 104, by2 + 6), 32, spk, Color("#7ad8ff") if fin else Color("#ffdf2e"), "绝响" if fin else "大招", "E / 右键", spk >= 1 and not me.foot, me.foot)
+		if me.pilot == "xiao" and me.debt > 0.5:
+			txt("夜债 %d" % int(me.debt) + ("  资不抵债！" if me.debt >= me.hp else ""), Vector2(bx2 - 104, by2 - 58), 18, Color("#ff3b52") if me.debt >= me.hp else Color("#b49cff"))
+		elif me.pilot == "xiwei":
+			txt("%s%s · 日轮 %d" % [Dawn.PH_NAMES[Dawn.phase(me)], "（定晷）" if me.dial_frz > 0 else "", me.suns], Vector2(bx2 - 104, by2 - 58), 18, DawnFx.PH_COLS[Dawn.phase(me)])
+		elif me.pilot == "coda":
+			txt("余韵 %d / 5" % me.linger + ("  绝响就绪" if fin and spk >= 1 else ""), Vector2(bx2 - 104, by2 - 58), 18, Color("#7ad8ff"))
+		if me.weapon == "vigil" and not me.foot:
+			draw_rect(Rect2(bx2 - 30, by2 + 46, 60, 5), Color(0, 0, 0, 0.7))
+			draw_rect(Rect2(bx2 - 30, by2 + 46, 60 * clampf(me.guard_e / 2.5, 0, 1), 5), Color("#9a7aff"))
 		ring(Vector2(bx2 - 186, by2 + 12), 26, regen if me.skill_uses <= 0 else 1.0, Color(str(P.accent)), str(P.skillInfo.short), "Q • %d/%d" % [me.skill_uses, me.skill_max], false, me.skill_uses <= 0)
 		if me.skill_uses < me.skill_max:
 			draw_arc(Vector2(bx2 - 186, by2 + 12), 33, -PI / 2, -PI / 2 + regen * TAU, 32, Color(1, 1, 1, 0.4), 3)

@@ -9,7 +9,9 @@ const MAX_PEERS := 7
 const PLAYER_FIELDS := ["x", "y", "z", "vx", "vy", "vz", "hp", "max_hp", "alive", "foot", "wheel", "hidden", "firing", "charge", "ammo", "sp", "ov", "ov_t",
 	"skill_uses", "skill_max", "skill_regen", "rebuild_t", "respawn_t", "shield", "flash", "carry", "cubes", "out", "kills", "deaths", "painted", "obj",
 	"balloons", "float_t", "seals", "spirits", "sp_t", "sp_kind", "on_ground", "lv", "bt", "ex_t", "extracted",
-	"rush_t", "slow_t", "dslow_t", "silence_t", "seal_t", "bind_t", "blind_t", "mark_t", "lock_t", "jam_t", "burn_t", "poison_t", "cloak_t", "rally_t", "nano_t", "sup_t", "smoke_t", "reveal_t"]
+	"rush_t", "slow_t", "dslow_t", "silence_t", "seal_t", "bind_t", "blind_t", "mark_t", "lock_t", "jam_t", "burn_t", "poison_t", "cloak_t", "rally_t", "nano_t", "sup_t", "smoke_t", "reveal_t",
+	"dial", "dial_frz", "suns", "glare_n", "echo_sum", "linger", "debt", "guarding", "night_t", "cine_t", "cine_with", "cine_lead",
+	"disc_on", "disc_x", "disc_y", "disc_z", "teth_id", "fork_id", "links"]
 
 signal room_changed
 signal match_started(info: Dictionary)

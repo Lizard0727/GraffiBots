@@ -8,22 +8,32 @@
 const fs = require('fs'), path = require('path');
 const S = require('../public/shared.js');
 const E = require('../public/economy.js');
+// 3.1：「黎明之后」联动（只给电脑版）：合并进 S / E；「夜都决战」下架
+const DAWN = require('./collab-dawn.js');
+DAWN.apply(S, E);
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 const bits = (arr) => Array.from(arr, (v) => (v ? '1' : '0')).join('');
+// 3.1：电脑版用重新设计的 14 张地图（tools/godot-maps.js），网页版不变
+const PC_MAPS = require('./godot-maps.js');
 const maps = [];
 for (let i = 0; i < S.MAP_N; i++) {
+  const keep = S.MAPS[i];
+  if (PC_MAPS[i]) S.MAPS[i] = Object.assign({}, PC_MAPS[i]);
   const M = S.buildMap(i);
   S.useMap(M);
   const pads = {};
   M.pad.forEach((v, k) => { if (v) pads[k] = v; });
-  maps.push({ name: S.MAPS[i].name, desc: S.MAPS[i].desc, sky: S.MAPS[i].sky || 0, gw: M.gw, gh: M.gh, goalX: S.MAPS[i].goalX || 24, park: !!S.MAPS[i].park,
+  maps.push({ name: S.MAPS[i].name, desc: S.MAPS[i].desc, sky: S.MAPS[i].sky || 0, biome: S.MAPS[i].biome || 'plaza', gw: M.gw, gh: M.gh, goalX: S.MAPS[i].goalX || 24, park: !!S.MAPS[i].park,
     top: Array.from(M.top, (v) => Math.round(v)), solid: bits(M.solid), bush: bits(M.bush), pads,
     spawns: [1, 2].map((t) => [0, 1, 2, 3].map((s) => S.spawnPoint(t, s))) });
+  S.MAPS[i] = keep;
 }
 
 // 阶段 5：日期转成秒（Godot 用 Time.get_unix_time_from_system() 比较）
 const sec = (ms) => Math.floor(ms / 1000);
 const GODOT_MAILS = [
+  { id: 'godot_v31', t: Date.UTC(2026, 10, 22, 5), from: '拂晓站 · 启明号', title: '3.1「黎明之后」联动礼包', body: '长夜结束后的第一个清晨，启明号停在了灰城外。熹微、尾声和宵向你问好——去大厅左边的「黎明之后」看看专属手书剧情和联动战斗影片吧。这些晨光碎片和宝石请收下！',
+    keep: true, items: [{ k: 'dawnshards', n: 300 }, { k: 'gems', n: 300 }, { k: 'chest', id: 'airdrop', n: 1 }, { k: 'coins', n: 2000 }] },
   { id: 'godot_v30', t: Date.UTC(2026, 10, 22, 4), from: '涂鸦机兵开发组', title: '电脑版 3.0 正式版上线礼包', body: '涂鸦机兵电脑版 3.0 正式版上线啦：匹配和排位选人、个人资料、好友和线上房间、对局聊天、搜刮撤离的消耗品 / 大地图 / 增援小队、新手教程、英文界面都来了。感谢一路陪伴，这份礼包请收下！',
     keep: true, items: [{ k: 'gems', n: 500 }, { k: 'chest', id: 'airdrop', n: 2 }, { k: 'coins', n: 3000 }, { k: 'parts', n: 500 }, { k: 'crystals', n: 3 }] },
   { id: 'godot_pc', t: Date.UTC(2026, 10, 21, 4), from: '涂鸦机兵开发组', title: 'Godot 电脑版上线礼包', body: '涂鸦机兵 Godot 电脑版上线啦：全部角色和模式、全新画面和大厅、通行证、排位赛、搜刮撤离和局域网联机都搬过来了。这份上线礼包请收下！',
@@ -90,6 +100,15 @@ const out = {
   banCounters: E.COUNTERS, banWhy: E.BAN_WHY,
   maps, colors: S.COLOR_SETS.map((c) => c.c),
 };
+for (const id of E.RETIRED || []) if (out.econ.locked[id] !== undefined) out.econ.locked[id] = '绝版（夜都决战联动）';
+for (const id of [...DAWN.PILOTS.map((P) => P.id), ...Object.keys(DAWN.WEAPONS)]) if (out.econ.locked[id] !== undefined) out.econ.locked[id] = '联动活动「黎明之后」';
+out.econ.retired = E.RETIRED || [];
+out.modeOrder = out.modeOrder.filter((k) => k !== 'raid' && k !== 'seal');
+out.dawn = { id: DAWN.id, name: DAWN.name, nameEn: DAWN.nameEn, story: DAWN.STORY, pilots: DAWN.PILOTS.map((P) => P.id), mechs: Object.keys(DAWN.WEAPONS),
+  archive: Object.fromEntries(DAWN.PILOTS.map((P) => [P.id, { bio: P.bio, faction: P.faction, archive: P.archive, extra: P.extra }])) };
+for (const P of DAWN.PILOTS) Object.assign(out.pilots[P.id], { bio: P.bio, faction: P.faction, extra: P.extra, collab: 'dawn', eyeShape: P.eyeShape, mouth: P.mouth });
+for (const id of Object.keys(DAWN.WEAPONS)) out.hex.mech[id] = DAWN.HEX.mech[id];
+for (const P of DAWN.PILOTS) out.hex.pilot[P.id] = DAWN.HEX.pilot[P.id];
 const json = JSON.stringify(out).replace(/·/g, '•').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]\uFE0F?/gu, '');   // Godot 版的字体没有「·」
 fs.writeFileSync(path.join(__dirname, '..', 'godot', 'data', 'game.json'), json);
 // 英文：网页版的词典（i18n-en.js）和带数字的句式（i18n.js 的 PATTERNS）

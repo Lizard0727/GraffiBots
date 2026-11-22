@@ -1,15 +1,24 @@
-# 涂鸦机兵 · 电脑版 3.0（正式版）
+# 涂鸦机兵 · 电脑版 3.1（「黎明之后」联动）
 
 用 Godot 4.3 重做的涂鸦机兵，现在专注 **Windows 电脑版**。网页版和安卓 APK 暂停更新。
 
-## 内容
+## 3.1 新内容
+- **「黎明之后」联动**（原创世界观，数据在 `tools/collab-dawn.js`，只给电脑版）：
+  - 三位干员：熹微（日晷循环 / 灼光 / 日轮）、尾声（回响延迟伤害 / 回溯 / 余韵）、宵（夜债）；三台机甲：晨轮（回旋光轮）、共鸣（拴索吸取）、守夜（格挡反击）。机制在 `scripts/dawn.gd`，画面在 `scripts/dawn_fx.gd`
+  - 终结技「绝响」：尾声 + 共鸣机兵 + 余韵 5 层，大招变成终结技，只有两人看得到的终章动画（`scripts/finale_cine.gd`），结束时直接击倒驾驶员
+  - 专属活动页（大厅左侧「黎明之后」）：6 话手书剧情（`scripts/tegaki.gd`）、任务、晨光碎片兑换、干员档案
+  - 1 分钟联动战斗影片（`scripts/dawn_pv.gd`，实机 3D；`GB_PV_RENDER=1 godot --write-movie out.avi --fixed-fps 30` 导出视频）
+  - 「夜都决战」下架：咒灵讨伐 / 封印争夺关闭，符零、赤镰、结界机兵、灵刃机兵绝版（已拥有的照常使用）
+- **14 张地图重新设计**：布局在 `tools/godot-maps.js`（`node` 检查脚本会验证出生区、球门、据点和可达性），画面主题在 `scripts/biomes.gd` + `shaders/turf.gdshader` / `shaders/wall.gdshader`
+- **光污染收住**：泛光、霓虹边、发光材质整体压低
 
-- **全部 22 台机体、21 位驾驶员**：攻击方式、特性、大招、充能制技能、被动、超载（R 键）。机体被打爆后驾驶员会弹出来，拿随身武器继续打；场上会空投新机体
+
+- **全部 25 台机体、24 位驾驶员**：攻击方式、特性、大招、充能制技能、被动、超载（R 键）。机体被打爆后驾驶员会弹出来，拿随身武器继续打；场上会空投新机体
 - **全部 14 张地图 + 搜刮撤离的超大地图（760×500）**
-- **12 种模式**：
+- **10 种模式**（咒灵讨伐 / 封印争夺随「夜都决战」下架）：
   - 涂地大战、抢占据点、护送宝物、漆弹足球、电池掠夺
   - 生死之战、逃亡圈（四队 / 单人）
-  - 乐园模式、咒灵讨伐、封印争夺
+  - 乐园模式
   - 排位赛：钻石起双方各禁用 2 个，再按 1-2-2-2-1 轮流选人，选的时候中间放驾驶员和机体的 3D 模型，有克制提示
   - **搜刮撤离**：6 支 3 人小队
     - 搜容器（F 键）、网格背包（Tab，可以旋转物品）、安全箱、钥匙房
@@ -86,6 +95,8 @@ GitHub Releases 里的 `godot-proto` 有 `GraffiBots-Godot-Windows.zip`。解压
   | `scripts/i18n.gd` | 中文 / English |
   | `scripts/thumbs.gd` | 机体 3D 小图 |
   | `scripts/relay_peer.gd` | 线上房间的传输层（通过 server.js 转发，Net 的 RPC 不用改） |
+  | `scripts/dawn.gd`、`dawn_fx.gd`、`finale_cine.gd`、`tegaki.gd`、`dawn_pv.gd` | 「黎明之后」联动：机制、画面、绝响终章、手书剧情、战斗影片 |
+  | `scripts/biomes.gd` | 地图画面主题 |
   | `scripts/settings.gd` | 设置 |
   | `scripts/music.gd` | 背景音乐 |
   | `scripts/hud.gd` | HUD |
@@ -97,6 +108,7 @@ GitHub Releases 里的 `godot-proto` 有 `GraffiBots-Godot-Windows.zip`。解压
   - `godot --headless --path godot --script res://tests/sim_test.gd`：跑所有模式、技能、大招、超载
   - `res://tests/profile_test.gd`：存档、通行证、邮件、皮肤、排位、活动
   - `res://tests/loot_test.gd`：搜刮撤离的整局模拟和性能
+  - `res://tests/dawn_test.gd`：联动机制（光轮、共鸣索、格挡、日晷、回响、夜债、绝响）
   - `res://tests/account_test.gd`：和网页版一样的密码哈希、转移码导入导出；设置 `GB_SERVER=地址` 时还会测在线账号
   - `res://tests/social_test.gd`：两个客户端连同一台服务器互加好友、看在线、发组队邀请（需要 `GB_SERVER`）
   - 线上房间：CI 里开一个 `node server.js`，两个电脑版进程一个开房一个用房间号加入，检查客人收到画面

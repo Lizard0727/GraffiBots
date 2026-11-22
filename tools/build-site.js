@@ -68,7 +68,18 @@ const apk = opt('--apk') || ['涂鸦机兵-GraffiBots.apk', 'GraffiBots.apk'].ma
 // 2.1.2：每个包同时发布「带版本号」和「固定名字（latest）」两份；官网按钮用固定名字 + ?v=版本号，
 // 这样官网更新的那一刻，还开着旧页面的人点下载也不会 404（以前旧页面指向的旧版本文件已经被删掉了）
 // 3.0：电脑版（Godot）——公告来自 godot/data/news.json，安装包由官网工作流从 GitHub Releases 的 godot-proto 下载到 dist/
-const PC = JSON.parse(fs.readFileSync(path.join(ROOT, 'godot', 'data', 'news.json'), 'utf8'))[0];
+const PC_ALL = JSON.parse(fs.readFileSync(path.join(ROOT, 'godot', 'data', 'news.json'), 'utf8'));
+const PC = PC_ALL[0];
+// 3.1「黎明之后」联动（电脑版）：干员、战斗影片
+const DAWN = require('./collab-dawn.js');
+const PC_EN = JSON.parse(fs.readFileSync(path.join(ROOT, 'godot', 'data', 'i18n_pc.json'), 'utf8'));
+const dawnSite = {
+  name: DAWN.name, nameEn: DAWN.nameEn, video: 'video/dawn-pv.mp4', poster: 'img/pc31-pv.jpg',
+  ops: DAWN.PILOTS.map((P) => { const W = DAWN.WEAPONS[P.weapon], O = DAWN.OVERLOADS[P.id], K = DAWN.SKILLS[P.skill];
+    return { id: P.id, name: P.name, en: PC_EN[P.name] || P.name, title: P.title, en_title: PC_EN[P.title] || P.title, accent: P.accent, line: P.line, en_line: PC_EN[P.line] || P.line,
+      img: 'img/op-' + P.id + '.png', passive: P.passive.name, en_passive: PC_EN[P.passive.name] || P.passive.name, pdesc: P.passive.desc, en_pdesc: PC_EN[P.passive.desc] || '',
+      skill: K.name, en_skill: PC_EN[K.name] || K.name, ov: O.name, en_ov: PC_EN[O.name] || O.name, mech: W.name, en_mech: PC_EN[W.name] || W.name, mdesc: W.desc, en_mdesc: PC_EN[W.desc] || '' }; }),
+};
 const DL = [
   { id: 'pc', src: path.join(DIST, 'GraffiBots-Godot-Windows.zip'), file: `graffibots-pc-${PC.ver}-windows.zip`, latest: 'graffibots-pc-latest-windows.zip', ver: PC.ver },
   { id: 'offline', src: path.join(DIST, '涂鸦机兵-单文件版.html'), file: `graffibots-${S.VERSION}-offline.html`, latest: 'graffibots-latest-offline.html' },
@@ -89,18 +100,20 @@ const data = {
   // 3.0：电脑版正式版公告（首页置顶 + 更新日志第一条）
   pc: Object.assign({}, PC, { release: 'https://github.com/Lizard0727/GraffiBots/releases/tag/godot-proto',
     shots: [
-      { img: 'img/pc30-draft.jpg', cap: '排位选人 + 3D 模型', en_cap: 'Ranked draft with 3D models' },
-      { img: 'img/pc30-profile.jpg', cap: '个人资料与展示框', en_cap: 'Profile & showcase' },
-      { img: 'img/pc30-bigmap.jpg', cap: '搜刮撤离大地图', en_cap: 'Loot & Extract big map' },
-      { img: 'img/pc30-results.jpg', cap: '结算评级', en_cap: 'Match ratings' },
+      { img: 'img/pc31-finale.jpg', cap: '终结技「绝响」终章动画', en_cap: 'Final Note finisher cutscene' },
+      { img: 'img/pc31-event.jpg', cap: '「黎明之后」专属活动页', en_cap: 'After Dawn event page' },
+      { img: 'img/pc31-tegaki.jpg', cap: '专属手书剧情', en_cap: 'Hand-drawn story' },
+      { img: 'img/pc31-maps.jpg', cap: '14 张地图全部重新设计', en_cap: 'All 14 maps redesigned' },
     ] }),
+  pcOld: PC_ALL.slice(1),
+  dawn: dawnSite,
   // 最新版本的截图（换版本时改这里）
   shots: [
     { img: 'img/v14-park.jpg', cap: '乐园模式', en_cap: 'Park Mode', sub: '花车巡游 + 打气球', en_sub: 'Parade float + balloons' },
     { img: 'img/v14-summer.jpg', cap: '夏日系列 + 新角色卡卡', en_cap: 'Summer skins + new pilot Kaka', sub: '1.4 新内容', en_sub: 'New in 1.4' },
     { img: 'img/v14-ranked.jpg', cap: '排位赛禁用阶段', en_cap: 'Ranked ban phase', sub: '黄金段位起', en_sub: 'From Gold tier' },
   ],
-  og: 'img/pc30-draft.jpg',
+  og: 'img/pc31-pv.jpg',
 };
 
 // ---- 发布到网上：官网地址、搜索引擎（SEO）----

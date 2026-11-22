@@ -1,4 +1,4 @@
-# 无画面测试：全部 22 台机体、21 位驾驶员轮流上场；涂地打 4 局 + 其他 10 种模式各打 1 局
+# 无画面测试：全部 25 台机体、24 位驾驶员轮流上场；涂地打 4 局 + 其他 10 种模式各打 1 局
 # 检查涂地、击倒、驾驶员弹出、所有技能 / 大招 / 超载都会被用到，每种模式的目标都有人在抢
 # 运行：godot --headless --path godot --script res://tests/sim_test.gd
 extends SceneTree
@@ -15,7 +15,7 @@ func _init() -> void:
 	var f := FileAccess.open("res://data/game.json", FileAccess.READ)
 	var data: Dictionary = JSON.parse_string(f.get_as_text())
 	var mechs: Array = data.order; var pilots: Array = data.pilotOrder
-	ok(mechs.size() == 22 and pilots.size() == 21 and data.maps.size() >= 11 and data.modeOrder.size() == 11, "数据：%d 台机体、%d 位驾驶员、%d 张地图、%d 种模式" % [mechs.size(), pilots.size(), data.maps.size(), data.modeOrder.size()])
+	ok(mechs.size() == 25 and pilots.size() == 24 and data.maps.size() >= 11 and data.modeOrder.size() == 9, "数据：%d 台机体、%d 位驾驶员、%d 张地图、%d 种模式" % [mechs.size(), pilots.size(), data.maps.size(), data.modeOrder.size()])
 	var counts := {}
 	var total_ms := 0; var total_ticks := 0
 	var runs: Array = []

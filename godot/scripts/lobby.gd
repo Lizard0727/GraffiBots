@@ -185,6 +185,13 @@ func build_home() -> void:
 		var v := vbox(0); h.add_child(v)
 		v.add_child(L(m[1], 21, Color.WHITE)); v.add_child(L(m[2], 13, Color("#a8a4c8")))
 		badge(c, int(m[4]), Vector2(206, -8))
+	var dev = dawn_event()
+	if dev != null:   # 3.1「黎明之后」联动入口
+		var dc := UIKit.card(Color("#ffb648"), Color("#3e3c7e"), Color("#ffe7a8"), 14, true); at(dc, Vector2(16, 190 + menu.size() * 68), Vector2(230, 74)); click(dc, func(): open_sub("dawn"))
+		var dh := hbox(4); dc.add_child(dh)
+		for fid in D.dawn.pilots: dh.add_child(face(fid, 34, false))
+		var dv := vbox(0); dh.add_child(dv); dv.add_child(L("黎明之后", 19, Color.WHITE, 5)); dv.add_child(L("联动活动", 12, Color("#ffe7a8"), 3))
+		badge(dc, dawn_todo(), Vector2(206, -8))
 	if pid != "":
 		var ban := UIKit.card(acc.lerp(Color("#ff3ea5"), 0.3), acc.darkened(0.5), Color.WHITE, 10); ban.skew = 0.18; ban.pad = Vector4(26, 4, 26, 6)
 		var bh := hbox(12); ban.add_child(bh)
@@ -242,12 +249,13 @@ func quests_done() -> int:
 func build_sub() -> void:
 	var see_3d := sub == "mechs"
 	if see_3d: side_shade(0.94, 0.55)
+	elif sub == "dawn": dawn_bg()
 	else:
 		var bg := ColorRect.new(); bg.color = Color(0.05, 0.04, 0.11, 0.93); bg.mouse_filter = Control.MOUSE_FILTER_STOP; at(bg, Vector2.ZERO, vs)
 		var sp := UIKit.Splash.new(); sp.cols = [Color("#ff3ea5"), Color("#1fd6ee"), Color("#ffe14d"), Color("#9cff2e")]; sp.seed_v = sub.hash(); sp.modulate.a = 0.6; at(sp, Vector2.ZERO, vs)
 	var back := UIKit.flat_button("< 返回大厅", 17); at(back, Vector2(16, 96), Vector2(150, 44)); click(back, func(): sub = ""; refresh())
 	var titles := {"pilots": "驾驶员", "mechs": "机体", "chests": "宝箱商店", "talents": "天赋树", "quests": "任务", "pass": "通行证 • " + str(D.econ.pass.season),
-		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "联机房间", "profile": "个人资料", "friends": "好友"}
+		"mail": "邮件", "events": "限时活动", "shop": "皮肤商店", "ranked": "排位赛 • " + str(D.econ.rank.season.name), "loot": "搜刮撤离", "lan": "联机房间", "profile": "个人资料", "friends": "好友", "dawn": "黎明之后 • 联动活动"}
 	at(L(str(titles[sub]), 34, Color("#ffe14d"), 8), Vector2(182, 94))
 	match sub:
 		"pilots": page_pilots()
@@ -264,6 +272,7 @@ func build_sub() -> void:
 		"lan": page_lan()
 		"profile": page_profile()
 		"friends": page_friends()
+		"dawn": page_dawn()
 	game.show_showroom(P.o.pilot, view_mech if see_3d else P.o.weapon, see_3d, -3.6)
 
 func grid(ids: Array, w: float, cols: int, make: Callable) -> void:
@@ -875,7 +884,7 @@ func page_mail() -> void:
 
 # ---------------- 活动 ----------------
 func page_events() -> void:
-	var evs := P.active_events()
+	var evs := P.active_events().filter(func(e): return not e.get("dawn", false))
 	if evs.is_empty(): at(L("现在没有进行中的活动", 18, Color("#a8a4c8")), Vector2(24, 160)); return
 	if ev_tab == "" or not evs.any(func(e): return e.id == ev_tab): ev_tab = evs[0].id
 	tabs(Vector2(330, 100), evs.map(func(e): return [e.id, e.name]), ev_tab, func(id): ev_tab = id)
@@ -939,6 +948,148 @@ func page_events() -> void:
 			v4.add_child(L("已拥有" if own else "%d 宝石" % int(x.gems), 13, Color("#6dff8a") if own else Color("#ff7ad0")))
 			if not own: click(c4, func(): show_items(P.collab_buy(x.id), "联动角色"))
 			ch.add_child(c4)
+
+# ---------------- 3.1「黎明之后」联动活动页 ----------------
+var dawn_tab := "story"
+func dawn_event():
+	for e in P.active_events():
+		if e.get("dawn", false): return e
+	return null
+
+func dawn_done(ev: Dictionary) -> int:
+	var st := P.event_state(ev); var n := 0
+	for i in ev.quests.size():
+		if int(st.p[i]) >= int(ev.quests[i][1]): n += 1
+	return n
+
+func dawn_todo() -> int:
+	var ev = dawn_event()
+	if ev == null: return 0
+	var st := P.event_state(ev); var n := 0
+	for i in ev.quests.size():
+		if not st.c[i] and int(st.p[i]) >= int(ev.quests[i][1]): n += 1
+	var done := dawn_done(ev)
+	for c in D.dawn.story:
+		if done >= int(c.need) and not P.o.get("dawnRead", []).has(int(c.id)): n += 1
+	return n
+
+func dawn_bg() -> void:
+	var bg := ColorRect.new(); bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item; void fragment(){ vec3 a = vec3(0.13, 0.12, 0.3); vec3 b = vec3(0.98, 0.62, 0.4); float y = UV.y; vec3 c = mix(a, b, smoothstep(0.1, 1.1, y)); float sun = smoothstep(0.32, 0.0, length((UV - vec2(0.82, 0.92)) * vec2(1.6, 1.0))); c += vec3(1.0, 0.8, 0.5) * sun * 0.45; COLOR = vec4(c * 0.62, 0.97); }"
+	var m := ShaderMaterial.new(); m.shader = sh; bg.material = m
+	at(bg, Vector2.ZERO, vs)
+
+func page_dawn() -> void:
+	var ev = dawn_event()
+	if ev == null: at(L("「黎明之后」联动活动已经结束了", 18, Color("#a8a4c8")), Vector2(24, 160)); return
+	var col := Color("#ffb648")
+	# 主视觉：三位干员的立绘叠在右边
+	var xs := [vs.x - 640, vs.x - 470, vs.x - 300]
+	for k in 3:
+		var pid: String = D.dawn.pilots[k]
+		var por := UIKit.image(portrait_path(pid), Vector2(330, 430)); at(por, Vector2(xs[k], vs.y - 440 + (k % 2) * 16))
+		por.modulate = Color(1, 1, 1, 0.95) if k == 1 else Color(0.85, 0.85, 0.95, 0.9)
+		por.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var days: int = max(0, (int(ev.end) - Profile.now_s()) / 3600)
+	var hd := vbox(0); at(hd, Vector2(24, 146))
+	hd.add_child(L("AFTER DAWN  •  拂晓站 × 涂鸦机兵", 14, Color("#ffe7a8"), 3))
+	hd.add_child(L("还剩 %d 天 %d 小时  •  晨光碎片 %d" % [days / 24, days % 24, int(P.o.get("dawnshards", 0))], 15, Color.WHITE, 3))
+	tabs(Vector2(24, 196), [["story", "专属手书剧情"], ["quests", "活动任务"], ["shop", "兑换 / 购买"], ["archive", "干员档案"]], dawn_tab, func(id): dawn_tab = id)
+	var W := vs.x * 0.5
+	var sc := ScrollContainer.new(); sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED; at(sc, Vector2(24, 250), Vector2(W, vs.y - 266))
+	var v := vbox(10); sc.add_child(v)
+	var st := P.event_state(ev)
+	match dawn_tab:
+		"story":
+			v.add_child(UIKit.wrap(L(str(ev.desc), 14, Color("#f2eefc"), 3), W - 20))
+			var pv := UIKit.card(Color("#5ad8ff"), Color("#2a3456"), Color("#c8f0ff"), 14, true); pv.custom_minimum_size = Vector2(W - 20, 0)
+			var pvh := hbox(10); pv.add_child(pvh); pvh.add_child(UIKit.icon("super", 34))
+			var pvv := vbox(0); pvh.add_child(pvv); pvv.add_child(L("联动战斗影片「黎明之后」", 18, Color.WHITE, 4)); pvv.add_child(L("1 分钟实机 3D 战斗：三位干员 vs 黑日残影", 12, Color("#e6f6ff"), 2))
+			click(pv, func(): game.play_dawn_pv())
+			v.add_child(pv)
+			var done := dawn_done(ev)
+			for c in D.dawn.story:
+				var open := done >= int(c.need)
+				var read: bool = P.o.get("dawnRead", []).has(int(c.id))
+				var cc := UIKit.dark_card(open); cc.custom_minimum_size = Vector2(W - 20, 0); cc.dim = not open
+				var h := hbox(12); cc.add_child(h)
+				var nb := UIKit.card(col, col.darkened(0.4), Color("#ffe7a8"), 10); nb.pad = Vector4(10, 4, 10, 4); nb.add_child(L("第 %d 话" % int(c.id), 15, Color.WHITE, 3)); h.add_child(nb)
+				var cv := vbox(0); cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(cv)
+				cv.add_child(L(str(c.title), 20, Color.WHITE, 3))
+				cv.add_child(L(("已观看" if read else "首次观看奖励：晨光碎片 ×50") if open else "完成 %d 个活动任务后解锁（现在 %d）" % [int(c.need), done], 12, Color("#6dff8a") if read else Color("#c9c5e6")))
+				if open: h.add_child(claim_btn("重看" if read else "观看", func(): play_tegaki(c), true))
+				else: h.add_child(L("未解锁", 14, Color("#8a84b0")))
+				v.add_child(cc)
+		"quests":
+			for i in ev.quests.size():
+				var q: Array = ev.quests[i]; var n := int(st.p[i]); var dn := n >= int(q[1])
+				var c := UIKit.dark_card(); c.custom_minimum_size = Vector2(W - 20, 0)
+				var h := hbox(10); c.add_child(h)
+				var qv := vbox(3); qv.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(qv)
+				qv.add_child(L(P.stat_name(q[0], q[1]), 15, Color.WHITE)); qv.add_child(UIKit.bar(float(n) / float(q[1]), W - 280, 9, col)); qv.add_child(mini_reward(q[2], 24))
+				if st.c[i]: h.add_child(L("已领取", 14, Color("#6dff8a")))
+				else: h.add_child(claim_btn("领取" if dn else "%d/%d" % [n, int(q[1])], func(): show_items(P.claim_event(ev.id, i), "黎明之后"), dn))
+				v.add_child(c)
+			var L2: Dictionary = P.o.evLogin.get(ev.id, {"n": 0, "d": -1})
+			v.add_child(L("登录奖励（每天领一次）", 18, Color("#ffe14d"), 4))
+			var lh := hbox(6); v.add_child(lh)
+			for i in ev.login.size():
+				var got: bool = i < int(L2.n); var today: bool = i == int(L2.n) and int(L2.d) != Profile.day_index()
+				var c2 := UIKit.card(col.darkened(0.3) if today else Color("#1d1838"), Color("#120f26"), Color("#ffe14d") if today else (Color("#6dff8a") if got else Color("#4b4396")), 12, today)
+				c2.pad = Vector4(5, 4, 5, 4)
+				var v2 := vbox(2); c2.add_child(v2); v2.add_child(centered(L("第 %d 天" % (i + 1), 11, Color.WHITE))); v2.add_child(mini_reward(ev.login[i], 22))
+				if today: click(c2, func(): show_items(P.event_login(ev.id), "登录奖励"))
+				lh.add_child(c2)
+		"shop":
+			var cur := "dawnshards"
+			var sh := hbox(8); v.add_child(sh); sh.add_child(L("晨光碎片兑换", 20, Color("#ffe14d"), 4)); sh.add_child(UIKit.pill(cur, str(int(P.o.get(cur, 0))), col))
+			var gr := GridContainer.new(); gr.columns = 2; gr.add_theme_constant_override("h_separation", 8); gr.add_theme_constant_override("v_separation", 8); v.add_child(gr)
+			for i in ev.shop.size():
+				var item: Dictionary = ev.shop[i]; var left := int(item.limit) - int(st.s[i])
+				var owned: bool = (item.it.k == "pilot" and P.has_pilot(item.it.id)) or (item.it.k == "mech" and P.has_mech(item.it.id))
+				var c3 := UIKit.dark_card(left > 0 and not owned); c3.custom_minimum_size = Vector2(W / 2 - 16, 0); c3.dim = left <= 0 or owned
+				var h3 := hbox(8); c3.add_child(h3); h3.add_child(mini_reward(item.it, 30))
+				var sp := Control.new(); sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sp.mouse_filter = Control.MOUSE_FILTER_IGNORE; h3.add_child(sp)
+				var v3 := vbox(0); h3.add_child(v3)
+				if owned: v3.add_child(L("已拥有", 13, Color("#6dff8a")))
+				else:
+					var ph := hbox(3); v3.add_child(ph); ph.add_child(UIKit.icon(cur, 20)); ph.add_child(L(str(int(item.cost)), 15, col))
+					v3.add_child(L("剩 %d" % left, 11, Color("#a8a4c8")))
+				if left > 0 and not owned: click(c3, func(): show_items(P.event_shop(ev.id, i), "兑换成功"))
+				gr.add_child(c3)
+			v.add_child(L("宝石直购（也可以做任务 / 碎片兑换拿到）", 18, Color("#ffe14d"), 4))
+			var ch := hbox(8); v.add_child(ch)
+			for x in D.econ.collab.shop:
+				var own: bool = P.has_pilot(x.id) if x.k == "pilot" else P.has_mech(x.id)
+				var c4 := UIKit.dark_card(not own); c4.dim = own
+				var v4 := vbox(2); c4.add_child(v4); v4.add_child(mini_reward({"k": x.k, "id": x.id}, 40))
+				v4.add_child(L("已拥有" if own else "%d 宝石" % int(x.gems), 13, Color("#6dff8a") if own else Color("#ff7ad0")))
+				if not own: click(c4, func(): show_items(P.collab_buy(x.id), "联动角色"))
+				ch.add_child(c4)
+			v.add_child(UIKit.wrap(L("「夜都决战」联动已下架：符零、赤镰、结界机兵、灵刃机兵暂时绝版，已经拥有的照常可以使用。", 12, Color("#a8a4c8")), W - 20))
+		"archive":
+			for pid in D.dawn.pilots:
+				var Pd: Dictionary = D.pilots[pid]; var A: Dictionary = D.dawn.archive[pid]
+				var c := UIKit.dark_card(); c.custom_minimum_size = Vector2(W - 20, 0)
+				var h := hbox(12); c.add_child(h); h.add_child(face(pid, 72, false))
+				var av := vbox(3); av.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(av)
+				var nh := hbox(8); av.add_child(nh); nh.add_child(L(str(Pd.name), 24, Color(str(Pd.accent)), 4)); nh.add_child(UIKit.chip(str(Pd.title), Color(str(Pd.accent)), 12))
+				av.add_child(L("「%s」 %s" % [Pd.code, Pd.line], 13, Color("#ffe7a8")))
+				av.add_child(UIKit.wrap(L(str(A.bio), 13, Color("#e6e2fa")), W - 140))
+				av.add_child(L("  •  ".join(A.archive), 12, Color("#a8a4c8")))
+				av.add_child(UIKit.wrap(L("被动「%s」：%s" % [Pd.passive.name, Pd.passive.desc], 12, Color("#c9c5e6")), W - 140))
+				v.add_child(c)
+
+func play_tegaki(c: Dictionary) -> void:
+	var tg := Tegaki.new(); tg.setup(game, c)
+	tg.finished.connect(func(cid):
+		if not P.o.has("dawnRead"): P.o.dawnRead = []
+		if not P.o.dawnRead.has(cid):
+			P.o.dawnRead.append(cid); P.o.dawnshards = int(P.o.get("dawnshards", 0)) + 50; P.save()
+			show_items({"ok": true, "items": [{"k": "dawnshards", "n": 50}]}, "第 %d 话 · 首次观看" % cid)
+		else: refresh())
+	add_child(tg)
 
 # ---------------- 皮肤商店（含限时角色） ----------------
 func page_shop() -> void:

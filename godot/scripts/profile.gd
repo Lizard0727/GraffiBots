@@ -5,7 +5,7 @@ extends RefCounted
 
 const PATH := "user://profile.json"
 const VERSION := 1
-const CUR_KEYS := ["coins", "gems", "parts", "crystals", "tickets", "shards", "talismans"]
+const CUR_KEYS := ["coins", "gems", "parts", "crystals", "tickets", "shards", "talismans", "dawnshards"]
 
 var D: Dictionary
 var E: Dictionary
@@ -17,6 +17,7 @@ func _init(data: Dictionary, save_path: String = PATH) -> void:
 	D = data; E = data.econ; path = save_path
 	rng.randomize()
 	load_or_new()
+	if not (str(o.get("mode", "turf")) in D.modeOrder or str(o.get("mode", "")) == "loot"): o.mode = "turf"   # 3.1：咒灵讨伐 / 封印争夺下架
 
 # ---------------- 存档 ----------------
 func new_profile() -> Dictionary:
@@ -617,14 +618,17 @@ func apply_match(rw: Dictionary) -> Dictionary:
 		rank_info = {"rp0": rp0, "rp1": rp1, "d": rp1 - rp0, "t0": t0, "t1": rank_tier(rp1)}
 	for ev in evs:
 		if park and ev.has("ticketsPerPark"): items.append({"k": "tickets", "n": int(ev.ticketsPerPark) + (int(ev.get("ticketsWin", 0)) if rw.won else 0), "why": ev.name})
-		if ev.has("curPer"):
+		if ev.get("dawn", false):   # 3.1 联动：每局都给晨光碎片，赢了 / 用联动角色再多给
+			var nd: int = int(ev.curPer.get("_all", 8)) + (int(ev.get("curWin", 0)) if rw.won else 0) + (int(ev.get("curDawn", 0)) if rw.get("dawn", false) else 0)
+			items.append({"k": ev.cur, "n": nd, "why": ev.name})
+		elif ev.has("curPer"):
 			var n: int = int(ev.curPer.get(mode, ev.get("curOther", 0))) + (int(ev.get("curWin", 0)) if rw.won and ev.curPer.has(mode) else 0)
 			if n > 0: items.append({"k": ev.cur, "n": n, "why": ev.name})
 	var g := {"play": 1, "win": 1 if rw.won else 0, "kills": int(rw.kills), "paint": int(rw.paint), "elim": 1 if mode == "elim" else 0, "escape": 1 if esc else 0,
 		"top3": 1 if esc and int(rw.get("rank", 9)) <= 3 else 0, "crates": int(rw.get("cubes", 0)), "park": 1 if park else 0, "parkwin": 1 if park and rw.won else 0,
 		"balloons": int(rw.get("balloons", 0)), "float": int(rw.get("float", 0)), "ranked": 1 if ranked else 0, "raid": 1 if mode == "raid" else 0,
 		"raidwin": 1 if mode == "raid" and rw.won else 0, "seal": 1 if mode == "seal" else 0, "seals": int(rw.get("seals", 0)), "spirits": int(rw.get("spirits", 0)),
-		"loot": 1 if mode == "loot" else 0, "lootex": 1 if rw.get("lootex", false) else 0, "lootv": int(rw.get("lootv", 0)), "lootgold": int(rw.get("lootgold", 0)), "loothi": 0}
+		"loot": 1 if mode == "loot" else 0, "dawnplay": 1 if rw.get("dawn", false) else 0, "dawnwin": 1 if rw.get("dawn", false) and rw.won else 0, "dawnmap": 1 if rw.get("dawnmap", false) else 0, "lootex": 1 if rw.get("lootex", false) else 0, "lootv": int(rw.get("lootv", 0)), "lootgold": int(rw.get("lootgold", 0)), "loothi": 0}
 	for ev in evs:
 		var st := event_state(ev)
 		for i in ev.quests.size(): st.p[i] = mini(int(ev.quests[i][1]), int(st.p[i]) + int(g.get(ev.quests[i][0], 0)))

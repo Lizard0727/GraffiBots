@@ -386,6 +386,15 @@
       s += path('M222,206 L270,198 L268,214 L224,220 Z', '#ff2d4b', ol(2));
       s += `<path d="M238,250 L246,282 M258,246 L266,276" stroke="#a89c88" stroke-width="3"/>`;
     }
+    if (X.includes('sunpin')) {   // 熹微：发间的小太阳发卡
+      s += `<circle cx="282" cy="118" r="15" fill="#ffd27a" ${ol(2.4)}/>`;
+      for (let k = 0; k < 8; k++) { const ang = k * Math.PI / 4; s += `<path d="M${(282 + Math.cos(ang) * 18).toFixed(1)},${(118 + Math.sin(ang) * 18).toFixed(1)} L${(282 + Math.cos(ang) * 26).toFixed(1)},${(118 + Math.sin(ang) * 26).toFixed(1)}" stroke="#ffb030" stroke-width="3.4" stroke-linecap="round"/>`; }
+    }
+    if (X.includes('phones')) {   // 尾声：头戴式监听耳机
+      s += `<path d="M112,196 C108,90 292,90 288,196" fill="none" stroke="#1a2034" stroke-width="12"/>`;
+      for (const x of [110, 290]) s += `<rect x="${x - 18}" y="176" width="36" height="56" rx="14" fill="#2a3048" ${ol(3)}/><rect x="${x - 10}" y="190" width="20" height="28" rx="8" fill="#7ad8ff" opacity="0.85"/>`;
+    }
+    if (X.includes('moonmark')) s += `<path d="M262,232 A12,12 0 1 0 262,256 A8,8 0 1 1 262,232 Z" fill="#9a7aff" opacity="0.9"/>`;
     if (X.includes('sealband')) s += `<g transform="rotate(-10 300 470)"><rect x="276" y="452" width="56" height="20" fill="#c8102e" ${ol(2.4)}/><rect x="296" y="448" width="16" height="28" fill="#f4e6c8" ${ol(1.8)}/></g>`;
     if (X.includes('sunglasses')) {
       for (const x of [164, 236]) s += `<rect x="${x - 30}" y="190" width="60" height="38" rx="16" fill="#1b1530" ${ol(3)}/><path d="M${x - 18},198 l14,0" stroke="#7af0ff" stroke-width="4" stroke-linecap="round" opacity="0.85"/>`;
@@ -630,6 +639,45 @@
         s += `<path d="M168,340 L200,372 L232,340" fill="none" stroke="${a}" stroke-width="4"/>`;
         s += `<text x="200" y="460" text-anchor="middle" font-size="40" font-family="Impact, sans-serif" fill="#e9eef2" opacity="0.9">00</text>`;
         s += `<rect x="96" y="420" width="46" height="22" rx="3" fill="#9aa0a8" ${ol(2)}/><text x="119" y="436" text-anchor="middle" font-size="11" font-family="Impact, sans-serif" fill="#2a2d3a">GRAYCO</text><path d="M92,446 L148,416" stroke="${a}" stroke-width="5" stroke-linecap="round"/>`;
+        break;
+      }
+      // 3.1「黎明之后」联动（电脑版）：拂晓站的三位干员
+      case 'dawnGlimmer': {   // 熹微：奶白短披风 + 琥珀色战术外套 + 胸前的日晷徽章 + 斜挎带
+        s += path(shape(SH), '#c9822e', ol(3));
+        s += path(shape([[150, 344, 1], [200, 372], [250, 344, 1], [244, 520, 1], [156, 520, 1]]), '#2e2a36', ol(2.6));
+        s += path(shape([[44, 470], [70, 386], [150, 340], [176, 380], [130, 470, 1], [90, 520, 1], [48, 520, 1]]), '#f6eedc', ol(3));
+        s += path(shape(mirrorPts([[44, 470], [70, 386], [150, 340], [176, 380], [130, 470, 1], [90, 520, 1], [48, 520, 1]])), '#f6eedc', ol(3));
+        s += `<path d="M64,452 Q100,430 132,452 M268,452 Q300,430 336,452" stroke="${a}" stroke-width="5" fill="none"/>`;
+        s += path('M156,334 L166,292 L234,292 L244,334 L200,356 Z', '#f6eedc', ol(3));
+        s += `<path d="M168,300 L232,300" stroke="${a}" stroke-width="5"/>`;
+        s += `<path d="M150,360 L262,520" stroke="#5a3a1e" stroke-width="12"/><path d="M150,360 L262,520" stroke="#8a5a2e" stroke-width="5"/>`;
+        s += `<circle cx="200" cy="428" r="24" fill="#ffe7a8" ${ol(2.6)}/><circle cx="200" cy="428" r="15" fill="none" stroke="${a}" stroke-width="3"/>`;
+        for (let k = 0; k < 8; k++) { const ang = k * Math.PI / 4; s += `<path d="M${(200 + Math.cos(ang) * 17).toFixed(1)},${(428 + Math.sin(ang) * 17).toFixed(1)} L${(200 + Math.cos(ang) * 22).toFixed(1)},${(428 + Math.sin(ang) * 22).toFixed(1)}" stroke="${a}" stroke-width="2.4"/>`; }
+        s += `<path d="M200,428 L200,416 M200,428 L209,433" stroke="${LINE}" stroke-width="2.6" stroke-linecap="round"/>`;
+        s += `<g transform="rotate(-8 108 488)"><rect x="80" y="476" width="58" height="22" rx="3" fill="#2e2a36" ${ol(2)}/><path d="M92,492 Q109,478 126,492 M88,493 L130,493" stroke="${a}" stroke-width="2.6" fill="none"/></g>`;
+        break;
+      }
+      case 'dawnCoda': {      // 尾声：深蓝长风衣 + 浅蓝滚边 + 胸前的声波线 + 挂在胸带上的旧磁带
+        s += path(shape(SH), '#1e2640', ol(3));
+        s += path(shape([[162, 340, 1], [200, 368], [238, 340, 1], [232, 520, 1], [168, 520, 1]]), '#e9eef4', ol(2.6));
+        s += path(shape([[90, 376], [162, 340], [140, 290, 1], [186, 344], [194, 450, 1], [160, 520, 1], [66, 520, 1]]), '#2a3456', ol(3));
+        s += path(shape(mirrorPts([[90, 376], [162, 340], [140, 290, 1], [186, 344], [194, 450, 1], [160, 520, 1], [66, 520, 1]])), '#2a3456', ol(3));
+        s += `<path d="M140,292 L186,344 L194,450 M260,292 L214,344 L206,450" stroke="${a}" stroke-width="3.4" fill="none"/>`;
+        s += `<path d="M170,404 l8,0 l5,-14 l6,28 l6,-34 l6,40 l6,-26 l5,12 l8,0" stroke="${a}" stroke-width="3.4" fill="none" stroke-linejoin="round"/>`;
+        s += `<path d="M96,384 L176,520" stroke="#141a2c" stroke-width="10"/>`;
+        s += `<g transform="rotate(-24 130 460)"><rect x="104" y="444" width="54" height="34" rx="4" fill="#d8dde6" ${ol(2.4)}/><rect x="112" y="452" width="38" height="14" rx="6" fill="#2a3048"/><circle cx="121" cy="459" r="4" fill="#d8dde6"/><circle cx="141" cy="459" r="4" fill="#d8dde6"/><path d="M110,472 h42" stroke="${a}" stroke-width="2.6"/></g>`;
+        s += `<path d="M270,470 L320,470 M276,484 L314,484" stroke="${a}" stroke-width="3" opacity="0.8"/>`;
+        break;
+      }
+      case 'dawnXiao': {      // 宵：黑色连帽斗篷 + 紫色内衬 + 月蚀胸针 + 缠着布条的提灯挂饰
+        s += path(shape([[70, 400], [110, 326], [200, 300], [290, 326], [330, 400], [200, 350]]), '#221e2c', ol(3));
+        s += path(shape(SH), '#14121a', ol(3));
+        s += path(shape([[154, 342, 1], [200, 386], [246, 342, 1], [236, 520, 1], [164, 520, 1]]), '#3a2e58', ol(2.6));
+        s += path('M158,334 L166,288 L234,288 L242,334 L200,362 Z', '#14121a', ol(3));
+        s += `<path d="M154,342 L200,386 L246,342" stroke="${a}" stroke-width="3.6" fill="none"/>`;
+        s += `<circle cx="200" cy="420" r="20" fill="#2a2440" ${ol(2.6)}/><path d="M207,404 A17,17 0 1 0 207,436 A12,12 0 1 1 207,404 Z" fill="${a}"/>`;
+        s += `<path d="M80,450 L150,436 M84,466 L148,456" stroke="#d8d0c0" stroke-width="7" opacity="0.9"/>`;
+        s += `<path d="M286,430 L286,452" stroke="#8a7a5a" stroke-width="3"/><rect x="274" y="452" width="24" height="30" rx="6" fill="#ffd27a" ${ol(2.4)}/><path d="M274,462 h24 M274,472 h24" stroke="#5a4a2a" stroke-width="2"/>`;
         break;
       }
       case 'engineer': {

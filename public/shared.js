@@ -790,7 +790,7 @@
     const hp = w.hp / (w.armor || 1) * (w.front ? 1.2 : 1);
     return [dmg, hp, w.spd, S.weaponRange(id), area / cyc];
   };
-  const v5 = (a) => [a[0] || 0, a[1] || 0, a[2] || 0, a[3] || 0, a[4] || 0];
+  const v5 = (a) => { a = a || []; return [a[0] || 0, a[1] || 0, a[2] || 0, a[3] || 0, a[4] || 0]; };
   // 技能 / 被动的分量 [战斗, 辅助, 控制, 机动, 生存]
   const SK_V = { rush: [1, 0, 0, 3, 0], scan: [0, 3, 0, 0, 0], cheer: [0, 3, 0, 0, 1], guard: [0, 0, 0, 0, 3], smoke: [0, 0, 0, 1, 2], turret: [2, 1, 0, 0, 0], dash: [0, 0, 0, 3, 1],
     emp: [0, 0, 3, 0, 0], bento: [0, 3, 0, 0, 1], overdrive: [3, 0, 0, 0, 0], drone: [2, 1, 0, 0, 0], rally: [1, 3, 0, 1, 0], blast: [3, 0, 1, 0, 0], jam: [0, 1, 3, 0, 0],

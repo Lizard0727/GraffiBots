@@ -179,6 +179,56 @@ class Mech:
 	var ai_last := Vector2.ZERO
 	var ai_strafe := 1.0
 	var ai_skill := 0.0
+	# 3.1「黎明之后」联动（见 dawn.gd）
+	var dial := 0.0           # 熹微：日晷（0~16 秒一圈）
+	var dial_frz := 0.0
+	var suns := 0
+	var eter_on := false
+	var glare_n := 0          # 身上的灼光层数
+	var glare_t := 0.0
+	var echo := {}            # 别人攒在我身上的回响：攻击者 id → {amt, t}
+	var echo_sum := 0.0
+	var linger := 0           # 尾声：余韵
+	var hist: Array = []
+	var hist_t := 0.0
+	var thea_on := false
+	var debt := 0.0           # 宵：夜债
+	var debt_by := 0
+	var debt_fast := 0.0
+	var moon_on := false
+	var hurt_by := {}         # 谁在什么时候打过我（长夜的「没打过你」判定）
+	var disc_on := false      # 晨轮：光轮
+	var disc_ph := 0
+	var disc_t := 0.0
+	var disc_d := 0.0
+	var disc_a := 0.0
+	var disc_x := 0.0
+	var disc_y := 0.0
+	var disc_z := 0.0
+	var disc_pt := 0.0
+	var disc_mul := 1.0
+	var disc_big := false
+	var disc_hit := {}
+	var teth_id := 0          # 共鸣：拴住的人
+	var teth_t := 0.0
+	var teth_acc := 0.0
+	var teth_lost := 0.0
+	var fork_id := 0
+	var links: Array = []     # 谐振网
+	var links_t := 0.0
+	var guarding := false     # 守夜：举盾
+	var g_hold := 0.0
+	var g_combo := 0
+	var guard_e := 2.5
+	var guard_down := -10.0
+	var parry_until := 0.0
+	var parried := false
+	var blocked := 0.0
+	var ai_tap := false
+	var night_t := 0.0
+	var cine_t := 0.0         # 绝响终章
+	var cine_with := 0
+	var cine_lead := false
 
 var D: Dictionary
 var C: Dictionary
@@ -282,6 +332,28 @@ func in_bush(x: float, y: float, z: float) -> bool:
 func dist2d(a, b) -> float:
 	return Vector2(a.x - b.x, a.y - b.y).length()
 
+func player_by(id: int) -> Mech:
+	for q in players:
+		if q.id == id: return q
+	return null
+
+var _sharing := false
+
+# 真实伤害（回响 / 灼光引爆）：不吃任何加成、减伤和护盾
+func hurt_true(t: Mech, amt: float, by: Mech) -> void:
+	if not t.alive or t.inv_t > 0 or t.cine_t > 0 or amt <= 0: return
+	if tutorial and by != null and by.team != t.team and not t.bot: amt = minf(amt, maxf(0.0, t.hp - 1.0))
+	t.hp -= amt; t.last_hurt = time; t.flash = 1.0
+	if by != null and by != t and by.team != t.team:
+		if not by.foot and by.sp_t <= 0 and by.no_sp_until <= time: by.sp = min(float(wdata(by).spNeed), by.sp + amt)
+		if by.ov_t <= 0 and not by.npc and by.bt >= 1: by.ov = min(float(C.OV_NEED), by.ov + amt)
+		t.hurt_by[by.id] = time
+	ev(["dmg", t.id, int(round(amt)), by.id if by != null else 0, true])
+	if t.hp <= 0:
+		if t.boss: boss_down(t, by)
+		elif t.foot or t.spirit: kill(t, by)
+		else: wreck(t, by)
+
 func ev(e: Array) -> void:
 	events.append(e)
 
@@ -334,7 +406,7 @@ func respawn(p: Mech) -> void:
 	ev(["spawn", p.id])
 
 func max_hp_of(p: Mech) -> float:
-	return float(C.PILOT_HP) if p.foot else p.max_hp
+	return (float(C.PILOT_HP) if p.foot else p.max_hp) * Dawn.max_hp_k(p)
 
 func near_pilot(p: Mech, pid: String, r: float) -> bool:
 	for a in players:
@@ -404,6 +476,7 @@ func update_player(p: Mech, dt: float) -> void:
 		return
 	var w := wdata(p)
 	p.flash = max(0.0, p.flash - dt * 5.0)
+	if Dawn.cine_tick(self, p, dt): return   # 绝响终章：两个人都定在原地
 	p.inv_t = max(0.0, p.inv_t - dt)
 	if p.shield_t > 0:
 		p.shield_t -= dt
@@ -438,6 +511,8 @@ func update_player(p: Mech, dt: float) -> void:
 	var OV = ov_of(p)
 	if p.ov_t > 0: p.ov_t = max(0.0, p.ov_t - dt)
 	if OV != null: overload_tick(p, OV, dt)
+	Dawn.tick(self, p, dt)
+	if not p.alive: return
 	if p.pilot == "zero" and int(time * 30) % 6 == 0:   # 沈零被动：战场感知
 		for e in players:
 			if e.alive and e.team != p.team and dist2d(e, p) < 260: e.reveal_t = max(e.reveal_t, 0.4)
@@ -456,6 +531,7 @@ func update_player(p: Mech, dt: float) -> void:
 	if p.dslow_t > 0: sm *= 0.75
 	if p.bind_t > 0: sm *= 0.12
 	if OV != null and OV.has("spd"): sm *= float(OV.spd)
+	sm *= Dawn.speed_mul(self, p)
 	if obj.has("tr") and obj.tr.carrier == p: sm *= 0.72
 	if p.carry > 0: sm *= 1.0 - 0.04 * p.carry
 	if p.boss: sm *= 0.8
@@ -712,6 +788,8 @@ func weapon_logic(p: Mech, dt: float, w: Dictionary) -> bool:
 			fire_sidearm(p, A)
 			return true
 		return false
+	if str(w.attack) == "guard": return Dawn.guard_input(self, p, w, dt)
+	if p.disc_on: return false   # 光轮还没回来
 	if str(w.attack) == "charge":
 		if p.inp.f and p.ammo >= 1:
 			p.charge = min(1.0, p.charge + dt / float(w.chargeTime))
@@ -744,6 +822,7 @@ func weapon_logic(p: Mech, dt: float, w: Dictionary) -> bool:
 				if w.has("bounce"): sh.bounce = 1
 				if w.has("sticky"): sh.sticky = float(w.sticky)
 			"punch": punch(p, w)
+			"disc", "tether": Dawn.fire(self, p, w)
 		ev(["fire", p.id, p.weapon])
 		return true
 	return p.roll_t > 0
@@ -1063,6 +1142,7 @@ func mech_edge(wa: String, wb: String) -> float:
 
 func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmul: float = 1.0, kup: float = 0.0) -> void:
 	if not t.alive or t.inv_t > 0: return
+	if t.cine_t > 0 or (by != null and by != t and by.cine_t > 0): return   # 绝响终章里谁都碰不到
 	if t.sp_t > 0 and t.sp_kind == "charge": return
 	var tOV = ov_of(t)
 	if by != null and by != t:
@@ -1084,6 +1164,7 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 		if t.mark_t > 0 and t.mark_team == by.team: dmg *= 1.12
 		if by.pilot == "fu" and t.slow_t > 0: dmg *= 1.1
 		if by.pilot == "aka" and by.hp < max_hp_of(by) * 0.5: dmg *= 1.22
+		dmg *= Dawn.atk_mul(self, by, t)
 		if not by.foot and not t.foot and not t.npc: dmg *= mech_edge(by.weapon, t.weapon)
 		if not by.foot and D.mechs[by.weapon].has("backstab"):
 			var da := wrapf(atan2(by.y - t.y, by.x - t.x) - float(t.inp.a), -PI, PI)
@@ -1091,6 +1172,9 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 	if not t.foot and D.mechs[t.weapon].has("front") and by != null and by != t:
 		var da2 := wrapf(atan2(by.y - t.y, by.x - t.x) - float(t.inp.a), -PI, PI)
 		if absf(da2) < 1.05: dmg *= float(D.mechs[t.weapon].front); ev(["guard", t.id])
+	if not t.foot and t.guarding:
+		dmg = Dawn.guard_block(self, t, by, dmg)
+		if dmg <= 0: return
 	if t.tal.has("d6") and dmg > 30: dmg *= 0.8
 	if tOV != null and tOV.has("def"): dmg *= float(tOV.def)
 	if tOV != null and tOV.has("reflect") and by != null and by != t and by.team != t.team and by.alive and not _reflecting:
@@ -1126,6 +1210,8 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 	if tutorial and by != null and by.team != t.team:
 		if not t.bot: dmg = minf(dmg, maxf(0.0, t.hp - 1.0))
 		elif not by.bot: tut_hits += 1
+	var dealt := dmg
+	dmg = Dawn.to_debt(self, t, by, dmg)
 	t.hp -= dmg; t.last_hurt = time; t.flash = 1.0
 	if by != null and by != t and by.team != t.team:
 		var bo = ov_of(by)
@@ -1134,17 +1220,20 @@ func hurt(t: Mech, dmg: float, by: Mech, kdx: float = 0.0, kdy: float = 0.0, kmu
 		if not by.foot and by.sp_t <= 0 and by.no_sp_until <= time:
 			by.sp = min(float(wdata(by).spNeed), by.sp + dmg * (1.3 if by.pilot == "candy" else 1.0) * (float(bo.spGain) if bo != null and bo.has("spGain") else 1.0) * (1.15 if by.tal.has("a3") else 1.0))
 		if by.ov_t <= 0 and not by.npc and by.bt >= 1: by.ov = min(float(C.OV_NEED), by.ov + dmg * (1.2 if by.tal.has("s3") else 1.0))
-	ev(["dmg", t.id, int(round(dmg)), by.id if by != null else 0])
+	ev(["dmg", t.id, int(round(dealt)), by.id if by != null else 0])
 	if t.hp <= 0:
 		if t.boss: boss_down(t, by)
 		elif t.foot or t.spirit: kill(t, by)
 		else: wreck(t, by)
+	if t.alive: Dawn.after_hit(self, t, by, dealt, false)
+	elif by != null and by != t: t.hurt_by[by.id] = time
 
 var _reflecting := false
 
 func on_takedown(by: Mech, t: Mech) -> void:
 	if by == null: return
 	by.kills += 1
+	Dawn.on_takedown(self, by, t)
 	var bo = ov_of(by)
 	if bo != null and bo.has("killCharge"): by.skill_uses = mini(by.skill_max, by.skill_uses + 1)
 	if by.tal.has("s4") and by.alive: by.hp = min(max_hp_of(by), by.hp + 15)
@@ -1154,6 +1243,7 @@ func on_takedown(by: Mech, t: Mech) -> void:
 
 # 机体被打爆：驾驶员弹出，用随身武器继续打；活过 6 秒原地空投新机体
 func wreck(t: Mech, by: Mech) -> void:
+	Dawn.on_down(self, t, false)
 	if by != null and by != t: on_takedown(by, t)
 	paint(t.x, t.y, top_at(t.x, t.y), 55, by.team if by != null else (0 if teams > 2 else 3 - t.team), by)
 	t.foot = true; t.hp = float(C.PILOT_HP); t.rebuild_t = 1e9 if one_life else float(C.REBUILD) - (2.0 if t.pilot == "aurora" else 0.0) - (1.0 if t.tal.has("d3") else 0.0)
@@ -1174,6 +1264,7 @@ func redeploy(p: Mech) -> void:
 	paint(p.x, p.y, p.z, 60, p.team, p)
 
 func kill(t: Mech, by: Mech) -> void:
+	Dawn.on_down(self, t, true)
 	t.alive = false; t.hp = 0; t.respawn_t = 1e9 if one_life else float(C.KO_RESPAWN); t.deaths += 1; t.foot = false
 	if one_life: t.out = true
 	t.charge = 0; t.burst_n = 0; t.roll_t = 0; t.sp_t = 0; t.sp_kind = ""; t.shield = 0
@@ -1217,6 +1308,7 @@ func use_skill(p: Mech) -> void:
 	var sk := str(pdata(p).skill)
 	var a := float(p.inp.a)
 	ev(["skill", p.id, sk, p.x, p.y, p.z])
+	if Dawn.use_skill(self, p, sk): return
 	match sk:
 		"rush": p.rush_t = 3.0
 		"scan": reveal[p.team] = time + 5.0
@@ -1295,7 +1387,12 @@ func activate_special(p: Mech) -> void:
 		for a2 in players:
 			if a2 != p and a2.alive and a2.team == p.team and dist2d(a2, p) < 200: a2.shield = max(a2.shield, 30.0); a2.shield_t = 4
 	var a := float(p.inp.a)
+	if p.sp_kind == "resnet" and Dawn.can_finale(p): p.sp_kind = "finale"
 	ev(["super", p.id, p.sp_kind, p.x, p.y, p.z])
+	if p.sp_kind == "finale":
+		p.sp_kind = "resnet"
+		if Dawn.finale(self, p): return
+	if Dawn.special(self, p, p.sp_kind): return
 	match p.sp_kind:
 		"storm": p.sp_t = 0.8; p.sp_wave = 0
 		"bulldoze":
@@ -1409,6 +1506,7 @@ func quake_slam(p: Mech) -> void:
 
 func update_special(p: Mech, dt: float) -> void:
 	p.sp_t -= dt
+	if Dawn.update_special(self, p, dt): return
 	match p.sp_kind:
 		"lancestorm":
 			p.ls_t -= dt
@@ -1663,10 +1761,12 @@ func ai_think(p: Mech, dt: float) -> void:
 		p.afk_next -= dt
 		if p.afk_next <= 0: p.afk_t = rng.randf_range(4.0, 10.0); p.afk_next = rng.randf_range(15.0, 30.0)
 	var w := wdata(p)
-	var melee: bool = str(w.attack) == "punch" and not p.foot
+	var melee: bool = str(w.attack) in ["punch", "guard"] and not p.foot
 	var rng_w := float(side(p).range) if p.foot else float(w.range2)
 	var tgt: Mech = null; var td := 1e9
 	var blind_r := 180.0 if p.blind_t > 0 else 1e9
+	for h in helpers:   # 3.1：在敌人的「长夜」里只能看见 150 以内
+		if h.kind == "night" and h.team != p.team and Vector2(p.x - h.x, p.y - h.y).length() < float(h.r): blind_r = minf(blind_r, 150.0)
 	# 交战距离：射程 + 200；逃亡圈里大家更在意捡箱子、躲毒圈，被打了才还手
 	var engage: float = minf(760.0, rng_w + 160.0)   # 和网页版一样：射程 + 160 内才会盯上
 	if mode in ["escape4", "escape8"] and time - p.last_hurt > 4.0: engage = minf(engage, rng_w * 0.75 + 40.0)
@@ -1735,6 +1835,7 @@ func ai_think(p: Mech, dt: float) -> void:
 			inp.f = td < float(w.range) + 20 and td > float(w.minRange)
 		else:
 			inp.f = td < rng_w + (30.0 if melee else 10.0)
+		Dawn.ai_fire(self, p, tgt, td)
 		if p.ai_seen < react: inp.f = false
 		if inp.f and not p.pz.is_empty() and rng.randf() > clampf(float(p.pz.fire) / 0.5, 0.35, 1.0): inp.f = false
 		var rt := float(p.pz.get("retreat", 0.0))
@@ -1748,6 +1849,9 @@ func ai_think(p: Mech, dt: float) -> void:
 			var use := false
 			match sk:
 				"rush": use = fight or p.foot
+				"dial": use = fight and Dawn.phase(p) in [1, 2]
+				"rewind": use = hp_k < 0.4 or (fight and players.any(func(e): return e.echo.has(p.id) and float(e.echo[p.id].amt) > 60))
+				"settle": use = p.debt > 45 and td < 150
 				"scan": use = false
 				"cheer": use = hp_k < 0.6
 				"guard": use = fight and hp_k < 0.75

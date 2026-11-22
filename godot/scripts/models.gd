@@ -26,6 +26,7 @@ static func glow(c: Color, k := 2.0, alpha := 1.0) -> StandardMaterial3D:
 	if _mats.has(key): return _mats[key]
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	k = 1.0 + (k - 1.0) * 0.45 if k > 1.0 else k   # 3.1：发光整体压低（以前光污染太重）
 	m.albedo_color = Color(c.r * k, c.g * k, c.b * k, alpha) if k > 1.0 else Color(c, alpha)
 	if alpha < 1.0: m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_mats[key] = m
@@ -252,6 +253,25 @@ static func build_weapon(id: String, g: Node3D, tc: Color, body: Node3D) -> void
 			part(g, mesh("cyl", 0.06, 2.3), toon(dk), Vector3(1.1, 0, 0), Vector3(0, 0, -90))
 			part(g, mesh("cyl", 0.4, 0.15, 0.25), toon(wh), Vector3(0.25, 0, 0), Vector3(0, 0, -90))
 			part(g, mesh("cone", 0.14, 0.7), glow(tc, 2.2), Vector3(2.55, 0, 0), Vector3(0, 0, -90))
+		# 3.1「黎明之后」联动机甲
+		"halo":   # 晨轮：手臂上的光轮发射架（光轮扔出去时这里的光轮会隐藏，见 game.gd）
+			part(g, mesh("box", 0.7, 0.26, 0.4), toon(Color("#f6eedc"), 0.0, 0.6), Vector3(0.3, 0, 0))
+			part(g, mesh("box", 0.4, 0.1, 0.5), toon(Color("#c9822e")), Vector3(0.35, 0.18, 0))
+			var disc := part(g, mesh("torus", 0.32, 0.48), toon(Color("#ffd27a"), 0.45, 0.8), Vector3(0.95, 0.05, 0))
+			disc.name = "disc"
+			part(disc, mesh("cyl", 0.3, 0.05), toon(Color("#ffe7a8"), 0.3, 0.6), Vector3.ZERO)
+		"chord":  # 共鸣：音叉形的发射器 + 卷着共鸣索的线轴
+			part(g, mesh("box", 0.6, 0.3, 0.34), toon(Color("#2a3456")), Vector3(0.25, 0, 0))
+			for zz in [-0.14, 0.14]: part(g, mesh("box", 0.9, 0.08, 0.06), toon(Color("#dfe6ee"), 0.0, 0.9), Vector3(1.0, 0.04, zz))
+			part(g, mesh("cyl", 0.2, 0.3), toon(Color("#7ad8ff"), 0.4, 0.6), Vector3(0.2, 0.0, 0.3), Vector3(90, 0, 0))
+			part(g, mesh("sph", 0.07), glow(Color("#7ad8ff"), 1.6), Vector3(1.48, 0.04, 0))
+		"vigil":  # 守夜：提灯刀 + 背在手臂上的夜幕盾
+			part(g, mesh("cyl", 0.05, 1.3), toon(Color("#1d1a26")), Vector3(0.5, 0.2, 0), Vector3(0, 0, -70))
+			part(g, mesh("box", 1.1, 0.07, 0.24), toon(Color("#cfc8e6"), 0.0, 0.9), Vector3(1.35, 0.62, 0), Vector3(0, 0, 20))
+			part(g, mesh("box", 0.2, 0.26, 0.2), glow(Color("#ffd27a"), 1.3), Vector3(0.75, 0.36, 0))
+			var sh := part(g, mesh("box", 0.12, 1.1, 0.9), toon(Color("#221e2c"), 0.0, 0.5), Vector3(0.3, 0.1, -0.7))
+			sh.name = "shield"
+			part(sh, mesh("box", 0.13, 0.12, 0.7), toon(Color("#9a7aff"), 0.3), Vector3(0, 0.25, 0))
 		_:
 			part(g, mesh("box", 0.6, 0.35, 0.35), toon(dk), Vector3(0.3, 0, 0))
 			part(g, mesh("cyl", 0.12, 0.6), toon(mt), Vector3(0.8, 0, 0), Vector3(0, 0, -90))
@@ -261,6 +281,12 @@ static func build_helper(h: Dictionary, tc: Color) -> Node3D:
 	var g := Node3D.new()
 	var dk := Color("#262838")
 	match str(h.kind):
+		"night":   # 3.1 守夜机兵的大招「长夜」：半透明的黑色穹顶 + 紫色边
+			var dm := StandardMaterial3D.new(); dm.albedo_color = Color(0.02, 0.0, 0.06, 0.55); dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			dm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; dm.cull_mode = BaseMaterial3D.CULL_DISABLED
+			var r := float(h.get("r", 260)) / 16.0
+			var dome := part(g, mesh("sph", 1.0), dm, Vector3.ZERO); dome.scale = Vector3(r, r * 0.45, r)
+			part(g, mesh("torus", r - 0.15, r), glow(Color("#9a7aff"), 1.4, 0.8), Vector3(0, 0.1, 0))
 		"turret":
 			part(g, mesh("cyl", 0.5, 0.4, 0.6), toon(dk), Vector3(0, 0.2, 0))
 			var head := Node3D.new(); head.name = "head"; head.position = Vector3(0, 0.75, 0); g.add_child(head)

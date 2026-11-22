@@ -46,6 +46,7 @@ jobs:
           ~/godot/godot --headless --path godot --script res://tests/sim_test.gd
           ~/godot/godot --headless --path godot --script res://tests/profile_test.gd
           ~/godot/godot --headless --path godot --script res://tests/loot_test.gd
+          ~/godot/godot --headless --path godot --script res://tests/dawn_test.gd
           # 账号：和网页版的转移码互通、在线账号（临时开一个 node server.js）
           GB_ACCOUNTS=/tmp/acc.json PORT=3917 node server.js &
           sleep 1
@@ -83,7 +84,7 @@ jobs:
           out += ["**Download**: unzip `GraffiBots-Godot-Windows.zip` and run `GraffiBots.exe`."]
           print("\n".join(out))
           PY
-          TITLE=$(python3 -c 'import json;N=json.load(open("godot/data/news.json",encoding="utf-8"))[0];print("涂鸦机兵 电脑版 %s（正式版）" % N["ver"])')
+          TITLE=$(python3 -c 'import json;N=json.load(open("godot/data/news.json",encoding="utf-8"))[0];print(N["title"])')
           gh release delete godot-proto --yes --cleanup-tag || true
           gh release create godot-proto build/GraffiBots-Godot-Windows.zip \
             --title "$TITLE" --notes-file build/notes.md --latest --target ${{ github.sha }}

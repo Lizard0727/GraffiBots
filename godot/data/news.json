@@ -1,33 +1,154 @@
 [
- {"ver": "3.0", "date": "2026-11-22", "title": "涂鸦机兵 电脑版 3.0 正式版上线",
+ {
+  "ver": "3.1",
+  "date": "2026-11-22",
+  "title": "涂鸦机兵 电脑版 3.1 ·「黎明之后」联动",
+  "title_en": "GraffiBots PC 3.1 · After Dawn Collab",
+  "intro": "长夜结束后的第一个清晨，拂晓站的陆行列车「启明号」停在了灰城外。三位全新干员、三台全新机甲、专属手书剧情和 1 分钟联动战斗影片同时上线；14 张地图全部重新设计，画面的光污染也收住了。联动礼包已经寄到邮箱！",
+  "intro_en": "On the first morning after the Long Night, Daybreak Station's land-train Morningstar stopped outside Gray City. Three new operators, three new mechs, a hand-drawn story and a 1-minute collab battle film are live — plus all 14 maps redesigned and much less light pollution. A collab gift is in your mailbox!",
+  "sections": [
+   {
+    "h": "「黎明之后」联动活动（3 周）",
+    "h_en": "After Dawn collab event (3 weeks)",
+    "items": [
+     "专属活动页（大厅左边的「黎明之后」）：剧情 / 活动任务 / 兑换 / 干员档案",
+     "6 话专属手书剧情：铅笔线稿 + 线条抖动的手书风格，做任务一话话解锁，首次观看送晨光碎片",
+     "1 分钟联动战斗影片：三位干员对战 Boss「黑日残影」，在活动页随时重看",
+     "新货币「晨光碎片」：每局都给，赢了和用联动角色更多；熹微 + 晨轮机兵做任务免费拿，尾声 + 共鸣机兵碎片兑换，宵 + 守夜机兵宝石购买或打通终章任务"
+    ],
+    "items_en": [
+     "A dedicated event page (After Dawn, left side of the lobby): Story / Quests / Exchange / Dossiers",
+     "6 hand-drawn story chapters with a boiling pencil-line look, unlocked by quests; first viewing gives Dawn Shards",
+     "A 1-minute collab battle film: the three operators vs the boss Shadow of the Black Sun, replayable on the event page",
+     "New currency Dawn Shards from every match (more for wins and collab characters): Glimmer + Halo free from quests, Coda + Chord via shards, Xiao + Vigil via gems or the final quest"
+    ]
+   },
+   {
+    "h": "三位新干员（机制比以往都复杂，伤害主要靠被动叠出来）",
+    "h_en": "Three new operators (more complex than ever, damage comes from passives)",
+    "items": [
+     "熹微 · 拾光者：脚下的日晷在 破晓 / 正午 / 黄昏 / 夜 之间循环，正午叠灼光、黄昏引爆，每转一圈叠一层日轮；技能「定晷」冻结阶段，超载「永昼」四个阶段一起生效",
+     "尾声 · 残响者：伤害的 35% 记成回响，2.5 秒后变成真实伤害重演；技能「回溯」回到 2.5 秒前并引爆回响；超载「回声剧场」",
+     "宵 · 守夜人：受到的伤害先记成夜债慢慢偿还，背着夜债伤害更高，击倒敌人清账换护盾；技能「清偿」引爆夜债，超载「无月之夜」",
+     "终结技「绝响」：尾声驾驶共鸣机兵、余韵叠满 5 层时，大招变成终结技，锁定一个敌人进入只有两人能看见的终章动画，结束时无视机甲直接击倒驾驶员"
+    ],
+    "items_en": [
+     "Glimmer · Lightcatcher: a sundial cycles Dawn / Noon / Dusk / Night — Noon stacks Glare, Dusk detonates it, each full cycle adds a Sun Ring; skill Sundial Lock freezes a phase, overload Eternal Day runs all four at once",
+     "Coda · Reverb: 35% of damage is stored as Echo and replays as true damage after 2.5 s; skill Rewind jumps back 2.5 s and detonates echoes; overload Echo Theater",
+     "Xiao · Nightwatch: damage taken becomes Night Debt paid off over time, more debt means more damage, takedowns clear it into shields; skill Settle detonates the debt, overload Moonless Night",
+     "Finisher Final Note: Coda in the Chord mech with 5 Resonance stacks turns the super into a finisher — lock one enemy into a cutscene only the two of you see, then down their pilot outright, mech or not"
+    ]
+   },
+   {
+    "h": "三台新机甲",
+    "h_en": "Three new mechs",
+    "items": [
+     "晨轮机兵：扔出会飞回来的光轮，来回都穿透、回程伤害 ×1.4、来回都中会致盲；大招「日冕环」",
+     "共鸣机兵：共鸣索拴住敌人持续吸血，越拴越疼，会分叉连到旁边的人；大招「谐振网」让被拴的人分担伤害",
+     "守夜机兵：点按两连斩，按住举夜幕盾，松开反斩（伤害 = 挡下的伤害），举盾瞬间挨打是完美格挡；大招「长夜」让敌人看不远"
+    ],
+    "items_en": [
+     "Halo mech: a returning light disc that pierces both ways, ×1.4 on the way back, and blinds on a double hit; super Corona Ring",
+     "Chord mech: a resonance tether that drains more the longer it holds and forks to nearby enemies; super Harmonic Web shares damage between linked enemies",
+     "Vigil mech: tap for a two-hit combo, hold to raise the Night Shield, release to counter for the damage blocked; a hit right as you raise it is a perfect parry; super Long Night shrinks enemy vision"
+    ]
+   },
+   {
+    "h": "14 张地图全部重新设计",
+    "h_en": "All 14 maps redesigned",
+    "items": [
+     "新布局：火车分道的晨光车站、楼顶群岛、钟楼环台、集装箱迷宫、梯田矿坑、地下站台……每张图的结构都不一样",
+     "每张图有自己的主题：地面花纹、墙面材质、草丛、场外远景、灯光和天气（雪、花瓣、火星、尘埃）各不相同",
+     "新联动地图「拂晓荒原」：沙丘、锈蚀列车残骸和夜蚀结晶"
+    ],
+    "items_en": [
+     "New layouts: a rail yard split by trains, rooftop islands, a clock-tower ring, a container maze, a terraced quarry, a metro platform... every map plays differently",
+     "Each map has its own look: ground patterns, wall materials, foliage, backdrop, lighting and weather (snow, petals, embers, dust)",
+     "New collab map Daybreak Wastes: dunes, a rusted land-train wreck and nightrot crystals"
+    ]
+   },
+   {
+    "h": "画面和其他",
+    "h_en": "Visuals and more",
+    "items": [
+     "光污染大幅降低：泛光、霓虹边、发光材质和彩色点光源都收住了，颜色更自然",
+     "「夜都决战」联动下架：咒灵讨伐、封印争夺两个限时玩法关闭，符零 / 赤镰 / 结界机兵 / 灵刃机兵暂时绝版（已拥有的照常使用）"
+    ],
+    "items_en": [
+     "Much less light pollution: bloom, neon edges, emissive materials and colored point lights are toned down for more natural colors",
+     "The Night City collab is over: Spirit Raid and Seal Clash are closed; Fu Ling / Akakama / Warden / Reaper are retired for now (owners keep them)"
+    ]
+   }
+  ]
+ },
+ {
+  "ver": "3.0",
+  "date": "2026-11-22",
+  "title": "涂鸦机兵 电脑版 3.0 正式版上线",
   "title_en": "GraffiBots PC 3.0 — Official Release",
   "intro": "网页版的全部内容都搬到电脑版了，还多了很多只有电脑版才有的东西。上线礼包已经寄到邮箱，记得领取！",
   "intro_en": "Everything from the web version is now on PC, plus lots of PC-only features. A launch gift is waiting in your mailbox!",
   "sections": [
-   {"h": "完整的游戏内容", "h_en": "The full game", "items": [
+   {
+    "h": "完整的游戏内容",
+    "h_en": "The full game",
+    "items": [
      "全部 22 台机体、21 位驾驶员、14 张地图和 12 种模式（含排位赛和搜刮撤离）",
-     "通行证、邮件、任务线、限时活动、皮肤商店、天赋、宝箱，账号和网页版通用（转移码互导）"],
-    "items_en": ["All 22 mechs, 21 pilots, 14 maps and 12 modes (including Ranked and Loot & Extract)",
-     "Pass, mail, questlines, events, skin shop, talents and chests; accounts are shared with the web version (transfer codes)"]},
-   {"h": "全新的开局流程", "h_en": "New match flow", "items": [
+     "通行证、邮件、任务线、限时活动、皮肤商店、天赋、宝箱，账号和网页版通用（转移码互导）"
+    ],
+    "items_en": [
+     "All 22 mechs, 21 pilots, 14 maps and 12 modes (including Ranked and Loot & Extract)",
+     "Pass, mail, questlines, events, skin shop, talents and chests; accounts are shared with the web version (transfer codes)"
+    ]
+   },
+   {
+    "h": "全新的开局流程",
+    "h_en": "New match flow",
+    "items": [
      "匹配对手 → 准备确认（有人没准备会重新匹配）→ 排位禁用 / 选人（中间放 3D 模型）→ VS 载入 → 观察阶段",
-     "AI 有性格、昵称和外观，对局里会聊天、回你的话；结算有 MVP / 钻石 / 黄金 / 白银 / 青铜评级"],
-    "items_en": ["Matchmaking → ready check (no-shows trigger a re-queue) → ranked bans / picks with 3D models → VS loading → observe phase",
-     "AI players have personalities, nicknames and looks, chat in matches and reply to you; results show MVP / Diamond / Gold / Silver / Bronze ratings"]},
-   {"h": "联机和社交", "h_en": "Online & social", "items": [
+     "AI 有性格、昵称和外观，对局里会聊天、回你的话；结算有 MVP / 钻石 / 黄金 / 白银 / 青铜评级"
+    ],
+    "items_en": [
+     "Matchmaking → ready check (no-shows trigger a re-queue) → ranked bans / picks with 3D models → VS loading → observe phase",
+     "AI players have personalities, nicknames and looks, chat in matches and reply to you; results show MVP / Diamond / Gold / Silver / Bronze ratings"
+    ]
+   },
+   {
+    "h": "联机和社交",
+    "h_en": "Online & social",
+    "items": [
      "局域网联机，以及通过游戏服务器的线上房间（输入房间号加入），所有模式都能一起打，包括组队排位和搜刮撤离",
-     "好友码加好友、在线状态、一键邀请组队；对局聊天（Enter）"],
-    "items_en": ["LAN play and online rooms through a game server (join with a room code) in every mode, including party Ranked and Loot & Extract",
-     "Friend codes, online status, one-click party invites; in-match chat (Enter)"]},
-   {"h": "搜刮撤离", "h_en": "Loot & Extract", "items": [
+     "好友码加好友、在线状态、一键邀请组队；对局聊天（Enter）"
+    ],
+    "items_en": [
+     "LAN play and online rooms through a game server (join with a room code) in every mode, including party Ranked and Loot & Extract",
+     "Friend codes, online status, one-click party invites; in-match chat (Enter)"
+    ]
+   },
+   {
+    "h": "搜刮撤离",
+    "h_en": "Loot & Extract",
+    "items": [
      "消耗品（1~4 键或双击使用）、N 键大地图、全灭的小队位置会有增援小队空降",
-     "交易行（价格每小时浮动）和本周撤离排行"],
-    "items_en": ["Consumables (keys 1–4 or double-click), big map with N, reinforcement squads drop into wiped squad slots",
-     "Market with hourly prices and a weekly extraction leaderboard"]},
-   {"h": "个人资料和其他", "h_en": "Profile & more", "items": [
+     "交易行（价格每小时浮动）和本周撤离排行"
+    ],
+    "items_en": [
+     "Consumables (keys 1–4 or double-click), big map with N, reinforcement squads drop into wiped squad slots",
+     "Market with hourly prices and a weekly extraction leaderboard"
+    ]
+   },
+   {
+    "h": "个人资料和其他",
+    "h_en": "Profile & more",
+    "items": [
      "个人资料：头像、动态头像框、称号、签名、生涯战绩、3 格展示框",
-     "新手教程、赛季开场动画、皮肤进场特效、暂停菜单、手柄、中文 / English、自动检查更新"],
-    "items_en": ["Profile: avatar, animated frames, titles, signature, career stats and a 3-slot showcase",
-     "Tutorial, season intro, skin entrance effects, pause menu, gamepad, 中文 / English, automatic update check"]}
-  ]}
+     "新手教程、赛季开场动画、皮肤进场特效、暂停菜单、手柄、中文 / English、自动检查更新"
+    ],
+    "items_en": [
+     "Profile: avatar, animated frames, titles, signature, career stats and a 3-slot showcase",
+     "Tutorial, season intro, skin entrance effects, pause menu, gamepad, 中文 / English, automatic update check"
+    ]
+   }
+  ]
+ }
 ]
