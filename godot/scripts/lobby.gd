@@ -598,10 +598,37 @@ func open_anim(cid: String, r: Dictionary) -> void:
 			tw.parallel().tween_property(rc, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK)
 			tw.tween_interval(0.5 if big else 0.18)
 		tw.tween_property(okb, "modulate:a", 1.0, 0.2)
+		for it in r.items:   # 3.2：开到驾驶员 → 全屏亮相（立绘 + 头像 + 名字）
+			if it.k == "pilot": tw.tween_callback(func(): pilot_reveal(str(it.id)))
 	var hit := Button.new(); hit.flat = true; hit.position = Vector2(340, 10); hit.size = Vector2(220, 238); stage.add_child(hit)
 	hit.pressed.connect(func(): do_open.call())
 	click(okb, func(): if opened[0]: close_popup(); refresh())
 	if OS.get_environment("GB_SHOT_OPEN") != "": do_open.call()
+
+# 新驾驶员亮相：斜切的彩色背景 + 立绘从右边滑进来 + 头像框 + 名字 / 称号 / 台词，点一下关掉
+func pilot_reveal(pid: String) -> void:
+	var Pd: Dictionary = D.pilots[pid]; var acc := Color(str(Pd.accent))
+	var ov := Control.new(); ov.set_anchors_preset(Control.PRESET_FULL_RECT); ov.mouse_filter = Control.MOUSE_FILTER_STOP; add_child(ov)
+	var bg := ColorRect.new(); bg.color = Color(0.02, 0.02, 0.06, 0.92); bg.position = Vector2.ZERO; bg.size = vs; ov.add_child(bg)
+	var band := Polygon2D.new(); band.color = acc.darkened(0.25)
+	band.polygon = PackedVector2Array([Vector2(vs.x * 0.56, 0), Vector2(vs.x, 0), Vector2(vs.x, vs.y), Vector2(vs.x * 0.42, vs.y)]); ov.add_child(band)
+	var band2 := Polygon2D.new(); band2.color = acc.lightened(0.15)
+	band2.polygon = PackedVector2Array([Vector2(vs.x * 0.53, 0), Vector2(vs.x * 0.56, 0), Vector2(vs.x * 0.42, vs.y), Vector2(vs.x * 0.39, vs.y)]); ov.add_child(band2)
+	var por := UIKit.image(portrait_path(pid), Vector2(vs.y * 0.95 * 600.0 / 780.0, vs.y * 0.95)); ov.add_child(por)
+	por.position = Vector2(vs.x, vs.y * 0.05)
+	var av := UIKit.avatar("res://art/faces/%s.png" % pid, "", 150, acc); ov.add_child(av); av.position = Vector2(vs.x * 0.08, vs.y * 0.22)
+	var v := vbox(4); ov.add_child(v); v.position = Vector2(vs.x * 0.08, vs.y * 0.22 + 170)
+	v.add_child(L("新驾驶员！", 26, Color("#fff3a8"), 6))
+	v.add_child(L(str(Pd.name), 64, Color.WHITE, 10))
+	v.add_child(L("「%s」%s" % [Pd.code, Pd.title], 22, acc.lightened(0.35), 5))
+	v.add_child(UIKit.wrap(L("“%s”" % Pd.line, 18, Color("#e6e2fa"), 4), vs.x * 0.36))
+	v.add_child(L("点击任意位置继续", 15, Color("#a8a4c8"), 3))
+	ov.modulate.a = 0
+	var tw := ov.create_tween()
+	tw.tween_property(ov, "modulate:a", 1.0, 0.2)
+	tw.parallel().tween_property(por, "position:x", vs.x - por.size.x - vs.x * 0.04, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	game.sfx.play("super")
+	ov.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed: ov.queue_free())
 
 class Rays extends Control:
 	var col := Color.WHITE
@@ -791,6 +818,8 @@ func claim_btn(text: String, f: Callable, enabled := true) -> GCard:
 func show_items(r: Dictionary, title: String) -> void:
 	if not r.ok: act(r, ""); return
 	game.sfx.play("win")
+	for it in r.items:
+		if it.k == "pilot": pilot_reveal(str(it.id))
 	var v := make_popup(Vector2(860, 420))
 	v.add_child(centered(L(title, 30, Color("#ffe14d"), 8)))
 	var row := hbox(12); row.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(row)

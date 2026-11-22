@@ -739,5 +739,13 @@
  "表现分": "Score",
  "松开 Tab 关闭": "Release Tab to close",
  "你胜利了！": "You won!",
- "你失败了": "You lost"
+ "你失败了": "You lost",
+ "显示帧率": "Show FPS",
+ "新驾驶员！": "New Pilot!",
+ "点击任意位置继续": "Click anywhere to continue",
+ "正常玩家": "Casual",
+ "有点实力": "Skilled",
+ "大神": "Godlike",
+ "菜鸟": "Rookie",
+ "高手": "Expert"
 }

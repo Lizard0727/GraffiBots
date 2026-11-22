@@ -28,6 +28,7 @@ const pub = path.join(__dirname, '..', 'public'), out = path.join(__dirname, '..
   const save = (rel, b64) => fs.writeFileSync(path.join(out, rel), Buffer.from(b64, 'base64'));
   const pilots = await p.evaluate(() => GS.PILOTS.map((P) => P.id));
   for (const id of pilots) {
+    if (fs.existsSync(path.join(__dirname, 'portraits-raw', id + '.png'))) continue;   // 3.2：已经用 GPT Image 生成过的立绘不覆盖（tools/gen-portraits.py）
     save(`portraits/${id}.png`, await render(await p.evaluate((id) => GP.portrait(id, { bg: false }), id), 600, 780));
     save(`faces/${id}.png`, await render(await p.evaluate((id) => GP.portrait(id, { face: true }), id), 160, 160));
   }

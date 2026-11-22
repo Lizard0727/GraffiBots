@@ -1,5 +1,79 @@
 [
  {
+  "ver": "3.2",
+  "date": "2026-11-22",
+  "title": "涂鸦机兵 电脑版 3.2 · AI 大改 + 模型重做",
+  "title_en": "GraffiBots PC 3.2 · AI Overhaul + New Models",
+  "intro": "AI 分成 5 档，每个模式都知道该干什么；全部驾驶员和机体的 3D 模型重做；隐身终于藏得住了；还加了帧率显示。",
+  "intro_en": "AI now comes in 5 tiers and understands every mode; all pilot and mech 3D models are rebuilt; stealth actually hides you now; plus an FPS counter.",
+  "sections": [
+   {
+    "h": "AI 5 档",
+    "h_en": "5 AI tiers",
+    "items": [
+     "菜鸟 / 正常玩家 / 有点实力 / 高手 / 大神：反应、准度、提前量、走位、闪避、技能和超载时机、残血撤退都不一样",
+     "高手和大神会优先集火残血、用真实弹速算提前量；大神残血时会变滚轮溜回己方涂料回血；菜鸟偶尔会发呆",
+     "普通赛按等级、排位赛按段位决定会遇到哪档 AI"
+    ],
+    "items_en": [
+     "Rookie / Casual / Skilled / Expert / Godlike: reaction, aim, leading, strafing, dodging, skill and overload timing and retreating all differ",
+     "Experts and Godlikes focus low-HP targets and lead with real projectile speed; Godlikes roll away to heal on their own paint; Rookies sometimes zone out",
+     "Which tiers you meet depends on your level (normal) or rank (ranked)"
+    ]
+   },
+   {
+    "h": "每个模式都会玩了",
+    "h_en": "AI plays every mode",
+    "items": [
+     "据点：所有 AI 都会去抢点、在点里横移不出圈（在点时间几乎翻倍）",
+     "乐园：大部分 AI 跟着花车得分，顺路才打气球；护送：持宝者直奔终点，队友护送，敌人追持宝者",
+     "电池掠夺：满载就回家存；漆弹足球：球能打就先打球；逃亡圈：先躲毒圈再打架"
+    ],
+    "items_en": [
+     "Zone: every AI goes for the zone and strafes inside it (almost double the time on point)",
+     "Park: most AIs ride with the float and only pop balloons on the way; Escort: carriers head straight for the goal, allies escort, enemies chase",
+     "Battery: full carriers go home to bank; Soccer: shoot the ball first; Escape: stay in the circle before fighting"
+    ]
+   },
+   {
+    "h": "隐身",
+    "h_en": "Stealth",
+    "items": [
+     "AI 看不见隐身 / 草丛里的你就不能直接锁定；光学迷彩和墨雾只有几乎贴脸才会被发现",
+     "有点实力以上的 AI 会按你最后出现的位置揣测、试探性开火，时间越久越不准；正常玩家只会过去看一眼"
+    ],
+    "items_en": [
+     "AIs can no longer lock onto you while you're stealthed or in a bush; cloak and ink smoke are only revealed at point-blank range",
+     "Skilled+ AIs guess from your last seen position and fire probing shots that get less accurate over time; Casuals just go take a look"
+    ]
+   },
+   {
+    "h": "3D 模型重做",
+    "h_en": "Rebuilt 3D models",
+    "items": [
+     "全部 24 位驾驶员：Q 版比例的完整人物，分层的眼睛和表情、11 种发型、每套衣服都有专属细节（外套下摆、兜帽、披风、围巾、护甲、背包……）",
+     "全部 25 台机体：按定位分轻型 / 重装 / 炮台 / 刺客 / 支援底盘，加上履带和悬浮推进；圆角装甲、胸甲徽记、左臂、背包和天线各不相同",
+     "开到新驾驶员时有全屏亮相（立绘 + 头像 + 台词）"
+    ],
+    "items_en": [
+     "All 24 pilots: full chibi characters with layered eyes and expressions, 11 hairstyles and outfit-specific details (coat tails, hoods, capes, scarves, armor, backpacks...)",
+     "All 25 mechs: scout / brawler / artillery / striker / support chassis plus treads and hover units, with rounded armor, chest emblems, a left arm and unique backpacks and antennas",
+     "Unlocking a new pilot now plays a full-screen reveal (portrait, avatar and quote)"
+    ]
+   },
+   {
+    "h": "其他",
+    "h_en": "Other",
+    "items": [
+     "左上角显示帧率（设置 → 画面 → 显示帧率 可以关掉）"
+    ],
+    "items_en": [
+     "FPS counter in the top-left corner (Settings → Display → Show FPS to turn it off)"
+    ]
+   }
+  ]
+ },
+ {
   "ver": "3.1.1",
   "date": "2026-11-22",
   "title": "涂鸦机兵 电脑版 3.1.1 · 维护更新",

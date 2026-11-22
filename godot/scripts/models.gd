@@ -65,6 +65,7 @@ static func part(parent: Node3D, m: Mesh, mat: Material, pos: Vector3, rot := Ve
 # ---------------- 机兵 ----------------
 # 返回 {root, body, legs: [l, r], gun, ball, foot, parts: [...可以闪白的网格]}
 static func build_mech(weapon: String, w: Dictionary, tc: Color, P: Dictionary, paint = null) -> Dictionary:
+	if OS.get_environment("GB_OLDMODELS") == "": return Mech3D.build(weapon, w, tc, P, paint)   # 3.2：新模型（mech3d.gd）
 	var root := Node3D.new()
 	var rig := Node3D.new(); root.add_child(rig)
 	var hp := float(w.hp)
@@ -141,14 +142,10 @@ static func build_head(P: Dictionary, r: float) -> Node3D:
 			part(h, mesh("box", r * 1.3, r * 0.4, r * 1.5), toon(hair), Vector3(0, r * 0.75, 0), Vector3(0, 0, -12))
 	return h
 
-static func build_pilot(P: Dictionary, tc: Color) -> Node3D:
-	var g := Node3D.new()
-	var acc := Color(str(P.accent)); var dk := Color("#262838")
-	for zz in [-0.13, 0.13]: part(g, mesh("box", 0.16, 0.45, 0.16), toon(dk), Vector3(0, 0.23, zz))
-	part(g, mesh("cap", 0.24, 0.62), toon(acc), Vector3(0, 0.72, 0))
-	part(g, mesh("box", 0.06, 0.08, 0.5), toon(tc, 1.2), Vector3(0.22, 0.8, 0))
-	var head := build_head(P, 0.24); head.position = Vector3(0, 1.22, 0); g.add_child(head)
-	part(g, mesh("box", 0.36, 0.12, 0.12), toon(dk), Vector3(0.25, 0.75, 0.24))
+static func build_pilot(P: Dictionary, tc: Color) -> Node3D:   # 3.2：弹出的驾驶员 = 完整的新人物模型（chars.gd）
+	var c: Dictionary = Chars.build_char(P, tc)
+	var g := Node3D.new(); g.add_child(c.root); c.root.scale = Vector3.ONE * 0.95
+	g.set_meta("char", c)
 	return g
 
 static func build_weapon(id: String, g: Node3D, tc: Color, body: Node3D) -> void:

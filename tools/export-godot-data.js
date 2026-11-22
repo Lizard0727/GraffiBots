@@ -71,7 +71,7 @@ const out = {
   order: S.WEAPON_ORDER, pilotOrder: S.PILOTS.map((P) => P.id),
   mechs: Object.fromEntries(S.WEAPON_ORDER.map((id) => [id, Object.assign({}, S.WEAPONS[id], { trait: S.TRAITS[id] || null, specialInfo: S.SPECIALS[S.WEAPONS[id].special], range2: S.weaponRange(id) })])),
   pilots: Object.fromEntries(S.PILOTS.map((P) => [P.id, { id: P.id, name: P.name, code: P.code, title: P.title, accent: P.accent, hair: P.hair, hair2: P.hair2, skin: P.skin, eye: P.eye,
-    style: P.style, outfit: P.outfit, weapon: P.weapon, skill: P.skill, skillInfo: S.SKILLS[P.skill], passive: P.passive, line: P.line, sidearm: S.sidearm(P.id), overload: S.OVERLOADS[P.id] }])),
+    style: P.style, outfit: P.outfit, eyeShape: P.eyeShape, mouth: P.mouth, extra: P.extra || [], weapon: P.weapon, skill: P.skill, skillInfo: S.SKILLS[P.skill], passive: P.passive, line: P.line, sidearm: S.sidearm(P.id), overload: S.OVERLOADS[P.id] }])),
   classes: S.CLASS, roles: Object.fromEntries(Object.entries(S.ROLES).map(([k, R]) => [k, pick(R, ['kind', 'name', 'color', 'desc'])])), ring: S.ROLE_RING, tags: S.TAGS,
   modeOrder: S.MODE_ORDER.slice(),
   modes: Object.fromEntries([...S.MODE_ORDER, 'loot'].map((k) => [k, pick(S.MODES[k], ['name', 'short', 'desc', 'oneLife', 'teams', 'size', 'coop'])])),

@@ -174,6 +174,7 @@ func _ready() -> void:
 		lobby.refresh()
 		if OS.get_environment("GB_DAWNTAB") != "": lobby.dawn_tab = OS.get_environment("GB_DAWNTAB")
 		if OS.get_environment("GB_TAB") != "" and OS.get_environment("GB_TAB") != "home": lobby.open_sub(OS.get_environment("GB_TAB"))
+		if OS.get_environment("GB_REVEAL") != "": lobby.pilot_reveal(OS.get_environment("GB_REVEAL"))
 		if OS.get_environment("GB_TEGAKI") != "": lobby.play_tegaki(data.dawn.story[int(OS.get_environment("GB_TEGAKI"))])
 		if OS.get_environment("GB_SHOT_OPEN") != "": profile.o.gems += 260; lobby.open_anim("airdrop", profile.buy_chest("airdrop"))
 		if int(profile.o.tut) == 0: lobby.welcome()
